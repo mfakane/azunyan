@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="Azunote.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid x:Name="RootGrid">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <MenuBar Grid.Row="0">
+            <MenuBarItem Title="File">
+                <MenuFlyoutItem Text="New" Click="NewMenuItem_Click" />
+                <MenuFlyoutItem Text="Open..." Click="OpenButton_Click" />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="Save" Click="SaveButton_Click" />
+                <MenuFlyoutItem Text="Save As..." Click="SaveAsButton_Click" />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="Exit" Click="ExitMenuItem_Click" />
+            </MenuBarItem>
+            <MenuBarItem Title="Edit">
+                <MenuFlyoutItem Text="Undo" Click="UndoMenuItem_Click" />
+                <MenuFlyoutItem Text="Redo" Click="RedoMenuItem_Click" />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="Cut" Click="CutMenuItem_Click" />
+                <MenuFlyoutItem Text="Copy" Click="CopyMenuItem_Click" />
+                <MenuFlyoutItem Text="Paste" Click="PasteMenuItem_Click" />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="Select All" Click="SelectAllMenuItem_Click" />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="Find..." Click="FindButton_Click" />
+                <MenuFlyoutItem Text="Replace..." Click="ReplaceButton_Click" />
+            </MenuBarItem>
+            <MenuBarItem Title="View">
+                <MenuFlyoutItem x:Name="WordWrapMenuItem" Text="Word Wrap" Click="WordWrapMenuItem_Click" />
+                <MenuFlyoutItem Text="Status Bar" Click="StatusBarMenuItem_Click" />
+            </MenuBarItem>
+            <MenuBarItem Title="Help">
+                <MenuFlyoutItem Text="About Azunote" Click="AboutMenuItem_Click" />
+            </MenuBarItem>
+        </MenuBar>
+        <Border x:Name="FindPanel" Grid.Row="1" Padding="12,8" BorderThickness="0,0,0,1" Visibility="Collapsed">
+            <Grid ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="220" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="220" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Find" VerticalAlignment="Center" />
+                <TextBox x:Name="FindTextBox" Grid.Column="1" PlaceholderText="Search text" TextChanged="FindTextBox_TextChanged" KeyDown="FindTextBox_KeyDown" />
+                <Button Grid.Column="2" Content="Next" Click="FindNextButton_Click" />
+                <TextBox x:Name="ReplaceTextBox" Grid.Column="3" PlaceholderText="Replace with" KeyDown="ReplaceTextBox_KeyDown" />
+                <Button Grid.Column="4" Content="Replace" Click="ReplaceCurrentButton_Click" />
+                <Button Grid.Column="5" Content="Replace all" Click="ReplaceAllButton_Click" />
+                <TextBlock x:Name="FindResultText" Grid.Column="6" VerticalAlignment="Center" />
+                <Button Grid.Column="7" Content="Close" HorizontalAlignment="Right" Click="CloseFindButton_Click" />
+            </Grid>
+        </Border>
+        <TextBox
+            x:Name="Editor"
+            Grid.Row="2"
+            AllowDrop="True"
+            AcceptsReturn="True"
+            FontFamily="Cascadia Mono,Consolas"
+            FontSize="14"
+            ScrollViewer.HorizontalScrollBarVisibility="Auto"
+            IsSpellCheckEnabled="False"
+            IsTextPredictionEnabled="False"
+            ScrollViewer.VerticalScrollBarVisibility="Auto"
+            TextWrapping="NoWrap"
+            KeyDown="Editor_KeyDown"
+            SelectionChanged="Editor_SelectionChanged"
+            TextChanged="Editor_TextChanged"
+            DragOver="Editor_DragOver"
+            Drop="Editor_Drop" />
+        <Border x:Name="StatusBarPanel" Grid.Row="3" BorderThickness="0,1,0,0" Padding="12,6">
+            <Grid ColumnSpacing="18">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="PositionStatus" Grid.Column="0" Text="Ln 1, Col 1" />
+                <TextBlock x:Name="EncodingStatus" Grid.Column="1" Text="UTF-8" />
+                <TextBlock x:Name="LineEndingStatus" Grid.Column="2" Text="LF" />
+                <TextBlock x:Name="FilePathStatus" Grid.Column="3" HorizontalAlignment="Right" Text="Untitled" TextTrimming="CharacterEllipsis" />
+            </Grid>
+        </Border>
+
+    </Grid>
+</Window>
