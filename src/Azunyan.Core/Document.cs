@@ -92,6 +92,20 @@ public sealed class Document
             : TextSelection.Caret(position));
     }
 
+    public void MoveCaretByGrapheme(int count, bool extendSelection = false) =>
+        TextEditorCommands.MoveCaretByGrapheme(this, count, extendSelection);
+
+    public void MoveCaretByScalar(int count, bool extendSelection = false) =>
+        TextEditorCommands.MoveCaretByScalar(this, count, extendSelection);
+
+    public TextChange DeleteBackward() => TextEditorCommands.DeleteBackward(this);
+
+    public TextChange DeleteForward() => TextEditorCommands.DeleteForward(this);
+
+    public TextChange DeleteBackwardByScalar() => TextEditorCommands.DeleteBackwardByScalar(this);
+
+    public TextChange DeleteForwardByScalar() => TextEditorCommands.DeleteForwardByScalar(this);
+
     public void CollapseSelectionToStart() => SetCaret(_selection.Start);
 
     public void CollapseSelectionToEnd() => SetCaret(_selection.End);

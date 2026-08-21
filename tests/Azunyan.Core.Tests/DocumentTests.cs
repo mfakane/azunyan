@@ -108,4 +108,51 @@ public sealed class DocumentTests
                 document.Snapshot.GetText(new TextRange(rangeStart, rangeLength)));
         }
     }
+
+    [Fact]
+    public void Scalar_navigation_does_not_split_surrogate_pairs()
+    {
+        const string text = "A😀B";
+
+        Assert.Equal(3, UnicodeText.GetNextScalarPosition(text, 1));
+        Assert.Equal(1, UnicodeText.GetPreviousScalarPosition(text, 3));
+        Assert.Equal(3, UnicodeText.MoveByScalars(text, 0, 2));
+
+        var document = new Document(text);
+        document.SetCaret(3);
+        document.DeleteBackwardByScalar();
+        Assert.Equal("AB", document.Text);
+    }
+
+    [Fact]
+    public void Grapheme_navigation_and_delete_keep_emoji_and_combining_sequences_together()
+    {
+        const string text = "a👩‍💻éb";
+        var emojiStart = 1;
+        var emojiEnd = UnicodeText.GetNextTextElementPosition(text, emojiStart);
+        var combiningStart = emojiEnd;
+        var combiningEnd = UnicodeText.GetNextTextElementPosition(text, combiningStart);
+
+        Assert.Equal("👩‍💻", text[emojiStart..emojiEnd]);
+        Assert.Equal("é", text[combiningStart..combiningEnd]);
+
+        var document = new Document(text);
+        document.SetCaret(emojiEnd);
+        document.DeleteBackward();
+        Assert.Equal("aéb", document.Text);
+
+        document.SetCaret(1);
+        document.DeleteForward();
+        Assert.Equal("ab", document.Text);
+    }
+
+    [Fact]
+    public void Grapheme_movement_preserves_selection_anchor()
+    {
+        var document = new Document("a👩‍💻b");
+        document.SetCaret(document.Length);
+        document.MoveCaretByGrapheme(-2, extendSelection: true);
+
+        Assert.Equal(new TextSelection(document.Length, 1), document.Selection);
+    }
 }
