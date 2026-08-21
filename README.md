@@ -11,6 +11,13 @@ The project targets Windows x64 and uses the Windows App SDK 1.6.
 dotnet build Azunyan.slnx -c Debug
 ```
 
+The UI-independent editing model lives in `src/Azunyan.Core` and can be
+tested without WinUI:
+
+```powershell
+dotnet test tests/Azunyan.Core.Tests/Azunyan.Core.Tests.csproj
+```
+
 If the plain .NET CLI cannot locate the Visual Studio Appx/PRI build tasks, run
 the command from a Visual Studio Developer PowerShell or pass the installed
 Visual Studio AppxPackage directory explicitly with `-p:AppxMSBuildToolsPath`.

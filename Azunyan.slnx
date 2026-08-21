@@ -1,3 +1,5 @@
 <Solution>
+  <Project Path="src/Azunyan.Core/Azunyan.Core.csproj" />
+  <Project Path="tests/Azunyan.Core.Tests/Azunyan.Core.Tests.csproj" />
   <Project Path="src/Azunote/Azunote.csproj" />
 </Solution>
