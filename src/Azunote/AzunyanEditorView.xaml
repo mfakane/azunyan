@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Azunote.AzunyanEditorView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Azunote">
+    <Grid x:Name="RootGrid" Background="Transparent">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition x:Name="GutterColumn" Width="0" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Canvas
+            x:Name="GutterCanvas"
+            Grid.Column="0"
+            IsHitTestVisible="False" />
+        <Grid x:Name="EditorHost" Grid.Column="1">
+            <local:AzunyanEditorControl
+                x:Name="InputEditor"
+                AllowDrop="True"
+                AcceptsReturn="True"
+                BorderThickness="0"
+                Padding="8,6"
+                ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                ScrollViewer.VerticalScrollBarVisibility="Auto"
+                TextWrapping="NoWrap" />
+            <Canvas
+                x:Name="TextRenderLayer"
+                IsHitTestVisible="False" />
+            <Canvas
+                x:Name="RenderOverlay"
+                IsHitTestVisible="False" />
+        </Grid>
+    </Grid>
+</UserControl>

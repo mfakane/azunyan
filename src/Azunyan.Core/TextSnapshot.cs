@@ -61,6 +61,18 @@ public sealed class TextSnapshot
 
     public LineIndex LineIndex => Lines;
 
+    public int GetNextScalarPosition(int position) => UnicodeText.GetNextScalarPosition(Text, position);
+
+    public int GetPreviousScalarPosition(int position) => UnicodeText.GetPreviousScalarPosition(Text, position);
+
+    public int GetNextTextElementPosition(int position) => UnicodeText.GetNextTextElementPosition(Text, position);
+
+    public int GetPreviousTextElementPosition(int position) => UnicodeText.GetPreviousTextElementPosition(Text, position);
+
+    public TextRange GetTextElementRange(int position) => UnicodeText.GetTextElementRange(Text, position);
+
+    public bool IsTextElementBoundary(int position) => UnicodeText.IsTextElementBoundary(Text, position);
+
     public string GetText(TextRange range) => _tree.GetText(range);
 
     public string GetText(int start, int length) => GetText(new TextRange(start, length));

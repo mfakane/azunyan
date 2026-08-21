@@ -1,3 +1,4 @@
+using Azunyan.Core;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -102,13 +103,13 @@ public sealed partial class MainWindow : Window
     private void UndoMenuItem_Click(object sender, RoutedEventArgs e)
     {
         Editor.Focus(FocusState.Programmatic);
-        Editor.Undo();
+        Editor.UndoDocument();
     }
 
     private void RedoMenuItem_Click(object sender, RoutedEventArgs e)
     {
         Editor.Focus(FocusState.Programmatic);
-        Editor.Redo();
+        Editor.RedoDocument();
     }
 
     private void CutMenuItem_Click(object sender, RoutedEventArgs e)
@@ -251,7 +252,7 @@ public sealed partial class MainWindow : Window
         _isLoading = true;
         try
         {
-            Editor.Text = string.Empty;
+            Editor.SetText(string.Empty);
         }
         finally
         {
@@ -273,7 +274,7 @@ public sealed partial class MainWindow : Window
         _isLoading = true;
         try
         {
-            Editor.Text = document.Text;
+            Editor.SetText(document.Text);
         }
         finally
         {
@@ -286,8 +287,7 @@ public sealed partial class MainWindow : Window
         UpdateStatus(document.LineEnding);
         UpdateTitle();
         Editor.Focus(FocusState.Programmatic);
-        Editor.SelectionStart = 0;
-        Editor.SelectionLength = 0;
+        Editor.SetDocumentSelection(TextSelection.Caret(0));
     }
 
     private async Task<bool> SaveAsync()
@@ -577,33 +577,12 @@ public sealed partial class MainWindow : Window
 
     private void UpdateStatus(LineEndingKind? lineEnding = null)
     {
-        var text = Editor.Text;
+        var snapshot = Editor.Snapshot;
+        var text = snapshot.Text;
         var selectionStart = Math.Clamp(Editor.SelectionStart, 0, text.Length);
-        var line = 1;
-        var column = 1;
-
-        for (var index = 0; index < selectionStart; index++)
-        {
-            if (text[index] == '\r')
-            {
-                line++;
-                column = 1;
-
-                if (index + 1 < selectionStart && text[index + 1] == '\n')
-                {
-                    index++;
-                }
-            }
-            else if (text[index] == '\n')
-            {
-                line++;
-                column = 1;
-            }
-            else
-            {
-                column++;
-            }
-        }
+        var lineColumn = snapshot.Lines.GetLineColumn(selectionStart);
+        var line = lineColumn.Line + 1;
+        var column = lineColumn.Column + 1;
 
         PositionStatus.Text = $"Ln {line}, Col {column}";
         EncodingStatus.Text = TextFileService.GetEncodingDisplayName(_encoding);

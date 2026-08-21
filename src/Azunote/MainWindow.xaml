@@ -2,7 +2,8 @@
 <Window
     x:Class="Azunote.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Azunote">
     <Grid x:Name="RootGrid">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -63,23 +64,20 @@
                 <Button Grid.Column="7" Content="Close" HorizontalAlignment="Right" Click="CloseFindButton_Click" />
             </Grid>
         </Border>
-        <TextBox
+        <local:AzunyanEditorView
             x:Name="Editor"
             Grid.Row="2"
             AllowDrop="True"
             AcceptsReturn="True"
             FontFamily="Cascadia Mono,Consolas"
             FontSize="14"
-            ScrollViewer.HorizontalScrollBarVisibility="Auto"
-            IsSpellCheckEnabled="False"
-            IsTextPredictionEnabled="False"
-            ScrollViewer.VerticalScrollBarVisibility="Auto"
             TextWrapping="NoWrap"
             KeyDown="Editor_KeyDown"
             SelectionChanged="Editor_SelectionChanged"
             TextChanged="Editor_TextChanged"
             DragOver="Editor_DragOver"
-            Drop="Editor_Drop" />
+            Drop="Editor_Drop"
+            AutomationProperties.Name="Document editor" />
         <Border x:Name="StatusBarPanel" Grid.Row="3" BorderThickness="0,1,0,0" Padding="12,6">
             <Grid ColumnSpacing="18">
                 <Grid.ColumnDefinitions>
