@@ -48,3 +48,22 @@ and overlay layers through `IAzunyanEditorRenderer`. The default renderer draws
 line numbers; syntax text, decorations, and inlay hints can be added without
 changing the document or input API. Native text remains the default until a
 custom text renderer is ready to own selection and caret painting as well.
+
+Provider APIs live in `Azunyan.Core`. `ISyntaxProvider`,
+`IDecorationProvider`, `ITooltipProvider`, `ICompletionProvider`, and
+`IGutterProvider` receive an immutable `EditorProviderContext` containing a
+snapshot, caret position, and selection. `EditorProviderCoordinator` runs
+providers off the caller thread, cancels superseded work, and discards stale
+results. `AzunyanEditorView.Providers` is the injection point for application
+providers; its `ProviderResultsChanged` event exposes the newest consistent
+result set to a renderer or UI.
+
+Azunote ships a deliberately small `AzunoteSyntaxProvider` and
+`AzunoteCompletionProvider`. The latter combines note keywords with distinct
+identifier-like words from the current snapshot.
+
+The target architecture for folding, inlay hints, CodeLens, virtualized text
+layout, IME, and accessibility is documented in
+[`docs/editor-architecture.md`](docs/editor-architecture.md). The current
+TextBox/Canvas renderer is a transitional prototype and is not the long-term
+text layout boundary.

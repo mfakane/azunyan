@@ -155,4 +155,136 @@ public sealed class DocumentTests
 
         Assert.Equal(new TextSelection(document.Length, 1), document.Selection);
     }
+
+    [Fact]
+    public async Task Provider_coordinator_runs_all_providers_for_one_snapshot_and_position()
+    {
+        var providers = new EditorProviderSet
+        {
+            Syntax = new DelegateSyntaxProvider(context =>
+                new[] { new SyntaxSpan(new TextRange(0, context.Snapshot.Length), "test") }),
+            Decorations = new DelegateDecorationProvider(_ =>
+                new[] { new TextDecoration(new TextRange(0, 1), "underline") }),
+            Tooltip = new DelegateTooltipProvider(_ =>
+                new TooltipData(new TextRange(0, 1), "tooltip")),
+            Completion = new DelegateCompletionProvider(_ =>
+                new CompletionResult(TextRange.Empty(0), new[] { new CompletionItem("item") })),
+            Gutter = new DelegateGutterProvider(_ => new[] { new GutterItem(0, "!") })
+        };
+        using var coordinator = new EditorProviderCoordinator(providers);
+        var snapshot = new TextSnapshot("hello");
+
+        var results = await coordinator.RequestAsync(snapshot, 2, TextSelection.Caret(2));
+
+        Assert.NotNull(results);
+        Assert.Same(snapshot, results!.Context.Snapshot);
+        Assert.Equal(2, results.Context.Position);
+        Assert.Equal("test", Assert.Single(results.Syntax).Classification);
+        Assert.Equal("underline", Assert.Single(results.Decorations).Kind);
+        Assert.Equal("tooltip", results.Tooltip!.Content);
+        Assert.Equal("item", Assert.Single(results.Completions!.Items).Label);
+        Assert.Equal("!", Assert.Single(results.Gutter).Text);
+    }
+
+    [Fact]
+    public async Task Provider_coordinator_discards_a_slow_result_when_a_new_request_arrives()
+    {
+        var oldRequestStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseOldRequest = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var providers = new EditorProviderSet
+        {
+            Syntax = new DelegateSyntaxProvider(async context =>
+            {
+                if (context.Snapshot.Text == "old")
+                {
+                    oldRequestStarted.SetResult();
+                    await releaseOldRequest.Task;
+                }
+
+                return new[] { new SyntaxSpan(TextRange.Empty(0), context.Snapshot.Text) };
+            })
+        };
+        using var coordinator = new EditorProviderCoordinator(providers);
+
+        var oldTask = coordinator.RequestAsync(new TextSnapshot("old"), 0);
+        await oldRequestStarted.Task;
+
+        var newTask = coordinator.RequestAsync(new TextSnapshot("new"), 0);
+        var newResults = await newTask;
+        releaseOldRequest.SetResult();
+        var oldResults = await oldTask;
+
+        Assert.NotNull(newResults);
+        Assert.Equal("new", Assert.Single(newResults!.Syntax).Classification);
+        Assert.Null(oldResults);
+    }
+
+    private sealed class DelegateSyntaxProvider : ISyntaxProvider
+    {
+        private readonly Func<EditorProviderContext, Task<IReadOnlyList<SyntaxSpan>>> _handler;
+
+        public DelegateSyntaxProvider(Func<EditorProviderContext, IEnumerable<SyntaxSpan>> handler)
+        {
+            _handler = context => Task.FromResult<IReadOnlyList<SyntaxSpan>>(handler(context).ToArray());
+        }
+
+        public DelegateSyntaxProvider(Func<EditorProviderContext, Task<IEnumerable<SyntaxSpan>>> handler)
+        {
+            _handler = async context => (await handler(context)).ToArray();
+        }
+
+        public ValueTask<IReadOnlyList<SyntaxSpan>> GetSyntaxAsync(
+            EditorProviderContext context,
+            CancellationToken cancellationToken = default) => new(_handler(context));
+    }
+
+    private sealed class DelegateDecorationProvider : IDecorationProvider
+    {
+        private readonly Func<EditorProviderContext, IReadOnlyList<TextDecoration>> _handler;
+
+        public DelegateDecorationProvider(Func<EditorProviderContext, IEnumerable<TextDecoration>> handler) =>
+            _handler = context => handler(context).ToArray();
+
+        public ValueTask<IReadOnlyList<TextDecoration>> GetDecorationsAsync(
+            EditorProviderContext context,
+            CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(_handler(context));
+    }
+
+    private sealed class DelegateTooltipProvider : ITooltipProvider
+    {
+        private readonly Func<EditorProviderContext, TooltipData?> _handler;
+
+        public DelegateTooltipProvider(Func<EditorProviderContext, TooltipData?> handler) => _handler = handler;
+
+        public ValueTask<TooltipData?> GetTooltipAsync(
+            EditorProviderContext context,
+            CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(_handler(context));
+    }
+
+    private sealed class DelegateCompletionProvider : ICompletionProvider
+    {
+        private readonly Func<EditorProviderContext, CompletionResult?> _handler;
+
+        public DelegateCompletionProvider(Func<EditorProviderContext, CompletionResult?> handler) => _handler = handler;
+
+        public ValueTask<CompletionResult?> GetCompletionsAsync(
+            EditorProviderContext context,
+            CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(_handler(context));
+    }
+
+    private sealed class DelegateGutterProvider : IGutterProvider
+    {
+        private readonly Func<EditorProviderContext, IReadOnlyList<GutterItem>> _handler;
+
+        public DelegateGutterProvider(Func<EditorProviderContext, IEnumerable<GutterItem>> handler) =>
+            _handler = context => handler(context).ToArray();
+
+        public ValueTask<IReadOnlyList<GutterItem>> GetGutterItemsAsync(
+            EditorProviderContext context,
+            CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(_handler(context));
+    }
 }

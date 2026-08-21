@@ -19,14 +19,22 @@ namespace Azunote;
 public sealed partial class AzunyanEditorView : UserControl
 {
     private readonly LineNumberRenderer _defaultRenderer = new();
+    private readonly EditorProviderSet _providers = new()
+    {
+        Syntax = new AzunoteSyntaxProvider(),
+        Completion = new AzunoteCompletionProvider()
+    };
+    private readonly EditorProviderCoordinator _providerCoordinator;
     private ScrollViewer? _scrollViewer;
     private double _lineHeight = 18;
     private double _characterWidth = 8;
     private IAzunyanEditorRenderer? _renderer;
+    private EditorProviderResults? _providerResults;
 
     public AzunyanEditorView()
     {
         InitializeComponent();
+        _providerCoordinator = new EditorProviderCoordinator(_providers);
         _renderer = _defaultRenderer;
 
         Loaded += OnLoaded;
@@ -75,6 +83,17 @@ public sealed partial class AzunyanEditorView : UserControl
     public Document Document => InputEditor.Document;
 
     public TextSnapshot Snapshot => InputEditor.Snapshot;
+
+    /// <summary>
+    /// Providers are called with immutable snapshots and are safe to replace
+    /// while the editor is running. Call <see cref="RefreshProviders"/> after
+    /// mutating this set.
+    /// </summary>
+    public EditorProviderSet Providers => _providers;
+
+    public EditorProviderResults? ProviderResults => _providerResults;
+
+    public event EventHandler<EditorProviderResultsEventArgs>? ProviderResultsChanged;
 
     public string Text
     {
@@ -146,6 +165,8 @@ public sealed partial class AzunyanEditorView : UserControl
 
     public void Select(int start, int length) => InputEditor.Select(start, length);
 
+    public void RefreshProviders() => RequestProviderResults();
+
     public new bool Focus(FocusState value) => InputEditor.Focus(value);
 
     private static void OnRenderPropertyChanged(DependencyObject sender, DependencyPropertyChangedEventArgs args)
@@ -174,10 +195,12 @@ public sealed partial class AzunyanEditorView : UserControl
         }
 
         RenderViewport();
+        RequestProviderResults();
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs args)
     {
+        _providerCoordinator.Cancel();
         if (_scrollViewer is not null)
         {
             _scrollViewer.ViewChanged -= OnViewportChanged;
@@ -187,9 +210,17 @@ public sealed partial class AzunyanEditorView : UserControl
 
     private void OnSizeChanged(object sender, SizeChangedEventArgs args) => RenderViewport();
 
-    private void OnInputTextChanged(object sender, TextChangedEventArgs args) => RenderViewport();
+    private void OnInputTextChanged(object sender, TextChangedEventArgs args)
+    {
+        RenderViewport();
+        RequestProviderResults();
+    }
 
-    private void OnInputSelectionChanged(object sender, RoutedEventArgs args) => RenderViewport();
+    private void OnInputSelectionChanged(object sender, RoutedEventArgs args)
+    {
+        RenderViewport();
+        RequestProviderResults();
+    }
 
     private void OnViewportChanged(object? sender, ScrollViewerViewChangedEventArgs args) => RenderViewport();
 
@@ -217,8 +248,12 @@ public sealed partial class AzunyanEditorView : UserControl
             Math.Max(0, lineCount - 1));
 
         var digits = Math.Max(1, lineCount.ToString().Length);
-        var gutterWidth = ShowLineNumbers
-            ? Math.Max(32, (digits * _characterWidth) + 16)
+        var providerGutter = _providerResults?.Gutter;
+        var providerGutterDigits = providerGutter is { Count: > 0 }
+            ? providerGutter.Max(item => item.Text.Length)
+            : 0;
+        var gutterWidth = ShowLineNumbers || providerGutter is { Count: > 0 }
+            ? Math.Max(32, (Math.Max(digits, providerGutterDigits) * _characterWidth) + 16)
             : 0;
         GutterColumn.Width = new GridLength(gutterWidth);
         GutterCanvas.Width = gutterWidth;
@@ -247,8 +282,55 @@ public sealed partial class AzunyanEditorView : UserControl
             InputEditor.FontFamily,
             InputEditor.FontSize,
             InputEditor.Padding.Top,
-            ShowLineNumbers);
+            ShowLineNumbers,
+            _providerResults);
         _renderer?.Render(context);
+    }
+
+    private void RequestProviderResults()
+    {
+        if (!IsLoaded)
+        {
+            return;
+        }
+
+        var snapshot = InputEditor.Snapshot;
+        var selection = InputEditor.Document.Selection;
+        _ = ApplyProviderResultsAsync(_providerCoordinator.RequestAsync(
+            snapshot,
+            selection.CaretPosition,
+            selection));
+    }
+
+    private async Task ApplyProviderResultsAsync(Task<EditorProviderResults?> request)
+    {
+        EditorProviderResults? results;
+        try
+        {
+            results = await request.ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // A third-party provider must not take down the editor surface.
+            return;
+        }
+
+        if (results is null)
+        {
+            return;
+        }
+
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (!IsLoaded || !ReferenceEquals(results.Context.Snapshot, InputEditor.Snapshot))
+            {
+                return;
+            }
+
+            _providerResults = results;
+            RenderViewport();
+            ProviderResultsChanged?.Invoke(this, new EditorProviderResultsEventArgs(results));
+        });
     }
 
     private void UpdateTextMetrics()

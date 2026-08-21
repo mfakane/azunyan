@@ -27,7 +27,8 @@ public sealed class AzunyanEditorRenderContext
         FontFamily fontFamily,
         double fontSize,
         double contentTop,
-        bool showLineNumbers)
+        bool showLineNumbers,
+        EditorProviderResults? providerResults)
     {
         Snapshot = snapshot;
         Selection = selection;
@@ -45,6 +46,7 @@ public sealed class AzunyanEditorRenderContext
         FontSize = fontSize;
         ContentTop = contentTop;
         ShowLineNumbers = showLineNumbers;
+        ProviderResults = providerResults;
     }
 
     public TextSnapshot Snapshot { get; }
@@ -78,6 +80,13 @@ public sealed class AzunyanEditorRenderContext
     public double ContentTop { get; }
 
     public bool ShowLineNumbers { get; }
+
+    /// <summary>
+    /// The newest provider results for this viewport request. A renderer may
+    /// use the syntax, decoration, gutter, tooltip, or completion data as
+    /// appropriate for its own visual layer.
+    /// </summary>
+    public EditorProviderResults? ProviderResults { get; }
 
     public TextRange GetLineRange(int line) => Snapshot.Lines.GetLineRange(line);
 }
