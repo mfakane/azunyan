@@ -1,6 +1,19 @@
 # Azunyan Code Editor Architecture
 
-Status: Proposed
+Status: In progress
+
+Implemented in the current milestone: the temporary syntax glyph overlay is
+removed from Azunote, viewport layers are clipped, Core owns projection and
+anchor mapping, `Azunyan.Layout` provides monospace line layout, wrapped
+continuation rows, and a variable-height viewport index, provider scheduling is
+split into document/viewport/position channels with stale-result,
+cancellation, and provider-error isolation, and Azunote has a projected-text
+renderer for visible lines. Visual rows model block adornment heights, inline
+inlay identity, and fold-hidden blocks. Tooltip and completion popups are
+anchored through the same projected caret geometry. The native TextBox remains
+a deliberate transitional IME and accessibility host; the current wrapped
+surface is a bounded DirectWrite/Win2D milestone. Final input ownership,
+accessibility, and large-document performance gates remain.
 
 This document defines the target architecture for Azunyan as a practical code
 editor engine. Azunote remains a lightweight example application that enables
@@ -81,8 +94,8 @@ outputs remain UI-framework independent.
 
 ### Azunyan.WinUI
 
-- the clipped drawing surface;
-- DirectWrite/Win2D integration;
+- the clipped Win2D drawing surface;
+- DirectWrite text layouts, styling, caret geometry, and selection regions;
 - scrollbars and pointer/keyboard routing;
 - IME input bridge and caret rectangle publication;
 - realization and recycling of interactive adornments;
@@ -94,6 +107,13 @@ outputs remain UI-framework independent.
 - the lightweight Azunote language definition;
 - theme and provider composition;
 - no editor layout algorithms.
+
+Theme ownership follows the same boundary. `Azunyan.WinUI` defines the
+`AzunyanColorScheme` shape and passes it through each render context, while the
+application supplies concrete colors. Azunote's default scheme is assembled
+from WinUI system brush resources for the light theme, so the projected text,
+gutter, selection marks, and transient popups share one palette. Other hosts
+may assign their own scheme through `AzunyanEditorView.ColorScheme`.
 
 ## 4. Coordinate spaces
 
@@ -300,8 +320,9 @@ not mutate the current frame.
 
 ## 8. Provider scheduling
 
-The current all-provider coordinator is transitional. Providers are separated
-by invalidation scope so a caret move never restarts syntax analysis.
+The production boundary is `EditorProviderScheduler`; providers are separated
+by invalidation scope so a caret move never restarts syntax analysis. The
+aggregate coordinator remains only as a compatibility API.
 
 ### Snapshot-scoped providers
 
@@ -461,10 +482,18 @@ rapid edits while providers return out of order.
 - retain a runtime fallback to the native TextBox until IME and accessibility
   acceptance tests pass.
 
+Azunote now has the first bounded viewport version of this phase using cached
+DirectWrite text layouts for visible rows and a paired gutter surface.
+Selection, caret, syntax colors, fold placeholders, inlay styling, and line
+numbers are drawn through the same measured text backend rather than through
+per-line XAML text controls. The native TextBox remains the input/IME host
+until the acceptance gates below pass.
+
 ### Phase D: provider channels and syntax
 
 - split snapshot-, viewport-, and position-scoped provider scheduling;
 - render syntax and decorations as style/drawing runs;
+- consume completion results through an input-preserving popup;
 - add incremental line invalidation and frame publication.
 
 ### Phase E: folding and adornments
@@ -474,9 +503,21 @@ rapid edits while providers return out of order.
 - add variable-height block adornments and visible UI realization;
 - preserve viewport anchors while heights change.
 
+The Core/Layout portion of this phase is now present: editor-owned collapsed
+IDs feed the projection, inlays and block adornments are represented in visual
+rows, inlays retain their provider identity through layout runs, and block
+height participates in viewport realization. Azunote exposes
+`SetFoldCollapsed`, `ToggleFold`, and `ExpandAllFolds`; its projected surface
+also maps pointer presses through the same visual rows, including fold
+placeholder clicks, wrapped rows, inlay identity, and block-row anchors. The
+DirectWrite surface now consumes those layouts and uses DirectWrite line
+metrics to choose wrapped-row boundaries. Richer inlay interaction and
+input/accessibility replacement remain next gates.
+
 ### Phase F: wrapping and hardening
 
-- add continuation visual rows and wrapped hit testing;
+- harden continuation visual rows and wrapped hit testing with additional real
+  font-metric cases;
 - complete UI Automation text patterns;
 - run IME, BiDi, grapheme, DPI, theme, and performance matrices;
 - remove the native visible-text fallback only after all gates pass.
@@ -494,9 +535,14 @@ The following parts are explicitly transitional:
 
 - one aggregate request that runs every provider for every caret change;
 - `IAzunyanEditorRenderer` receiving mutable XAML Canvas layers;
-- syntax rendered as colored TextBlocks over native text;
+- the native TextBox remaining visible as the input/IME proxy;
 - line coordinates inferred from one measured character and a ScrollViewer
   offset.
+
+Azunote's application shell also installs a failure boundary around the WinUI
+dispatcher, AppDomain, and unobserved-task paths. Managed UI failures are
+shown to the user with the per-user log path; process-level failures are
+recorded even when the UI can no longer be trusted.
 
 No new editor feature should depend on those transitional rendering details.
 
@@ -505,7 +551,9 @@ No new editor feature should depend on those transitional rendering details.
 The following choices require focused prototypes, but do not change the
 architecture above:
 
-- DirectWrite/Direct2D directly versus Win2D as the first drawing backend;
+- Win2D is the selected DirectWrite/Direct2D backend for the current WinUI
+  surface; direct COM interop remains an optimization option if profiling
+  requires it;
 - native TextBox proxy versus a lower-level Windows text-services bridge;
 - exact augmented-tree/chunk structure for lazy visual-line heights;
 - whether interactive adornments use pooled XAML controls or composition

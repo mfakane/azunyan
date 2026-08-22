@@ -600,15 +600,39 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    internal void ShowUnhandledError(Exception exception, string logPath)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        ArgumentException.ThrowIfNullOrWhiteSpace(logPath);
+
+        var detail = string.IsNullOrWhiteSpace(exception.Message)
+            ? exception.GetType().Name
+            : exception.Message;
+        var message = $"{detail}\n\nDetails were written to:\n{logPath}";
+        DispatcherQueue.TryEnqueue(() => _ = ShowErrorAsync("Azunote encountered an unexpected error", message));
+    }
+
     private async Task ShowErrorAsync(string title, string message)
     {
-        var dialog = new ContentDialog
+        try
         {
-            Title = title,
-            Content = message,
-            CloseButtonText = "OK",
-            XamlRoot = RootGrid.XamlRoot
-        };
-        await dialog.ShowAsync();
+            if (RootGrid.XamlRoot is null)
+            {
+                return;
+            }
+
+            var dialog = new ContentDialog
+            {
+                Title = title,
+                Content = message,
+                CloseButtonText = "OK",
+                XamlRoot = RootGrid.XamlRoot
+            };
+            await dialog.ShowAsync();
+        }
+        catch (Exception exception)
+        {
+            ErrorReporter.LogException("Error dialog failure", exception);
+        }
     }
 }

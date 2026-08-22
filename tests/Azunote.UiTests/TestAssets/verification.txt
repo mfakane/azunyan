@@ -1,0 +1,7 @@
+Azunyan UI verification
+日本語の入力とカーソル位置を確認します。
+emoji: 😀 👍🏽
+combining: é
+Arabic: مرحبا بالعالم
+Hebrew: שלום עולם
+completion folding inlay

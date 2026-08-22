@@ -18,10 +18,12 @@ namespace Azunote;
 public sealed class AzunyanEditorControl : TextBox
 {
     private bool _synchronizing;
+    private TextRange? _compositionRange;
 
     public AzunyanEditorControl()
     {
         Document = new Document();
+        Document.Changed += OnDocumentChanged;
         IsSpellCheckEnabled = false;
         IsTextPredictionEnabled = false;
         AutomationProperties.SetName(this, "Text editor");
@@ -30,11 +32,32 @@ public sealed class AzunyanEditorControl : TextBox
         TextChanged += OnTextChanged;
         SelectionChanged += OnSelectionChanged;
         KeyDown += OnKeyDown;
+        TextCompositionStarted += OnTextCompositionStarted;
+        TextCompositionChanged += OnTextCompositionChanged;
+        TextCompositionEnded += OnTextCompositionEnded;
     }
 
     public Document Document { get; private set; }
 
     public TextSnapshot Snapshot => Document.Snapshot;
+
+    public bool IsComposing => _compositionRange is not null;
+
+    public TextRange? CompositionRange => _compositionRange;
+
+    /// <summary>
+    /// Raised when the native text service starts, updates, or ends an IME
+    /// composition. The range is expressed in the current native text and is
+    /// forwarded to the projected renderer as transient decoration state.
+    /// </summary>
+    public event EventHandler? CompositionChanged;
+
+    /// <summary>
+    /// Raised after the native text service has been mirrored into the core
+    /// document. Consumers can use the coarse change to invalidate projected
+    /// layout state without diffing the full text again.
+    /// </summary>
+    public event EventHandler<DocumentChangedEventArgs>? DocumentChanged;
 
     /// <summary>
     /// Replaces the displayed document and starts a fresh undo history. This
@@ -45,10 +68,13 @@ public sealed class AzunyanEditorControl : TextBox
     {
         ArgumentNullException.ThrowIfNull(text);
 
+        ClearComposition();
         _synchronizing = true;
         try
         {
+            Document.Changed -= OnDocumentChanged;
             Document = new Document(text);
+            Document.Changed += OnDocumentChanged;
             Text = text;
             SelectionStart = 0;
             SelectionLength = 0;
@@ -72,6 +98,35 @@ public sealed class AzunyanEditorControl : TextBox
             Document.Selection = selection;
             SelectionStart = selection.Start;
             SelectionLength = selection.Length;
+        }
+        finally
+        {
+            _synchronizing = false;
+        }
+    }
+
+    /// <summary>
+    /// Applies one document replacement and updates the native text-service
+    /// host and document selection as one operation. This is required for
+    /// programmatic edits such as completion acceptance: setting
+    /// <see cref="TextBox.SelectedText"/> first would raise <c>TextChanged</c>
+    /// after the caller tried to place the new caret.
+    /// </summary>
+    public void ReplaceDocumentRange(TextRange range, string replacement)
+    {
+        ArgumentNullException.ThrowIfNull(replacement);
+        if (range.Start > Document.Length || range.End > Document.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(range));
+        }
+
+        _synchronizing = true;
+        try
+        {
+            ClearComposition();
+            Document.Replace(range, replacement);
+            Text = Document.Text;
+            ApplyDocumentSelection();
         }
         finally
         {
@@ -121,12 +176,49 @@ public sealed class AzunyanEditorControl : TextBox
         SyncDocumentSelection();
     }
 
+    private void OnDocumentChanged(object? sender, DocumentChangedEventArgs args) =>
+        DocumentChanged?.Invoke(this, args);
+
     private void OnSelectionChanged(object sender, RoutedEventArgs args)
     {
         if (!_synchronizing)
         {
             SyncDocumentSelection();
         }
+    }
+
+    private void OnTextCompositionStarted(
+        object sender,
+        TextCompositionStartedEventArgs args) =>
+        SetComposition(args.StartIndex, args.Length);
+
+    private void OnTextCompositionChanged(
+        object sender,
+        TextCompositionChangedEventArgs args) =>
+        SetComposition(args.StartIndex, args.Length);
+
+    private void OnTextCompositionEnded(
+        object sender,
+        TextCompositionEndedEventArgs args) =>
+        ClearComposition();
+
+    private void SetComposition(int start, int length)
+    {
+        var safeStart = Math.Clamp(start, 0, Text.Length);
+        var safeLength = Math.Clamp(length, 0, Text.Length - safeStart);
+        _compositionRange = new TextRange(safeStart, safeLength);
+        CompositionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void ClearComposition()
+    {
+        if (_compositionRange is null)
+        {
+            return;
+        }
+
+        _compositionRange = null;
+        CompositionChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void OnKeyDown(object sender, KeyRoutedEventArgs args)

@@ -6,7 +6,11 @@ namespace Azunyan.Core;
 /// </summary>
 public sealed class EditorProviderContext
 {
-    public EditorProviderContext(TextSnapshot snapshot, int position, TextSelection selection)
+    public EditorProviderContext(
+        TextSnapshot snapshot,
+        int position,
+        TextSelection selection,
+        TextRange? visibleRange = null)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         if (position < 0 || position > snapshot.Length)
@@ -19,9 +23,16 @@ public sealed class EditorProviderContext
             throw new ArgumentOutOfRangeException(nameof(selection));
         }
 
+        if (visibleRange is { } range
+            && (range.Start > snapshot.Length || range.End > snapshot.Length))
+        {
+            throw new ArgumentOutOfRangeException(nameof(visibleRange));
+        }
+
         Snapshot = snapshot;
         Position = position;
         Selection = selection;
+        VisibleRange = visibleRange;
     }
 
     public TextSnapshot Snapshot { get; }
@@ -29,6 +40,12 @@ public sealed class EditorProviderContext
     public int Position { get; }
 
     public TextSelection Selection { get; }
+
+    /// <summary>
+    /// The requested document range for viewport-scoped providers. It is null
+    /// for document- and position-scoped requests.
+    /// </summary>
+    public TextRange? VisibleRange { get; }
 
     public LineColumn Location => Snapshot.Lines.GetLineColumn(Position);
 }
@@ -212,6 +229,27 @@ public interface IGutterProvider
         CancellationToken cancellationToken = default);
 }
 
+public interface IFoldingProvider
+{
+    ValueTask<IReadOnlyList<FoldRange>> GetFoldsAsync(
+        EditorProviderContext context,
+        CancellationToken cancellationToken = default);
+}
+
+public interface IInlayProvider
+{
+    ValueTask<IReadOnlyList<InlineAdornment>> GetInlaysAsync(
+        EditorProviderContext context,
+        CancellationToken cancellationToken = default);
+}
+
+public interface IBlockAdornmentProvider
+{
+    ValueTask<IReadOnlyList<BlockAdornment>> GetBlockAdornmentsAsync(
+        EditorProviderContext context,
+        CancellationToken cancellationToken = default);
+}
+
 /// <summary>
 /// The provider set used by <see cref="EditorProviderCoordinator"/>. It is
 /// deliberately a mutable container so an application can replace one
@@ -228,6 +266,12 @@ public sealed class EditorProviderSet
     public ICompletionProvider? Completion { get; set; }
 
     public IGutterProvider? Gutter { get; set; }
+
+    public IFoldingProvider? Folding { get; set; }
+
+    public IInlayProvider? Inlay { get; set; }
+
+    public IBlockAdornmentProvider? BlockAdornment { get; set; }
 }
 
 /// <summary>
