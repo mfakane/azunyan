@@ -241,6 +241,9 @@ public sealed partial class AzunyanEditorView : UserControl
 
     public void SetDocumentSelection(TextSelection selection) => InputEditor.SetDocumentSelection(selection);
 
+    public void ReplaceDocumentRange(TextRange range, string replacement) =>
+        InputEditor.ReplaceDocumentRange(range, replacement);
+
     public bool UndoDocument() => InputEditor.UndoDocument();
 
     public bool RedoDocument() => InputEditor.RedoDocument();

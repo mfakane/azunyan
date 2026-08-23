@@ -15,16 +15,50 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        AzunoteCommandLineOptions options;
+        try
+        {
+            options = AzunoteCommandLine.Parse(Environment.GetCommandLineArgs().Skip(1));
+        }
+        catch (CommandLineParseException exception)
+        {
+            options = new AzunoteCommandLineOptions { ShowHelp = true };
+            ErrorReporter.LogMessage("Invalid command line", exception.Message);
+        }
+
         MainWindow = new MainWindow();
         MainWindow.Activate();
+        _ = MainWindow.InitializeSettingsAsync();
 
-        var startupPath = Environment.GetCommandLineArgs()
-            .Skip(1)
-            .FirstOrDefault(argument => !argument.StartsWith("-", StringComparison.Ordinal));
-
-        if (!string.IsNullOrWhiteSpace(startupPath))
+        if (options.ReadStandardInput)
         {
-            _ = MainWindow.OpenStartupDocumentAsync(startupPath);
+            _ = OpenStandardInputAsync(MainWindow, options);
+        }
+        else if (!string.IsNullOrWhiteSpace(options.FilePath))
+        {
+            _ = MainWindow.OpenStartupDocumentAsync(
+                options.FilePath,
+                options.Line,
+                options.Column);
+        }
+        else if (options.ShowHelp)
+        {
+            _ = MainWindow.ShowCommandLineHelpAsync();
+        }
+    }
+
+    private static async Task OpenStandardInputAsync(
+        MainWindow window,
+        AzunoteCommandLineOptions options)
+    {
+        try
+        {
+            var text = await Console.In.ReadToEndAsync();
+            await window.OpenStartupTextAsync(text, options.Line, options.Column);
+        }
+        catch (Exception exception)
+        {
+            await window.ShowStartupErrorAsync("Could not read standard input", exception.Message);
         }
     }
 

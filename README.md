@@ -19,6 +19,51 @@ tested without WinUI:
 dotnet test tests/Azunyan.Core.Tests/Azunyan.Core.Tests.csproj
 ```
 
+The project boundary is intentional: `Azunyan.Core`, `Azunyan.Layout`, and
+`Azunyan.WinUI` contain only reusable editor-component code. Azunote-specific
+application concerns—including the command-line contract, external tool
+runner, and JSON5 settings service—live under `src/Azunote` and are not part
+of `Azunyan.Core`.
+
+Azunote application tests, including the external-tool and command-line tests,
+are kept separate from the editor-component tests:
+
+```powershell
+dotnet test tests/Azunote.Tests/Azunote.Tests.csproj
+```
+
+## Repository layout
+
+The source tree is grouped by responsibility rather than keeping all files at
+the project root:
+
+```text
+src/
+  Azunyan.Core/
+    Documents/       document model, snapshots, ranges, and editing commands
+    Providers/        provider contracts, frames, and scheduling
+    Projection/       projected rows, folds, adornments, and height indexing
+  Azunyan.Layout/
+    LineLayout/      logical-line and wrapping layout
+    Viewport/        viewport realization and scrolling calculations
+  Azunyan.WinUI/
+    Rendering/       DirectWrite/Win2D rendering primitives and color scheme
+  Azunote/
+    Application/     application startup and error reporting
+    Shell/            main window, menus, and file commands
+    Editor/           Azunote editor control, rendering, and accessibility
+    CommandLine/     executable command-line parsing
+    ExternalTools/   external process execution
+    Settings/        JSON5 settings persistence
+    FileSystem/      text-file I/O
+    Language/        Azunote's built-in language providers
+    Theme/           Azunote's default color scheme
+tests/
+  Azunyan.Core.Tests/  editor-component tests grouped like Core
+  Azunote.Tests/       application and external-tool tests
+  Azunote.UiTests/     opt-in Windows UI Automation tests
+```
+
 If the plain .NET CLI cannot locate the Visual Studio Appx/PRI build tasks, run
 the command from a Visual Studio Developer PowerShell or pass the installed
 Visual Studio AppxPackage directory explicitly with `-p:AppxMSBuildToolsPath`.
@@ -27,6 +72,57 @@ Visual Studio AppxPackage directory explicitly with `-p:AppxMSBuildToolsPath`.
 
 ```powershell
 Azunote.exe path\to\file.txt
+```
+
+The command-line contract also accepts external-editor positions and standard
+input:
+
+```powershell
+Azunote.exe --wait --line 12 --column 4 path\to\file.txt
+Get-Content input.md | Azunote.exe --stdin
+Azunote.exe +12:4 path\to\file.txt
+```
+
+Line and column are one-based and are clamped to the opened document. `--wait`
+is accepted as the external-editor wait contract; because Azunote is a desktop
+application, its process remains alive until the editor window closes.
+
+External commands are available from Tools > Run External Tool... and through
+the `ExternalToolRunner` API. Commands run without a shell and can receive
+`FilePath`, `Document`, or `Selection` through stdin. Arguments support the
+placeholders `${file}`, `${fileDir}`, `${fileName}`, `${document}`,
+`${selection}`, `${userHome}`, `${lineNumber}`, and `${columnNumber}`.
+Environment variables are available as `${env:NAME}`. Output can be ignored,
+inserted into the document or selection, opened as a new document, or used to
+reload the current file. Non-zero exit codes leave the document unchanged and
+show stderr.
+
+Files opened from disk are watched for external changes. A clean document is
+reloaded automatically; if it has unsaved edits, Azunote asks whether to reload
+or keep the local changes.
+
+Tool definitions are stored in `%LOCALAPPDATA%\Azunote\settings.json5` and
+appear under Tools > External Tools. The file is created with an empty list on
+first launch. Tools can be added by opening Tools > Preferences..., editing the
+JSON5 document, and saving it. Comments, single-quoted strings, unquoted keys,
+and trailing commas are accepted. Azunote watches the settings file and tries
+to load valid external changes without replacing the previous settings when
+the new file is invalid.
+
+For example:
+
+```json5
+{
+  externalTools: [
+    {
+      name: 'Format document',
+      command: 'prettier',
+      arguments: '--write ${file}',
+      input: 'FilePath',
+      output: 'ReloadFile',
+    },
+  ],
+}
 ```
 
 The editor supports File/Edit/View/Help menus, Open, Save, Save As,

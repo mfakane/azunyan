@@ -38,6 +38,14 @@
                 <MenuFlyoutItem x:Name="WordWrapMenuItem" Text="Word Wrap" Click="WordWrapMenuItem_Click" />
                 <MenuFlyoutItem Text="Status Bar" Click="StatusBarMenuItem_Click" />
             </MenuBarItem>
+            <MenuBarItem Title="Tools">
+                <MenuFlyoutSubItem x:Name="ConfiguredExternalToolsMenuItem" Text="External Tools">
+                    <MenuFlyoutItem Text="No tools configured" IsEnabled="False" />
+                </MenuFlyoutSubItem>
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="Run External Tool..." Click="RunExternalToolMenuItem_Click" />
+                <MenuFlyoutItem Text="Preferences..." Click="PreferencesMenuItem_Click" />
+            </MenuBarItem>
             <MenuBarItem Title="Help">
                 <MenuFlyoutItem Text="About Azunote" Click="AboutMenuItem_Click" />
             </MenuBarItem>
