@@ -47,11 +47,11 @@ src/
     LineLayout/      logical-line and wrapping layout
     Viewport/        viewport realization and scrolling calculations
   Azunyan.WinUI/
+    Editor/          reusable WinUI editor control, rendering host, and accessibility
     Rendering/       DirectWrite/Win2D rendering primitives and color scheme
   Azunote/
     Application/     application startup and error reporting
     Shell/            main window, menus, and file commands
-    Editor/           Azunote editor control, rendering, and accessibility
     CommandLine/     executable command-line parsing
     ExternalTools/   external process execution
     Settings/        JSON5 settings persistence

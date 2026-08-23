@@ -7,7 +7,7 @@ using Microsoft.UI.Xaml.Input;
 using Windows.System;
 using Windows.UI.Core;
 
-namespace Azunote;
+namespace Azunyan.WinUI;
 
 /// <summary>
 /// The WinUI editor surface. It deliberately derives from the platform
@@ -27,7 +27,7 @@ public sealed class AzunyanEditorControl : TextBox
         IsSpellCheckEnabled = false;
         IsTextPredictionEnabled = false;
         AutomationProperties.SetName(this, "Text editor");
-        AutomationProperties.SetHelpText(this, "Azunote document editor");
+        AutomationProperties.SetHelpText(this, "Azunyan document editor");
 
         TextChanged += OnTextChanged;
         SelectionChanged += OnSelectionChanged;

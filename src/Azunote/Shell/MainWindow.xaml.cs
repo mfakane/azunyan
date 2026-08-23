@@ -34,6 +34,11 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        Editor.Providers.Syntax = new AzunoteSyntaxProvider();
+        Editor.Providers.Completion = new AzunoteCompletionProvider();
+        Editor.Providers.Tooltip = new AzunoteTooltipProvider();
+        Editor.Providers.Folding = new AzunoteFoldingProvider();
+        Editor.ColorScheme = AzunoteSystemColorScheme.CreateLight();
         RegisterKeyboardAccelerators();
 
         _windowHandle = WindowNative.GetWindowHandle(this);
