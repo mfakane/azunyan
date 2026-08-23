@@ -20,6 +20,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ApplicationDefinition Include="Application\App.xaml" />
+    <Page Remove="Application\App.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Azunyan.Core\Azunyan.Core.csproj" />
     <ProjectReference Include="..\Azunyan.Layout\Azunyan.Layout.csproj" />
     <ProjectReference Include="..\Azunyan.WinUI\Azunyan.WinUI.csproj" />

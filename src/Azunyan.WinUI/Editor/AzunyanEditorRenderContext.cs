@@ -4,7 +4,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 
-namespace Azunote;
+namespace Azunyan.WinUI;
 
 /// <summary>
 /// Immutable viewport information passed to an editor renderer. Renderers may

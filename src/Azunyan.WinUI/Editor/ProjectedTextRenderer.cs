@@ -9,10 +9,10 @@ using Windows.Foundation;
 using Windows.UI;
 using Windows.UI.Text;
 
-namespace Azunote;
+namespace Azunyan.WinUI;
 
 /// <summary>
-/// The bounded Azunote text surface. It realizes only visible projected rows;
+/// The bounded projected text surface. It realizes only visible projected rows;
 /// rows may be unwrapped lines or continuation segments produced by the
 /// framework-independent layout layer.
 /// </summary>
@@ -1352,9 +1352,9 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
             || caretStop == row.TextEndColumn && caretStop == row.TextLine.VisualLength);
 }
 
-internal sealed class AzunoteEditorRenderer : IAzunyanEditorRenderer
+internal sealed class AzunyanEditorRenderer : IAzunyanEditorRenderer
 {
-    public AzunoteEditorRenderer(
+    public AzunyanEditorRenderer(
         CanvasControl gutterSurface,
         CanvasControl textSurface)
     {

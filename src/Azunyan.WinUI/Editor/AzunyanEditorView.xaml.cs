@@ -1,5 +1,4 @@
 using Azunyan.Core;
-using Azunyan.WinUI;
 using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI;
 using Microsoft.UI.Input;
@@ -16,7 +15,7 @@ using Windows.System;
 using Windows.UI.Core;
 using Windows.UI;
 
-namespace Azunote;
+namespace Azunyan.WinUI;
 
 /// <summary>
 /// Reusable editor host. The inner TextBox remains the native text-service and
@@ -27,15 +26,9 @@ namespace Azunote;
 /// </summary>
 public sealed partial class AzunyanEditorView : UserControl
 {
-    private readonly AzunoteEditorRenderer _defaultRenderer;
+    private readonly AzunyanEditorRenderer _defaultRenderer;
     private AzunyanColorScheme _colorScheme;
-    private readonly EditorProviderSet _providers = new()
-    {
-        Syntax = new AzunoteSyntaxProvider(),
-        Completion = new AzunoteCompletionProvider(),
-        Tooltip = new AzunoteTooltipProvider(),
-        Folding = new AzunoteFoldingProvider()
-    };
+    private readonly EditorProviderSet _providers = new();
     private readonly EditorProviderScheduler _providerScheduler;
     private ScrollViewer? _scrollViewer;
     private double _lineHeight = 18;
@@ -53,8 +46,8 @@ public sealed partial class AzunyanEditorView : UserControl
     public AzunyanEditorView()
     {
         InitializeComponent();
-        _colorScheme = AzunoteSystemColorScheme.CreateLight();
-        _defaultRenderer = new AzunoteEditorRenderer(
+        _colorScheme = AzunyanColorScheme.Default;
+        _defaultRenderer = new AzunyanEditorRenderer(
             GutterDrawingSurface,
             TextDrawingSurface);
         _defaultRenderer.LayoutInvalidated += OnRendererLayoutInvalidated;
@@ -150,8 +143,8 @@ public sealed partial class AzunyanEditorView : UserControl
 
     /// <summary>
     /// Palette consumed by the default Azunyan renderer and transient editor
-    /// UI. Azunote supplies the system-resource default, while applications
-    /// may replace it with their own scheme.
+    /// UI. The host application may replace the default scheme with its own
+    /// system or editor theme.
     /// </summary>
     public AzunyanColorScheme ColorScheme
     {
@@ -240,6 +233,9 @@ public sealed partial class AzunyanEditorView : UserControl
     public void SetText(string text) => InputEditor.SetText(text);
 
     public void SetDocumentSelection(TextSelection selection) => InputEditor.SetDocumentSelection(selection);
+
+    public void ReplaceDocumentRange(TextRange range, string replacement) =>
+        InputEditor.ReplaceDocumentRange(range, replacement);
 
     public bool UndoDocument() => InputEditor.UndoDocument();
 

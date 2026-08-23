@@ -1,6 +1,6 @@
 using Azunyan.Core;
 
-namespace Azunote;
+namespace Azunyan.WinUI;
 
 /// <summary>
 /// Describes an interactive inlay or block adornment hit. The editor reports

@@ -2,7 +2,7 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Automation.Provider;
 
-namespace Azunote;
+namespace Azunyan.WinUI;
 
 /// <summary>
 /// Keeps the outer editor in the UI Automation tree. The native TextBox peer

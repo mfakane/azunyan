@@ -7,7 +7,7 @@ using Microsoft.UI.Xaml.Automation.Text;
 using Microsoft.UI.Xaml.Controls;
 using Windows.Foundation;
 
-namespace Azunote;
+namespace Azunyan.WinUI;
 
 internal sealed record ProjectedTextAutomationTarget(
     string Id,
