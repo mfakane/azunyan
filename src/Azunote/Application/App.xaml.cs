@@ -1,9 +1,14 @@
 using Microsoft.UI.Xaml;
+using System.Runtime.InteropServices;
 
 namespace Azunote;
 
 public partial class App : Application
 {
+    private const uint MessageBoxOk = 0x00000000;
+    private const uint MessageBoxIconError = 0x00000010;
+    private static int _unhandledDialogShown;
+
     public static MainWindow? MainWindow { get; private set; }
 
     public App()
@@ -66,9 +71,8 @@ public partial class App : Application
         object sender,
         Microsoft.UI.Xaml.UnhandledExceptionEventArgs args)
     {
-        var logPath = ErrorReporter.LogException("Unhandled UI exception", args.Exception);
+        ReportUnhandledException("Unhandled UI exception", args.Exception);
         args.Handled = true;
-        MainWindow?.ShowUnhandledError(args.Exception, logPath);
     }
 
     private static void OnAppDomainUnhandledException(
@@ -77,13 +81,19 @@ public partial class App : Application
     {
         if (args.ExceptionObject is Exception exception)
         {
-            ErrorReporter.LogException("Unhandled AppDomain exception", exception);
+            ReportUnhandledException("Unhandled AppDomain exception", exception);
         }
         else
         {
-            ErrorReporter.LogMessage(
+            var logPath = ErrorReporter.LogMessage(
                 "Unhandled AppDomain exception",
                 args.ExceptionObject?.ToString() ?? "Unknown exception object.");
+            ShowFallbackErrorDialog(
+                "Azunote encountered an unexpected error",
+                "An unexpected error occurred."
+                + Environment.NewLine
+                + Environment.NewLine
+                + $"Details were written to:{Environment.NewLine}{logPath}");
         }
     }
 
@@ -92,8 +102,54 @@ public partial class App : Application
         UnobservedTaskExceptionEventArgs args)
     {
         var exception = args.Exception.Flatten();
-        var logPath = ErrorReporter.LogException("Unobserved task exception", exception);
+        ReportUnhandledException("Unobserved task exception", exception);
         args.SetObserved();
-        MainWindow?.ShowUnhandledError(exception, logPath);
     }
+
+    private static void ReportUnhandledException(string source, Exception exception)
+    {
+        var logPath = ErrorReporter.LogException(source, exception);
+        if (Interlocked.Exchange(ref _unhandledDialogShown, 1) != 0)
+        {
+            return;
+        }
+
+        var detail = string.IsNullOrWhiteSpace(exception.Message)
+            ? exception.GetType().Name
+            : exception.Message;
+        var message = $"{detail}{Environment.NewLine}{Environment.NewLine}"
+            + $"Details were written to:{Environment.NewLine}{logPath}";
+
+        if (MainWindow is { } window)
+        {
+            window.ShowUnhandledError(exception, logPath);
+        }
+        else
+        {
+            ShowFallbackErrorDialog("Azunote encountered an unexpected error", message);
+        }
+    }
+
+    private static void ShowFallbackErrorDialog(string title, string message)
+    {
+        try
+        {
+            MessageBoxW(
+                nint.Zero,
+                message,
+                title,
+                MessageBoxOk | MessageBoxIconError);
+        }
+        catch (Exception exception)
+        {
+            ErrorReporter.LogException("Fallback error dialog failure", exception);
+        }
+    }
+
+    [LibraryImport("user32.dll", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+    private static partial int MessageBoxW(
+        nint hWnd,
+        string text,
+        string caption,
+        uint type);
 }

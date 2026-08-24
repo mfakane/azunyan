@@ -68,14 +68,8 @@ internal static class ErrorReporter
 
     private static string GetLogPath()
     {
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        if (string.IsNullOrWhiteSpace(localAppData))
-        {
-            localAppData = Path.GetTempPath();
-        }
-
         return Path.Combine(
-            localAppData,
+            Path.GetTempPath(),
             "Azunote",
             "logs",
             $"azunote-{DateTime.Now:yyyyMMdd}.log");
