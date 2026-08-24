@@ -1187,6 +1187,9 @@ public sealed partial class MainWindow : Window
         PositionStatus.Text = $"Ln {line}, Col {column}";
         EncodingStatus.Text = TextFileService.GetEncodingDisplayName(_encoding);
         LineEndingStatus.Text = TextFileService.GetLineEndingDisplayName(lineEnding ?? TextFileService.DetectLineEnding(text));
+        IndentationStatus.Text = TextEditorCommands.GetIndentationSettings(
+            snapshot,
+            selectionStart).DisplayName;
         FilePathStatus.Text = _filePath ?? "Untitled";
     }
 
