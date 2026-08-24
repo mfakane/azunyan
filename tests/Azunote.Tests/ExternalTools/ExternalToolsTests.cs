@@ -109,31 +109,26 @@ public sealed class ExternalToolsTests
     }
 
     [Fact]
-    public async Task Settings_service_loads_json5_comments_single_quotes_and_trailing_commas()
+    public async Task Settings_service_loads_toml_tools_and_builds_the_folder_hierarchy()
     {
         var root = Path.Combine(Path.GetTempPath(), $"azunyan-settings-{Guid.NewGuid():N}");
-        var path = Path.Combine(root, "settings.json5");
-        Directory.CreateDirectory(root);
+        var tools = Path.Combine(root, SettingsFileService.ToolsDirectoryName);
+        var nestedDirectory = Path.Combine(tools, "Formatting", "CSharp");
+        var toolPath = Path.Combine(nestedDirectory, "format.tool.toml");
+        Directory.CreateDirectory(nestedDirectory);
         try
         {
             await File.WriteAllTextAsync(
-                path,
+                toolPath,
                 """
-                {
-                  // JSON5 permits comments and unquoted keys.
-                  externalTools: [
-                    {
-                      name: 'Format document',
-                      command: 'prettier',
-                      arguments: ['--write', '${file}'],
-                      input: 'FilePath',
-                      output: 'ReloadFile',
-                    },
-                  ],
-                }
+                name = "Format document"
+                command = "prettier"
+                arguments = ["--write", "${file}"]
+                input = "FilePath"
+                output = "ReloadFile"
                 """);
 
-            var settings = await SettingsFileService.LoadAsync(path);
+            var settings = await SettingsFileService.LoadAsync(root);
             var tool = Assert.Single(settings.ExternalTools);
             var definition = tool.ToDefinition();
 
@@ -143,11 +138,11 @@ public sealed class ExternalToolsTests
             Assert.Equal(ExternalToolInputMode.FilePath, definition.InputMode);
             Assert.Equal(ExternalToolOutputMode.ReloadFile, definition.OutputMode);
 
-            await SettingsFileService.SaveAsync(path, settings);
-            var saved = await File.ReadAllTextAsync(path);
-            Assert.Contains("externalTools", saved, StringComparison.Ordinal);
-            Assert.Contains("Azunote settings", saved, StringComparison.Ordinal);
-            Assert.Single((await SettingsFileService.LoadAsync(path)).ExternalTools);
+            var formatting = Assert.Single(settings.ExternalToolMenu);
+            Assert.Equal("Formatting", formatting.Name);
+            var csharp = Assert.Single(formatting.Children);
+            Assert.Equal("CSharp", csharp.Name);
+            Assert.Same(tool, Assert.Single(csharp.Children).Tool);
         }
         finally
         {
@@ -159,17 +154,60 @@ public sealed class ExternalToolsTests
     }
 
     [Fact]
-    public async Task Settings_service_creates_a_default_json5_file()
+    public async Task Settings_service_treats_a_tool_bundle_directory_as_one_tool()
     {
         var root = Path.Combine(Path.GetTempPath(), $"azunyan-settings-{Guid.NewGuid():N}");
-        var path = Path.Combine(root, "settings.json5");
+        var bundle = Path.Combine(
+            root,
+            SettingsFileService.ToolsDirectoryName,
+            "Packages",
+            "markdown.tool");
         try
         {
-            await SettingsFileService.EnsureExistsAsync(path);
+            Directory.CreateDirectory(bundle);
+            await File.WriteAllTextAsync(
+                Path.Combine(bundle, "manifest.toml"),
+                """
+                name = "Markdown preview"
+                command = "markdown-preview"
+                input = "Document"
+                output = "NewDocument"
+                """);
 
-            Assert.True(File.Exists(path));
-            var settings = await SettingsFileService.LoadAsync(path);
+            var settings = await SettingsFileService.LoadAsync(root);
+
+            var packages = Assert.Single(settings.ExternalToolMenu);
+            var bundleNode = Assert.Single(packages.Children);
+            Assert.Equal("Markdown preview", bundleNode.Name);
+            Assert.True(bundleNode.IsTool);
+            Assert.Equal("Markdown preview", Assert.Single(settings.ExternalTools).Name);
+            Assert.EndsWith("markdown.tool", bundleNode.Tool!.DefinitionDirectory, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Settings_service_creates_a_toml_settings_file_and_tools_directory()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"azunyan-settings-{Guid.NewGuid():N}");
+        try
+        {
+            await SettingsFileService.EnsureExistsAsync(root);
+
+            Assert.True(File.Exists(SettingsFileService.GetSettingsFilePath(root)));
+            Assert.True(Directory.Exists(SettingsFileService.GetToolsDirectoryPath(root)));
+            var settingsText = await File.ReadAllTextAsync(SettingsFileService.GetSettingsFilePath(root));
+            Assert.Contains("TOML", settingsText, StringComparison.OrdinalIgnoreCase);
+            var settings = await SettingsFileService.LoadAsync(root);
             Assert.Empty(settings.ExternalTools);
+            await SettingsFileService.SaveAsync(root, settings);
+            Assert.Contains("TOML", await File.ReadAllTextAsync(SettingsFileService.GetSettingsFilePath(root)), StringComparison.OrdinalIgnoreCase);
         }
         finally
         {

@@ -22,7 +22,7 @@ dotnet test tests/Azunyan.Core.Tests/Azunyan.Core.Tests.csproj
 The project boundary is intentional: `Azunyan.Core`, `Azunyan.Layout`, and
 `Azunyan.WinUI` contain only reusable editor-component code. Azunote-specific
 application concerns—including the command-line contract, external tool
-runner, and JSON5 settings service—live under `src/Azunote` and are not part
+runner, and TOML settings service—live under `src/Azunote` and are not part
 of `Azunyan.Core`.
 
 Azunote application tests, including the external-tool and command-line tests,
@@ -54,7 +54,7 @@ src/
     Shell/            main window, menus, and file commands
     CommandLine/     executable command-line parsing
     ExternalTools/   external process execution
-    Settings/        JSON5 settings persistence
+    Settings/        TOML settings persistence
     FileSystem/      text-file I/O
     Language/        Azunote's built-in language providers
     Theme/           Azunote's default color scheme
@@ -101,28 +101,28 @@ Files opened from disk are watched for external changes. A clean document is
 reloaded automatically; if it has unsaved edits, Azunote asks whether to reload
 or keep the local changes.
 
-Tool definitions are stored in `%LOCALAPPDATA%\Azunote\settings.json5` and
-appear under Tools > External Tools. The file is created with an empty list on
-first launch. Tools can be added by opening Tools > Preferences..., editing the
-JSON5 document, and saving it. Comments, single-quoted strings, unquoted keys,
-and trailing commas are accepted. Azunote watches the settings file and tries
-to load valid external changes without replacing the previous settings when
-the new file is invalid.
+The settings folder is `%LOCALAPPDATA%\Azunote`. Tools > Preferences... opens
+that folder in Explorer. The folder is created on first launch and contains a
+TOML-based `settings.toml` plus a `tools` folder. Azunyan watches the settings
+folder recursively and reloads valid external changes without replacing the
+previous tool menu when a definition is invalid.
+
+Every file ending in `.tool.toml` below `tools` is one tool definition. Normal
+folders become menu submenus, so a file at `tools\Formatting\CSharp\format.tool.toml`
+appears under Tools > External Tools > Formatting > CSharp. A folder whose name
+ends in `.tool` and contains `manifest.toml` is instead one bundled tool; its
+contents are not turned into additional menu levels. The tool definition uses
+TOML fields for `name`, `command`, `arguments`, `input`, `output`, and optional
+`workingDirectory`.
 
 For example:
 
-```json5
-{
-  externalTools: [
-    {
-      name: 'Format document',
-      command: 'prettier',
-      arguments: '--write ${file}',
-      input: 'FilePath',
-      output: 'ReloadFile',
-    },
-  ],
-}
+```toml
+name = "Format document"
+command = "prettier"
+arguments = ["--write", "${file}"]
+input = "FilePath"
+output = "ReloadFile"
 ```
 
 The editor supports File/Edit/View/Help menus, Open, Save, Save As,

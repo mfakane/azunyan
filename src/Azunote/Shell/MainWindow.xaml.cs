@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.Storage;
 using Windows.Storage.Pickers;
 using Windows.System;
 using WinRT.Interop;
@@ -16,8 +17,7 @@ public sealed partial class MainWindow : Window
     private readonly IntPtr _windowHandle;
     private readonly AppWindow? _appWindow;
     private readonly ExternalToolRunner _externalToolRunner = new();
-    private readonly string _settingsPath = SettingsFileService.GetDefaultPath();
-    private readonly List<MenuFlyoutItem> _configuredToolMenuItems = new();
+    private readonly string _settingsDirectory = SettingsFileService.GetDefaultDirectory();
     private string? _filePath;
     private string _savedText = string.Empty;
     private TextEncodingKind _encoding = TextEncodingKind.Utf8;
@@ -135,7 +135,7 @@ public sealed partial class MainWindow : Window
     {
         try
         {
-            await SettingsFileService.EnsureExistsAsync(_settingsPath);
+            await SettingsFileService.EnsureExistsAsync(_settingsDirectory);
             await TryLoadSettingsAsync(showError: true);
             StartSettingsWatcher();
         }
@@ -378,28 +378,26 @@ public sealed partial class MainWindow : Window
 
     private async void PreferencesMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        if (!await ConfirmPendingChangesAsync())
-        {
-            return;
-        }
-
         try
         {
-            await SettingsFileService.EnsureExistsAsync(_settingsPath);
-            await LoadDocumentAsync(_settingsPath);
+            await SettingsFileService.EnsureExistsAsync(_settingsDirectory);
+            var folder = await StorageFolder.GetFolderFromPathAsync(_settingsDirectory);
+            if (!await Launcher.LaunchFolderAsync(folder))
+            {
+                throw new InvalidOperationException("Windows could not open the settings folder.");
+            }
         }
         catch (Exception exception)
         {
-            await ShowErrorAsync("Could not open settings", exception.Message);
+            await ShowErrorAsync("Could not open settings folder", exception.Message);
         }
     }
 
     private void RefreshExternalToolMenu()
     {
         ConfiguredExternalToolsMenuItem.Items.Clear();
-        _configuredToolMenuItems.Clear();
 
-        if (_settings.ExternalTools.Count == 0)
+        if (_settings.ExternalToolMenu.Count == 0)
         {
             ConfiguredExternalToolsMenuItem.Items.Add(
                 new MenuFlyoutItem
@@ -410,12 +408,29 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        foreach (var tool in _settings.ExternalTools)
+        AddExternalToolMenuItems(ConfiguredExternalToolsMenuItem, _settings.ExternalToolMenu);
+    }
+
+    private void AddExternalToolMenuItems(
+        MenuFlyoutSubItem parent,
+        IReadOnlyList<ExternalToolMenuNode> nodes)
+    {
+        foreach (var node in nodes)
         {
-            var menuItem = new MenuFlyoutItem { Text = tool.Name };
-            menuItem.Click += (_, _) => _ = RunConfiguredExternalToolAsync(tool);
-            ConfiguredExternalToolsMenuItem.Items.Add(menuItem);
-            _configuredToolMenuItems.Add(menuItem);
+            if (node.Tool is { } tool)
+            {
+                var menuItem = new MenuFlyoutItem { Text = node.Name };
+                menuItem.Click += (_, _) => _ = RunConfiguredExternalToolAsync(tool);
+                parent.Items.Add(menuItem);
+                continue;
+            }
+
+            var subMenu = new MenuFlyoutSubItem { Text = node.Name };
+            AddExternalToolMenuItems(subMenu, node.Children);
+            if (subMenu.Items.Count > 0)
+            {
+                parent.Items.Add(subMenu);
+            }
         }
     }
 
@@ -439,14 +454,9 @@ public sealed partial class MainWindow : Window
     {
         try
         {
-            var settings = await SettingsFileService.LoadAsync(_settingsPath);
+            var settings = await SettingsFileService.LoadAsync(_settingsDirectory);
             _settings = settings;
             RefreshExternalToolMenu();
-
-            if (IsSettingsDocumentOpen() && !IsDirty)
-            {
-                await ReloadDocumentFromDiskAsync();
-            }
 
             return true;
         }
@@ -461,30 +471,23 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private bool IsSettingsDocumentOpen() =>
-        _filePath is not null
-        && string.Equals(
-            Path.GetFullPath(_filePath),
-            Path.GetFullPath(_settingsPath),
-            StringComparison.OrdinalIgnoreCase);
-
     private void StartSettingsWatcher()
     {
         StopSettingsWatcher();
 
-        var fullPath = Path.GetFullPath(_settingsPath);
-        var directory = Path.GetDirectoryName(fullPath);
-        var fileName = Path.GetFileName(fullPath);
-        if (string.IsNullOrWhiteSpace(directory) || string.IsNullOrWhiteSpace(fileName))
+        var directory = Path.GetFullPath(_settingsDirectory);
+        if (!Directory.Exists(directory))
         {
             return;
         }
 
-        _settingsWatcher = new FileSystemWatcher(directory, fileName)
+        _settingsWatcher = new FileSystemWatcher(directory)
         {
+            IncludeSubdirectories = true,
             NotifyFilter = NotifyFilters.LastWrite
                 | NotifyFilters.Size
                 | NotifyFilters.FileName
+                | NotifyFilters.DirectoryName
         };
         _settingsWatcher.Changed += SettingsWatcher_Changed;
         _settingsWatcher.Created += SettingsWatcher_Changed;
@@ -532,10 +535,7 @@ public sealed partial class MainWindow : Window
                 return;
             }
 
-            if (!File.Exists(_settingsPath))
-            {
-                await SettingsFileService.EnsureExistsAsync(_settingsPath, cancellationToken);
-            }
+            await SettingsFileService.EnsureExistsAsync(_settingsDirectory, cancellationToken);
 
             await TryLoadSettingsAsync(showError: true);
         }

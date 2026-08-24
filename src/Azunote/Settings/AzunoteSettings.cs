@@ -1,27 +1,25 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using Tomlyn;
 
 namespace Azunote;
 
 public sealed class AzunoteSettings
 {
-    public List<ExternalToolSettings> ExternalTools { get; set; } = new();
+    /// <summary>
+    /// The tools discovered below the settings directory's tools folder.
+    /// These values are derived from tool definition files and are not written
+    /// into settings.toml.
+    /// </summary>
+    [JsonIgnore]
+    public IReadOnlyList<ExternalToolSettings> ExternalTools { get; internal set; } = [];
 
-    public IReadOnlyList<ExternalToolSettings> Validate()
-    {
-        ExternalTools ??= new List<ExternalToolSettings>();
-        foreach (var tool in ExternalTools)
-        {
-            if (tool is null)
-            {
-                throw new SettingsFileException("externalTools cannot contain null entries.");
-            }
-
-            tool.Validate();
-        }
-
-        return ExternalTools;
-    }
+    /// <summary>
+    /// The hierarchical menu nodes discovered below the tools folder.
+    /// </summary>
+    [JsonIgnore]
+    public IReadOnlyList<ExternalToolMenuNode> ExternalToolMenu { get; internal set; } = [];
 }
 
 public sealed class ExternalToolSettings
@@ -38,19 +36,41 @@ public sealed class ExternalToolSettings
 
     public string? WorkingDirectory { get; set; }
 
+    /// <summary>
+    /// The directory containing this tool definition. This is metadata from
+    /// the discovery process, not a TOML property.
+    /// </summary>
+    [JsonIgnore]
+    public string? DefinitionDirectory { get; internal set; }
+
     public ExternalToolDefinition ToDefinition()
     {
         Validate();
+
+        var workingDirectory = WorkingDirectory;
+        if (!string.IsNullOrWhiteSpace(workingDirectory)
+            && !Path.IsPathRooted(workingDirectory)
+            && !string.IsNullOrWhiteSpace(DefinitionDirectory))
+        {
+            workingDirectory = Path.GetFullPath(Path.Combine(DefinitionDirectory, workingDirectory));
+        }
+        else if (string.IsNullOrWhiteSpace(workingDirectory))
+        {
+            workingDirectory = DefinitionDirectory;
+        }
+
         return new ExternalToolDefinition(
             Command,
             Arguments,
             ParseEnum<ExternalToolInputMode>(Input, nameof(Input)),
             ParseEnum<ExternalToolOutputMode>(Output, nameof(Output)),
-            WorkingDirectory);
+            workingDirectory);
     }
 
     internal void Validate()
     {
+        Arguments ??= [];
+
         if (string.IsNullOrWhiteSpace(Name))
         {
             throw new SettingsFileException("Each external tool needs a non-empty name.");
@@ -91,34 +111,66 @@ public sealed class SettingsFileException : Exception
     }
 }
 
+/// <summary>
+/// A node in the External Tools menu. A node with a tool is a leaf; a node
+/// without one is a folder whose children become a submenu.
+/// </summary>
+public sealed class ExternalToolMenuNode
+{
+    public ExternalToolMenuNode(
+        string name,
+        ExternalToolSettings? tool = null,
+        IReadOnlyList<ExternalToolMenuNode>? children = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+        Name = name;
+        Tool = tool;
+        Children = children ?? [];
+    }
+
+    public string Name { get; }
+
+    public ExternalToolSettings? Tool { get; }
+
+    public IReadOnlyList<ExternalToolMenuNode> Children { get; }
+
+    public bool IsTool => Tool is not null;
+}
+
+public sealed class ExternalToolCatalog
+{
+    public ExternalToolCatalog(
+        IReadOnlyList<ExternalToolMenuNode> menu,
+        IReadOnlyList<ExternalToolSettings> tools)
+    {
+        Menu = menu;
+        Tools = tools;
+    }
+
+    public IReadOnlyList<ExternalToolMenuNode> Menu { get; }
+
+    public IReadOnlyList<ExternalToolSettings> Tools { get; }
+}
+
 public static class SettingsFileService
 {
-    private const string SettingsDirectoryName = "Azunote";
-    private const string SettingsFileName = "settings.json5";
-    private const string DefaultSettingsText = """
-        {
-          // External commands shown under Tools > External Tools.
-          // Text values may use ${file}, ${document}, ${selection},
-          // ${userHome}, ${lineNumber}, ${columnNumber}, or ${env:NAME}.
-          "externalTools": [
-            // {
-            //   "name": "Run C# File-based app",
-            //   "command": "dotnet",
-            //   "args": ["run", "--file", "${file}"],
-            //   "inputMode": "none",
-            //   "outputMode": "newDocument"
-            // }
-          ],
-        }
-        """;
+    public const string SettingsDirectoryName = "Azunote";
+    public const string SettingsFileName = "settings.toml";
+    public const string ToolsDirectoryName = "tools";
 
-    private static readonly JsonSerializerOptions SerializerOptions = new()
+    private const string DefaultSettingsText = """
+        # Azunote settings. This file uses TOML syntax.
+        # External tools are defined below the tools/ directory.
+        """ + "\n";
+
+    private static readonly TomlSerializerOptions SerializerOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = true
     };
 
-    public static string GetDefaultPath()
+    public static string GetDefaultDirectory()
     {
         var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         if (string.IsNullOrWhiteSpace(localAppData))
@@ -126,351 +178,94 @@ public static class SettingsFileService
             localAppData = Path.GetTempPath();
         }
 
-        return Path.Combine(localAppData, SettingsDirectoryName, SettingsFileName);
+        return Path.Combine(localAppData, SettingsDirectoryName);
     }
 
+    public static string GetSettingsFilePath(string settingsDirectory) =>
+        Path.Combine(GetFullDirectoryPath(settingsDirectory), SettingsFileName);
+
+    public static string GetToolsDirectoryPath(string settingsDirectory) =>
+        Path.Combine(GetFullDirectoryPath(settingsDirectory), ToolsDirectoryName);
+
     public static async Task EnsureExistsAsync(
-        string path,
+        string settingsDirectory,
         CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        if (File.Exists(path))
-        {
-            return;
-        }
+        var directory = GetFullDirectoryPath(settingsDirectory);
+        Directory.CreateDirectory(directory);
+        Directory.CreateDirectory(Path.Combine(directory, ToolsDirectoryName));
 
-        var directory = Path.GetDirectoryName(Path.GetFullPath(path));
-        if (!string.IsNullOrWhiteSpace(directory))
+        var settingsPath = Path.Combine(directory, SettingsFileName);
+        if (!File.Exists(settingsPath))
         {
-            Directory.CreateDirectory(directory);
+            await File.WriteAllTextAsync(
+                settingsPath,
+                DefaultSettingsText,
+                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+                cancellationToken);
         }
+    }
 
+    public static async Task<AzunoteSettings> LoadAsync(
+        string settingsDirectory,
+        CancellationToken cancellationToken = default)
+    {
+        var directory = GetFullDirectoryPath(settingsDirectory);
+        var settingsPath = Path.Combine(directory, SettingsFileName);
+        var settings = File.Exists(settingsPath)
+            ? await DeserializeAsync<AzunoteSettings>(settingsPath, cancellationToken)
+            : new AzunoteSettings();
+
+        var catalog = await ExternalToolDiscovery.LoadAsync(
+            Path.Combine(directory, ToolsDirectoryName),
+            cancellationToken);
+        settings.ExternalTools = catalog.Tools;
+        settings.ExternalToolMenu = catalog.Menu;
+        return settings;
+    }
+
+    public static async Task SaveAsync(
+        string settingsDirectory,
+        AzunoteSettings settings,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        var directory = GetFullDirectoryPath(settingsDirectory);
+        Directory.CreateDirectory(directory);
+        Directory.CreateDirectory(Path.Combine(directory, ToolsDirectoryName));
+
+        var toml = TomlSerializer.Serialize(settings, SerializerOptions);
         await File.WriteAllTextAsync(
-            path,
-            DefaultSettingsText,
+            Path.Combine(directory, SettingsFileName),
+            "# Azunote settings. This file uses TOML syntax.\n" + toml,
             new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
             cancellationToken);
     }
 
-    public static async Task<AzunoteSettings> LoadAsync(
+    internal static async Task<T> DeserializeAsync<T>(
         string path,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        if (!File.Exists(path))
-        {
-            return new AzunoteSettings();
-        }
-
-        var text = await File.ReadAllTextAsync(path, cancellationToken);
         try
         {
-            var settings = JsonSerializer.Deserialize<AzunoteSettings>(
-                Json5Normalizer.Normalize(text),
-                SerializerOptions)
-                ?? new AzunoteSettings();
-            settings.Validate();
-            return settings;
+            var text = await File.ReadAllTextAsync(path, cancellationToken);
+            return TomlSerializer.Deserialize<T>(text, SerializerOptions)
+                ?? throw new SettingsFileException($"Could not parse TOML file '{path}'.");
         }
         catch (SettingsFileException)
         {
             throw;
         }
-        catch (JsonException exception)
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            throw new SettingsFileException(
-                $"Could not parse settings file '{path}'.",
-                exception);
+            throw new SettingsFileException($"Could not parse TOML file '{path}'.", exception);
         }
     }
 
-    public static async Task SaveAsync(
-        string path,
-        AzunoteSettings settings,
-        CancellationToken cancellationToken = default)
+    private static string GetFullDirectoryPath(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        ArgumentNullException.ThrowIfNull(settings);
-        settings.Validate();
-
-        var directory = Path.GetDirectoryName(Path.GetFullPath(path));
-        if (!string.IsNullOrWhiteSpace(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
-
-        var json = JsonSerializer.Serialize(settings, SerializerOptions);
-        await File.WriteAllTextAsync(
-            path,
-            "// Azunote settings. This file uses JSON5 syntax.\n" + json + Environment.NewLine,
-            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
-            cancellationToken);
-    }
-
-    private static class Json5Normalizer
-    {
-        public static string Normalize(string text)
-        {
-            ArgumentNullException.ThrowIfNull(text);
-            return RemoveTrailingCommas(
-                QuoteUnquotedKeys(RemoveCommentsAndConvertStrings(text)));
-        }
-
-        private static string RemoveCommentsAndConvertStrings(string text)
-        {
-            var output = new StringBuilder(text.Length);
-            var inDoubleQuotedString = false;
-            var inSingleQuotedString = false;
-            var escaped = false;
-
-            for (var index = 0; index < text.Length; index++)
-            {
-                var current = text[index];
-                var next = index + 1 < text.Length ? text[index + 1] : '\0';
-
-                if (inSingleQuotedString)
-                {
-                    if (escaped)
-                    {
-                        output.Append(ConvertSingleQuotedEscape(current));
-                        escaped = false;
-                    }
-                    else if (current == '\\')
-                    {
-                        escaped = true;
-                    }
-                    else if (current == '\'')
-                    {
-                        output.Append('"');
-                        inSingleQuotedString = false;
-                    }
-                    else
-                    {
-                        if (current == '"')
-                        {
-                            output.Append('\\');
-                        }
-
-                        output.Append(current);
-                    }
-
-                    continue;
-                }
-
-                if (inDoubleQuotedString)
-                {
-                    output.Append(current);
-                    if (escaped)
-                    {
-                        escaped = false;
-                    }
-                    else if (current == '\\')
-                    {
-                        escaped = true;
-                    }
-                    else if (current == '"')
-                    {
-                        inDoubleQuotedString = false;
-                    }
-
-                    continue;
-                }
-
-                if (current == '/' && next == '/')
-                {
-                    index += 2;
-                    while (index < text.Length && text[index] is not '\r' and not '\n')
-                    {
-                        index++;
-                    }
-
-                    if (index < text.Length)
-                    {
-                        output.Append(text[index]);
-                    }
-
-                    continue;
-                }
-
-                if (current == '/' && next == '*')
-                {
-                    index += 2;
-                    while (index + 1 < text.Length
-                        && !(text[index] == '*' && text[index + 1] == '/'))
-                    {
-                        if (text[index] is '\r' or '\n')
-                        {
-                            output.Append(text[index]);
-                        }
-
-                        index++;
-                    }
-
-                    index++;
-                    continue;
-                }
-
-                if (current == '"')
-                {
-                    inDoubleQuotedString = true;
-                }
-                else if (current == '\'')
-                {
-                    output.Append('"');
-                    inSingleQuotedString = true;
-                    continue;
-                }
-
-                output.Append(current);
-            }
-
-            if (inSingleQuotedString || inDoubleQuotedString || escaped)
-            {
-                throw new SettingsFileException("A settings string is not terminated.");
-            }
-
-            return output.ToString();
-        }
-
-        private static char ConvertSingleQuotedEscape(char value) => value switch
-        {
-            '\'' => '\'',
-            '"' => '"',
-            '\\' => '\\',
-            '/' => '/',
-            'b' => '\b',
-            'f' => '\f',
-            'n' => '\n',
-            'r' => '\r',
-            't' => '\t',
-            _ => value
-        };
-
-        private static string QuoteUnquotedKeys(string text)
-        {
-            var output = new StringBuilder(text.Length);
-            var inString = false;
-            var escaped = false;
-
-            for (var index = 0; index < text.Length; index++)
-            {
-                var current = text[index];
-                output.Append(current);
-                if (inString)
-                {
-                    if (escaped)
-                    {
-                        escaped = false;
-                    }
-                    else if (current == '\\')
-                    {
-                        escaped = true;
-                    }
-                    else if (current == '"')
-                    {
-                        inString = false;
-                    }
-
-                    continue;
-                }
-
-                if (current == '"')
-                {
-                    inString = true;
-                    continue;
-                }
-
-                if (current is not '{' and not ',')
-                {
-                    continue;
-                }
-
-                var whitespaceStart = index + 1;
-                var keyStart = whitespaceStart;
-                while (keyStart < text.Length && char.IsWhiteSpace(text[keyStart]))
-                {
-                    keyStart++;
-                }
-
-                var keyEnd = keyStart;
-                while (keyEnd < text.Length
-                    && (char.IsLetterOrDigit(text[keyEnd]) || text[keyEnd] is '_' or '$'))
-                {
-                    keyEnd++;
-                }
-
-                var colon = keyEnd;
-                while (colon < text.Length && char.IsWhiteSpace(text[colon]))
-                {
-                    colon++;
-                }
-
-                if (keyEnd > keyStart && colon < text.Length && text[colon] == ':')
-                {
-                    output.Append(text, whitespaceStart, keyStart - whitespaceStart);
-                    output.Append('"');
-                    output.Append(text, keyStart, keyEnd - keyStart);
-                    output.Append('"');
-                    index = keyEnd - 1;
-                }
-            }
-
-            return output.ToString();
-        }
-
-        private static string RemoveTrailingCommas(string text)
-        {
-            var output = new StringBuilder(text.Length);
-            var inString = false;
-            var escaped = false;
-
-            for (var index = 0; index < text.Length; index++)
-            {
-                var current = text[index];
-                if (inString)
-                {
-                    output.Append(current);
-                    if (escaped)
-                    {
-                        escaped = false;
-                    }
-                    else if (current == '\\')
-                    {
-                        escaped = true;
-                    }
-                    else if (current == '"')
-                    {
-                        inString = false;
-                    }
-
-                    continue;
-                }
-
-                if (current == '"')
-                {
-                    inString = true;
-                    output.Append(current);
-                    continue;
-                }
-
-                if (current == ',')
-                {
-                    var lookahead = index + 1;
-                    while (lookahead < text.Length && char.IsWhiteSpace(text[lookahead]))
-                    {
-                        lookahead++;
-                    }
-
-                    if (lookahead < text.Length && text[lookahead] is '}' or ']')
-                    {
-                        continue;
-                    }
-                }
-
-                output.Append(current);
-            }
-
-            return output.ToString();
-        }
+        return Path.GetFullPath(path);
     }
 }
