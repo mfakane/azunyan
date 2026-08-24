@@ -15,7 +15,7 @@ namespace Azunyan.WinUI;
 /// anchoring, selection rendering, scrolling, and Edit UI Automation patterns.
 /// The core <see cref="Document"/> remains the source of editing semantics.
 /// </summary>
-public sealed class AzunyanEditorControl : TextBox
+public sealed partial class AzunyanEditorControl : TextBox
 {
     private bool _synchronizing;
     private TextRange? _compositionRange;

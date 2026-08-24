@@ -12,6 +12,16 @@ The project targets Windows x64 and uses the Windows App SDK 2.4.0.
 dotnet build Azunyan.slnx -c Debug
 ```
 
+Release publishing uses Native AOT, full trimming, and a self-contained
+Windows App SDK runtime:
+
+```powershell
+dotnet publish src/Azunote/Azunote.csproj -c Release -r win-x64 --self-contained true
+```
+
+The runnable output is written below
+`src/Azunote/bin/Release/net8.0-windows10.0.19041.0/win-x64/publish`.
+
 The UI-independent editing model lives in `src/Azunyan.Core` and can be
 tested without WinUI:
 

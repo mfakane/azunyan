@@ -429,6 +429,7 @@ public static class ExternalToolDiscovery
         {
             var tool = await SettingsFileService.DeserializeAsync<ExternalToolSettings>(
                 path,
+                AzunoteTomlSerializerContext.Default.ExternalToolSettings,
                 cancellationToken);
             if (string.IsNullOrWhiteSpace(tool.Name))
             {

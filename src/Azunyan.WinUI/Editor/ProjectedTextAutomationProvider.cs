@@ -24,7 +24,7 @@ internal sealed record ProjectedTextAutomationTarget(
 /// TextBox remains the input/IME host, but automation clients see the same
 /// immutable document ranges and projected geometry that the renderer uses.
 /// </summary>
-internal sealed class ProjectedTextAutomationProvider : ITextProvider, ITextProvider2
+internal sealed partial class ProjectedTextAutomationProvider : ITextProvider, ITextProvider2
 {
     private readonly AzunyanEditorView _owner;
 
@@ -70,13 +70,13 @@ internal sealed class ProjectedTextAutomationProvider : ITextProvider, ITextProv
         new(_owner, range);
 }
 
-internal sealed class ProjectedTextAutomationButton : Button
+internal sealed partial class ProjectedTextAutomationButton : Button
 {
     protected override AutomationPeer OnCreateAutomationPeer() =>
         new ProjectedTextAutomationButtonPeer(this);
 }
 
-internal sealed class ProjectedTextAutomationButtonPeer : ButtonAutomationPeer
+internal sealed partial class ProjectedTextAutomationButtonPeer : ButtonAutomationPeer
 {
     public ProjectedTextAutomationButtonPeer(ProjectedTextAutomationButton owner)
         : base(owner)
@@ -91,7 +91,7 @@ internal sealed class ProjectedTextAutomationButtonPeer : ButtonAutomationPeer
 /// Operations that change editor state are forwarded to the same document
 /// selection and projected scroll path used by keyboard and pointer input.
 /// </summary>
-internal sealed class ProjectedTextRangeProvider : ITextRangeProvider
+internal sealed partial class ProjectedTextRangeProvider : ITextRangeProvider
 {
     private readonly AzunyanEditorView _owner;
     private readonly TextSnapshot _snapshot;

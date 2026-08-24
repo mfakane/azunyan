@@ -1,7 +1,7 @@
 using System.Text;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using Tomlyn;
+using Tomlyn.Serialization;
 
 namespace Azunote;
 
@@ -20,6 +20,15 @@ public sealed class AzunoteSettings
     /// </summary>
     [JsonIgnore]
     public IReadOnlyList<ExternalToolMenuNode> ExternalToolMenu { get; internal set; } = [];
+}
+
+[TomlSourceGenerationOptions(
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    WriteIndented = true)]
+[TomlSerializable(typeof(AzunoteSettings))]
+[TomlSerializable(typeof(ExternalToolSettings))]
+internal partial class AzunoteTomlSerializerContext : TomlSerializerContext
+{
 }
 
 public sealed class ExternalToolSettings
@@ -164,12 +173,6 @@ public static class SettingsFileService
         # External tools are defined below the tools/ directory.
         """ + "\n";
 
-    private static readonly TomlSerializerOptions SerializerOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = true
-    };
-
     public static string GetDefaultDirectory()
     {
         var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
@@ -213,7 +216,10 @@ public static class SettingsFileService
         var directory = GetFullDirectoryPath(settingsDirectory);
         var settingsPath = Path.Combine(directory, SettingsFileName);
         var settings = File.Exists(settingsPath)
-            ? await DeserializeAsync<AzunoteSettings>(settingsPath, cancellationToken)
+            ? await DeserializeAsync(
+                settingsPath,
+                AzunoteTomlSerializerContext.Default.AzunoteSettings,
+                cancellationToken)
             : new AzunoteSettings();
 
         var catalog = await ExternalToolDiscovery.LoadAsync(
@@ -235,7 +241,9 @@ public static class SettingsFileService
         Directory.CreateDirectory(directory);
         Directory.CreateDirectory(Path.Combine(directory, ToolsDirectoryName));
 
-        var toml = TomlSerializer.Serialize(settings, SerializerOptions);
+        var toml = TomlSerializer.Serialize(
+            settings,
+            AzunoteTomlSerializerContext.Default.AzunoteSettings);
         await File.WriteAllTextAsync(
             Path.Combine(directory, SettingsFileName),
             "# Azunote settings. This file uses TOML syntax.\n" + toml,
@@ -245,12 +253,13 @@ public static class SettingsFileService
 
     internal static async Task<T> DeserializeAsync<T>(
         string path,
+        TomlTypeInfo<T> typeInfo,
         CancellationToken cancellationToken)
     {
         try
         {
             var text = await File.ReadAllTextAsync(path, cancellationToken);
-            return TomlSerializer.Deserialize<T>(text, SerializerOptions)
+            return TomlSerializer.Deserialize(text, typeInfo)
                 ?? throw new SettingsFileException($"Could not parse TOML file '{path}'.");
         }
         catch (SettingsFileException)

@@ -9,7 +9,7 @@ namespace Azunyan.WinUI;
 /// remains the compatibility implementation for custom renderers, while the
 /// projected surface exposes snapshot-bound text ranges and geometry.
 /// </summary>
-internal sealed class AzunyanEditorViewAutomationPeer : FrameworkElementAutomationPeer
+internal sealed partial class AzunyanEditorViewAutomationPeer : FrameworkElementAutomationPeer
 {
     private readonly AzunyanEditorView _owner;
     private ProjectedTextAutomationProvider? _projectedTextProvider;
