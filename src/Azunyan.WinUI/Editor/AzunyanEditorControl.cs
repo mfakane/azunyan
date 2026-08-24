@@ -192,14 +192,60 @@ public sealed class AzunyanEditorControl : TextBox
         if (!string.Equals(previousText, currentText, StringComparison.Ordinal))
         {
             var (range, insertedText) = FindReplacement(previousText, currentText);
-            var replacement = AutoIndentOnEnter
+            var replacementRange = range;
+            var indentationPosition = range.Start;
+            var autoIndentLineBreak = AutoIndentOnEnter
                 && !IsComposing
-                && IsLineBreak(insertedText)
+                && IsLineBreakWithOptionalIndentation(insertedText);
+
+            if (autoIndentLineBreak)
+            {
+                replacementRange = TextEditorCommands.GetNewLineReplacementRange(
+                    Document.Snapshot,
+                    range);
+            }
+
+            if (autoIndentLineBreak
+                && TryGetNativeClosingLineBreakInsertion(
+                    Document.Snapshot,
+                    range,
+                    out var lineBreakPosition))
+            {
+                // The native TextBox can report Enter at the start of an
+                // existing closing-delimiter line. Keep that line intact and
+                // insert the new indented line before its original ending.
+                replacementRange = TextRange.Empty(lineBreakPosition);
+                indentationPosition = lineBreakPosition;
+            }
+
+            var replacement = autoIndentLineBreak
                 ? TextEditorCommands.GetNewLineWithAutoIndentation(
                     Document.Snapshot,
-                    range.Start)
+                    indentationPosition)
                 : insertedText;
-            Document.Replace(range, replacement);
+
+            if (AutoIndentOnEnter
+                && !IsComposing
+                && insertedText.Length == 1
+                && TextEditorCommands.TryGetClosingDelimiterDedent(
+                    Document.Snapshot,
+                    range.End,
+                    insertedText[0],
+                    out var indentationRange,
+                    out var targetIndentation))
+            {
+                var isNativeIndentationReplacement =
+                    !range.IsEmpty
+                    && range.Start == indentationRange.Start
+                    && range.End == indentationRange.End;
+                if (range.IsEmpty || isNativeIndentationReplacement)
+                {
+                    replacementRange = indentationRange;
+                    replacement = targetIndentation + insertedText;
+                }
+            }
+
+            Document.Replace(replacementRange, replacement);
 
             if (!string.Equals(Text, Document.Text, StringComparison.Ordinal))
             {
@@ -353,8 +399,108 @@ public sealed class AzunyanEditorControl : TextBox
         return state.HasFlag(CoreVirtualKeyStates.Down);
     }
 
-    private static bool IsLineBreak(string text) =>
-        text is "\r" or "\n" or "\r\n";
+    private static bool IsLineBreakWithOptionalIndentation(string text)
+    {
+        if (!TryGetLineBreakLength(text, out var lineBreakLength))
+        {
+            return false;
+        }
+
+        for (var index = lineBreakLength; index < text.Length; index++)
+        {
+            if (text[index] is not (' ' or '\t'))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryGetNativeClosingLineBreakInsertion(
+        TextSnapshot snapshot,
+        TextRange range,
+        out int insertionPosition)
+    {
+        insertionPosition = 0;
+        if (range.Start >= snapshot.Length)
+        {
+            return false;
+        }
+
+        var line = snapshot.Lines.GetLine(range.Start);
+        var lineStart = snapshot.Lines.GetLineStart(line);
+        if (range.Start != lineStart)
+        {
+            return false;
+        }
+
+        var lineEnd = snapshot.Lines.GetLineEnd(line);
+        var text = snapshot.Text;
+        var firstCodePosition = range.Start;
+        while (firstCodePosition < lineEnd
+            && text[firstCodePosition] is ' ' or '\t')
+        {
+            firstCodePosition++;
+        }
+
+        if (firstCodePosition >= lineEnd
+            || (!range.IsEmpty && range.End > firstCodePosition)
+            || !IsClosingDelimiter(text[firstCodePosition])
+            || !TryGetLineEndingLengthBefore(
+                text,
+                range.Start,
+                out var lineEndingLength))
+        {
+            return false;
+        }
+
+        insertionPosition = range.Start - lineEndingLength;
+        return true;
+    }
+
+    private static bool TryGetLineBreakLength(string text, out int length)
+    {
+        if (text.StartsWith("\r\n", StringComparison.Ordinal))
+        {
+            length = 2;
+            return true;
+        }
+
+        if (text.Length > 0 && text[0] is ('\r' or '\n'))
+        {
+            length = 1;
+            return true;
+        }
+
+        length = 0;
+        return false;
+    }
+
+    private static bool TryGetLineEndingLengthBefore(
+        string text,
+        int position,
+        out int length)
+    {
+        if (position >= 2
+            && text[position - 2] == '\r'
+            && text[position - 1] == '\n')
+        {
+            length = 2;
+            return true;
+        }
+
+        if (position >= 1 && text[position - 1] is '\r' or '\n')
+        {
+            length = 1;
+            return true;
+        }
+
+        length = 0;
+        return false;
+    }
+
+    private static bool IsClosingDelimiter(char value) => value is '}' or ']' or ')';
 
     private static (TextRange Range, string InsertedText) FindReplacement(string previousText, string currentText)
     {

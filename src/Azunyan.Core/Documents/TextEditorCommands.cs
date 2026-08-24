@@ -1,5 +1,18 @@
 namespace Azunyan.Core;
 
+public enum IndentationKind
+{
+    Spaces,
+    Tabs,
+}
+
+public readonly record struct IndentationSettings(IndentationKind Kind, int Size)
+{
+    public string DisplayName => Kind == IndentationKind.Tabs
+        ? $"Tab Size: {Size}"
+        : $"Spaces: {Size}";
+}
+
 /// <summary>
 /// Small, UI-independent editing commands shared by text controls. The
 /// commands keep the document's selection direction and operate on grapheme
@@ -8,6 +21,9 @@ namespace Azunyan.Core;
 /// </summary>
 public static class TextEditorCommands
 {
+    private const string DefaultIndentation = "  ";
+    private const int DefaultTabSize = 4;
+
     public static void MoveCaretByGrapheme(Document document, int count, bool extendSelection = false)
     {
         ArgumentNullException.ThrowIfNull(document);
@@ -100,20 +116,139 @@ public static class TextEditorCommands
         ArgumentNullException.ThrowIfNull(document);
 
         var selection = document.Selection;
+        var replacementRange = GetNewLineReplacementRange(
+            document.Snapshot,
+            selection.Range);
         return document.Replace(
-            selection.Range,
+            replacementRange,
             GetNewLineWithAutoIndentation(document.Snapshot, selection.Start));
     }
 
     /// <summary>
+    /// Returns the range to replace for an auto-indented line break. A
+    /// whitespace-only line is normalized to a true empty line before the
+    /// new indented line is inserted.
+    /// </summary>
+    public static TextRange GetNewLineReplacementRange(
+        TextSnapshot snapshot,
+        TextRange selection)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        if (!selection.IsEmpty)
+        {
+            return selection;
+        }
+
+        var line = snapshot.Lines.GetLine(selection.Start);
+        var lineStart = snapshot.Lines.GetLineStart(line);
+        var lineEnd = snapshot.Lines.GetLineEnd(line);
+        var indentation = GetLineIndentation(snapshot, selection.Start);
+        if (selection.Start == lineEnd
+            && lineStart + indentation.Length == lineEnd)
+        {
+            return TextRange.FromBounds(lineStart, lineEnd);
+        }
+
+        return selection;
+    }
+
+    /// <summary>
     /// Returns a line break followed by the indentation that should be copied
-    /// from the line containing <paramref name="position"/>.
+    /// from the line containing <paramref name="position"/> and adjusted for
+    /// the surrounding bracket structure.
     /// </summary>
     public static string GetNewLineWithAutoIndentation(TextSnapshot snapshot, int position)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         return GetPreferredLineEnding(snapshot.Text)
-            + GetLineIndentation(snapshot, position);
+            + GetAutoIndentation(snapshot, position);
+    }
+
+    /// <summary>
+    /// If <paramref name="position"/> is at the end of a line's indentation,
+    /// returns the range that should be replaced when a closing delimiter is
+    /// typed there. This keeps a closing JSON/object or array delimiter at its
+    /// parent indentation level.
+    /// </summary>
+    public static bool TryGetClosingDelimiterDedent(
+        TextSnapshot snapshot,
+        int position,
+        char delimiter,
+        out TextRange indentationRange)
+    {
+        return TryGetClosingDelimiterDedent(
+            snapshot,
+            position,
+            delimiter,
+            out indentationRange,
+            out _);
+    }
+
+    /// <summary>
+    /// If a closing delimiter is about to be typed at the end of a line's
+    /// indentation, returns both the indentation range and the indentation
+    /// that belongs to the matching parent delimiter.
+    /// </summary>
+    public static bool TryGetClosingDelimiterDedent(
+        TextSnapshot snapshot,
+        int position,
+        char delimiter,
+        out TextRange indentationRange,
+        out string targetIndentation)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        indentationRange = default;
+        targetIndentation = string.Empty;
+
+        if (!IsClosingDelimiter(delimiter))
+        {
+            return false;
+        }
+
+        var line = snapshot.Lines.GetLine(position);
+        var lineStart = snapshot.Lines.GetLineStart(line);
+        var indentation = GetLineIndentation(snapshot, position);
+        var indentationEnd = lineStart + indentation.Length;
+        if (position != indentationEnd || indentation.Length == 0)
+        {
+            return false;
+        }
+
+        var stack = GetBracketStack(snapshot.Text, position);
+        if (stack.Count == 0 || !IsMatchingDelimiter(stack[^1], delimiter))
+        {
+            return false;
+        }
+
+        stack.RemoveAt(stack.Count - 1);
+        targetIndentation = Repeat(GetIndentationUnit(snapshot, line), stack.Count);
+        if (targetIndentation.Length >= indentation.Length)
+        {
+            targetIndentation = string.Empty;
+            return false;
+        }
+
+        indentationRange = TextRange.FromBounds(lineStart, indentationEnd);
+        return true;
+    }
+
+    /// <summary>
+    /// Returns the indentation convention inferred from the document near
+    /// <paramref name="position"/>. Tabs use the conventional four-column
+    /// display width because a tab's visual width is not encoded in text.
+    /// </summary>
+    public static IndentationSettings GetIndentationSettings(
+        TextSnapshot snapshot,
+        int position)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        var line = snapshot.Lines.GetLine(position);
+        var unit = GetIndentationUnit(snapshot, line);
+        return unit.Contains('\t')
+            ? new IndentationSettings(IndentationKind.Tabs, DefaultTabSize)
+            : new IndentationSettings(IndentationKind.Spaces, Math.Max(unit.Length, 1));
     }
 
     /// <summary>
@@ -154,5 +289,233 @@ public static class TextEditorCommands
         }
 
         return Environment.NewLine;
+    }
+
+    private static string GetAutoIndentation(TextSnapshot snapshot, int position)
+    {
+        var line = snapshot.Lines.GetLine(position);
+        var existingIndentation = GetLineIndentation(snapshot, position);
+
+        var lineStart = snapshot.Lines.GetLineStart(line);
+        var lineEnd = snapshot.Lines.GetLineEnd(line);
+        var firstCodeCharacter = FindFirstCodeCharacter(
+            snapshot.Text,
+            lineStart + existingIndentation.Length,
+            Math.Min(position, lineEnd));
+
+        var sourceLine = line;
+        if (firstCodeCharacter < 0)
+        {
+            sourceLine = FindPreviousNonBlankLine(snapshot, line);
+            if (sourceLine < 0)
+            {
+                return existingIndentation;
+            }
+        }
+
+        var sourceLineStart = snapshot.Lines.GetLineStart(sourceLine);
+        var sourceLineEnd = snapshot.Lines.GetLineEnd(sourceLine);
+        var sourceIndentation = GetLineIndentation(snapshot, sourceLineStart);
+        var sourceFirstCodeCharacter = FindFirstCodeCharacter(
+            snapshot.Text,
+            sourceLineStart + sourceIndentation.Length,
+            sourceLineEnd);
+        var stackAtSourceEnd = GetBracketStack(snapshot.Text, sourceLineEnd);
+
+        if (sourceFirstCodeCharacter >= 0
+            && IsClosingDelimiter(snapshot.Text[sourceFirstCodeCharacter]))
+        {
+            var structuralIndentation = Repeat(
+                GetIndentationUnit(snapshot, sourceLine),
+                stackAtSourceEnd.Count);
+            return structuralIndentation.Length < sourceIndentation.Length
+                ? structuralIndentation
+                : sourceIndentation;
+        }
+
+        var stackAtSourceStart = GetBracketStack(snapshot.Text, sourceLineStart);
+        if (stackAtSourceEnd.Count > stackAtSourceStart.Count)
+        {
+            return sourceIndentation + GetIndentationUnit(snapshot, sourceLine);
+        }
+
+        // A normal line carries its own indentation forward. This preserves
+        // an intentional manual dedent instead of restoring the indentation
+        // implied by an outer bracket.
+        return sourceIndentation;
+    }
+
+    private static int FindPreviousNonBlankLine(TextSnapshot snapshot, int line)
+    {
+        for (var candidate = line - 1; candidate >= 0; candidate--)
+        {
+            var lineStart = snapshot.Lines.GetLineStart(candidate);
+            var lineEnd = snapshot.Lines.GetLineEnd(candidate);
+            if (FindFirstCodeCharacter(snapshot.Text, lineStart, lineEnd) >= 0)
+            {
+                return candidate;
+            }
+        }
+
+        return -1;
+    }
+
+    private static string GetIndentationUnit(TextSnapshot snapshot, int line)
+    {
+        var currentIndentation = GetLineIndentation(
+            snapshot,
+            snapshot.Lines.GetLineStart(line));
+        if (currentIndentation.Contains('\t'))
+        {
+            return "\t";
+        }
+
+        var greatestCommonDivisor = 0;
+        for (var candidateLine = 0; candidateLine <= line; candidateLine++)
+        {
+            var indentation = GetLineIndentation(
+                snapshot,
+                snapshot.Lines.GetLineStart(candidateLine));
+            if (indentation.Contains('\t'))
+            {
+                continue;
+            }
+
+            var width = indentation.Length;
+            if (width == 0)
+            {
+                continue;
+            }
+
+            greatestCommonDivisor = greatestCommonDivisor == 0
+                ? width
+                : GreatestCommonDivisor(greatestCommonDivisor, width);
+        }
+
+        return greatestCommonDivisor == 0
+            ? DefaultIndentation
+            : new string(' ', greatestCommonDivisor);
+    }
+
+    private static List<char> GetBracketStack(string text, int position)
+    {
+        var stack = new List<char>();
+        var quote = '\0';
+        var inLineComment = false;
+        var inBlockComment = false;
+
+        for (var index = 0; index < position; index++)
+        {
+            var current = text[index];
+            var next = index + 1 < position ? text[index + 1] : '\0';
+
+            if (inLineComment)
+            {
+                if (current is '\r' or '\n')
+                {
+                    inLineComment = false;
+                }
+
+                continue;
+            }
+
+            if (inBlockComment)
+            {
+                if (current == '*' && next == '/')
+                {
+                    inBlockComment = false;
+                    index++;
+                }
+
+                continue;
+            }
+
+            if (quote != '\0')
+            {
+                if (current == '\\')
+                {
+                    index++;
+                }
+                else if (current == quote)
+                {
+                    quote = '\0';
+                }
+
+                continue;
+            }
+
+            if ((current is '\'' or '"') && quote == '\0')
+            {
+                quote = current;
+                continue;
+            }
+
+            if (current == '/' && next == '/')
+            {
+                inLineComment = true;
+                index++;
+                continue;
+            }
+
+            if (current == '/' && next == '*')
+            {
+                inBlockComment = true;
+                index++;
+                continue;
+            }
+
+            if (IsOpeningDelimiter(current))
+            {
+                stack.Add(current);
+            }
+            else if (IsClosingDelimiter(current)
+                && stack.Count > 0
+                && IsMatchingDelimiter(stack[^1], current))
+            {
+                stack.RemoveAt(stack.Count - 1);
+            }
+        }
+
+        return stack;
+    }
+
+    private static int FindFirstCodeCharacter(string text, int start, int end)
+    {
+        for (var index = start; index < end; index++)
+        {
+            if (!char.IsWhiteSpace(text[index]))
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    private static string Repeat(string value, int count)
+    {
+        if (count == 0)
+        {
+            return string.Empty;
+        }
+
+        return string.Concat(Enumerable.Repeat(value, count));
+    }
+
+    private static bool IsOpeningDelimiter(char value) => value is '{' or '[' or '(';
+
+    private static bool IsClosingDelimiter(char value) => value is '}' or ']' or ')';
+
+    private static bool IsMatchingDelimiter(char opening, char closing) =>
+        (opening, closing) is ('{', '}') or ('[', ']') or ('(', ')');
+
+    private static int GreatestCommonDivisor(int left, int right)
+    {
+        while (right != 0)
+        {
+            (left, right) = (right, left % right);
+        }
+
+        return left;
     }
 }

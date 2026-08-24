@@ -165,6 +165,125 @@ public sealed class DocumentTests
     }
 
     [Fact]
+    public void Newline_auto_indent_adds_a_level_after_json_delimiters()
+    {
+        var document = new Document("{");
+        document.SetCaret(document.Length);
+
+        TextEditorCommands.InsertNewLineWithAutoIndent(document);
+
+        Assert.Equal("{" + Environment.NewLine + "  ", document.Text);
+        Assert.Equal(Environment.NewLine + "  ",
+            TextEditorCommands.GetNewLineWithAutoIndentation(
+                new TextSnapshot("{"),
+                1));
+
+        document.Insert("\"name\": [");
+        TextEditorCommands.InsertNewLineWithAutoIndent(document);
+
+        Assert.Equal(
+            "{" + Environment.NewLine + "  \"name\": [" + Environment.NewLine + "    ",
+            document.Text);
+    }
+
+    [Fact]
+    public void Newline_auto_indent_dedents_closing_json_delimiters()
+    {
+        var snapshot = new TextSnapshot("{" + Environment.NewLine + "  }");
+        var position = snapshot.Length;
+
+        Assert.Equal(Environment.NewLine,
+            TextEditorCommands.GetNewLineWithAutoIndentation(snapshot, position));
+
+        var indentationSnapshot = new TextSnapshot("{" + Environment.NewLine + "  ");
+        Assert.True(TextEditorCommands.TryGetClosingDelimiterDedent(
+            indentationSnapshot,
+            indentationSnapshot.Length,
+            '}',
+            out var indentationRange));
+        Assert.Equal(new TextRange(indentationSnapshot.Length - 2, 2), indentationRange);
+
+        var nestedIndentationSnapshot = new TextSnapshot(
+            "{" + Environment.NewLine + "  a: [" + Environment.NewLine + "    \"b\"" + Environment.NewLine + "    ");
+        Assert.True(TextEditorCommands.TryGetClosingDelimiterDedent(
+            nestedIndentationSnapshot,
+            nestedIndentationSnapshot.Length,
+            ']',
+            out var nestedIndentationRange,
+            out var targetIndentation));
+        Assert.Equal(new TextRange(nestedIndentationSnapshot.Length - 4, 4), nestedIndentationRange);
+        Assert.Equal("  ", targetIndentation);
+    }
+
+    [Fact]
+    public void Newline_auto_indent_keeps_a_following_closing_delimiter_on_its_line()
+    {
+        var newline = Environment.NewLine;
+        var document = new Document("{" + newline + "  a: [" + newline + "}");
+        document.SetCaret(("{" + newline + "  a: [").Length);
+
+        TextEditorCommands.InsertNewLineWithAutoIndent(document);
+
+        Assert.Equal("{" + newline + "  a: [" + newline + "    " + newline + "}", document.Text);
+    }
+
+    [Fact]
+    public void Newline_auto_indent_preserves_a_manual_dedent_on_a_regular_line()
+    {
+        var snapshot = new TextSnapshot("{\n  a\nb");
+
+        Assert.Equal("\n", TextEditorCommands.GetNewLineWithAutoIndentation(
+            snapshot,
+            snapshot.Length));
+    }
+
+    [Fact]
+    public void Newline_auto_indent_keeps_the_previous_line_indentation_through_blank_lines()
+    {
+        var lineWithText = new TextSnapshot("  a\n  b");
+        var blankLine = new TextSnapshot("  a\n  b\n  ");
+
+        Assert.Equal("\n  ", TextEditorCommands.GetNewLineWithAutoIndentation(
+            lineWithText,
+            lineWithText.Length));
+        Assert.Equal("\n  ", TextEditorCommands.GetNewLineWithAutoIndentation(
+            blankLine,
+            blankLine.Length));
+    }
+
+    [Fact]
+    public void Newline_auto_indent_turns_an_indented_blank_line_into_a_true_blank_line()
+    {
+        var document = new Document("  a\n  b\n  ");
+        document.SetCaret(document.Length);
+
+        TextEditorCommands.InsertNewLineWithAutoIndent(document);
+
+        Assert.Equal("  a\n  b\n\n  ", document.Text);
+    }
+
+    [Fact]
+    public void Newline_auto_indent_ignores_delimiters_in_strings_and_comments()
+    {
+        var snapshot = new TextSnapshot(
+            "{\n  \"literal\": \"}\", // ]\n  value");
+
+        Assert.Equal("\n  ",
+            TextEditorCommands.GetNewLineWithAutoIndentation(snapshot, snapshot.Length));
+    }
+
+    [Fact]
+    public void Indentation_settings_infer_spaces_and_tabs()
+    {
+        Assert.Equal(
+            new IndentationSettings(IndentationKind.Spaces, 2),
+            TextEditorCommands.GetIndentationSettings(new TextSnapshot("{\n  value"), 8));
+        Assert.Equal(
+            new IndentationSettings(IndentationKind.Tabs, 4),
+            TextEditorCommands.GetIndentationSettings(new TextSnapshot("{\n\tvalue"), 7));
+    }
+
+    [Fact]
     public void Grapheme_navigation_and_delete_keep_emoji_and_combining_sequences_together()
     {
         const string text = "a👩‍💻éb";

@@ -40,6 +40,7 @@ public sealed partial class AzunyanEditorView : UserControl
     private bool _synchronizingProjectedScroll;
     private bool _preservingViewport;
     private bool _completionRequested;
+    private bool _explicitCompletionRequested;
     private bool _applyingCompletion;
     private int _hoverPosition = -1;
 
@@ -61,7 +62,10 @@ public sealed partial class AzunyanEditorView : UserControl
         InputEditor.DocumentChanged += OnInputDocumentChanged;
         InputEditor.SelectionChanged += OnInputSelectionChanged;
         InputEditor.CompositionChanged += OnInputCompositionChanged;
-        InputEditor.KeyDown += OnInputKeyDown;
+        InputEditor.AddHandler(
+            UIElement.KeyDownEvent,
+            new KeyEventHandler(OnInputKeyDown),
+            true);
         InputEditor.PointerPressed += OnInputPointerPressed;
         InputEditor.PointerMoved += OnInputPointerMoved;
         InputEditor.PointerExited += OnInputPointerExited;
@@ -347,7 +351,8 @@ public sealed partial class AzunyanEditorView : UserControl
             && !_applyingCompletion
             && InputEditor.FocusState != FocusState.Unfocused)
         {
-            _completionRequested = true;
+            _explicitCompletionRequested = false;
+            _completionRequested = HasCompletionPrefix();
         }
 
         RenderViewport();
@@ -364,6 +369,7 @@ public sealed partial class AzunyanEditorView : UserControl
     private void OnInputCompositionChanged(object? sender, EventArgs args)
     {
         _completionRequested = false;
+        _explicitCompletionRequested = false;
         HideCompletionPopup();
         RenderViewport();
         if (!InputEditor.IsComposing)
@@ -402,12 +408,15 @@ public sealed partial class AzunyanEditorView : UserControl
                     return;
                 case VirtualKey.Enter:
                 case VirtualKey.Tab:
-                    AcceptSelectedCompletion();
-                    args.Handled = true;
+                    if (TryAcceptSelectedCompletion())
+                    {
+                        args.Handled = true;
+                    }
                     return;
                 case VirtualKey.Escape:
                     HideCompletionPopup();
                     _completionRequested = false;
+                    _explicitCompletionRequested = false;
                     args.Handled = true;
                     return;
             }
@@ -417,6 +426,7 @@ public sealed partial class AzunyanEditorView : UserControl
             && InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control)
                 .HasFlag(CoreVirtualKeyStates.Down))
         {
+            _explicitCompletionRequested = true;
             _completionRequested = true;
             RequestProviderResults(false, false, true);
             args.Handled = true;
@@ -1327,6 +1337,12 @@ public sealed partial class AzunyanEditorView : UserControl
             return;
         }
 
+        if (!_explicitCompletionRequested && !HasUsefulCompletion(completions))
+        {
+            HideCompletionPopup();
+            return;
+        }
+
         InputEditor.AutoIndentOnEnter = false;
 
         if (!_defaultRenderer.TextRenderer.TryGetCaretRect(
@@ -1437,27 +1453,39 @@ public sealed partial class AzunyanEditorView : UserControl
     {
         if (args.ClickedItem is CompletionItem)
         {
-            AcceptSelectedCompletion();
+            TryAcceptSelectedCompletion();
         }
     }
 
-    private void AcceptSelectedCompletion()
+    private bool TryAcceptSelectedCompletion()
     {
         if (CompletionList.SelectedItem is not CompletionItem item
             || GetCurrentFrame()?.Position?.Completions is not { } completions)
         {
-            return;
+            HideCompletionPopup();
+            _completionRequested = false;
+            _explicitCompletionRequested = false;
+            return false;
         }
 
+        var frame = GetCurrentFrame();
         var range = completions.ReplacementRange;
-        if (range.Start > InputEditor.Snapshot.Length || range.End > InputEditor.Snapshot.Length)
+        if (frame is null
+            || frame.Position!.Context.Position != frame.Selection.CaretPosition
+            || frame.Selection.CaretPosition < range.Start
+            || frame.Selection.CaretPosition > range.End
+            || range.Start > InputEditor.Snapshot.Length
+            || range.End > InputEditor.Snapshot.Length
+            || (!_explicitCompletionRequested && !HasUsefulCompletion(completions)))
         {
             HideCompletionPopup();
             _completionRequested = false;
-            return;
+            _explicitCompletionRequested = false;
+            return false;
         }
 
         _completionRequested = false;
+        _explicitCompletionRequested = false;
         HideCompletionPopup();
         _applyingCompletion = true;
         try
@@ -1470,6 +1498,31 @@ public sealed partial class AzunyanEditorView : UserControl
         }
 
         InputEditor.Focus(FocusState.Programmatic);
+        return true;
+    }
+
+    private bool HasCompletionPrefix() => GetCompletionPrefix().Length > 0;
+
+    private string GetCompletionPrefix()
+    {
+        var position = InputEditor.Document.Selection.CaretPosition;
+        var text = InputEditor.Snapshot.Text;
+        var start = position;
+        while (start > 0 && IsIdentifierPart(text[start - 1]))
+        {
+            start--;
+        }
+
+        return text[start..position];
+    }
+
+    private static bool IsIdentifierPart(char value) => char.IsLetterOrDigit(value) || value == '_';
+
+    private bool HasUsefulCompletion(CompletionResult completions)
+    {
+        var prefix = GetCompletionPrefix();
+        return completions.Items.Any(item =>
+            !string.Equals(item.InsertText, prefix, StringComparison.OrdinalIgnoreCase));
     }
 
     private void HideCompletionPopup()
