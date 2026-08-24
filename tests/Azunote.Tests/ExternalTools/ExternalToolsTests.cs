@@ -98,7 +98,7 @@ public sealed class ExternalToolsTests
         var isWindows = OperatingSystem.IsWindows();
         var definition = new ExternalToolDefinition(
             isWindows ? "cmd.exe" : "/bin/cat",
-            isWindows ? "/c more" : string.Empty,
+            ExternalToolDefinition.ParseArguments(isWindows ? "/c more" : string.Empty),
             ExternalToolInputMode.Document);
         var result = await new ExternalToolRunner().RunAsync(
             definition,
@@ -125,7 +125,7 @@ public sealed class ExternalToolsTests
                     {
                       name: 'Format document',
                       command: 'prettier',
-                      arguments: '--write ${file}',
+                      arguments: ['--write', '${file}'],
                       input: 'FilePath',
                       output: 'ReloadFile',
                     },
@@ -139,7 +139,7 @@ public sealed class ExternalToolsTests
 
             Assert.Equal("Format document", tool.Name);
             Assert.Equal("prettier", definition.FileName);
-            Assert.Equal("--write ${file}", definition.Arguments);
+            Assert.Equal(["--write", "${file}"], definition.Arguments);
             Assert.Equal(ExternalToolInputMode.FilePath, definition.InputMode);
             Assert.Equal(ExternalToolOutputMode.ReloadFile, definition.OutputMode);
 

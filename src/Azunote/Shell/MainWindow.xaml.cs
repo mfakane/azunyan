@@ -371,7 +371,7 @@ public sealed partial class MainWindow : Window
             outputModeBox.SelectedItem?.ToString() ?? nameof(ExternalToolOutputMode.Ignore));
         await RunExternalToolAsync(new ExternalToolDefinition(
             commandBox.Text,
-            argumentsBox.Text,
+            ExternalToolDefinition.ParseArguments(argumentsBox.Text),
             inputMode,
             outputMode));
     }

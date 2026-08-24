@@ -30,7 +30,7 @@ public sealed class ExternalToolSettings
 
     public string Command { get; set; } = string.Empty;
 
-    public string Arguments { get; set; } = string.Empty;
+    public string[] Arguments { get; set; } = [];
 
     public string Input { get; set; } = nameof(ExternalToolInputMode.None);
 
@@ -100,7 +100,15 @@ public static class SettingsFileService
           // External commands shown under Tools > External Tools.
           // Text values may use ${file}, ${document}, ${selection},
           // ${userHome}, ${lineNumber}, ${columnNumber}, or ${env:NAME}.
-          externalTools: [],
+          "externalTools": [
+            // {
+            //   "name": "Run C# File-based app",
+            //   "command": "dotnet",
+            //   "args": ["run", "--file", "${file}"],
+            //   "inputMode": "none",
+            //   "outputMode": "newDocument"
+            // }
+          ],
         }
         """;
 

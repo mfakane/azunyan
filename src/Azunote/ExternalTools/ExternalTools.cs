@@ -32,16 +32,15 @@ public sealed record ExternalToolDefinition
 {
     public ExternalToolDefinition(
         string fileName,
-        string arguments = "",
+        string[]? arguments = null,
         ExternalToolInputMode inputMode = ExternalToolInputMode.None,
         ExternalToolOutputMode outputMode = ExternalToolOutputMode.Ignore,
         string? workingDirectory = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
-        ArgumentNullException.ThrowIfNull(arguments);
 
         FileName = fileName;
-        Arguments = arguments;
+        Arguments = arguments ?? [];
         InputMode = inputMode;
         OutputMode = outputMode;
         WorkingDirectory = workingDirectory;
@@ -49,20 +48,56 @@ public sealed record ExternalToolDefinition
 
     public string FileName { get; }
 
-    public string Arguments { get; }
+    public string[] Arguments { get; }
 
     public ExternalToolInputMode InputMode { get; }
 
     public ExternalToolOutputMode OutputMode { get; }
 
     public string? WorkingDirectory { get; }
+
+    public static string[] ParseArguments(string arguments)
+    {
+        if (string.IsNullOrWhiteSpace(arguments)) return [];
+
+        var result = new List<string>();
+        var tokens = arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var quoted = false;
+
+        foreach (var token in tokens)
+        {
+            if (token.StartsWith('"') && token.EndsWith('"'))
+            {
+                result.Add(token[1..^1]);
+            }
+            else if (token.StartsWith('"'))
+            {
+                quoted = true;
+                result.Add(token[1..]);
+            }
+            else if (token.EndsWith('"'))
+            {
+                quoted = false;
+                result.Add(token[..^1]);
+            }
+            else if (quoted)
+            {
+                result[^1] += " " + token;
+            }
+            else
+            {
+                result.Add(token);
+            }
+        }
+
+        return result.ToArray();
+    }
 }
 
-public sealed record ExternalToolContext
+public sealed partial record ExternalToolContext
 {
-    private static readonly Regex PlaceholderPattern = new(
-        @"\$\{(?<name>[^{}]+)\}",
-        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+    [GeneratedRegex(@"\$\{(?<name>[^{}]+)\}", RegexOptions.Compiled | RegexOptions.CultureInvariant)]
+    private static partial Regex PlaceholderPattern();
 
     public ExternalToolContext(
         string? filePath,
@@ -73,15 +108,8 @@ public sealed record ExternalToolContext
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(selection);
-        if (lineNumber < 1)
-        {
-            throw new ArgumentOutOfRangeException(nameof(lineNumber));
-        }
-
-        if (columnNumber < 1)
-        {
-            throw new ArgumentOutOfRangeException(nameof(columnNumber));
-        }
+        ArgumentOutOfRangeException.ThrowIfLessThan(lineNumber, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(columnNumber, 1);
 
         FilePath = string.IsNullOrWhiteSpace(filePath)
             ? null
@@ -123,7 +151,7 @@ public sealed record ExternalToolContext
     {
         ArgumentNullException.ThrowIfNull(value);
 
-        return PlaceholderPattern.Replace(value, match =>
+        return PlaceholderPattern().Replace(value, match =>
         {
             var name = match.Groups["name"].Value;
             if (name.StartsWith("env:", StringComparison.Ordinal))
@@ -147,6 +175,8 @@ public sealed record ExternalToolContext
         });
     }
 
+    public string[] Expand(string[] arguments) => [.. arguments.Select(Expand)];
+
     public string GetInput(ExternalToolInputMode inputMode) => inputMode switch
     {
         ExternalToolInputMode.None => string.Empty,
@@ -157,6 +187,7 @@ public sealed record ExternalToolContext
         ExternalToolInputMode.Selection => Selection,
         _ => throw new ArgumentOutOfRangeException(nameof(inputMode))
     };
+
 }
 
 public sealed record ExternalToolResult(
@@ -188,7 +219,7 @@ public sealed class ExternalToolRunner
         var startInfo = new ProcessStartInfo
         {
             FileName = context.Expand(definition.FileName),
-            Arguments = context.Expand(definition.Arguments),
+            Arguments = string.Join(" ", context.Expand(definition.Arguments).Select(x => x.Contains(' ') ? $"\"{x}\"" : x)),
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardInput = true,
@@ -206,8 +237,8 @@ public sealed class ExternalToolRunner
                     $"Could not start external tool: {startInfo.FileName}");
             }
 
-            var outputTask = process.StandardOutput.ReadToEndAsync();
-            var errorTask = process.StandardError.ReadToEndAsync();
+            var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
 
             if (input is null)
             {
