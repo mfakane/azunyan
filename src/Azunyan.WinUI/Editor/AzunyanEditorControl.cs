@@ -322,11 +322,12 @@ public sealed partial class AzunyanEditorControl : TextBox
                 when !IsComposing
                 && !control
                 && !menu:
+                SyncDocumentSelection();
                 TextEditorCommands.IndentSelection(Document, extendSelection);
                 ApplyDocumentState();
                 args.Handled = true;
                 break;
-            case VirtualKey.Z when control:
+            case VirtualKey.Z when control && !IsComposing:
                 if (extendSelection)
                 {
                     RedoDocument();
@@ -338,26 +339,24 @@ public sealed partial class AzunyanEditorControl : TextBox
 
                 args.Handled = true;
                 break;
-            case VirtualKey.Y when control:
+            case VirtualKey.Y when control && !IsComposing:
                 RedoDocument();
                 args.Handled = true;
                 break;
-            case VirtualKey.Left:
+            case VirtualKey.Left when !IsComposing:
+                SyncDocumentSelection();
                 Document.MoveCaretByGrapheme(-1, extendSelection);
                 ApplyDocumentSelection();
                 args.Handled = true;
                 break;
-            case VirtualKey.Right:
+            case VirtualKey.Right when !IsComposing:
+                SyncDocumentSelection();
                 Document.MoveCaretByGrapheme(1, extendSelection);
                 ApplyDocumentSelection();
                 args.Handled = true;
                 break;
-            case VirtualKey.Back:
-                Document.DeleteBackward();
-                ApplyDocumentState();
-                args.Handled = true;
-                break;
-            case VirtualKey.Delete:
+            case VirtualKey.Delete when !IsComposing:
+                SyncDocumentSelection();
                 Document.DeleteForward();
                 ApplyDocumentState();
                 args.Handled = true;

@@ -4,7 +4,6 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:Azunyan.WinUI"
-    xmlns:core="using:Azunyan.Core"
     xmlns:canvas="using:Microsoft.Graphics.Canvas.UI.Xaml">
     <Grid x:Name="RootGrid" Background="Transparent">
         <Grid.ColumnDefinitions>
@@ -94,15 +93,7 @@
                         Background="Transparent"
                         Foreground="Transparent"
                         IsItemClickEnabled="True"
-                        SelectionMode="Single">
-                        <ListView.ItemTemplate>
-                            <DataTemplate x:DataType="core:CompletionItem">
-                                <TextBlock
-                                    Text="{x:Bind Label}"
-                                    Padding="8,4" />
-                            </DataTemplate>
-                        </ListView.ItemTemplate>
-                    </ListView>
+                        SelectionMode="Single" />
                 </Border>
             </Popup>
             <Popup
