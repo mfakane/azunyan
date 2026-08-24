@@ -59,14 +59,99 @@ public static class TextFileService
         TextEncodingKind encodingKind,
         CancellationToken cancellationToken = default)
     {
+        await WriteAsync(path, text, encodingKind, lineEnding: null, cancellationToken);
+    }
+
+    public static async Task WriteAsync(
+        string path,
+        string text,
+        TextEncodingKind encodingKind,
+        LineEndingKind lineEnding,
+        CancellationToken cancellationToken = default)
+    {
+        await WriteAsync(path, text, encodingKind, (LineEndingKind?)lineEnding, cancellationToken);
+    }
+
+    private static async Task WriteAsync(
+        string path,
+        string text,
+        TextEncodingKind encodingKind,
+        LineEndingKind? lineEnding,
+        CancellationToken cancellationToken)
+    {
         var encoding = GetEncoding(encodingKind);
         var preamble = encoding.GetPreamble();
-        var body = encoding.GetBytes(text);
+        var body = encoding.GetBytes(NormalizeLineEndings(text, lineEnding));
         var bytes = new byte[preamble.Length + body.Length];
 
         Buffer.BlockCopy(preamble, 0, bytes, 0, preamble.Length);
         Buffer.BlockCopy(body, 0, bytes, preamble.Length, body.Length);
         await File.WriteAllBytesAsync(path, bytes, cancellationToken);
+    }
+
+    private static string NormalizeLineEndings(string text, LineEndingKind? lineEnding)
+    {
+        if (lineEnding is null)
+        {
+            if (text.IndexOf('\r') < 0)
+            {
+                return text;
+            }
+
+            var normalizedOutput = new StringBuilder(text.Length);
+            for (var index = 0; index < text.Length; index++)
+            {
+                if (text[index] == '\r'
+                    && index + 1 < text.Length
+                    && text[index + 1] == '\n')
+                {
+                    normalizedOutput.Append("\r\n");
+                    index++;
+                }
+                else if (text[index] == '\r')
+                {
+                    normalizedOutput.Append(Environment.NewLine);
+                }
+                else
+                {
+                    normalizedOutput.Append(text[index]);
+                }
+            }
+
+            return normalizedOutput.ToString();
+        }
+
+        var target = lineEnding.Value switch
+        {
+            LineEndingKind.Lf => "\n",
+            LineEndingKind.CrLf => "\r\n",
+            LineEndingKind.Cr => "\r",
+            _ => Environment.NewLine
+        };
+
+        var output = new StringBuilder(text.Length);
+        for (var index = 0; index < text.Length; index++)
+        {
+            if (text[index] == '\r')
+            {
+                if (index + 1 < text.Length && text[index + 1] == '\n')
+                {
+                    index++;
+                }
+
+                output.Append(target);
+            }
+            else if (text[index] == '\n')
+            {
+                output.Append(target);
+            }
+            else
+            {
+                output.Append(text[index]);
+            }
+        }
+
+        return output.ToString();
     }
 
     public static LineEndingKind DetectLineEnding(string text)

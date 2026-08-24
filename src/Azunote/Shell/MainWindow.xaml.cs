@@ -21,6 +21,7 @@ public sealed partial class MainWindow : Window
     private string? _filePath;
     private string _savedText = string.Empty;
     private TextEncodingKind _encoding = TextEncodingKind.Utf8;
+    private LineEndingKind _lineEnding = GetDefaultLineEnding();
     private AzunoteSettings _settings = new();
     private bool _isLoading;
     private bool _allowClose;
@@ -125,6 +126,7 @@ public sealed partial class MainWindow : Window
         _filePath = null;
         _savedText = string.Empty;
         _encoding = TextEncodingKind.Utf8;
+        _lineEnding = GetLineEndingOrDefault(TextFileService.DetectLineEnding(text));
         UpdateStatus();
         UpdateTitle();
         SetStartupPosition(line, column);
@@ -650,6 +652,7 @@ public sealed partial class MainWindow : Window
         _filePath = null;
         _savedText = string.Empty;
         _encoding = TextEncodingKind.Utf8;
+        _lineEnding = GetDefaultLineEnding();
         UpdateStatus();
         UpdateTitle();
         Editor.Focus(FocusState.Programmatic);
@@ -673,6 +676,7 @@ public sealed partial class MainWindow : Window
         _filePath = Path.GetFullPath(path);
         _savedText = document.Text;
         _encoding = document.Encoding;
+        _lineEnding = GetLineEndingOrDefault(document.LineEnding);
         UpdateStatus(document.LineEnding);
         UpdateTitle();
         Editor.Focus(FocusState.Programmatic);
@@ -702,6 +706,7 @@ public sealed partial class MainWindow : Window
 
         _savedText = document.Text;
         _encoding = document.Encoding;
+        _lineEnding = GetLineEndingOrDefault(document.LineEnding);
         var restoredSelection = new TextSelection(
             Math.Min(selection.Anchor, document.Text.Length),
             Math.Min(selection.Active, document.Text.Length));
@@ -720,9 +725,9 @@ public sealed partial class MainWindow : Window
 
         try
         {
-            await TextFileService.WriteAsync(_filePath, Editor.Text, _encoding);
+            await TextFileService.WriteAsync(_filePath, Editor.Text, _encoding, _lineEnding);
             _savedText = Editor.Text;
-            UpdateStatus();
+            UpdateStatus(_lineEnding);
             UpdateTitle();
             StartFileWatcher(_filePath);
             return true;
@@ -736,26 +741,28 @@ public sealed partial class MainWindow : Window
 
     private async Task<bool> SaveAsAsync()
     {
-        var picker = new FileSavePicker
-        {
-            SuggestedFileName = _filePath is null ? "Untitled.txt" : Path.GetFileName(_filePath),
-            DefaultFileExtension = ".txt"
-        };
-        picker.FileTypeChoices.Add("Text files", new List<string> { ".txt", ".md", ".log", ".json", ".xml", ".csv" });
-        InitializeWithWindow.Initialize(picker, _windowHandle);
-
-        var file = await picker.PickSaveFileAsync();
-        if (file is null)
-        {
-            return false;
-        }
-
         try
         {
-            await TextFileService.WriteAsync(file.Path, Editor.Text, _encoding);
-            _filePath = Path.GetFullPath(file.Path);
+            var save = NativeSaveFileDialog.Show(
+                _windowHandle,
+                _filePath is null ? "Untitled.txt" : Path.GetFileName(_filePath),
+                _encoding,
+                GetLineEndingOrDefault(_lineEnding));
+            if (save is null)
+            {
+                return false;
+            }
+
+            await TextFileService.WriteAsync(
+                save.Path,
+                Editor.Text,
+                save.Encoding,
+                save.LineEnding);
+            _filePath = Path.GetFullPath(save.Path);
             _savedText = Editor.Text;
-            UpdateStatus();
+            _encoding = save.Encoding;
+            _lineEnding = save.LineEnding;
+            UpdateStatus(_lineEnding);
             UpdateTitle();
             StartFileWatcher(_filePath);
             return true;
@@ -963,6 +970,7 @@ public sealed partial class MainWindow : Window
 
         _savedText = document.Text;
         _encoding = document.Encoding;
+        _lineEnding = GetLineEndingOrDefault(document.LineEnding);
         Editor.SetDocumentSelection(new TextSelection(
             Math.Min(selection.Anchor, document.Text.Length),
             Math.Min(selection.Active, document.Text.Length)));
@@ -1186,12 +1194,20 @@ public sealed partial class MainWindow : Window
 
         PositionStatus.Text = $"Ln {line}, Col {column}";
         EncodingStatus.Text = TextFileService.GetEncodingDisplayName(_encoding);
-        LineEndingStatus.Text = TextFileService.GetLineEndingDisplayName(lineEnding ?? TextFileService.DetectLineEnding(text));
+        LineEndingStatus.Text = TextFileService.GetLineEndingDisplayName(lineEnding ?? _lineEnding);
         IndentationStatus.Text = TextEditorCommands.GetIndentationSettings(
             snapshot,
             selectionStart).DisplayName;
         FilePathStatus.Text = _filePath ?? "Untitled";
     }
+
+    private static LineEndingKind GetDefaultLineEnding() =>
+        OperatingSystem.IsWindows() ? LineEndingKind.CrLf : LineEndingKind.Lf;
+
+    private static LineEndingKind GetLineEndingOrDefault(LineEndingKind lineEnding) =>
+        lineEnding is LineEndingKind.CrLf or LineEndingKind.Lf or LineEndingKind.Cr
+            ? lineEnding
+            : GetDefaultLineEnding();
 
     private void UpdateTitle()
     {

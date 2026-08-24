@@ -1,0 +1,10 @@
+// Native file save dialog and its customization controls.
+CoCreateInstance
+FileSaveDialog
+IFileSaveDialog
+IFileDialog
+IFileDialogCustomize
+IShellItem
+COMDLG_FILTERSPEC
+FILEOPENDIALOGOPTIONS
+SIGDN

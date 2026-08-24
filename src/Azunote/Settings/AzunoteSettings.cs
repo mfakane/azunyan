@@ -259,7 +259,9 @@ public static class SettingsFileService
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            throw new SettingsFileException($"Could not parse TOML file '{path}'.", exception);
+            throw new SettingsFileException(
+                $"Could not parse TOML file '{path}': {exception.Message}",
+                exception);
         }
     }
 

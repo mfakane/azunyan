@@ -109,6 +109,60 @@ public sealed class ExternalToolsTests
     }
 
     [Fact]
+    public async Task Text_file_service_normalizes_lone_carriage_returns_when_saving()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"azunyan-text-{Guid.NewGuid():N}");
+        var path = Path.Combine(root, "document.txt");
+        try
+        {
+            Directory.CreateDirectory(root);
+            await TextFileService.WriteAsync(
+                path,
+                "first\rsecond\r\nthird",
+                TextEncodingKind.Utf8);
+
+            Assert.Equal(
+                $"first{Environment.NewLine}second\r\nthird",
+                await File.ReadAllTextAsync(path));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Text_file_service_can_write_selected_encoding_and_line_ending()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"azunyan-text-{Guid.NewGuid():N}");
+        var path = Path.Combine(root, "document.txt");
+        try
+        {
+            Directory.CreateDirectory(root);
+            await TextFileService.WriteAsync(
+                path,
+                "first\r\nsecond\nthird",
+                TextEncodingKind.Utf8Bom,
+                LineEndingKind.Lf);
+
+            var bytes = await File.ReadAllBytesAsync(path);
+            Assert.Equal([0xEF, 0xBB, 0xBF], bytes[..3]);
+            var read = await TextFileService.ReadAsync(path);
+            Assert.Equal("first\nsecond\nthird", read.Text);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task Settings_service_loads_toml_tools_and_builds_the_folder_hierarchy()
     {
         var root = Path.Combine(Path.GetTempPath(), $"azunyan-settings-{Guid.NewGuid():N}");
