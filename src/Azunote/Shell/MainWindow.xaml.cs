@@ -150,7 +150,9 @@ public sealed partial class MainWindow : Window
     /// <summary>
     /// Runs a configured process against the current editor context. The
     /// caller chooses whether stdout is ignored, inserted, or used to reload
-    /// the current file; a failed process never changes the document.
+    /// the current file; a failed process never changes the document. An
+    /// unsaved buffer is written to an extension-preserving temporary file so
+    /// file path inputs and placeholders refer to the current editor text.
     /// </summary>
     public async Task<ExternalToolResult> RunExternalToolAsync(
         ExternalToolDefinition definition,
@@ -161,88 +163,109 @@ public sealed partial class MainWindow : Window
         var selection = new TextSelection(Editor.SelectionStart, Editor.SelectionStart + Editor.SelectionLength);
         var caret = Editor.Document.CaretPosition;
         var lineColumn = Editor.Snapshot.Lines.GetLineColumn(caret);
-        var context = new ExternalToolContext(
-            _filePath,
-            Editor.Text,
-            Editor.SelectedText,
-            lineColumn.Line + 1,
-            lineColumn.Column + 1);
+        var temporaryFilePath = IsDirty || _filePath is null
+            ? CreateExternalToolTemporaryFilePath()
+            : null;
         ExternalToolResult result;
         try
         {
+            if (temporaryFilePath is not null)
+            {
+                await TextFileService.WriteAsync(
+                    temporaryFilePath,
+                    Editor.Text,
+                    _encoding,
+                    _lineEnding,
+                    cancellationToken);
+            }
+
+            var context = new ExternalToolContext(
+                temporaryFilePath ?? _filePath,
+                Editor.Text,
+                Editor.SelectedText,
+                lineColumn.Line + 1,
+                lineColumn.Column + 1);
             result = await _externalToolRunner.RunAsync(definition, context, cancellationToken);
+
+            var output = ExternalToolOutputInterpreter.Interpret(definition, result);
+            if (!output.IsSuccess)
+            {
+                await ShowErrorAsync("External tool failed", output.Error!);
+                return result;
+            }
+
+            if (output.ReloadFile)
+            {
+                if (temporaryFilePath is not null)
+                {
+                    await ReloadDocumentFromTemporaryFileAsync(temporaryFilePath);
+                }
+                else if (_filePath is null)
+                {
+                    await ShowErrorAsync(
+                        "Could not reload file",
+                        "The current document is not backed by a file.");
+                }
+                else
+                {
+                    if (IsDirty)
+                    {
+                        var changedDocument = await TextFileService.ReadAsync(_filePath, cancellationToken);
+                        await ResolveExternalFileConflictAsync(
+                            changedDocument,
+                            CancellationToken.None);
+                    }
+                    else
+                    {
+                        await ReloadDocumentFromDiskAsync();
+                    }
+                }
+
+                return result;
+            }
+
+            if (output.ReplacementText is not null)
+            {
+                switch (definition.OutputMode)
+                {
+                    case ExternalToolOutputMode.ReplaceDocument:
+                        Editor.ReplaceDocumentRange(
+                            new TextRange(0, Editor.Text.Length),
+                            output.ReplacementText);
+                        break;
+                    case ExternalToolOutputMode.ReplaceSelection:
+                        if (selection.End > Editor.Text.Length)
+                        {
+                            await ShowErrorAsync(
+                                "Could not apply external tool output",
+                                "The selection changed while the tool was running.");
+                        }
+                        else
+                        {
+                            Editor.ReplaceDocumentRange(selection.Range, output.ReplacementText);
+                        }
+
+                        break;
+                    case ExternalToolOutputMode.NewDocument:
+                        await OpenStartupTextAsync(output.ReplacementText);
+                        break;
+                }
+
+                UpdateStatus();
+                UpdateTitle();
+            }
+
+            return result;
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             await ShowErrorAsync("Could not run external tool", exception.Message);
             throw;
         }
-
-        var output = ExternalToolOutputInterpreter.Interpret(definition, result);
-        if (!output.IsSuccess)
+        finally
         {
-            await ShowErrorAsync("External tool failed", output.Error!);
-            return result;
+            DeleteExternalToolTemporaryFile(temporaryFilePath);
         }
-
-        if (output.ReloadFile)
-        {
-            if (_filePath is null)
-            {
-                await ShowErrorAsync(
-                    "Could not reload file",
-                    "The current document is not backed by a file.");
-            }
-            else
-            {
-                if (IsDirty)
-                {
-                    var changedDocument = await TextFileService.ReadAsync(_filePath);
-                    await ResolveExternalFileConflictAsync(
-                        changedDocument,
-                        CancellationToken.None);
-                }
-                else
-                {
-                    await ReloadDocumentFromDiskAsync();
-                }
-            }
-
-            return result;
-        }
-
-        if (output.ReplacementText is not null)
-        {
-            switch (definition.OutputMode)
-            {
-                case ExternalToolOutputMode.ReplaceDocument:
-                    Editor.ReplaceDocumentRange(
-                        new TextRange(0, Editor.Text.Length),
-                        output.ReplacementText);
-                    break;
-                case ExternalToolOutputMode.ReplaceSelection:
-                    if (selection.End > Editor.Text.Length)
-                    {
-                        await ShowErrorAsync(
-                            "Could not apply external tool output",
-                            "The selection changed while the tool was running.");
-                    }
-                    else
-                    {
-                        Editor.ReplaceDocumentRange(selection.Range, output.ReplacementText);
-                    }
-
-                    break;
-                case ExternalToolOutputMode.NewDocument:
-                    await OpenStartupTextAsync(output.ReplacementText);
-                    break;
-            }
-
-            UpdateStatus();
-            UpdateTitle();
-        }
-
-        return result;
     }
 
     private async void OpenButton_Click(object sender, RoutedEventArgs e) => await OpenFileAsync();
@@ -714,6 +737,74 @@ public sealed partial class MainWindow : Window
         UpdateStatus(document.LineEnding);
         UpdateTitle();
         StartFileWatcher(_filePath);
+    }
+
+    private async Task ReloadDocumentFromTemporaryFileAsync(string path)
+    {
+        if (!File.Exists(path))
+        {
+            await ShowErrorAsync(
+                "Could not reload file",
+                "The external tool did not leave the temporary file available.");
+            return;
+        }
+
+        var selection = new TextSelection(Editor.SelectionStart, Editor.SelectionStart + Editor.SelectionLength);
+        var document = await TextFileService.ReadAsync(path);
+        _isLoading = true;
+        try
+        {
+            Editor.SetText(document.Text);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+
+        // The temporary file represents the current buffer, not the saved
+        // version on disk. Keep _savedText unchanged so the document remains
+        // dirty when it was dirty before the tool ran.
+        _encoding = document.Encoding;
+        _lineEnding = GetLineEndingOrDefault(document.LineEnding);
+        Editor.SetDocumentSelection(new TextSelection(
+            Math.Min(selection.Anchor, document.Text.Length),
+            Math.Min(selection.Active, document.Text.Length)));
+        UpdateStatus(document.LineEnding);
+        UpdateTitle();
+    }
+
+    private string CreateExternalToolTemporaryFilePath()
+    {
+        var extension = _filePath is null ? ".txt" : Path.GetExtension(_filePath);
+        if (string.IsNullOrWhiteSpace(extension))
+        {
+            extension = ".txt";
+        }
+
+        return Path.Combine(
+            Path.GetTempPath(),
+            $"azunote-external-{Guid.NewGuid():N}{extension}");
+    }
+
+    private static void DeleteExternalToolTemporaryFile(string? path)
+    {
+        if (path is null)
+        {
+            return;
+        }
+
+        try
+        {
+            File.Delete(path);
+        }
+        catch (IOException)
+        {
+            // Cleanup must not hide the external tool result.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Cleanup must not hide the external tool result.
+        }
     }
 
     private async Task<bool> SaveAsync()

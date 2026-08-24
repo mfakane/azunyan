@@ -104,8 +104,10 @@ placeholders `${file}`, `${fileDir}`, `${fileName}`, `${document}`,
 `${selection}`, `${userHome}`, `${lineNumber}`, and `${columnNumber}`.
 Environment variables are available as `${env:NAME}`. Output can be ignored,
 inserted into the document or selection, opened as a new document, or used to
-reload the current file. Non-zero exit codes leave the document unchanged and
-show stderr.
+reload the current file. When the current buffer is unsaved, the tool receives
+a temporary file containing the current text through `${file}` or `FilePath`;
+the temporary file is removed after the tool finishes. Non-zero exit codes
+leave the document unchanged and show stderr.
 
 Files opened from disk are watched for external changes. A clean document is
 reloaded automatically; if it has unsaved edits, Azunote asks whether to reload
