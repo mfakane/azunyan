@@ -423,6 +423,10 @@ public sealed partial class AzunyanEditorView : UserControl
         }
     }
 
+    private static bool IsKeyDown(VirtualKey key) =>
+        InputKeyboardSource.GetKeyStateForCurrentThread(key)
+            .HasFlag(CoreVirtualKeyStates.Down);
+
     private void OnInputPointerPressed(object sender, PointerRoutedEventArgs args)
     {
         if (!IsProjectedTextSurface)
@@ -1323,6 +1327,8 @@ public sealed partial class AzunyanEditorView : UserControl
             return;
         }
 
+        InputEditor.AutoIndentOnEnter = false;
+
         if (!_defaultRenderer.TextRenderer.TryGetCaretRect(
                 DocumentAnchor.Before(frame.Selection.CaretPosition),
                 InputEditor.Padding.Left,
@@ -1468,6 +1474,7 @@ public sealed partial class AzunyanEditorView : UserControl
 
     private void HideCompletionPopup()
     {
+        InputEditor.AutoIndentOnEnter = true;
         CompletionPopup.IsOpen = false;
         CompletionList.ItemsSource = null;
         CompletionList.SelectedIndex = -1;

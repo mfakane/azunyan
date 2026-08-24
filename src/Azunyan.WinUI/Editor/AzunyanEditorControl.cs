@@ -46,6 +46,13 @@ public sealed class AzunyanEditorControl : TextBox
     public TextRange? CompositionRange => _compositionRange;
 
     /// <summary>
+    /// Gets or sets whether a normal Enter inserts a line break with copied
+    /// leading indentation. Hosts can temporarily disable this while another
+    /// Enter action, such as completion acceptance, owns the key.
+    /// </summary>
+    public bool AutoIndentOnEnter { get; set; } = true;
+
+    /// <summary>
     /// Raised when the native text service starts, updates, or ends an IME
     /// composition. The range is expressed in the current native text and is
     /// forwarded to the projected renderer as transient decoration state.
@@ -103,6 +110,21 @@ public sealed class AzunyanEditorControl : TextBox
         {
             _synchronizing = false;
         }
+    }
+
+    /// <summary>
+    /// Inserts a line break and carries the current line's leading whitespace
+    /// onto the new line. The caller is responsible for deciding whether the
+    /// key event should be treated as a normal Enter (for example, completion
+    /// popups may consume Enter first).
+    /// </summary>
+    public TextChange InsertNewLineWithAutoIndent()
+    {
+        SyncDocumentSelection();
+        ClearComposition();
+        var change = TextEditorCommands.InsertNewLineWithAutoIndent(Document);
+        ApplyDocumentState();
+        return change;
     }
 
     /// <summary>
@@ -170,7 +192,20 @@ public sealed class AzunyanEditorControl : TextBox
         if (!string.Equals(previousText, currentText, StringComparison.Ordinal))
         {
             var (range, insertedText) = FindReplacement(previousText, currentText);
-            Document.Replace(range, insertedText);
+            var replacement = AutoIndentOnEnter
+                && !IsComposing
+                && IsLineBreak(insertedText)
+                ? TextEditorCommands.GetNewLineWithAutoIndentation(
+                    Document.Snapshot,
+                    range.Start)
+                : insertedText;
+            Document.Replace(range, replacement);
+
+            if (!string.Equals(Text, Document.Text, StringComparison.Ordinal))
+            {
+                ApplyDocumentState();
+                return;
+            }
         }
 
         SyncDocumentSelection();
@@ -224,9 +259,19 @@ public sealed class AzunyanEditorControl : TextBox
     private void OnKeyDown(object sender, KeyRoutedEventArgs args)
     {
         var control = IsKeyDown(VirtualKey.Control);
+        var menu = IsKeyDown(VirtualKey.Menu);
         var extendSelection = IsKeyDown(VirtualKey.Shift);
         switch (args.Key)
         {
+            case VirtualKey.Enter
+                when AutoIndentOnEnter
+                && AcceptsReturn
+                && !IsComposing
+                && !control
+                && !menu:
+                InsertNewLineWithAutoIndent();
+                args.Handled = true;
+                break;
             case VirtualKey.Z when control:
                 if (extendSelection)
                 {
@@ -307,6 +352,9 @@ public sealed class AzunyanEditorControl : TextBox
         var state = InputKeyboardSource.GetKeyStateForCurrentThread(key);
         return state.HasFlag(CoreVirtualKeyStates.Down);
     }
+
+    private static bool IsLineBreak(string text) =>
+        text is "\r" or "\n" or "\r\n";
 
     private static (TextRange Range, string InsertedText) FindReplacement(string previousText, string currentText)
     {

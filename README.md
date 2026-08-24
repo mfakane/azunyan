@@ -127,8 +127,8 @@ For example:
 
 The editor supports File/Edit/View/Help menus, Open, Save, Save As,
 UTF-8/UTF-8 BOM/UTF-16 detection, line-ending reporting, dirty-title tracking,
-find/replace, basic editing commands, keyboard shortcuts, and dropping a file
-onto the editor.
+find/replace, basic editing commands, automatic indentation on Enter, keyboard
+shortcuts, and dropping a file onto the editor.
 
 The editor surface is `AzunyanEditorControl`, a `TextBox`-derived control that
 keeps Windows' native text-service integration. This provides Japanese IME

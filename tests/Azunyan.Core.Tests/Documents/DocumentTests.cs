@@ -125,6 +125,46 @@ public sealed class DocumentTests
     }
 
     [Fact]
+    public void Newline_auto_indent_carries_leading_spaces_and_preserves_line_ending()
+    {
+        var document = new Document("  first\r\nsecond");
+        document.SetCaret(7);
+
+        var change = TextEditorCommands.InsertNewLineWithAutoIndent(document);
+
+        Assert.Equal("  first\r\n  \r\nsecond", document.Text);
+        Assert.Equal(new TextRange(7, 0), change.OldRange);
+        Assert.Equal("\r\n  ", change.NewText);
+        Assert.Equal(11, document.CaretPosition);
+        Assert.Equal("\r\n  ", TextEditorCommands.GetNewLineWithAutoIndentation(
+            new TextSnapshot("  first\r\nsecond"),
+            7));
+    }
+
+    [Fact]
+    public void Newline_auto_indent_carries_tabs_and_replaces_selection()
+    {
+        var document = new Document("\tfirst\nsecond");
+        document.SetSelection(new TextSelection(2, 6));
+
+        TextEditorCommands.InsertNewLineWithAutoIndent(document);
+
+        Assert.Equal("\tf\n\t\nsecond", document.Text);
+        Assert.Equal(4, document.CaretPosition);
+    }
+
+    [Fact]
+    public void Newline_auto_indent_uses_platform_line_ending_for_a_new_document()
+    {
+        var document = new Document("text");
+        document.SetCaret(document.Length);
+
+        TextEditorCommands.InsertNewLineWithAutoIndent(document);
+
+        Assert.Equal("text" + Environment.NewLine, document.Text);
+    }
+
+    [Fact]
     public void Grapheme_navigation_and_delete_keep_emoji_and_combining_sequences_together()
     {
         const string text = "a👩‍💻éb";
