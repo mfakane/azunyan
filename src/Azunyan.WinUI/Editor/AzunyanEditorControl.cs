@@ -318,6 +318,14 @@ public sealed class AzunyanEditorControl : TextBox
                 InsertNewLineWithAutoIndent();
                 args.Handled = true;
                 break;
+            case VirtualKey.Tab
+                when !IsComposing
+                && !control
+                && !menu:
+                TextEditorCommands.IndentSelection(Document, extendSelection);
+                ApplyDocumentState();
+                args.Handled = true;
+                break;
             case VirtualKey.Z when control:
                 if (extendSelection)
                 {

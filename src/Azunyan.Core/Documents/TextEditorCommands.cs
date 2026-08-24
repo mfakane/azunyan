@@ -107,6 +107,91 @@ public static class TextEditorCommands
     }
 
     /// <summary>
+    /// Inserts one indentation unit at a caret, or indents/dedents every line
+    /// touched by a selection. A selection is expanded to complete lines so
+    /// that a multi-line Tab operation behaves like a normal code editor.
+    /// </summary>
+    public static TextChange IndentSelection(Document document, bool dedent = false)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+
+        var selection = document.Selection;
+        if (selection.IsEmpty)
+        {
+            var line = document.Snapshot.Lines.GetLine(selection.CaretPosition);
+            var lineStart = document.Snapshot.Lines.GetLineStart(line);
+            var indentationUnit = GetIndentationUnit(document.Snapshot, line);
+            if (!dedent)
+            {
+                return document.Insert(selection.CaretPosition, indentationUnit);
+            }
+
+            var indentation = GetLineIndentation(document.Snapshot, selection.CaretPosition);
+            var removalLength = GetIndentationRemovalLength(indentation, indentationUnit);
+            if (removalLength == 0)
+            {
+                return document.Replace(TextRange.Empty(selection.CaretPosition), string.Empty);
+            }
+
+            var dedentChange = document.Replace(
+                TextRange.FromBounds(lineStart, lineStart + removalLength),
+                string.Empty);
+            document.SetCaret(selection.CaretPosition - Math.Min(
+                selection.CaretPosition - lineStart,
+                removalLength));
+            return dedentChange;
+        }
+
+        var snapshot = document.Snapshot;
+        var firstLine = snapshot.Lines.GetLine(selection.Start);
+        var lastLine = snapshot.Lines.GetLine(selection.End - 1);
+        var firstLineStart = snapshot.Lines.GetLineStart(firstLine);
+        var lastLineEnd = snapshot.Lines.GetLineEnd(lastLine);
+        var indentationUnitForSelection = GetIndentationUnit(snapshot, firstLine);
+        var edits = new List<IndentationEdit>();
+        var replacement = new System.Text.StringBuilder();
+
+        for (var line = firstLine; line <= lastLine; line++)
+        {
+            var lineStart = snapshot.Lines.GetLineStart(line);
+            var lineEnd = snapshot.Lines.GetLineEnd(line);
+            var lineText = snapshot.Text[lineStart..lineEnd];
+
+            if (dedent)
+            {
+                var removalLength = GetIndentationRemovalLength(
+                    GetLineIndentation(snapshot, lineStart),
+                    indentationUnitForSelection);
+                if (removalLength > 0)
+                {
+                    edits.Add(new IndentationEdit(lineStart, -removalLength));
+                }
+
+                replacement.Append(lineText[removalLength..]);
+            }
+            else
+            {
+                edits.Add(new IndentationEdit(lineStart, indentationUnitForSelection.Length));
+                replacement.Append(indentationUnitForSelection);
+                replacement.Append(lineText);
+            }
+
+            if (line < lastLine)
+            {
+                var nextLineStart = snapshot.Lines.GetLineStart(line + 1);
+                replacement.Append(snapshot.Text[lineEnd..nextLineStart]);
+            }
+        }
+
+        var range = TextRange.FromBounds(firstLineStart, lastLineEnd);
+        var change = document.Replace(range, replacement.ToString());
+        document.SetSelection(new TextSelection(
+            MapIndentationPosition(selection.Anchor, edits),
+            MapIndentationPosition(selection.Active, edits)));
+        return change;
+    }
+
+    /// <summary>
     /// Inserts a line break at the current selection and carries the current
     /// line's leading spaces and tabs onto the new line. The existing document
     /// line-ending style is preserved when one is present.
@@ -396,6 +481,57 @@ public static class TextEditorCommands
             ? DefaultIndentation
             : new string(' ', greatestCommonDivisor);
     }
+
+    private static int GetIndentationRemovalLength(string indentation, string indentationUnit)
+    {
+        if (indentation.Length == 0)
+        {
+            return 0;
+        }
+
+        if (indentationUnit == "\t")
+        {
+            return indentation[0] == '\t' ? 1 : 1;
+        }
+
+        var spaces = 0;
+        while (spaces < indentation.Length && indentation[spaces] == ' ')
+        {
+            spaces++;
+        }
+
+        return spaces > 0
+            ? Math.Min(spaces, indentationUnit.Length)
+            : indentation[0] == '\t' ? 1 : 0;
+    }
+
+    private static int MapIndentationPosition(
+        int position,
+        IReadOnlyList<IndentationEdit> edits)
+    {
+        var mapped = position;
+        foreach (var edit in edits)
+        {
+            if (edit.Delta > 0)
+            {
+                if (position >= edit.Position)
+                {
+                    mapped += edit.Delta;
+                }
+
+                continue;
+            }
+
+            if (position > edit.Position)
+            {
+                mapped -= Math.Min(position - edit.Position, -edit.Delta);
+            }
+        }
+
+        return mapped;
+    }
+
+    private readonly record struct IndentationEdit(int Position, int Delta);
 
     private static List<char> GetBracketStack(string text, int position)
     {

@@ -407,7 +407,7 @@ public sealed partial class AzunyanEditorView : UserControl
                     args.Handled = true;
                     return;
                 case VirtualKey.Enter:
-                case VirtualKey.Tab:
+                case VirtualKey.Tab when !IsKeyDown(VirtualKey.Shift):
                     if (TryAcceptSelectedCompletion())
                     {
                         args.Handled = true;

@@ -263,6 +263,54 @@ public sealed class DocumentTests
     }
 
     [Fact]
+    public void Tab_inserts_at_the_caret_without_a_selection()
+    {
+        var document = new Document("ab");
+        document.SetCaret(1);
+
+        TextEditorCommands.IndentSelection(document);
+
+        Assert.Equal("a  b", document.Text);
+        Assert.Equal(3, document.CaretPosition);
+    }
+
+    [Fact]
+    public void Tab_indents_every_line_touched_by_a_selection()
+    {
+        var document = new Document("a\nb\nc");
+        document.SetSelection(new TextSelection(0, 3));
+
+        TextEditorCommands.IndentSelection(document);
+
+        Assert.Equal("  a\n  b\nc", document.Text);
+        Assert.Equal(new TextSelection(2, 7), document.Selection);
+    }
+
+    [Fact]
+    public void Shift_tab_dedents_every_line_touched_by_a_selection()
+    {
+        var document = new Document("  a\n  b\nc");
+        document.SetSelection(new TextSelection(0, 7));
+
+        TextEditorCommands.IndentSelection(document, dedent: true);
+
+        Assert.Equal("a\nb\nc", document.Text);
+        Assert.Equal(new TextSelection(0, 3), document.Selection);
+    }
+
+    [Fact]
+    public void Shift_tab_dedents_a_single_line_without_a_selection()
+    {
+        var document = new Document("  abc");
+        document.SetCaret(document.Length);
+
+        TextEditorCommands.IndentSelection(document, dedent: true);
+
+        Assert.Equal("abc", document.Text);
+        Assert.Equal(3, document.CaretPosition);
+    }
+
+    [Fact]
     public void Newline_auto_indent_ignores_delimiters_in_strings_and_comments()
     {
         var snapshot = new TextSnapshot(
