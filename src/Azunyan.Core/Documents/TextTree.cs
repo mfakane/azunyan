@@ -202,7 +202,7 @@ internal sealed class TextTree
         }
 
         AppendAll(node.Left, builder);
-            node.Piece.AppendTo(builder);
+        node.Piece.AppendTo(builder);
         AppendAll(node.Right, builder);
     }
 

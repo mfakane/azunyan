@@ -6,6 +6,8 @@ namespace Azunyan.Syntax;
 /// <summary>Common lexical language definitions supplied with Azunyan.</summary>
 public static class BuiltInSyntaxLanguages
 {
+    private static readonly string[] CommonCompletionTriggers = [".", "(", "{", "[", "->"];
+
     private const string CommonNumberPattern =
         @"\b(?:0[xX][0-9a-fA-F](?:_?[0-9a-fA-F])*|0[bB][01](?:_?[01])*|\d(?:_?\d)*(?:\.\d(?:_?\d)*)?(?:[eE][+-]?\d(?:_?\d)*)?)";
 
@@ -59,7 +61,8 @@ public static class BuiltInSyntaxLanguages
             new DelimitedSyntaxRule("'", "'", "string", allowLineBreaks: false, escapePrefix: "\\"),
             new KeywordSyntaxRule(keywords),
             new RegexSyntaxRule(CommonNumberPattern + @"(?:[uUlLfFdDmM]+)?\b", "number")
-        ]);
+        ],
+        CommonCompletionTriggers);
     }
 
     private static SyntaxLanguageDefinition CreateJavaScript(bool typeScript)
@@ -93,7 +96,8 @@ public static class BuiltInSyntaxLanguages
                 new DelimitedSyntaxRule("'", "'", "string", allowLineBreaks: false, escapePrefix: "\\"),
                 new KeywordSyntaxRule(keywords),
                 new RegexSyntaxRule(CommonNumberPattern + @"n?\b", "number")
-            ]);
+            ],
+            CommonCompletionTriggers);
     }
 
     private static SyntaxLanguageDefinition CreatePython()
@@ -117,7 +121,12 @@ public static class BuiltInSyntaxLanguages
         sources.AddRange(strings);
         sources.Add(new KeywordSyntaxRule(keywords));
         sources.Add(new RegexSyntaxRule(CommonNumberPattern + @"[jJ]?\b", "number"));
-        return new SyntaxLanguageDefinition("python", "Python", [".py", ".pyw", ".pyi"], sources);
+        return new SyntaxLanguageDefinition(
+            "python",
+            "Python",
+            [".py", ".pyw", ".pyi"],
+            sources,
+            CommonCompletionTriggers);
     }
 
     private static SyntaxLanguageDefinition CreateJson() =>
@@ -126,7 +135,8 @@ public static class BuiltInSyntaxLanguages
             new DelimitedSyntaxRule("\"", "\"", "string", allowLineBreaks: false, escapePrefix: "\\"),
             new KeywordSyntaxRule(["true", "false", "null"]),
             new RegexSyntaxRule(@"(?<![\w.])-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?(?![\w.])", "number")
-        ]);
+        ],
+        CommonCompletionTriggers);
 
     private static SyntaxLanguageDefinition CreateMarkdown() =>
         new("markdown", "Markdown", [".md", ".markdown", ".mdown"],
@@ -141,7 +151,8 @@ public static class BuiltInSyntaxLanguages
             new LineRemainderSyntaxRule("### ", "heading", requireLineStart: true),
             new LineRemainderSyntaxRule("## ", "heading", requireLineStart: true),
             new LineRemainderSyntaxRule("# ", "heading", requireLineStart: true)
-        ]);
+        ],
+        CommonCompletionTriggers);
 
     private static SyntaxLanguageDefinition CreatePowerShell()
     {
@@ -163,6 +174,7 @@ public static class BuiltInSyntaxLanguages
             new KeywordSyntaxRule(keywords, comparer: StringComparer.OrdinalIgnoreCase),
             new RegexSyntaxRule(@"\$[A-Za-z_?^][\w:?^]*", "variable", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase),
             new RegexSyntaxRule(CommonNumberPattern + @"\b", "number")
-        ]);
+        ],
+        CommonCompletionTriggers);
     }
 }

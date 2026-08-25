@@ -1,6 +1,7 @@
 id = "toml"
 displayName = "TOML"
 extensions = [".toml"]
+completionTriggerCharacters = [".", "(", "{", "[", "->"]
 
 [[rules]]
 type = "line"

@@ -121,7 +121,8 @@ public sealed class EditorProviderScheduler : IDisposable
         TextSnapshot snapshot,
         int position,
         TextSelection selection,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool includeCompletion = true)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         var context = new EditorProviderContext(snapshot, position, selection);
@@ -129,7 +130,8 @@ public sealed class EditorProviderScheduler : IDisposable
             _position,
             context,
             cancellationToken,
-            CollectPositionAsync);
+            (requestId, providerContext, token) =>
+                CollectPositionAsync(requestId, providerContext, includeCompletion, token));
     }
 
     public void CancelAll()
@@ -270,6 +272,7 @@ public sealed class EditorProviderScheduler : IDisposable
     private async Task<PositionProviderResults> CollectPositionAsync(
         long requestId,
         EditorProviderContext context,
+        bool includeCompletion,
         CancellationToken cancellationToken)
     {
         var tooltipTask = _providers.Tooltip is null
@@ -277,7 +280,7 @@ public sealed class EditorProviderScheduler : IDisposable
             : InvokeOptionalAsync(
                 () => _providers.Tooltip.GetTooltipAsync(context, cancellationToken),
                 cancellationToken);
-        var completionTask = _providers.Completion is null
+        var completionTask = !includeCompletion || _providers.Completion is null
             ? Task.FromResult<CompletionResult?>(null)
             : InvokeOptionalAsync(
                 () => _providers.Completion.GetCompletionsAsync(context, cancellationToken),

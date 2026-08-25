@@ -155,6 +155,33 @@ public sealed class ProviderSchedulerTests
         Assert.Equal("diagnostic", Assert.Single(results.Decorations).Kind);
     }
 
+    [Fact]
+    public async Task Position_request_can_skip_completion_provider()
+    {
+        var calls = 0;
+        var providers = new EditorProviderSet
+        {
+            Completion = new DelegateCompletionProvider(_ =>
+            {
+                Interlocked.Increment(ref calls);
+                return new CompletionResult(
+                    TextRange.Empty(0),
+                    new[] { new CompletionItem("word") });
+            })
+        };
+        using var scheduler = new EditorProviderScheduler(providers);
+
+        var results = await scheduler.RequestPositionAsync(
+            new TextSnapshot("hello"),
+            0,
+            TextSelection.Caret(0),
+            includeCompletion: false);
+
+        Assert.NotNull(results);
+        Assert.Null(results!.Completions);
+        Assert.Equal(0, calls);
+    }
+
     private sealed class DelegateSyntaxProvider : ISyntaxProvider
     {
         private readonly Func<EditorProviderContext, Task<IEnumerable<SyntaxSpan>>> _handler;

@@ -342,58 +342,58 @@ public sealed class ProjectedLine
             switch (inline)
             {
                 case ProjectedText text:
-                {
-                    var end = column + text.Source.Length;
-                    if (visualColumn <= end)
                     {
-                        var offset = text.Source.Start + (visualColumn - column);
-                        var beforeNextAdornment = visualColumn == end
-                            && index + 1 < Inlines.Count
-                            && Inlines[index + 1] is InlineAdornment next
-                            && next.Anchor.Position.Offset == text.Source.End;
-                        return new DocumentAnchor(
-                            new DocumentPosition(offset),
-                            beforeNextAdornment ? AnchorAffinity.Before : AnchorAffinity.After);
-                    }
+                        var end = column + text.Source.Length;
+                        if (visualColumn <= end)
+                        {
+                            var offset = text.Source.Start + (visualColumn - column);
+                            var beforeNextAdornment = visualColumn == end
+                                && index + 1 < Inlines.Count
+                                && Inlines[index + 1] is InlineAdornment next
+                                && next.Anchor.Position.Offset == text.Source.End;
+                            return new DocumentAnchor(
+                                new DocumentPosition(offset),
+                                beforeNextAdornment ? AnchorAffinity.Before : AnchorAffinity.After);
+                        }
 
-                    column = end;
-                    break;
-                }
+                        column = end;
+                        break;
+                    }
                 case FoldPlaceholder fold:
-                {
-                    var end = column + fold.DisplayText.Length;
-                    if (visualColumn <= column)
                     {
-                        return DocumentAnchor.Before(fold.HiddenSource.Start);
-                    }
+                        var end = column + fold.DisplayText.Length;
+                        if (visualColumn <= column)
+                        {
+                            return DocumentAnchor.Before(fold.HiddenSource.Start);
+                        }
 
-                    if (visualColumn < end)
-                    {
-                        var midpoint = column + (fold.DisplayText.Length / 2);
-                        return visualColumn < midpoint
-                            ? DocumentAnchor.Before(fold.HiddenSource.Start)
-                            : DocumentAnchor.After(fold.HiddenSource.End);
-                    }
+                        if (visualColumn < end)
+                        {
+                            var midpoint = column + (fold.DisplayText.Length / 2);
+                            return visualColumn < midpoint
+                                ? DocumentAnchor.Before(fold.HiddenSource.Start)
+                                : DocumentAnchor.After(fold.HiddenSource.End);
+                        }
 
-                    column = end;
-                    break;
-                }
+                        column = end;
+                        break;
+                    }
                 case InlineAdornment adornment:
-                {
-                    var end = column + adornment.Content.Text.Length;
-                    if (visualColumn <= column)
                     {
-                        return new DocumentAnchor(adornment.Anchor.Position, AnchorAffinity.Before);
-                    }
+                        var end = column + adornment.Content.Text.Length;
+                        if (visualColumn <= column)
+                        {
+                            return new DocumentAnchor(adornment.Anchor.Position, AnchorAffinity.Before);
+                        }
 
-                    if (visualColumn <= end)
-                    {
-                        return new DocumentAnchor(adornment.Anchor.Position, AnchorAffinity.After);
-                    }
+                        if (visualColumn <= end)
+                        {
+                            return new DocumentAnchor(adornment.Anchor.Position, AnchorAffinity.After);
+                        }
 
-                    column = end;
-                    break;
-                }
+                        column = end;
+                        break;
+                    }
             }
         }
 

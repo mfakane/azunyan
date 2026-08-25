@@ -1,6 +1,7 @@
 using Azunyan.Core;
 using Azunyan.Syntax;
 using Microsoft.UI;
+using Microsoft.UI.Input;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -8,6 +9,7 @@ using Microsoft.UI.Xaml.Input;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
 using Windows.System;
+using Windows.UI.Core;
 using WinRT.Interop;
 
 namespace Azunote;
@@ -18,6 +20,7 @@ public sealed partial class MainWindow : Window
     private readonly AppWindow? _appWindow;
     private readonly ExternalToolRunner _externalToolRunner = new();
     private readonly Dictionary<string, ISyntaxProvider?> _languageModes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, IReadOnlyList<string>> _languageModeCompletionTriggers = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, ToggleMenuFlyoutItem> _languageModeItems = new(StringComparer.OrdinalIgnoreCase);
     private readonly string _settingsDirectory = SettingsFileService.GetDefaultDirectory();
     private string? _filePath;
@@ -341,14 +344,19 @@ public sealed partial class MainWindow : Window
         var selectedMode = _languageModeId;
         LanguageModeMenuItem.Items.Clear();
         _languageModes.Clear();
+        _languageModeCompletionTriggers.Clear();
         _languageModeItems.Clear();
 
         AddLanguageMode("plain-text", "Plain Text", null);
         LanguageModeMenuItem.Items.Add(new MenuFlyoutSeparator());
-        AddLanguageMode("azunote", "Azunote", new AzunoteSyntaxProvider());
+        AddLanguageMode("azunote", "Azunote", new AzunoteSyntaxProvider(), [".", "(", "{", "[", "->"]);
         foreach (var language in BuiltInSyntaxLanguages.All)
         {
-            AddLanguageMode(language.Id, language.DisplayName, language);
+            AddLanguageMode(
+                language.Id,
+                language.DisplayName,
+                language,
+                language.CompletionTriggerCharacters);
         }
 
         var additionalModes = customModes?
@@ -359,7 +367,11 @@ public sealed partial class MainWindow : Window
             LanguageModeMenuItem.Items.Add(new MenuFlyoutSeparator());
             foreach (var language in additionalModes)
             {
-                AddLanguageMode(language.Id, language.DisplayName, language);
+                AddLanguageMode(
+                    language.Id,
+                    language.DisplayName,
+                    language,
+                    language.CompletionTriggerCharacters);
             }
         }
 
@@ -371,9 +383,16 @@ public sealed partial class MainWindow : Window
         SetLanguageMode(selectedMode, refresh: customModes is not null);
     }
 
-    private void AddLanguageMode(string id, string displayName, ISyntaxProvider? provider)
+    private void AddLanguageMode(
+        string id,
+        string displayName,
+        ISyntaxProvider? provider,
+        IReadOnlyList<string>? completionTriggerCharacters = null)
     {
         _languageModes.Add(id, provider);
+        _languageModeCompletionTriggers.Add(
+            id,
+            completionTriggerCharacters ?? Array.Empty<string>());
         var item = new ToggleMenuFlyoutItem
         {
             Text = displayName,
@@ -402,6 +421,10 @@ public sealed partial class MainWindow : Window
 
         _languageModeId = id;
         Editor.Providers.Syntax = provider;
+        Editor.CompletionTriggerCharacters =
+            _languageModeCompletionTriggers.TryGetValue(id, out var completionTriggers)
+                ? completionTriggers
+                : Array.Empty<string>();
         var isAzunote = string.Equals(id, "azunote", StringComparison.OrdinalIgnoreCase);
         Editor.Providers.Completion = isAzunote ? new AzunoteCompletionProvider() : null;
         Editor.Providers.Tooltip = isAzunote ? new AzunoteTooltipProvider() : null;
@@ -771,6 +794,22 @@ public sealed partial class MainWindow : Window
     {
         args.Handled = true;
         ShowFindPanel(replace: true);
+    }
+
+    private void ShowCompletionMenuItem_Click(object sender, RoutedEventArgs e) => ShowCompletion();
+
+    private void ShowCompletionAccelerator_Invoked(
+        KeyboardAccelerator sender,
+        KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = true;
+        ShowCompletion();
+    }
+
+    private void ShowCompletion()
+    {
+        Editor.Focus(FocusState.Programmatic);
+        Editor.RequestCompletion();
     }
 
     private void EscapeAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
@@ -1260,12 +1299,26 @@ public sealed partial class MainWindow : Window
 
     private void Editor_KeyDown(object sender, KeyRoutedEventArgs e)
     {
+        // The menu accelerator invokes the command, but WinUI can still route
+        // the accelerator's Space key to the native text host. Consume it at
+        // the application boundary so it cannot insert a literal space. The
+        // reusable Azunyan component remains unaware of this shortcut.
+        if (e.Key == VirtualKey.Space && IsKeyDown(VirtualKey.Control))
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key == VirtualKey.Enter && FindPanel.Visibility == Visibility.Visible && FindTextBox.FocusState != FocusState.Unfocused)
         {
             FindNext();
             e.Handled = true;
         }
     }
+
+    private static bool IsKeyDown(VirtualKey key) =>
+        InputKeyboardSource.GetKeyStateForCurrentThread(key)
+            .HasFlag(CoreVirtualKeyStates.Down);
 
     private void Editor_DragOver(object sender, DragEventArgs e)
     {

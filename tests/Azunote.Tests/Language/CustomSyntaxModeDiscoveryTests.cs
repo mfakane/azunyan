@@ -21,6 +21,7 @@ public sealed class CustomSyntaxModeDiscoveryTests
             Assert.Equal("toml", mode.Id);
             Assert.Equal("TOML", mode.DisplayName);
             Assert.Contains(".toml", mode.FileExtensions);
+            Assert.Equal([".", "(", "{", "[", "->"], mode.CompletionTriggerCharacters);
 
             const string text = "# comment\nname = \"a # b\"\nactive = true\nvalue = 42\ndate = 2024-01-02\n[server]\n";
             var spans = await mode.GetSyntaxAsync(
@@ -66,6 +67,7 @@ public sealed class CustomSyntaxModeDiscoveryTests
                 id = "example"
                 displayName = "Example"
                 extensions = ["example"]
+                completionTriggerCharacters = ["->", "."]
 
                 [[rules]]
                 type = "literal"
@@ -78,6 +80,7 @@ public sealed class CustomSyntaxModeDiscoveryTests
             var mode = Assert.Single(settings.CustomSyntaxModes);
             Assert.Equal("example", mode.Id);
             Assert.Equal([".example"], mode.FileExtensions);
+            Assert.Equal(["->", "."], mode.CompletionTriggerCharacters);
         }
         finally
         {

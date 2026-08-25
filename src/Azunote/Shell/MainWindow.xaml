@@ -33,6 +33,11 @@
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="Find..." Click="FindButton_Click" />
                 <MenuFlyoutItem Text="Replace..." Click="ReplaceButton_Click" />
+                <MenuFlyoutItem Text="Show Completions" Click="ShowCompletionMenuItem_Click">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="Space" Modifiers="Control" Invoked="ShowCompletionAccelerator_Invoked" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
             </MenuBarItem>
             <MenuBarItem Title="View">
                 <MenuFlyoutSubItem x:Name="LanguageModeMenuItem" Text="Language Mode" />

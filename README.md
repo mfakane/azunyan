@@ -167,7 +167,7 @@ vertical scrollbar uses the visual-row height index; the native TextBox keeps
 its internal scroll state only as an input/IME synchronization aid. Position
 completion results and provider tooltips are shown in projected-mode popups
 anchored to the same caret geometry; arrow keys, Enter/Tab, Escape, and
-Ctrl+Space are supported.
+the host application's completion command is supported.
 
 Provider APIs live in `Azunyan.Core`. `ISyntaxProvider`,
 `IDecorationProvider`, `ITooltipProvider`, `ICompletionProvider`, and
@@ -219,6 +219,7 @@ example, a small mode definition looks like this:
 id = "ini"
 displayName = "INI"
 extensions = [".ini"]
+completionTriggerCharacters = [".", "(", "{", "[", "->"]
 
 [[rules]]
 type = "line"
@@ -241,6 +242,10 @@ words = ["true", "false"]
 
 The bundled toml.toml definition demonstrates multiline strings, comments,
 table headings, keys, booleans, dates, and numeric literals.
+`completionTriggerCharacters` contains literal strings that request completion
+after insertion (multi-character values such as `->` are allowed). Explicit
+completion is an application command; Azunote exposes it as Edit > Show
+Completions with Ctrl+Space.
 
 Rules and an LSP-backed or other custom provider can occupy the same priority
 list. Earlier entries win when candidates start at the same position:

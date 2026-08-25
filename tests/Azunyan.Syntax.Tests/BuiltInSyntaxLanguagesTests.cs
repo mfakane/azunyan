@@ -73,6 +73,20 @@ public sealed class BuiltInSyntaxLanguagesTests
     {
         Assert.Contains(".cs", BuiltInSyntaxLanguages.CSharp.FileExtensions);
         Assert.Contains(".tsx", BuiltInSyntaxLanguages.TypeScript.FileExtensions);
+        Assert.Equal([".", "(", "{", "[", "->"], BuiltInSyntaxLanguages.CSharp.CompletionTriggerCharacters);
         Assert.Equal(7, BuiltInSyntaxLanguages.All.Count);
+    }
+
+    [Fact]
+    public void Definitions_normalize_completion_triggers_and_keep_multi_character_values()
+    {
+        var definition = new SyntaxLanguageDefinition(
+            "example",
+            "Example",
+            [],
+            [],
+            ["->", ".", "->"]);
+
+        Assert.Equal(["->", "."], definition.CompletionTriggerCharacters);
     }
 }

@@ -43,6 +43,7 @@ public sealed partial class AzunyanEditorView : UserControl
     private bool _explicitCompletionRequested;
     private bool _applyingCompletion;
     private IReadOnlyList<CompletionItem>? _displayedCompletionItems;
+    private IReadOnlyList<string> _completionTriggerCharacters = Array.Empty<string>();
     private int _hoverPosition = -1;
 
     public AzunyanEditorView()
@@ -143,6 +144,29 @@ public sealed partial class AzunyanEditorView : UserControl
     /// mutating this set.
     /// </summary>
     public EditorProviderSet Providers => _providers;
+
+    /// <summary>
+    /// Literal strings which request completion after they are inserted. The
+    /// host supplies this value from the active language mode.
+    /// </summary>
+    public IReadOnlyList<string> CompletionTriggerCharacters
+    {
+        get => _completionTriggerCharacters;
+        set
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            _completionTriggerCharacters = value
+                .Where(trigger => !string.IsNullOrEmpty(trigger))
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+            _completionRequested = false;
+            _explicitCompletionRequested = false;
+            if (IsLoaded)
+            {
+                HideCompletionPopup();
+            }
+        }
+    }
 
     public EditorProviderFrame? ProviderFrame => _providerFrame;
 
@@ -258,6 +282,19 @@ public sealed partial class AzunyanEditorView : UserControl
 
     public void RefreshProviders() => RequestProviderResults(true, true, true);
 
+    /// <summary>Requests completion explicitly, independent of the current prefix.</summary>
+    public void RequestCompletion()
+    {
+        if (!IsLoaded || IsComposing)
+        {
+            return;
+        }
+
+        _explicitCompletionRequested = true;
+        _completionRequested = true;
+        RequestProviderResults(false, false, true, requestCompletion: true);
+    }
+
     public void SetFoldCollapsed(string foldId, bool collapsed)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(foldId);
@@ -348,18 +385,10 @@ public sealed partial class AzunyanEditorView : UserControl
 
     private void OnInputTextChanged(object sender, TextChangedEventArgs args)
     {
-        if (!InputEditor.IsComposing
-            && !_applyingCompletion
-            && InputEditor.FocusState != FocusState.Unfocused)
-        {
-            _explicitCompletionRequested = false;
-            _completionRequested = HasCompletionPrefix();
-        }
-
         RenderViewport();
         if (!InputEditor.IsComposing)
         {
-            RequestProviderResults(true, true, true);
+            RequestProviderResults(true, true, true, requestCompletion: _completionRequested);
         }
     }
 
@@ -368,6 +397,15 @@ public sealed partial class AzunyanEditorView : UserControl
         DocumentChangedEventArgs args)
     {
         _defaultRenderer.TextRenderer.NotifyDocumentChanged(args);
+        if (!InputEditor.IsComposing
+            && !_applyingCompletion
+            && InputEditor.FocusState != FocusState.Unfocused)
+        {
+            _explicitCompletionRequested = false;
+            _completionRequested = args.Kind == DocumentChangeKind.Edit
+                && args.Change.IsInsertion
+                && IsCompletionTrigger(args.NewSnapshot.Text, args.NewSelection.CaretPosition);
+        }
     }
 
     private void OnInputCompositionChanged(object? sender, EventArgs args)
@@ -395,7 +433,7 @@ public sealed partial class AzunyanEditorView : UserControl
         RenderViewport();
         if (!InputEditor.IsComposing)
         {
-            RequestProviderResults(false, false, true);
+            RequestProviderResults(false, false, true, requestCompletion: _completionRequested);
         }
     }
 
@@ -429,15 +467,6 @@ public sealed partial class AzunyanEditorView : UserControl
             }
         }
 
-        if (args.Key == VirtualKey.Space
-            && InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control)
-                .HasFlag(CoreVirtualKeyStates.Down))
-        {
-            _explicitCompletionRequested = true;
-            _completionRequested = true;
-            RequestProviderResults(false, false, true);
-            args.Handled = true;
-        }
     }
 
     private static bool IsKeyDown(VirtualKey key) =>
@@ -848,7 +877,8 @@ public sealed partial class AzunyanEditorView : UserControl
     private void RequestProviderResults(
         bool requestDocument,
         bool requestViewport,
-        bool requestPosition)
+        bool requestPosition,
+        bool requestCompletion = false)
     {
         if (!IsLoaded)
         {
@@ -888,7 +918,8 @@ public sealed partial class AzunyanEditorView : UserControl
                 _providerScheduler.RequestPositionAsync(
                     snapshot,
                     selection.CaretPosition,
-                    selection));
+                    selection,
+                    includeCompletion: requestCompletion));
         }
     }
 
@@ -1404,7 +1435,8 @@ public sealed partial class AzunyanEditorView : UserControl
             _providerScheduler.RequestPositionAsync(
                 InputEditor.Snapshot,
                 position,
-                InputEditor.Document.Selection));
+                InputEditor.Document.Selection,
+                includeCompletion: false));
     }
 
     private void UpdateTooltipPopup()
@@ -1528,6 +1560,21 @@ public sealed partial class AzunyanEditorView : UserControl
     }
 
     private bool HasCompletionPrefix() => GetCompletionPrefix().Length > 0;
+
+    private bool IsCompletionTrigger(string text, int caretPosition)
+    {
+        if (_completionTriggerCharacters.Count == 0
+            || caretPosition <= 0
+            || caretPosition > text.Length)
+        {
+            return false;
+        }
+
+        return _completionTriggerCharacters.Any(trigger =>
+            trigger.Length <= caretPosition
+            && text.AsSpan(caretPosition - trigger.Length, trigger.Length)
+                .SequenceEqual(trigger.AsSpan()));
+    }
 
     private string GetCompletionPrefix()
     {

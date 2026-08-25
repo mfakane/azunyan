@@ -13,6 +13,9 @@ public sealed class CustomSyntaxModeSettings
 
     public string[] Extensions { get; set; } = [];
 
+    /// <summary>Literal strings which trigger completion requests in this mode.</summary>
+    public string[] CompletionTriggerCharacters { get; set; } = [];
+
     public CustomSyntaxRuleSettings[] Rules { get; set; } = [];
 }
 
@@ -135,7 +138,8 @@ public static class CustomSyntaxModeDiscovery
             settings.Id,
             settings.DisplayName,
             settings.Extensions,
-            sources);
+            sources,
+            settings.CompletionTriggerCharacters);
     }
 
     private static ISyntaxProvider CreateRule(CustomSyntaxRuleSettings settings)
