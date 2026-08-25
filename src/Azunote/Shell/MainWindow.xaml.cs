@@ -35,6 +35,7 @@ public sealed partial class MainWindow : Window
     private CancellationTokenSource? _settingsChangeDebounce;
     private bool _externalChangeDialogOpen;
     private string _languageModeId = "azunote";
+    private bool _languageModeManuallySelected;
 
     public MainWindow()
     {
@@ -388,6 +389,7 @@ public sealed partial class MainWindow : Window
     {
         if (sender is ToggleMenuFlyoutItem item && item.Tag is string id)
         {
+            _languageModeManuallySelected = true;
             SetLanguageMode(id, refresh: true);
         }
     }
@@ -413,6 +415,30 @@ public sealed partial class MainWindow : Window
         if (refresh)
         {
             Editor.RefreshProviders();
+        }
+    }
+
+    private void SelectLanguageModeForPath(string path)
+    {
+        var extension = Path.GetExtension(path);
+        var selectedModeId = "plain-text";
+        if (!string.IsNullOrEmpty(extension))
+        {
+            foreach (var pair in _languageModes)
+            {
+                if (pair.Value is SyntaxLanguageDefinition language
+                    && language.FileExtensions.Any(fileExtension =>
+                        string.Equals(fileExtension, extension, StringComparison.OrdinalIgnoreCase)))
+                {
+                    selectedModeId = pair.Key;
+                    break;
+                }
+            }
+        }
+
+        if (!string.Equals(_languageModeId, selectedModeId, StringComparison.OrdinalIgnoreCase))
+        {
+            SetLanguageMode(selectedModeId, refresh: true);
         }
     }
 
@@ -565,6 +591,10 @@ public sealed partial class MainWindow : Window
             _settings = settings;
             RefreshExternalToolMenu();
             InitializeLanguageModeMenu(settings.CustomSyntaxModes);
+            if (!_languageModeManuallySelected && _filePath is not null)
+            {
+                SelectLanguageModeForPath(_filePath);
+            }
 
             return true;
         }
@@ -780,6 +810,8 @@ public sealed partial class MainWindow : Window
         }
 
         _filePath = Path.GetFullPath(path);
+        _languageModeManuallySelected = false;
+        SelectLanguageModeForPath(_filePath);
         _savedText = document.Text;
         _encoding = document.Encoding;
         _lineEnding = GetLineEndingOrDefault(document.LineEnding);

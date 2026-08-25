@@ -204,6 +204,9 @@ Azunote also discovers custom language modes from
 Resources/DefaultAppData/modes are copied there. Once the folder exists it is
 user-owned and is never overwritten; adding, editing, or removing a .toml
 definition is picked up by the settings watcher.
+When a file is opened, its extension is matched against the built-in and
+custom definitions; unmatched files use Plain Text. A manual menu selection
+is kept until another file is opened.
 
 Each file describes one mode and applies its rules in the listed order. The
 supported rule types are delimited, line, literal, keyword, and regex. For
