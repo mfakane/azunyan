@@ -617,17 +617,17 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
             switch (inline)
             {
                 case FoldPlaceholder fold:
-                {
-                    var end = column + fold.DisplayText.Length;
-                    if (visualColumn >= column && visualColumn < end)
                     {
-                        foldId = fold.FoldId;
-                        return true;
-                    }
+                        var end = column + fold.DisplayText.Length;
+                        if (visualColumn >= column && visualColumn < end)
+                        {
+                            foldId = fold.FoldId;
+                            return true;
+                        }
 
-                    column = end;
-                    break;
-                }
+                        column = end;
+                        break;
+                    }
                 case ProjectedText text:
                     column += text.Source.Length;
                     break;
@@ -1163,16 +1163,7 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
             return colors.InlayForeground;
         }
 
-        return run.Classification switch
-        {
-            "heading" => colors.HeadingForeground,
-            "keyword" => colors.KeywordForeground,
-            "string" => colors.StringForeground,
-            "number" => colors.NumberForeground,
-            "comment" => colors.CommentForeground,
-            "task-marker" => colors.TaskForeground,
-            _ => colors.EditorForeground
-        };
+        return colors.ResolveSyntaxForeground(run.Classification);
     }
 
     private sealed class ProjectedTextLayoutState
@@ -1315,12 +1306,12 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
     private static string GetProjectedInlineText(
         TextSnapshot snapshot,
         ProjectionInline inline) => inline switch
-    {
-        ProjectedText text => snapshot.GetText(text.Source),
-        FoldPlaceholder fold => fold.DisplayText,
-        InlineAdornment adornment => adornment.Content.Text,
-        _ => string.Empty
-    };
+        {
+            ProjectedText text => snapshot.GetText(text.Source),
+            FoldPlaceholder fold => fold.DisplayText,
+            InlineAdornment adornment => adornment.Content.Text,
+            _ => string.Empty
+        };
 
     private static int GetWrapColumns(AzunyanEditorRenderContext context)
     {

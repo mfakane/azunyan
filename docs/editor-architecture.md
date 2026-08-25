@@ -34,8 +34,10 @@ Azunyan must support, without changing document text:
 - IME input and UI Automation;
 - large documents without creating one XAML element per token or line.
 
-Azunyan does not embed language knowledge, an LSP client, or a parser. Those
-remain providers supplied by the application.
+`Azunyan.Core` does not embed language knowledge, an LSP client, or a parser.
+The optional `Azunyan.Syntax` library supplies composable lexical rules and
+common language definitions; parser- and LSP-backed results remain providers
+supplied by the application and can be composed into the same priority list.
 
 ## 2. Architectural decision
 

@@ -63,6 +63,12 @@ public sealed record AzunyanColorScheme
 
     public Color TaskForeground { get; init; }
 
+    /// <summary>
+    /// Optionally resolves a foreground for any syntax classification. Returning
+    /// null retains Azunyan's built-in classification mapping and fallback.
+    /// </summary>
+    public Func<string, Color?>? SyntaxForegroundResolver { get; init; }
+
     public Color PopupBackground { get; init; }
 
     public Color PopupForeground { get; init; }
@@ -74,4 +80,25 @@ public sealed record AzunyanColorScheme
     public Color TooltipForeground { get; init; }
 
     public Color TooltipBorder { get; init; }
+
+    public Color ResolveSyntaxForeground(string? classification)
+    {
+        if (!string.IsNullOrEmpty(classification)
+            && SyntaxForegroundResolver?.Invoke(classification) is { } resolved)
+        {
+            return resolved;
+        }
+
+        return classification switch
+        {
+            "heading" => HeadingForeground,
+            "keyword" => KeywordForeground,
+            "string" => StringForeground,
+            "code" => StringForeground,
+            "number" => NumberForeground,
+            "comment" => CommentForeground,
+            "task-marker" => TaskForeground,
+            _ => EditorForeground
+        };
+    }
 }

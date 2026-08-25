@@ -29,8 +29,8 @@ tested without WinUI:
 dotnet test tests/Azunyan.Core.Tests/Azunyan.Core.Tests.csproj
 ```
 
-The project boundary is intentional: `Azunyan.Core`, `Azunyan.Layout`, and
-`Azunyan.WinUI` contain only reusable editor-component code. Azunote-specific
+The project boundary is intentional: `Azunyan.Core`, `Azunyan.Syntax`,
+`Azunyan.Layout`, and `Azunyan.WinUI` contain only reusable editor-component code. Azunote-specific
 application concerns—including the command-line contract, external tool
 runner, and TOML settings service—live under `src/Azunote` and are not part
 of `Azunyan.Core`.
@@ -56,6 +56,7 @@ src/
   Azunyan.Layout/
     LineLayout/      logical-line and wrapping layout
     Viewport/        viewport realization and scrolling calculations
+  Azunyan.Syntax/    composable lexical rules and built-in language definitions
   Azunyan.WinUI/
     Editor/          reusable WinUI editor control, rendering host, and accessibility
     Rendering/       DirectWrite/Win2D rendering primitives and color scheme
@@ -70,6 +71,7 @@ src/
     Theme/           Azunote's default color scheme
 tests/
   Azunyan.Core.Tests/  editor-component tests grouped like Core
+  Azunyan.Syntax.Tests/ syntax rules, composition, and language definition tests
   Azunote.Tests/       application and external-tool tests
   Azunote.UiTests/     opt-in Windows UI Automation tests
 ```
@@ -180,6 +182,46 @@ for callers that have not migrated. `AzunyanEditorView.Providers` is the
 injection point for application providers; `ProviderFrame` exposes the
 channel-bound results used by the renderer, while `ProviderResults` remains a
 compatibility view.
+
+`Azunyan.Syntax` supplies reusable lexical providers for delimited ranges,
+line remainders, keywords, literal tokens, and regular-expression matches.
+`CompositeSyntaxProvider` runs its sources in parallel, then performs a
+left-to-right lexical scan: at each position the first matching source wins
+and its complete token is consumed. This keeps comment markers inside strings
+and quotes inside comments from leaking into later classifications.
+
+Built-in definitions are available for C#, JavaScript, TypeScript, Python,
+JSON, Markdown, and PowerShell. Selection is deliberately application-owned:
+
+```csharp
+Editor.Providers.Syntax = BuiltInSyntaxLanguages.CSharp;
+```
+
+Rules and an LSP-backed or other custom provider can occupy the same priority
+list. Earlier entries win when candidates start at the same position:
+
+```csharp
+Editor.Providers.Syntax = new CompositeSyntaxProvider(new ISyntaxProvider[]
+{
+    new DelimitedSyntaxRule("/*", "*/", "comment"),
+    new LineRemainderSyntaxRule("//", "comment"),
+    new DelimitedSyntaxRule("\"", "\"", "string", false, "\\"),
+    semanticTokenProvider,
+    new KeywordSyntaxRule(new[] { "class", "return" })
+});
+```
+
+Applications can color classifications supplied by external providers without
+changing the renderer. Returning `null` retains the built-in mapping and the
+normal editor-foreground fallback:
+
+```csharp
+Editor.ColorScheme = Editor.ColorScheme with
+{
+    SyntaxForegroundResolver = classification =>
+        classification == "variable" ? variableColor : null
+};
+```
 
 `Azunyan.Layout` contains the framework-independent projection-to-layout
 boundary: fold placeholders and inline adornments map through document anchors,

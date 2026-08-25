@@ -1,4 +1,5 @@
 using Azunyan.Core;
+using Azunyan.Syntax;
 
 namespace Azunote;
 
@@ -27,126 +28,26 @@ public static class AzunoteLanguageDefinition
 /// </summary>
 public sealed class AzunoteSyntaxProvider : ISyntaxProvider
 {
-    private static readonly HashSet<string> Keywords =
-        new(AzunoteLanguageDefinition.Keywords, StringComparer.OrdinalIgnoreCase);
+    private static readonly CompositeSyntaxProvider Provider = new(new ISyntaxProvider[]
+    {
+        new LineRemainderSyntaxRule("#", "heading", requireLineStart: true),
+        new LiteralSyntaxRule("[ ]", "task-marker"),
+        new LiteralSyntaxRule("[x]", "task-marker", StringComparison.OrdinalIgnoreCase),
+        new LineRemainderSyntaxRule("//", "comment"),
+        new DelimitedSyntaxRule("\"", "\"", "string", allowLineBreaks: false, escapePrefix: "\\"),
+        new DelimitedSyntaxRule("'", "'", "string", allowLineBreaks: false, escapePrefix: "\\"),
+        new RegexSyntaxRule(@"\b\d+(?:\.\d+)?\b", "number"),
+        new KeywordSyntaxRule(
+            AzunoteLanguageDefinition.Keywords,
+            comparer: StringComparer.OrdinalIgnoreCase)
+    });
 
     public ValueTask<IReadOnlyList<SyntaxSpan>> GetSyntaxAsync(
         EditorProviderContext context,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(context);
-        var spans = new List<SyntaxSpan>();
-        var text = context.Snapshot.Text;
-        var position = 0;
-
-        while (position < text.Length)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            if (text[position] == '#' && IsLineStart(text, position))
-            {
-                var lineEnd = FindLineEnd(text, position);
-                spans.Add(new SyntaxSpan(TextRange.FromBounds(position, lineEnd), "heading"));
-                position = lineEnd;
-                continue;
-            }
-
-            if (text[position] == '[' && position + 2 < text.Length
-                && (text[position + 1] == ' ' || text[position + 1] is 'x' or 'X')
-                && text[position + 2] == ']')
-            {
-                spans.Add(new SyntaxSpan(new TextRange(position, 3), "task-marker"));
-                position += 3;
-                continue;
-            }
-
-            if (text[position] == '/' && position + 1 < text.Length && text[position + 1] == '/')
-            {
-                var lineEnd = FindLineEnd(text, position);
-                spans.Add(new SyntaxSpan(TextRange.FromBounds(position, lineEnd), "comment"));
-                position = lineEnd;
-                continue;
-            }
-
-            if (text[position] is '\'' or '"')
-            {
-                var start = position;
-                position = ConsumeQuoted(text, position, cancellationToken);
-                spans.Add(new SyntaxSpan(TextRange.FromBounds(start, position), "string"));
-                continue;
-            }
-
-            if (char.IsDigit(text[position]))
-            {
-                var start = position++;
-                while (position < text.Length && (char.IsDigit(text[position]) || text[position] == '.'))
-                {
-                    position++;
-                }
-
-                spans.Add(new SyntaxSpan(TextRange.FromBounds(start, position), "number"));
-                continue;
-            }
-
-            if (IsIdentifierPart(text[position]))
-            {
-                var start = position++;
-                while (position < text.Length && IsIdentifierPart(text[position]))
-                {
-                    position++;
-                }
-
-                var word = text[start..position];
-                if (Keywords.Contains(word))
-                {
-                    spans.Add(new SyntaxSpan(TextRange.FromBounds(start, position), "keyword"));
-                }
-
-                continue;
-            }
-
-            position++;
-        }
-
-        return ValueTask.FromResult<IReadOnlyList<SyntaxSpan>>(spans);
+        return Provider.GetSyntaxAsync(context, cancellationToken);
     }
-
-    private static int ConsumeQuoted(string text, int start, CancellationToken cancellationToken)
-    {
-        var quote = text[start];
-        var position = start + 1;
-        while (position < text.Length)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (text[position] == '\\')
-            {
-                position = Math.Min(text.Length, position + 2);
-                continue;
-            }
-
-            if (text[position++] == quote)
-            {
-                break;
-            }
-        }
-
-        return position;
-    }
-
-    private static bool IsLineStart(string text, int position) =>
-        position == 0 || text[position - 1] is '\r' or '\n';
-
-    private static int FindLineEnd(string text, int position)
-    {
-        while (position < text.Length && text[position] is not '\r' and not '\n')
-        {
-            position++;
-        }
-
-        return position;
-    }
-
-    private static bool IsIdentifierPart(char value) => char.IsLetterOrDigit(value) || value == '_';
 }
 
 /// <summary>

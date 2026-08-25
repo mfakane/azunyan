@@ -33,6 +33,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Azunyan.Core\Azunyan.Core.csproj" />
     <ProjectReference Include="..\Azunyan.Layout\Azunyan.Layout.csproj" />
+    <ProjectReference Include="..\Azunyan.Syntax\Azunyan.Syntax.csproj" />
     <ProjectReference Include="..\Azunyan.WinUI\Azunyan.WinUI.csproj" />
     <PackageReference Include="Microsoft.Graphics.Win2D" Version="1.3.2" />
     <PackageReference Include="Microsoft.Windows.CsWin32" Version="0.3.321" PrivateAssets="all" />
