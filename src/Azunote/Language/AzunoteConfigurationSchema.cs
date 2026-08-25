@@ -1,0 +1,311 @@
+using Azunyan.Core;
+using Azunyan.Syntax;
+
+namespace Azunote;
+
+public enum AzunoteSchemaValueKind
+{
+    String,
+    Boolean,
+    Integer,
+    Array,
+    Map,
+    Enum
+}
+
+/// <summary>
+/// NativeAOT-safe metadata used by Azunote's configuration completion
+/// provider. It is deliberately independent from the TOML serialization DTOs.
+/// </summary>
+public sealed record AzunoteSchemaField(
+    string Name,
+    AzunoteSchemaValueKind ValueKind,
+    string Classification = "property",
+    IReadOnlyList<string>? AllowedValues = null,
+    string? Documentation = null)
+{
+    public IReadOnlyList<string> Values => AllowedValues ?? Array.Empty<string>();
+}
+
+public sealed record AzunoteSchemaTable(
+    string Path,
+    IReadOnlyList<AzunoteSchemaField> Fields);
+
+public sealed record AzunoteSchemaDefinition(
+    string Id,
+    IReadOnlyList<string> Patterns,
+    IReadOnlyList<AzunoteSchemaTable> Tables);
+
+/// <summary>
+/// Compiled-in schemas for the TOML files Azunote owns. These descriptors are
+/// explicit rather than reflection-generated so they work in NativeAOT builds.
+/// </summary>
+public static class AzunoteSchemaCatalog
+{
+    public static AzunoteSchemaDefinition Settings { get; } = new(
+        "azunote.settings",
+        ["settings.toml"],
+        []);
+
+    public static AzunoteSchemaDefinition ExternalTool { get; } = new(
+        "azunote.tool",
+        ["*.tool.toml", "manifest.toml", "*/manifest.toml"],
+        [
+            new AzunoteSchemaTable(
+                string.Empty,
+                [
+                    Field("name", AzunoteSchemaValueKind.String, "property", documentation: "The tool name shown in the Tools menu."),
+                    Field("command", AzunoteSchemaValueKind.String, "command"),
+                    Field("arguments", AzunoteSchemaValueKind.Array, "property"),
+                    EnumField("input", "None", "Document", "Selection", "FilePath"),
+                    EnumField("output", "Ignore", "ReplaceDocument", "ReplaceSelection", "NewDocument", "ReloadFile"),
+                    Field("workingDirectory", AzunoteSchemaValueKind.String, "path")
+                ]),
+            new AzunoteSchemaTable(
+                "when",
+                [
+                    Field("extension", AzunoteSchemaValueKind.Array, "property"),
+                    Field("pattern", AzunoteSchemaValueKind.Array, "property")
+                ]),
+            new AzunoteSchemaTable(
+                "env",
+                [])
+        ]);
+
+    public static AzunoteSchemaDefinition CustomMode { get; } = new(
+        "azunote.mode",
+        ["modes/*.toml"],
+        [
+            new AzunoteSchemaTable(
+                string.Empty,
+                [
+                    Field("id", AzunoteSchemaValueKind.String),
+                    Field("displayName", AzunoteSchemaValueKind.String),
+                    Field("patterns", AzunoteSchemaValueKind.Array),
+                    Field("completionTriggerCharacters", AzunoteSchemaValueKind.Array),
+                    Field("rules", AzunoteSchemaValueKind.Array)
+                ]),
+            new AzunoteSchemaTable(
+                "rules",
+                [
+                    EnumField("type", "delimited", "line", "literal", "keyword", "regex"),
+                    Field("classification", AzunoteSchemaValueKind.String),
+                    Field("open", AzunoteSchemaValueKind.String),
+                    Field("close", AzunoteSchemaValueKind.String),
+                    Field("token", AzunoteSchemaValueKind.String),
+                    Field("pattern", AzunoteSchemaValueKind.String),
+                    Field("escapePrefix", AzunoteSchemaValueKind.String),
+                    Field("escapedEndToken", AzunoteSchemaValueKind.String),
+                    Field("allowLineBreaks", AzunoteSchemaValueKind.Boolean),
+                    Field("requireLineStart", AzunoteSchemaValueKind.Boolean),
+                    Field("caseSensitive", AzunoteSchemaValueKind.Boolean),
+                    Field("words", AzunoteSchemaValueKind.Array)
+                ])
+        ]);
+
+    public static IReadOnlyList<AzunoteSchemaDefinition> All { get; } =
+    [
+        Settings,
+        ExternalTool,
+        CustomMode
+    ];
+
+    public static IReadOnlyList<string> Patterns { get; } = All
+        .SelectMany(schema => schema.Patterns)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
+    public static IReadOnlyList<AzunoteSchemaDefinition> ForPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return All;
+        }
+
+        var bestScore = -1;
+        var matches = new List<AzunoteSchemaDefinition>();
+        foreach (var schema in All)
+        {
+            var score = SyntaxLanguageDefinition.GetPatternMatchScore(path, schema.Patterns);
+            if (score < 0)
+            {
+                continue;
+            }
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                matches.Clear();
+            }
+
+            if (score == bestScore)
+            {
+                matches.Add(schema);
+            }
+        }
+
+        return matches.Count == 0 ? All : matches;
+    }
+
+    private static AzunoteSchemaField Field(
+        string name,
+        AzunoteSchemaValueKind valueKind,
+        string classification = "property",
+        string? documentation = null) =>
+        new(name, valueKind, classification, Documentation: documentation);
+
+    private static AzunoteSchemaField EnumField(
+        string name,
+        params string[] values) =>
+        new(name, AzunoteSchemaValueKind.Enum, AllowedValues: values);
+}
+
+/// <summary>Provides schema fields and enum values for the active TOML file.</summary>
+public sealed class AzunoteConfigurationCompletionProvider : ICompletionProvider
+{
+    private readonly IReadOnlyList<AzunoteSchemaDefinition> _schemas;
+
+    public AzunoteConfigurationCompletionProvider(
+        IReadOnlyList<AzunoteSchemaDefinition>? schemas = null)
+    {
+        _schemas = schemas ?? AzunoteSchemaCatalog.All;
+    }
+
+    public ValueTask<CompletionResult?> GetCompletionsAsync(
+        EditorProviderContext context,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var snapshot = context.Snapshot;
+        var line = snapshot.Lines.GetLine(context.Position);
+        var lineStart = snapshot.Lines.GetLineStart(line);
+        var lineText = snapshot.GetText(snapshot.Lines.GetLineRange(line));
+        var column = context.Position - lineStart;
+        var beforeCaret = lineText[..Math.Min(column, lineText.Length)];
+        var tablePath = FindTablePath(snapshot, line);
+
+        if (TryGetValueContext(beforeCaret, out var valueStart, out var valuePrefix, out var key))
+        {
+            var field = FindFields(tablePath)
+                .FirstOrDefault(candidate =>
+                    string.Equals(candidate.Name, key, StringComparison.OrdinalIgnoreCase));
+            if (field is null || field.Values.Count == 0)
+            {
+                return ValueTask.FromResult<CompletionResult?>(null);
+            }
+
+            var items = field.Values
+                .Where(value => string.IsNullOrEmpty(valuePrefix)
+                    || value.StartsWith(valuePrefix, StringComparison.OrdinalIgnoreCase))
+                .Select(value => new CompletionItem(
+                    FormatTomlValue(value),
+                    FormatTomlValue(value),
+                    field.ValueKind.ToString(),
+                    field.Documentation))
+                .ToArray();
+            return ValueTask.FromResult<CompletionResult?>(
+                new CompletionResult(
+                    TextRange.FromBounds(lineStart + valueStart, context.Position),
+                    items));
+        }
+
+        var keyStart = beforeCaret.Length;
+        while (keyStart > 0 && IsKeyCharacter(beforeCaret[keyStart - 1]))
+        {
+            keyStart--;
+        }
+
+        var keyPrefix = beforeCaret[keyStart..];
+        if (beforeCaret[..keyStart].TrimEnd().EndsWith("=", StringComparison.Ordinal))
+        {
+            return ValueTask.FromResult<CompletionResult?>(null);
+        }
+
+        var keyItems = FindFields(tablePath)
+            .Where(field => field.Name.StartsWith(keyPrefix, StringComparison.OrdinalIgnoreCase))
+            .Select(field => new CompletionItem(
+                field.Name,
+                field.Name,
+                field.ValueKind.ToString(),
+                field.Documentation))
+            .ToArray();
+        return ValueTask.FromResult<CompletionResult?>(
+            new CompletionResult(
+                TextRange.FromBounds(lineStart + keyStart, context.Position),
+                keyItems));
+    }
+
+    private IReadOnlyList<AzunoteSchemaField> FindFields(string tablePath) =>
+        _schemas
+            .SelectMany(schema => schema.Tables)
+            .Where(table => string.Equals(table.Path, tablePath, StringComparison.OrdinalIgnoreCase))
+            .SelectMany(table => table.Fields)
+            .GroupBy(field => field.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .ToArray();
+
+    private static string FindTablePath(TextSnapshot snapshot, int currentLine)
+    {
+        var tablePath = string.Empty;
+        for (var line = 0; line <= currentLine; line++)
+        {
+            var text = snapshot.GetText(snapshot.Lines.GetLineRange(line)).Trim();
+            if (text.StartsWith("[[", StringComparison.Ordinal)
+                && text.EndsWith("]]", StringComparison.Ordinal))
+            {
+                tablePath = text[2..^2].Trim();
+            }
+            else if (text.StartsWith("[", StringComparison.Ordinal)
+                && text.EndsWith("]", StringComparison.Ordinal))
+            {
+                tablePath = text[1..^1].Trim();
+            }
+        }
+
+        return tablePath;
+    }
+
+    private static bool TryGetValueContext(
+        string text,
+        out int valueStart,
+        out string valuePrefix,
+        out string key)
+    {
+        valueStart = 0;
+        valuePrefix = string.Empty;
+        key = string.Empty;
+        var equals = text.IndexOf('=');
+        if (equals < 0)
+        {
+            return false;
+        }
+
+        var rawKey = text[..equals].Trim();
+        if (rawKey.Length == 0 || rawKey.Any(character => !IsKeyCharacter(character)))
+        {
+            return false;
+        }
+
+        valueStart = equals + 1;
+        while (valueStart < text.Length && char.IsWhiteSpace(text[valueStart]))
+        {
+            valueStart++;
+        }
+
+        key = rawKey;
+        valuePrefix = text[valueStart..];
+        if (valuePrefix.StartsWith('"') || valuePrefix.StartsWith('\''))
+        {
+            valuePrefix = valuePrefix[1..];
+        }
+
+        return true;
+    }
+
+    private static bool IsKeyCharacter(char value) =>
+        char.IsLetterOrDigit(value) || value is '_' or '-' or '.';
+
+    private static string FormatTomlValue(string value) => $"\"{value}\"";
+}

@@ -11,6 +11,9 @@ public sealed class CustomSyntaxModeSettings
 
     public string DisplayName { get; set; } = string.Empty;
 
+    public string[] Patterns { get; set; } = [];
+
+    /// <summary>Compatibility alias for definitions written before patterns.</summary>
     public string[] Extensions { get; set; } = [];
 
     /// <summary>Literal strings which trigger completion requests in this mode.</summary>
@@ -122,9 +125,14 @@ public static class CustomSyntaxModeDiscovery
                 $"Syntax mode '{settings.Id}' needs a non-empty displayName.");
         }
 
-        if (settings.Extensions is null)
+        if (settings.Patterns is null)
         {
-            settings.Extensions = [];
+            settings.Patterns = [];
+        }
+
+        if (settings.Patterns.Length == 0 && settings.Extensions is { Length: > 0 })
+        {
+            settings.Patterns = settings.Extensions;
         }
 
         if (settings.Rules is null || settings.Rules.Length == 0)
@@ -137,7 +145,7 @@ public static class CustomSyntaxModeDiscovery
         return new SyntaxLanguageDefinition(
             settings.Id,
             settings.DisplayName,
-            settings.Extensions,
+            settings.Patterns,
             sources,
             settings.CompletionTriggerCharacters);
     }

@@ -22,6 +22,7 @@ public sealed partial class MainWindow : Window
     private readonly Dictionary<string, ISyntaxProvider?> _languageModes = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, IReadOnlyList<string>> _languageModeCompletionTriggers = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, IReadOnlyList<string>> _languageModeExtensions = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, IReadOnlyList<string>> _languageModePatterns = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, ToggleMenuFlyoutItem> _languageModeItems = new(StringComparer.OrdinalIgnoreCase);
     private readonly string _settingsDirectory = SettingsFileService.GetDefaultDirectory();
     private string? _filePath;
@@ -347,22 +348,31 @@ public sealed partial class MainWindow : Window
         _languageModes.Clear();
         _languageModeCompletionTriggers.Clear();
         _languageModeExtensions.Clear();
+        _languageModePatterns.Clear();
         _languageModeItems.Clear();
 
         AddLanguageMode(
             "plain-text",
             "Plain Text",
             null,
-            fileExtensions: [".txt", ".log"]);
+            fileExtensions: [".txt", ".log"],
+            patterns: ["*.txt", "*.log"]);
         LanguageModeMenuItem.Items.Add(new MenuFlyoutSeparator());
-        AddLanguageMode("azunote", "Azunote", new AzunoteSyntaxProvider(), [".", "(", "{", "[", "->"]);
+        AddLanguageMode(
+            "azunote",
+            "Azunote",
+            new AzunoteSyntaxProvider(),
+            [".", "(", "{", "[", "->"],
+            fileExtensions: [".toml"],
+            patterns: AzunoteLanguageDefinition.Patterns);
         foreach (var language in BuiltInSyntaxLanguages.All)
         {
             AddLanguageMode(
                 language.Id,
                 language.DisplayName,
                 language,
-                language.CompletionTriggerCharacters);
+                language.CompletionTriggerCharacters,
+                patterns: language.Patterns);
         }
 
         var additionalModes = customModes?
@@ -377,7 +387,8 @@ public sealed partial class MainWindow : Window
                     language.Id,
                     language.DisplayName,
                     language,
-                    language.CompletionTriggerCharacters);
+                    language.CompletionTriggerCharacters,
+                    patterns: language.Patterns);
             }
         }
 
@@ -394,7 +405,8 @@ public sealed partial class MainWindow : Window
         string displayName,
         ISyntaxProvider? provider,
         IReadOnlyList<string>? completionTriggerCharacters = null,
-        IReadOnlyList<string>? fileExtensions = null)
+        IReadOnlyList<string>? fileExtensions = null,
+        IReadOnlyList<string>? patterns = null)
     {
         _languageModes.Add(id, provider);
         _languageModeCompletionTriggers.Add(
@@ -404,6 +416,11 @@ public sealed partial class MainWindow : Window
             id,
             fileExtensions
                 ?? (provider as SyntaxLanguageDefinition)?.FileExtensions
+                ?? Array.Empty<string>());
+        _languageModePatterns.Add(
+            id,
+            patterns
+                ?? (provider as SyntaxLanguageDefinition)?.Patterns
                 ?? Array.Empty<string>());
         var item = new ToggleMenuFlyoutItem
         {
@@ -432,15 +449,22 @@ public sealed partial class MainWindow : Window
         }
 
         _languageModeId = id;
-        Editor.Providers.Syntax = provider;
         Editor.CompletionTriggerCharacters =
             _languageModeCompletionTriggers.TryGetValue(id, out var completionTriggers)
                 ? completionTriggers
                 : Array.Empty<string>();
         var isAzunote = string.Equals(id, "azunote", StringComparison.OrdinalIgnoreCase);
-        Editor.Providers.Completion = isAzunote ? new AzunoteCompletionProvider() : null;
-        Editor.Providers.Tooltip = isAzunote ? new AzunoteTooltipProvider() : null;
-        Editor.Providers.Folding = isAzunote ? new AzunoteFoldingProvider() : null;
+        var azunoteSchemas = isAzunote
+            ? AzunoteSchemaCatalog.ForPath(_filePath)
+            : Array.Empty<AzunoteSchemaDefinition>();
+        Editor.Providers.Syntax = isAzunote
+            ? new AzunoteSyntaxProvider()
+            : provider;
+        Editor.Providers.Completion = isAzunote
+            ? new AzunoteCompletionProvider(azunoteSchemas)
+            : null;
+        Editor.Providers.Tooltip = null;
+        Editor.Providers.Folding = null;
         foreach (var pair in _languageModeItems)
         {
             pair.Value.IsChecked = string.Equals(pair.Key, id, StringComparison.OrdinalIgnoreCase);
@@ -454,19 +478,15 @@ public sealed partial class MainWindow : Window
 
     private void SelectLanguageModeForPath(string path)
     {
-        var extension = Path.GetExtension(path);
         var selectedModeId = "plain-text";
-        if (!string.IsNullOrEmpty(extension))
+        var bestScore = -1;
+        foreach (var pair in _languageModePatterns)
         {
-            foreach (var pair in _languageModes)
+            var score = SyntaxLanguageDefinition.GetPatternMatchScore(path, pair.Value);
+            if (score > bestScore)
             {
-                if (pair.Value is SyntaxLanguageDefinition language
-                    && language.FileExtensions.Any(fileExtension =>
-                        string.Equals(fileExtension, extension, StringComparison.OrdinalIgnoreCase)))
-                {
-                    selectedModeId = pair.Key;
-                    break;
-                }
+                bestScore = score;
+                selectedModeId = pair.Key;
             }
         }
 

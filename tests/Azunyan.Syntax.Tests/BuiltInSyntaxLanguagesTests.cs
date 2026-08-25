@@ -39,6 +39,12 @@ public sealed class BuiltInSyntaxLanguagesTests
         };
         yield return new object[]
         {
+            BuiltInSyntaxLanguages.Toml,
+            "# note\nname = \"azunote\"\n[tool]\nactive = true\ncount = 42",
+            new[] { "# note:comment", "name:keyword", "\"azunote\":string", "[tool]:heading", "active:keyword", "true:keyword", "count:keyword", "42:number" }
+        };
+        yield return new object[]
+        {
             BuiltInSyntaxLanguages.Markdown,
             "# Title\n`code`\n<!-- note -->",
             new[] { "# Title:heading", "`code`:code", "<!-- note -->:comment" }
@@ -73,8 +79,9 @@ public sealed class BuiltInSyntaxLanguagesTests
     {
         Assert.Contains(".cs", BuiltInSyntaxLanguages.CSharp.FileExtensions);
         Assert.Contains(".tsx", BuiltInSyntaxLanguages.TypeScript.FileExtensions);
+        Assert.Contains("*.toml", BuiltInSyntaxLanguages.Toml.Patterns);
         Assert.Equal([".", "(", "{", "[", "->"], BuiltInSyntaxLanguages.CSharp.CompletionTriggerCharacters);
-        Assert.Equal(7, BuiltInSyntaxLanguages.All.Count);
+        Assert.Equal(8, BuiltInSyntaxLanguages.All.Count);
     }
 
     [Fact]
@@ -88,5 +95,22 @@ public sealed class BuiltInSyntaxLanguagesTests
             ["->", ".", "->"]);
 
         Assert.Equal(["->", "."], definition.CompletionTriggerCharacters);
+    }
+
+    [Fact]
+    public void Path_patterns_prefer_the_most_specific_suffix()
+    {
+        var definition = new SyntaxLanguageDefinition(
+            "example",
+            "Example",
+            ["*.toml", "modes/*.toml", "settings.toml"],
+            []);
+
+        Assert.True(
+            definition.GetPatternMatchScore(@"C:\Users\test\settings.toml")
+                > definition.GetPatternMatchScore(@"C:\Users\test\modes\custom.toml"));
+        Assert.True(
+            definition.GetPatternMatchScore(@"C:\Users\test\modes\custom.toml")
+                > definition.GetPatternMatchScore(@"C:\Users\test\other.toml"));
     }
 }

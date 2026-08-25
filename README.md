@@ -191,7 +191,7 @@ and its complete token is consumed. This keeps comment markers inside strings
 and quotes inside comments from leaking into later classifications.
 
 Built-in definitions are available for C#, JavaScript, TypeScript, Python,
-JSON, Markdown, and PowerShell. Selection is deliberately application-owned:
+JSON, TOML, Markdown, and PowerShell. Selection is deliberately application-owned:
 Azunote exposes them from View > Language Mode, alongside Plain Text and its
 Azunote note mode.
 
@@ -204,8 +204,8 @@ Azunote also discovers custom language modes from
 Resources/DefaultAppData/modes are copied there. Once the folder exists it is
 user-owned and is never overwritten; adding, editing, or removing a .toml
 definition is picked up by the settings watcher.
-When a file is opened, its extension is matched against the built-in and
-custom definitions; unmatched files use Plain Text. A manual menu selection
+When a file is opened, its path is matched against the built-in and custom
+patterns; unmatched files use Plain Text. A manual menu selection
 is kept until another file is opened.
 Plain Text is the default mode and its supported extensions are `.txt` and
 `.log`.
@@ -214,13 +214,15 @@ filters: supported formats, one entry per language mode, and all files. Open
 starts on supported formats, while Save As starts on the active language mode.
 
 Each file describes one mode and applies its rules in the listed order. The
-supported rule types are delimited, line, literal, keyword, and regex. For
+supported rule types are delimited, line, literal, keyword, and regex. A
+pattern without a path separator matches the file name; when multiple modes
+match, the most specific matching suffix wins. For
 example, a small mode definition looks like this:
 
 ~~~toml
 id = "ini"
 displayName = "INI"
-extensions = [".ini"]
+patterns = ["*.ini", "*.cfg", "*.conf"]
 completionTriggerCharacters = [".", "(", "{", "[", "->"]
 
 [[rules]]
@@ -242,8 +244,9 @@ classification = "keyword"
 words = ["true", "false"]
 ~~~
 
-The bundled toml.toml definition demonstrates multiline strings, comments,
-table headings, keys, booleans, dates, and numeric literals.
+TOML is built into Azunyan and is also the syntax layer used by Azunote's
+configuration mode. The bundled `ini.toml` definition demonstrates a custom
+mode without duplicating the built-in TOML definition.
 `completionTriggerCharacters` contains literal strings that request completion
 after insertion (multi-character values such as `->` are allowed). Explicit
 completion is an application command; Azunote exposes it as Edit > Show
@@ -285,9 +288,7 @@ lines become continuation visual rows, block adornments become visual rows with
 independent heights, and a variable-height index realizes only a bounded
 viewport window. The projected surface maps pointer presses back through that
 same visual-row cache, including fold placeholder toggling, inlay identity, and
-block-row anchors. Azunote's lightweight provider also supplies heading-based
-fold candidates and keyword tooltips; the editor owns which fold IDs are
-collapsed. `Azunyan.WinUI` supplies the DirectWrite-backed Win2D text layout
+block-row anchors. `Azunyan.WinUI` supplies the DirectWrite-backed Win2D text layout
 backend used by Azunote's projected surface, including font-aware wrapping and
 gutter text. It is still a bounded viewport renderer; the native
 input/accessibility bridge remains transitional.
@@ -299,11 +300,10 @@ marks, inlays, and completion/tooltip popups. Azunote initializes this with a
 light-theme palette read from WinUI `SystemControl*Brush` resources; an
 embedding application can replace it with its own scheme.
 
-Azunote ships deliberately small `AzunoteSyntaxProvider`,
-`AzunoteTooltipProvider`, and `AzunoteCompletionProvider` implementations. The
-completion provider combines note keywords with distinct identifier-like words
-from the current snapshot, and the view can accept the selected item against
-its snapshot-bound replacement range.
+Azunote's configuration mode uses the built-in TOML provider and a
+NativeAOT-safe schema catalog for completion candidates in settings, tool,
+manifest, and custom-mode definition files. The view can accept the selected
+item against its snapshot-bound replacement range.
 
 Unexpected UI exceptions are logged and shown in an error dialog. Unhandled
 AppDomain and unobserved task exceptions are logged as well. Logs are written

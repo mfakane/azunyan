@@ -6,24 +6,23 @@ namespace Azunote.Tests;
 public sealed class CustomSyntaxModeDiscoveryTests
 {
     [Fact]
-    public async Task Ensure_exists_copies_the_bundled_toml_mode_and_loads_it()
+    public async Task Ensure_exists_copies_the_bundled_ini_mode_and_loads_it()
     {
         var root = CreateTemporaryDirectory();
         try
         {
             await SettingsFileService.EnsureExistsAsync(root);
 
-            var modePath = Path.Combine(SettingsFileService.GetModesDirectoryPath(root), "toml.toml");
+            var modePath = Path.Combine(SettingsFileService.GetModesDirectoryPath(root), "ini.toml");
             Assert.True(File.Exists(modePath));
 
             var settings = await SettingsFileService.LoadAsync(root);
             var mode = Assert.Single(settings.CustomSyntaxModes);
-            Assert.Equal("toml", mode.Id);
-            Assert.Equal("TOML", mode.DisplayName);
-            Assert.Contains(".toml", mode.FileExtensions);
-            Assert.Equal([".", "(", "{", "[", "->"], mode.CompletionTriggerCharacters);
+            Assert.Equal("ini", mode.Id);
+            Assert.Equal("INI", mode.DisplayName);
+            Assert.Contains("*.ini", mode.Patterns);
 
-            const string text = "# comment\nname = \"a # b\"\nactive = true\nvalue = 42\ndate = 2024-01-02\n[server]\n";
+            const string text = "; comment\nname = \"a ; b\"\nactive = true\nvalue = 42\n[server]\n";
             var spans = await mode.GetSyntaxAsync(
                 new EditorProviderContext(
                     new TextSnapshot(text),
@@ -32,20 +31,16 @@ public sealed class CustomSyntaxModeDiscoveryTests
 
             Assert.Contains(
                 spans,
-                span => text[span.Range.Start..span.Range.End] == "# comment"
+                span => text[span.Range.Start..span.Range.End] == "; comment"
                     && span.Classification == "comment");
             Assert.Contains(
                 spans,
-                span => text[span.Range.Start..span.Range.End] == "\"a # b\""
+                span => text[span.Range.Start..span.Range.End] == "\"a ; b\""
                     && span.Classification == "string");
             Assert.Contains(
                 spans,
                 span => text[span.Range.Start..span.Range.End] == "[server]"
                     && span.Classification == "heading");
-            Assert.Contains(
-                spans,
-                span => text[span.Range.Start..span.Range.End] == "2024-01-02"
-                    && span.Classification == "number");
         }
         finally
         {
@@ -66,8 +61,7 @@ public sealed class CustomSyntaxModeDiscoveryTests
                 """
                 id = "example"
                 displayName = "Example"
-                extensions = ["example"]
-                completionTriggerCharacters = ["->", "."]
+                patterns = ["configs/*.example"]
 
                 [[rules]]
                 type = "literal"
@@ -79,8 +73,7 @@ public sealed class CustomSyntaxModeDiscoveryTests
 
             var mode = Assert.Single(settings.CustomSyntaxModes);
             Assert.Equal("example", mode.Id);
-            Assert.Equal([".example"], mode.FileExtensions);
-            Assert.Equal(["->", "."], mode.CompletionTriggerCharacters);
+            Assert.Equal(["configs/*.example"], mode.Patterns);
         }
         finally
         {

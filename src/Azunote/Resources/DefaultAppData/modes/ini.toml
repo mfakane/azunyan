@@ -1,0 +1,48 @@
+id = "ini"
+displayName = "INI"
+patterns = ["*.ini", "*.cfg", "*.conf"]
+
+[[rules]]
+type = "line"
+classification = "comment"
+token = ";"
+
+[[rules]]
+type = "line"
+classification = "comment"
+token = "#"
+
+[[rules]]
+type = "delimited"
+classification = "string"
+open = '"'
+close = '"'
+allowLineBreaks = false
+escapePrefix = '\'
+
+[[rules]]
+type = "delimited"
+classification = "string"
+open = "'"
+close = "'"
+allowLineBreaks = false
+
+[[rules]]
+type = "regex"
+classification = "heading"
+pattern = '(?m)^[ \t]*\[[^\r\n\]]+\][ \t]*$'
+
+[[rules]]
+type = "regex"
+classification = "keyword"
+pattern = '(?m)^[ \t]*[^=;#\r\n]+(?=\s*=)'
+
+[[rules]]
+type = "keyword"
+classification = "keyword"
+words = ["true", "false", "yes", "no", "on", "off"]
+
+[[rules]]
+type = "regex"
+classification = "number"
+pattern = '(?<![\w.])[-+]?\d+(?:\.\d+)?(?![\w.])'

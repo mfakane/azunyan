@@ -21,6 +21,8 @@ public static class BuiltInSyntaxLanguages
 
     public static SyntaxLanguageDefinition Json => CreateJson();
 
+    public static SyntaxLanguageDefinition Toml => CreateToml();
+
     public static SyntaxLanguageDefinition Markdown => CreateMarkdown();
 
     public static SyntaxLanguageDefinition PowerShell => CreatePowerShell();
@@ -32,6 +34,7 @@ public static class BuiltInSyntaxLanguages
         TypeScript,
         Python,
         Json,
+        Toml,
         Markdown,
         PowerShell
     ];
@@ -135,6 +138,30 @@ public static class BuiltInSyntaxLanguages
             new DelimitedSyntaxRule("\"", "\"", "string", allowLineBreaks: false, escapePrefix: "\\"),
             new KeywordSyntaxRule(["true", "false", "null"]),
             new RegexSyntaxRule(@"(?<![\w.])-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?(?![\w.])", "number")
+        ],
+        CommonCompletionTriggers);
+
+    private static SyntaxLanguageDefinition CreateToml() =>
+        new("toml", "TOML", ["*.toml"],
+        [
+            new LineRemainderSyntaxRule("#", "comment"),
+            new DelimitedSyntaxRule("\"\"\"", "\"\"\"", "string", escapePrefix: "\\"),
+            new DelimitedSyntaxRule("'''", "'''", "string"),
+            new DelimitedSyntaxRule("\"", "\"", "string", allowLineBreaks: false, escapePrefix: "\\"),
+            new DelimitedSyntaxRule("'", "'", "string", allowLineBreaks: false),
+            new RegexSyntaxRule(
+                @"(?m)^[ \t]*\[\[?[^\r\n\]]+\]\]?[ \t]*$",
+                "heading"),
+            new RegexSyntaxRule(
+                @"(?m)^[ \t]*[A-Za-z0-9_-]+(?:[ \t]*\.[ \t]*[A-Za-z0-9_-]+)*(?=[ \t]*=)",
+                "keyword"),
+            new KeywordSyntaxRule(["true", "false"]),
+            new RegexSyntaxRule(
+                @"(?<![\w.])\d{4}-\d{2}-\d{2}(?:[Tt ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[-+]\d{2}:?\d{2})?)?(?![\w.])",
+                "number"),
+            new RegexSyntaxRule(
+                @"(?<![\w.])(?:[-+]?(?:\d(?:_?\d)*(?:\.\d(?:_?\d)*)?(?:[eE][-+]?\d(?:_?\d)*)?|0x[0-9A-Fa-f](?:_?[0-9A-Fa-f])*|0o[0-7](?:_?[0-7])*|0b[01](?:_?[01])*))(?![\w.])",
+                "number")
         ],
         CommonCompletionTriggers);
 

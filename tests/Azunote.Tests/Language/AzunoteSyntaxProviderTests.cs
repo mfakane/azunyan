@@ -6,9 +6,9 @@ namespace Azunote.Tests;
 public sealed class AzunoteSyntaxProviderTests
 {
     [Fact]
-    public async Task Rule_based_provider_preserves_azunote_classifications()
+    public async Task Configuration_provider_uses_toml_syntax()
     {
-        const string text = "# TODO 12\n[x] \"http://x\" // DONE";
+        const string text = "# note\nname = \"azunote\"\n[tool]\nactive = true";
         var snapshot = new TextSnapshot(text);
         var provider = new AzunoteSyntaxProvider();
 
@@ -17,10 +17,12 @@ public sealed class AzunoteSyntaxProviderTests
 
         Assert.Equal(
             [
-                "# TODO 12:heading",
-                "[x]:task-marker",
-                "\"http://x\":string",
-                "// DONE:comment"
+                "# note:comment",
+                "name:keyword",
+                "\"azunote\":string",
+                "[tool]:heading",
+                "active:keyword",
+                "true:keyword"
             ],
             spans.Select(span => $"{text[span.Range.Start..span.Range.End]}:{span.Classification}"));
     }
