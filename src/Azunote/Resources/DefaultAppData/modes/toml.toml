@@ -1,0 +1,63 @@
+id = "toml"
+displayName = "TOML"
+extensions = [".toml"]
+
+[[rules]]
+type = "line"
+classification = "comment"
+token = "#"
+
+[[rules]]
+type = "delimited"
+classification = "string"
+open = '"""'
+close = '"""'
+allowLineBreaks = true
+escapePrefix = '\'
+
+[[rules]]
+type = "delimited"
+classification = "string"
+open = "'''"
+close = "'''"
+allowLineBreaks = true
+
+[[rules]]
+type = "delimited"
+classification = "string"
+open = '"'
+close = '"'
+allowLineBreaks = false
+escapePrefix = '\'
+
+[[rules]]
+type = "delimited"
+classification = "string"
+open = "'"
+close = "'"
+allowLineBreaks = false
+
+[[rules]]
+type = "regex"
+classification = "heading"
+pattern = '(?m)^[ \t]*\[\[?[^\r\n\]]+\]\]?[ \t]*$'
+
+[[rules]]
+type = "regex"
+classification = "keyword"
+pattern = '(?m)^[ \t]*[A-Za-z0-9_-]+(?:[ \t]*\.[ \t]*[A-Za-z0-9_-]+)*[ \t]*(?==)'
+
+[[rules]]
+type = "keyword"
+classification = "keyword"
+words = ["true", "false"]
+
+[[rules]]
+type = "regex"
+classification = "number"
+pattern = '(?<![\w.])\d{4}-\d{2}-\d{2}(?:[Tt ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[-+]\d{2}:?\d{2})?)?(?![\w.])'
+
+[[rules]]
+type = "regex"
+classification = "number"
+pattern = '(?<![\w.])(?:[-+]?(?:\d(?:_?\d)*(?:\.\d(?:_?\d)*)?(?:[eE][-+]?\d(?:_?\d)*)?|0x[0-9A-Fa-f](?:_?[0-9A-Fa-f])*|0o[0-7](?:_?[0-7])*|0b[01](?:_?[01])*))(?![\w.])'

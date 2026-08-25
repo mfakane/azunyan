@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json.Serialization;
+using Azunyan.Syntax;
 using Tomlyn;
 using Tomlyn.Serialization;
 
@@ -16,6 +17,13 @@ public sealed class AzunoteSettings
     public IReadOnlyList<ExternalToolSettings> ExternalTools { get; internal set; } = [];
 
     /// <summary>
+    /// Syntax language definitions discovered below the settings directory's
+    /// modes folder. These values are derived from mode definition files.
+    /// </summary>
+    [JsonIgnore]
+    public IReadOnlyList<SyntaxLanguageDefinition> CustomSyntaxModes { get; internal set; } = [];
+
+    /// <summary>
     /// The hierarchical menu nodes discovered below the tools folder.
     /// </summary>
     [JsonIgnore]
@@ -27,6 +35,8 @@ public sealed class AzunoteSettings
     WriteIndented = true)]
 [TomlSerializable(typeof(AzunoteSettings))]
 [TomlSerializable(typeof(ExternalToolSettings))]
+[TomlSerializable(typeof(CustomSyntaxModeSettings))]
+[TomlSerializable(typeof(CustomSyntaxRuleSettings))]
 internal partial class AzunoteTomlSerializerContext : TomlSerializerContext
 {
 }
@@ -167,6 +177,7 @@ public static class SettingsFileService
     public const string SettingsDirectoryName = "Azunote";
     public const string SettingsFileName = "settings.toml";
     public const string ToolsDirectoryName = "tools";
+    public const string ModesDirectoryName = "modes";
 
     private const string DefaultSettingsText = """
         # Azunote settings. This file uses TOML syntax.
@@ -190,6 +201,9 @@ public static class SettingsFileService
     public static string GetToolsDirectoryPath(string settingsDirectory) =>
         Path.Combine(GetFullDirectoryPath(settingsDirectory), ToolsDirectoryName);
 
+    public static string GetModesDirectoryPath(string settingsDirectory) =>
+        Path.Combine(GetFullDirectoryPath(settingsDirectory), ModesDirectoryName);
+
     public static async Task EnsureExistsAsync(
         string settingsDirectory,
         CancellationToken cancellationToken = default)
@@ -197,6 +211,7 @@ public static class SettingsFileService
         var directory = GetFullDirectoryPath(settingsDirectory);
         Directory.CreateDirectory(directory);
         Directory.CreateDirectory(Path.Combine(directory, ToolsDirectoryName));
+        await EnsureDefaultModesAsync(directory, cancellationToken);
 
         var settingsPath = Path.Combine(directory, SettingsFileName);
         if (!File.Exists(settingsPath))
@@ -227,6 +242,9 @@ public static class SettingsFileService
             cancellationToken);
         settings.ExternalTools = catalog.Tools;
         settings.ExternalToolMenu = catalog.Menu;
+        settings.CustomSyntaxModes = await CustomSyntaxModeDiscovery.LoadAsync(
+            GetModesDirectoryPath(directory),
+            cancellationToken);
         return settings;
     }
 
@@ -278,5 +296,46 @@ public static class SettingsFileService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         return Path.GetFullPath(path);
+    }
+
+    private static async Task EnsureDefaultModesAsync(
+        string settingsDirectory,
+        CancellationToken cancellationToken)
+    {
+        var modesDirectory = GetModesDirectoryPath(settingsDirectory);
+        if (Directory.Exists(modesDirectory))
+        {
+            return;
+        }
+
+        var defaultModesDirectory = Path.Combine(
+            AppContext.BaseDirectory,
+            "Resources",
+            "DefaultAppData",
+            ModesDirectoryName);
+        Directory.CreateDirectory(modesDirectory);
+        if (!Directory.Exists(defaultModesDirectory))
+        {
+            return;
+        }
+
+        foreach (var sourcePath in Directory.EnumerateFiles(
+                     defaultModesDirectory,
+                     "*",
+                     SearchOption.AllDirectories))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var relativePath = Path.GetRelativePath(defaultModesDirectory, sourcePath);
+            var destinationPath = Path.Combine(modesDirectory, relativePath);
+            var destinationDirectory = Path.GetDirectoryName(destinationPath);
+            if (!string.IsNullOrWhiteSpace(destinationDirectory))
+            {
+                Directory.CreateDirectory(destinationDirectory);
+            }
+
+            await using var source = File.OpenRead(sourcePath);
+            await using var destination = File.Create(destinationPath);
+            await source.CopyToAsync(destination, cancellationToken);
+        }
     }
 }

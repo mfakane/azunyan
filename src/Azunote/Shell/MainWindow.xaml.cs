@@ -1,4 +1,5 @@
 using Azunyan.Core;
+using Azunyan.Syntax;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -17,6 +18,8 @@ public sealed partial class MainWindow : Window
     private readonly IntPtr _windowHandle;
     private readonly AppWindow? _appWindow;
     private readonly ExternalToolRunner _externalToolRunner = new();
+    private readonly Dictionary<string, ISyntaxProvider?> _languageModes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, ToggleMenuFlyoutItem> _languageModeItems = new(StringComparer.OrdinalIgnoreCase);
     private readonly string _settingsDirectory = SettingsFileService.GetDefaultDirectory();
     private string? _filePath;
     private string _savedText = string.Empty;
@@ -31,14 +34,12 @@ public sealed partial class MainWindow : Window
     private CancellationTokenSource? _fileChangeDebounce;
     private CancellationTokenSource? _settingsChangeDebounce;
     private bool _externalChangeDialogOpen;
+    private string _languageModeId = "azunote";
 
     public MainWindow()
     {
         InitializeComponent();
-        Editor.Providers.Syntax = new AzunoteSyntaxProvider();
-        Editor.Providers.Completion = new AzunoteCompletionProvider();
-        Editor.Providers.Tooltip = new AzunoteTooltipProvider();
-        Editor.Providers.Folding = new AzunoteFoldingProvider();
+        InitializeLanguageModeMenu();
         Editor.ColorScheme = AzunoteSystemColorScheme.CreateLight();
         RegisterKeyboardAccelerators();
 
@@ -334,6 +335,87 @@ public sealed partial class MainWindow : Window
             : Visibility.Visible;
     }
 
+    private void InitializeLanguageModeMenu(
+        IReadOnlyList<SyntaxLanguageDefinition>? customModes = null)
+    {
+        var selectedMode = _languageModeId;
+        LanguageModeMenuItem.Items.Clear();
+        _languageModes.Clear();
+        _languageModeItems.Clear();
+
+        AddLanguageMode("plain-text", "Plain Text", null);
+        LanguageModeMenuItem.Items.Add(new MenuFlyoutSeparator());
+        AddLanguageMode("azunote", "Azunote", new AzunoteSyntaxProvider());
+        foreach (var language in BuiltInSyntaxLanguages.All)
+        {
+            AddLanguageMode(language.Id, language.DisplayName, language);
+        }
+
+        var additionalModes = customModes?
+            .Where(language => !_languageModes.ContainsKey(language.Id))
+            .ToArray() ?? Array.Empty<SyntaxLanguageDefinition>();
+        if (additionalModes.Length > 0)
+        {
+            LanguageModeMenuItem.Items.Add(new MenuFlyoutSeparator());
+            foreach (var language in additionalModes)
+            {
+                AddLanguageMode(language.Id, language.DisplayName, language);
+            }
+        }
+
+        if (!_languageModes.ContainsKey(selectedMode))
+        {
+            selectedMode = "azunote";
+        }
+
+        SetLanguageMode(selectedMode, refresh: customModes is not null);
+    }
+
+    private void AddLanguageMode(string id, string displayName, ISyntaxProvider? provider)
+    {
+        _languageModes.Add(id, provider);
+        var item = new ToggleMenuFlyoutItem
+        {
+            Text = displayName,
+            Tag = id
+        };
+        item.Click += LanguageModeItem_Click;
+        _languageModeItems.Add(id, item);
+        LanguageModeMenuItem.Items.Add(item);
+    }
+
+    private void LanguageModeItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is ToggleMenuFlyoutItem item && item.Tag is string id)
+        {
+            SetLanguageMode(id, refresh: true);
+        }
+    }
+
+    private void SetLanguageMode(string id, bool refresh)
+    {
+        if (!_languageModes.TryGetValue(id, out var provider))
+        {
+            return;
+        }
+
+        _languageModeId = id;
+        Editor.Providers.Syntax = provider;
+        var isAzunote = string.Equals(id, "azunote", StringComparison.OrdinalIgnoreCase);
+        Editor.Providers.Completion = isAzunote ? new AzunoteCompletionProvider() : null;
+        Editor.Providers.Tooltip = isAzunote ? new AzunoteTooltipProvider() : null;
+        Editor.Providers.Folding = isAzunote ? new AzunoteFoldingProvider() : null;
+        foreach (var pair in _languageModeItems)
+        {
+            pair.Value.IsChecked = string.Equals(pair.Key, id, StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (refresh)
+        {
+            Editor.RefreshProviders();
+        }
+    }
+
     private async void AboutMenuItem_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new ContentDialog
@@ -482,6 +564,7 @@ public sealed partial class MainWindow : Window
             var settings = await SettingsFileService.LoadAsync(_settingsDirectory);
             _settings = settings;
             RefreshExternalToolMenu();
+            InitializeLanguageModeMenu(settings.CustomSyntaxModes);
 
             return true;
         }

@@ -117,9 +117,9 @@ or keep the local changes.
 
 The settings folder is `%LOCALAPPDATA%\Azunote`. Tools > Preferences... opens
 that folder in Explorer. The folder is created on first launch and contains a
-TOML-based `settings.toml` plus a `tools` folder. Azunyan watches the settings
-folder recursively and reloads valid external changes without replacing the
-previous tool menu when a definition is invalid.
+TOML-based `settings.toml` plus `tools` and `modes` folders. Azunyan watches
+the settings folder recursively and reloads valid external changes without
+replacing the previous tool or language-mode menu when a definition is invalid.
 
 Every file ending in `.tool.toml` below `tools` is one tool definition. Normal
 folders become menu submenus, so a file at `tools\Formatting\CSharp\format.tool.toml`
@@ -192,10 +192,49 @@ and quotes inside comments from leaking into later classifications.
 
 Built-in definitions are available for C#, JavaScript, TypeScript, Python,
 JSON, Markdown, and PowerShell. Selection is deliberately application-owned:
+Azunote exposes them from View > Language Mode, alongside Plain Text and its
+Azunote note mode.
 
 ```csharp
 Editor.Providers.Syntax = BuiltInSyntaxLanguages.CSharp;
 ```
+
+Azunote also discovers custom language modes from
+%LOCALAPPDATA%\Azunote\modes. On first launch, the bundled definitions under
+Resources/DefaultAppData/modes are copied there. Once the folder exists it is
+user-owned and is never overwritten; adding, editing, or removing a .toml
+definition is picked up by the settings watcher.
+
+Each file describes one mode and applies its rules in the listed order. The
+supported rule types are delimited, line, literal, keyword, and regex. For
+example, a small mode definition looks like this:
+
+~~~toml
+id = "ini"
+displayName = "INI"
+extensions = [".ini"]
+
+[[rules]]
+type = "line"
+classification = "comment"
+token = ";"
+
+[[rules]]
+type = "delimited"
+classification = "string"
+open = "\""
+close = "\""
+allowLineBreaks = false
+escapePrefix = "\\"
+
+[[rules]]
+type = "keyword"
+classification = "keyword"
+words = ["true", "false"]
+~~~
+
+The bundled toml.toml definition demonstrates multiline strings, comments,
+table headings, keys, booleans, dates, and numeric literals.
 
 Rules and an LSP-backed or other custom provider can occupy the same priority
 list. Earlier entries win when candidates start at the same position:

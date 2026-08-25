@@ -28,6 +28,9 @@
   <ItemGroup>
     <ApplicationDefinition Include="Application\App.xaml" />
     <Page Remove="Application\App.xaml" />
+    <None Include="Resources\DefaultAppData\modes\**\*"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

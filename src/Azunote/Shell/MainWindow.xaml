@@ -35,6 +35,7 @@
                 <MenuFlyoutItem Text="Replace..." Click="ReplaceButton_Click" />
             </MenuBarItem>
             <MenuBarItem Title="View">
+                <MenuFlyoutSubItem x:Name="LanguageModeMenuItem" Text="Language Mode" />
                 <MenuFlyoutItem x:Name="WordWrapMenuItem" Text="Word Wrap" Click="WordWrapMenuItem_Click" />
                 <MenuFlyoutItem Text="Status Bar" Click="StatusBarMenuItem_Click" />
             </MenuBarItem>
