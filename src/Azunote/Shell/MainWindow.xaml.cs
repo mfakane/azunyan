@@ -21,6 +21,7 @@ public sealed partial class MainWindow : Window
     private readonly ExternalToolRunner _externalToolRunner = new();
     private readonly Dictionary<string, ISyntaxProvider?> _languageModes = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, IReadOnlyList<string>> _languageModeCompletionTriggers = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, IReadOnlyList<string>> _languageModeExtensions = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, ToggleMenuFlyoutItem> _languageModeItems = new(StringComparer.OrdinalIgnoreCase);
     private readonly string _settingsDirectory = SettingsFileService.GetDefaultDirectory();
     private string? _filePath;
@@ -36,7 +37,7 @@ public sealed partial class MainWindow : Window
     private CancellationTokenSource? _fileChangeDebounce;
     private CancellationTokenSource? _settingsChangeDebounce;
     private bool _externalChangeDialogOpen;
-    private string _languageModeId = "azunote";
+    private string _languageModeId = "plain-text";
     private bool _languageModeManuallySelected;
 
     public MainWindow()
@@ -345,9 +346,14 @@ public sealed partial class MainWindow : Window
         LanguageModeMenuItem.Items.Clear();
         _languageModes.Clear();
         _languageModeCompletionTriggers.Clear();
+        _languageModeExtensions.Clear();
         _languageModeItems.Clear();
 
-        AddLanguageMode("plain-text", "Plain Text", null);
+        AddLanguageMode(
+            "plain-text",
+            "Plain Text",
+            null,
+            fileExtensions: [".txt", ".log"]);
         LanguageModeMenuItem.Items.Add(new MenuFlyoutSeparator());
         AddLanguageMode("azunote", "Azunote", new AzunoteSyntaxProvider(), [".", "(", "{", "[", "->"]);
         foreach (var language in BuiltInSyntaxLanguages.All)
@@ -377,7 +383,7 @@ public sealed partial class MainWindow : Window
 
         if (!_languageModes.ContainsKey(selectedMode))
         {
-            selectedMode = "azunote";
+            selectedMode = "plain-text";
         }
 
         SetLanguageMode(selectedMode, refresh: customModes is not null);
@@ -387,12 +393,18 @@ public sealed partial class MainWindow : Window
         string id,
         string displayName,
         ISyntaxProvider? provider,
-        IReadOnlyList<string>? completionTriggerCharacters = null)
+        IReadOnlyList<string>? completionTriggerCharacters = null,
+        IReadOnlyList<string>? fileExtensions = null)
     {
         _languageModes.Add(id, provider);
         _languageModeCompletionTriggers.Add(
             id,
             completionTriggerCharacters ?? Array.Empty<string>());
+        _languageModeExtensions.Add(
+            id,
+            fileExtensions
+                ?? (provider as SyntaxLanguageDefinition)?.FileExtensions
+                ?? Array.Empty<string>());
         var item = new ToggleMenuFlyoutItem
         {
             Text = displayName,
@@ -470,8 +482,8 @@ public sealed partial class MainWindow : Window
             .Select(pair => new FileDialogFilter(
                 pair.Key,
                 _languageModeItems[pair.Key].Text,
-                pair.Value is SyntaxLanguageDefinition definition
-                    ? NormalizeFileExtensions(definition.FileExtensions)
+                _languageModeExtensions.TryGetValue(pair.Key, out var extensions)
+                    ? NormalizeFileExtensions(extensions)
                     : Array.Empty<string>()))
             .ToArray();
         var supportedExtensions = NormalizeFileExtensions(

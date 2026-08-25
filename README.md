@@ -207,6 +207,8 @@ definition is picked up by the settings watcher.
 When a file is opened, its extension is matched against the built-in and
 custom definitions; unmatched files use Plain Text. A manual menu selection
 is kept until another file is opened.
+Plain Text is the default mode and its supported extensions are `.txt` and
+`.log`.
 The Open and Save dialogs use the same mode definitions for their file-type
 filters: supported formats, one entry per language mode, and all files. Open
 starts on supported formats, while Save As starts on the active language mode.
