@@ -20,11 +20,13 @@ public sealed record AzunyanColorScheme
         FoldForeground = Color.FromArgb(0xff, 0x60, 0x60, 0x60),
         InlayForeground = Color.FromArgb(0xff, 0x60, 0x60, 0x60),
         HeadingForeground = Color.FromArgb(0xff, 0x00, 0x66, 0xcc),
-        KeywordForeground = Color.FromArgb(0xff, 0x00, 0x66, 0xcc),
-        StringForeground = Color.FromArgb(0xff, 0x1a, 0x1a, 0x1a),
-        NumberForeground = Color.FromArgb(0xff, 0x1a, 0x1a, 0x1a),
+        KeywordForeground = Color.FromArgb(0xff, 0x7a, 0x3e, 0x9d),
+        StringForeground = Color.FromArgb(0xff, 0xa3, 0x15, 0x15),
+        NumberForeground = Color.FromArgb(0xff, 0x09, 0x86, 0x58),
         CommentForeground = Color.FromArgb(0xff, 0x60, 0x60, 0x60),
-        TaskForeground = Color.FromArgb(0xff, 0x00, 0x66, 0xcc),
+        TaskForeground = Color.FromArgb(0xff, 0xc2, 0x41, 0x0c),
+        CodeForeground = Color.FromArgb(0xff, 0x26, 0x7f, 0x99),
+        VariableForeground = Color.FromArgb(0xff, 0x79, 0x5e, 0x26),
         PopupBackground = Color.FromArgb(0xff, 0xf4, 0xf4, 0xf4),
         PopupForeground = Color.FromArgb(0xff, 0x1a, 0x1a, 0x1a),
         PopupBorder = Color.FromArgb(0xff, 0x80, 0x80, 0x80),
@@ -63,6 +65,10 @@ public sealed record AzunyanColorScheme
 
     public Color TaskForeground { get; init; }
 
+    public Color CodeForeground { get; init; }
+
+    public Color VariableForeground { get; init; }
+
     /// <summary>
     /// Optionally resolves a foreground for any syntax classification. Returning
     /// null retains Azunyan's built-in classification mapping and fallback.
@@ -94,10 +100,11 @@ public sealed record AzunyanColorScheme
             "heading" => HeadingForeground,
             "keyword" => KeywordForeground,
             "string" => StringForeground,
-            "code" => StringForeground,
+            "code" => CodeForeground,
             "number" => NumberForeground,
             "comment" => CommentForeground,
             "task-marker" => TaskForeground,
+            "variable" => VariableForeground,
             _ => EditorForeground
         };
     }

@@ -254,8 +254,11 @@ Editor.Providers.Syntax = new CompositeSyntaxProvider(new ISyntaxProvider[]
 ```
 
 Applications can color classifications supplied by external providers without
-changing the renderer. Returning `null` retains the built-in mapping and the
-normal editor-foreground fallback:
+changing the renderer. The default scheme gives `heading`, `keyword`, `string`,
+`code`, `number`, `comment`, `task-marker`, and `variable` distinct foreground
+colors so each syntax category is visible while inspecting a definition.
+Returning `null` retains the built-in mapping and the normal editor-foreground
+fallback:
 
 ```csharp
 Editor.ColorScheme = Editor.ColorScheme with

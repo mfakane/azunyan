@@ -21,4 +21,24 @@ public sealed class AzunyanColorSchemeTests
         Assert.Equal(colors.CommentForeground, colors.ResolveSyntaxForeground("comment"));
         Assert.Equal(colors.EditorForeground, colors.ResolveSyntaxForeground("unknown"));
     }
+
+    [Fact]
+    public void Default_scheme_distinguishes_each_builtin_syntax_classification()
+    {
+        var colors = AzunyanColorScheme.Default;
+        var syntaxColors = new[]
+        {
+            colors.ResolveSyntaxForeground("heading"),
+            colors.ResolveSyntaxForeground("keyword"),
+            colors.ResolveSyntaxForeground("string"),
+            colors.ResolveSyntaxForeground("code"),
+            colors.ResolveSyntaxForeground("number"),
+            colors.ResolveSyntaxForeground("comment"),
+            colors.ResolveSyntaxForeground("task-marker"),
+            colors.ResolveSyntaxForeground("variable")
+        };
+
+        Assert.Equal(syntaxColors.Length, syntaxColors.Distinct().Count());
+        Assert.DoesNotContain(colors.EditorForeground, syntaxColors);
+    }
 }
