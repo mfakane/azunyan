@@ -7,7 +7,6 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
-using Windows.Storage.Pickers;
 using Windows.System;
 using WinRT.Interop;
 
@@ -442,6 +441,50 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private IReadOnlyList<FileDialogFilter> GetFileDialogFilters()
+    {
+        var modeFilters = _languageModes
+            .Select(pair => new FileDialogFilter(
+                pair.Key,
+                _languageModeItems[pair.Key].Text,
+                pair.Value is SyntaxLanguageDefinition definition
+                    ? NormalizeFileExtensions(definition.FileExtensions)
+                    : Array.Empty<string>()))
+            .ToArray();
+        var supportedExtensions = NormalizeFileExtensions(
+            modeFilters.SelectMany(filter => filter.Extensions));
+
+        return
+        [
+            new FileDialogFilter(
+                "supported",
+                "Supported files",
+                supportedExtensions),
+            ..modeFilters,
+            new FileDialogFilter("all", "All files", ["*"])
+        ];
+    }
+
+    private static IReadOnlyList<string> NormalizeFileExtensions(
+        IEnumerable<string> extensions)
+    {
+        return extensions
+            .Where(extension => !string.IsNullOrWhiteSpace(extension))
+            .Select(extension => extension.Trim())
+            .Select(extension => extension is "*" or "*.*"
+                ? "*"
+                : extension.StartsWith('*')
+                    ? NormalizeFileExtension(extension[1..])
+                    : NormalizeFileExtension(extension))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static string NormalizeFileExtension(string extension)
+    {
+        return extension.StartsWith('.') ? extension : $".{extension}";
+    }
+
     private async void AboutMenuItem_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new ContentDialog
@@ -747,19 +790,18 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var picker = new FileOpenPicker();
-        picker.FileTypeFilter.Add("*");
-        InitializeWithWindow.Initialize(picker, _windowHandle);
-
-        var file = await picker.PickSingleFileAsync();
-        if (file is null)
-        {
-            return;
-        }
-
         try
         {
-            await LoadDocumentAsync(file.Path);
+            var path = NativeOpenFileDialog.Show(
+                _windowHandle,
+                GetFileDialogFilters(),
+                "supported");
+            if (path is null)
+            {
+                return;
+            }
+
+            await LoadDocumentAsync(path);
         }
         catch (Exception exception)
         {
@@ -953,7 +995,9 @@ public sealed partial class MainWindow : Window
                 _windowHandle,
                 _filePath is null ? "Untitled.txt" : Path.GetFileName(_filePath),
                 _encoding,
-                GetLineEndingOrDefault(_lineEnding));
+                GetLineEndingOrDefault(_lineEnding),
+                GetFileDialogFilters(),
+                _languageModeId);
             if (save is null)
             {
                 return false;

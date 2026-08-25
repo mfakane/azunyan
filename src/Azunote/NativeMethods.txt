@@ -1,6 +1,8 @@
-// Native file save dialog and its customization controls.
+// Native file dialogs and the save-dialog customization controls.
 CoCreateInstance
 FileSaveDialog
+FileOpenDialog
+IFileOpenDialog
 IFileSaveDialog
 IFileDialog
 IFileDialogCustomize

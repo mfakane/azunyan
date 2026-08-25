@@ -38,9 +38,16 @@ public static class NativeSaveFileDialog
         IntPtr ownerWindowHandle,
         string suggestedFileName,
         TextEncodingKind defaultEncoding,
-        LineEndingKind defaultLineEnding)
+        LineEndingKind defaultLineEnding,
+        IReadOnlyList<FileDialogFilter> filters,
+        string defaultFilterId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(suggestedFileName);
+        ArgumentNullException.ThrowIfNull(filters);
+        if (filters.Count == 0)
+        {
+            throw new ArgumentException("At least one file dialog filter is required.", nameof(filters));
+        }
 
         IFileSaveDialog? dialog = null;
         IFileDialogCustomize? customize = null;
@@ -54,9 +61,9 @@ public static class NativeSaveFileDialog
                 out dialog).ThrowOnFailure();
 
             var fileSaveDialog = dialog!;
-            SetFileTypes(fileSaveDialog);
-            fileSaveDialog.SetFileTypeIndex(1);
-            fileSaveDialog.SetDefaultExtension("txt");
+            SetFileTypes(fileSaveDialog, filters);
+            fileSaveDialog.SetFileTypeIndex(GetFilterIndex(filters, defaultFilterId));
+            fileSaveDialog.SetDefaultExtension(GetDefaultExtension(filters, defaultFilterId));
             fileSaveDialog.SetFileName(suggestedFileName);
             fileSaveDialog.SetTitle("Save As");
 
@@ -89,28 +96,62 @@ public static class NativeSaveFileDialog
         }
     }
 
-    private static unsafe void SetFileTypes(IFileSaveDialog dialog)
+    private static unsafe void SetFileTypes(
+        IFileSaveDialog dialog,
+        IReadOnlyList<FileDialogFilter> filters)
     {
-        fixed (
-            char* textName = "Text files",
-            textSpecification = "*.txt;*.md;*.log;*.json;*.xml;*.csv",
-            allName = "All files",
-            allSpecification = "*.*")
+        var names = filters.Select(filter => filter.DisplayName).ToArray();
+        var specifications = filters.Select(filter => filter.Specification).ToArray();
+        fixed (char* name = string.Join('\0', names) + '\0',
+               specification = string.Join('\0', specifications) + '\0')
         {
-            var fileTypes = stackalloc COMDLG_FILTERSPEC[2];
-            fileTypes[0] = new COMDLG_FILTERSPEC
+            var fileTypes = stackalloc COMDLG_FILTERSPEC[filters.Count];
+            var nameOffset = 0;
+            var specificationOffset = 0;
+            for (var index = 0; index < filters.Count; index++)
             {
-                pszName = new PCWSTR(textName),
-                pszSpec = new PCWSTR(textSpecification)
-            };
-            fileTypes[1] = new COMDLG_FILTERSPEC
-            {
-                pszName = new PCWSTR(allName),
-                pszSpec = new PCWSTR(allSpecification)
-            };
+                fileTypes[index] = new COMDLG_FILTERSPEC
+                {
+                    pszName = new PCWSTR(name + nameOffset),
+                    pszSpec = new PCWSTR(specification + specificationOffset)
+                };
+                nameOffset += names[index].Length + 1;
+                specificationOffset += specifications[index].Length + 1;
+            }
 
-            dialog.SetFileTypes(new ReadOnlySpan<COMDLG_FILTERSPEC>(fileTypes, 2));
+            dialog.SetFileTypes(new ReadOnlySpan<COMDLG_FILTERSPEC>(fileTypes, filters.Count));
         }
+    }
+
+    private static uint GetFilterIndex(
+        IReadOnlyList<FileDialogFilter> filters,
+        string defaultFilterId)
+    {
+        for (var index = 0; index < filters.Count; index++)
+        {
+            if (string.Equals(
+                filters[index].Id,
+                defaultFilterId,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return (uint)(index + 1);
+            }
+        }
+
+        return 1;
+    }
+
+    private static string GetDefaultExtension(
+        IReadOnlyList<FileDialogFilter> filters,
+        string defaultFilterId)
+    {
+        var filter = filters.FirstOrDefault(item => string.Equals(
+            item.Id,
+            defaultFilterId,
+            StringComparison.OrdinalIgnoreCase));
+        var extension = filter?.Extensions.FirstOrDefault(item =>
+            !string.IsNullOrWhiteSpace(item) && item is not "*" and not "*.*");
+        return extension?.TrimStart('.').TrimStart('*') ?? "txt";
     }
 
     private static void AddFormatControls(
