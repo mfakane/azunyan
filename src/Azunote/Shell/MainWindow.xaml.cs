@@ -18,24 +18,21 @@ public sealed partial class MainWindow : Window, IDisposable
 {
     private readonly IntPtr _windowHandle;
     private readonly AppWindow? _appWindow;
-    private readonly Dictionary<string, ISyntaxProvider?> _languageModes = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, IReadOnlyList<string>> _languageModeCompletionTriggers = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, IReadOnlyList<string>> _languageModeExtensions = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, IReadOnlyList<string>> _languageModePatterns = new(StringComparer.OrdinalIgnoreCase);
+    private readonly DocumentSession _documentSession = new();
+    private readonly TextFileStore _textFileStore = new();
+    private LanguageModeCatalog _languageModeCatalog = LanguageModeCatalog.Create();
     private readonly Dictionary<string, ToggleMenuFlyoutItem> _languageModeItems = new(StringComparer.OrdinalIgnoreCase);
-    private readonly string _settingsDirectory = SettingsFileService.GetDefaultDirectory();
-    private string? _filePath;
-    private string _savedText = string.Empty;
-    private TextEncodingKind _encoding = TextEncodingKind.Utf8;
-    private LineEndingKind _lineEnding = GetDefaultLineEnding();
-    private AzunoteSettings _settings = new();
+    private readonly SettingsController _settingsController = new(
+        SettingsFileService.GetDefaultDirectory());
+    private IEditorBuffer _editorBuffer = null!;
+    private DocumentController _documentController = null!;
+    private ExternalToolController _externalToolController = null!;
+    private IUserPrompt _userPrompt = null!;
     private bool _isLoading;
     private bool _allowClose;
     private bool _wordWrapEnabled;
-    private FileSystemWatcher? _fileWatcher;
-    private FileSystemWatcher? _settingsWatcher;
-    private CancellationTokenSource? _fileChangeDebounce;
-    private CancellationTokenSource? _settingsChangeDebounce;
+    private DebouncedFileChangeMonitor? _fileChangeMonitor;
+    private DebouncedFileChangeMonitor? _settingsChangeMonitor;
     private bool _externalChangeDialogOpen;
     private string _languageModeId = "plain-text";
     private bool _languageModeManuallySelected;
@@ -45,6 +42,18 @@ public sealed partial class MainWindow : Window, IDisposable
     public MainWindow()
     {
         InitializeComponent();
+        _userPrompt = new WinUiUserPrompt(() => RootGrid.XamlRoot);
+        _editorBuffer = new AzunyanEditorBuffer(Editor);
+        _documentController = new DocumentController(
+            _editorBuffer,
+            _documentSession,
+            _textFileStore,
+            _userPrompt);
+        _externalToolController = new ExternalToolController(
+            _editorBuffer,
+            _documentController,
+            _textFileStore,
+            _userPrompt);
         InitializeLanguageModeMenu();
         Editor.ColorScheme = AzunoteSystemColorScheme.CreateLight();
         RegisterKeyboardAccelerators();
@@ -70,7 +79,13 @@ public sealed partial class MainWindow : Window, IDisposable
         RootGrid.KeyboardAccelerators.Add(escape);
     }
 
-    private bool IsDirty => !string.Equals(Editor.Text, _savedText, StringComparison.Ordinal);
+    private bool IsDirty => _documentSession.State.IsDirty;
+
+    private string? CurrentFilePath => _documentSession.State.FilePath;
+
+    private TextEncodingKind CurrentEncoding => _documentSession.State.Encoding;
+
+    private LineEndingKind CurrentLineEnding => _documentSession.State.LineEnding;
 
     public async Task OpenStartupDocumentAsync(
         string path,
@@ -88,39 +103,35 @@ public sealed partial class MainWindow : Window, IDisposable
         }
     }
 
-    public async Task OpenStartupTextAsync(
+    public Task OpenStartupTextAsync(
         string text,
         int? line = null,
         int? column = null)
     {
         ArgumentNullException.ThrowIfNull(text);
 
+        StopFileWatcher();
         _isLoading = true;
         try
         {
-            StopFileWatcher();
-            Editor.SetText(text);
+            _documentController.LoadUntitledText(text);
         }
         finally
         {
             _isLoading = false;
         }
-
-        _filePath = null;
-        _savedText = string.Empty;
-        _encoding = TextEncodingKind.Utf8;
-        _lineEnding = GetLineEndingOrDefault(TextFileService.DetectLineEnding(text));
         UpdateStatus();
         UpdateTitle();
         SetStartupPosition(line, column);
         Editor.Focus(FocusState.Programmatic);
+        return Task.CompletedTask;
     }
 
     public async Task InitializeSettingsAsync()
     {
         try
         {
-            await SettingsFileService.EnsureExistsAsync(_settingsDirectory);
+            await _settingsController.EnsureExistsAsync();
             await TryLoadSettingsAsync(showError: true);
             StartSettingsWatcher();
         }
@@ -141,113 +152,24 @@ public sealed partial class MainWindow : Window, IDisposable
         ExternalToolDefinition definition,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(definition);
-
-        var selection = new TextSelection(Editor.SelectionStart, Editor.SelectionStart + Editor.SelectionLength);
-        var caret = Editor.Document.CaretPosition;
-        var lineColumn = Editor.Snapshot.Lines.GetLineColumn(caret);
-        var temporaryFilePath = IsDirty || _filePath is null
-            ? CreateExternalToolTemporaryFilePath()
-            : null;
-        ExternalToolResult result;
+        StopFileWatcher();
         try
         {
-            if (temporaryFilePath is not null)
-            {
-                await TextFileService.WriteAsync(
-                    temporaryFilePath,
-                    Editor.Text,
-                    _encoding,
-                    _lineEnding,
-                    cancellationToken);
-            }
-
-            var context = new ExternalToolContext(
-                temporaryFilePath ?? _filePath,
-                Editor.Text,
-                Editor.SelectedText,
-                lineColumn.Line + 1,
-                lineColumn.Column + 1);
-            result = await ExternalToolRunner.RunAsync(definition, context, cancellationToken);
-
-            var output = ExternalToolOutputInterpreter.Interpret(definition, result);
-            if (!output.IsSuccess)
-            {
-                await ShowErrorAsync("External tool failed", output.Error!);
-                return result;
-            }
-
-            if (output.ReloadFile)
-            {
-                if (temporaryFilePath is not null)
-                {
-                    await ReloadDocumentFromTemporaryFileAsync(temporaryFilePath);
-                }
-                else if (_filePath is null)
-                {
-                    await ShowErrorAsync(
-                        "Could not reload file",
-                        "The current document is not backed by a file.");
-                }
-                else
-                {
-                    if (IsDirty)
-                    {
-                        var changedDocument = await TextFileService.ReadAsync(_filePath, cancellationToken);
-                        await ResolveExternalFileConflictAsync(
-                            changedDocument,
-                            CancellationToken.None);
-                    }
-                    else
-                    {
-                        await ReloadDocumentFromDiskAsync();
-                    }
-                }
-
-                return result;
-            }
-
-            if (output.ReplacementText is not null)
-            {
-                switch (definition.OutputMode)
-                {
-                    case ExternalToolOutputMode.ReplaceDocument:
-                        Editor.ReplaceDocumentRange(
-                            new TextRange(0, Editor.Text.Length),
-                            output.ReplacementText);
-                        break;
-                    case ExternalToolOutputMode.ReplaceSelection:
-                        if (selection.End > Editor.Text.Length)
-                        {
-                            await ShowErrorAsync(
-                                "Could not apply external tool output",
-                                "The selection changed while the tool was running.");
-                        }
-                        else
-                        {
-                            Editor.ReplaceDocumentRange(selection.Range, output.ReplacementText);
-                        }
-
-                        break;
-                    case ExternalToolOutputMode.NewDocument:
-                        await OpenStartupTextAsync(output.ReplacementText);
-                        break;
-                }
-
-                UpdateStatus();
-                UpdateTitle();
-            }
-
-            return result;
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            await ShowErrorAsync("Could not run external tool", exception.Message);
-            throw;
+            return await _externalToolController.RunAsync(definition, cancellationToken);
         }
         finally
         {
-            DeleteExternalToolTemporaryFile(temporaryFilePath);
+            if (CurrentFilePath is not null)
+            {
+                StartFileWatcher();
+            }
+            else
+            {
+                StopFileWatcher();
+            }
+
+            UpdateStatus();
+            UpdateTitle();
         }
     }
 
@@ -315,55 +237,24 @@ public sealed partial class MainWindow : Window, IDisposable
         IReadOnlyList<SyntaxLanguageDefinition>? customModes = null)
     {
         var selectedMode = _languageModeId;
+        _languageModeCatalog = LanguageModeCatalog.Create(customModes);
         LanguageModeMenuItem.Items.Clear();
-        _languageModes.Clear();
-        _languageModeCompletionTriggers.Clear();
-        _languageModeExtensions.Clear();
-        _languageModePatterns.Clear();
         _languageModeItems.Clear();
 
-        AddLanguageMode(
-            "plain-text",
-            "Plain Text",
-            null,
-            fileExtensions: [".txt", ".log"],
-            patterns: ["*.txt", "*.log"]);
+        AddLanguageMode(_languageModeCatalog.Entries[0]);
         LanguageModeMenuItem.Items.Add(new MenuFlyoutSeparator());
-        AddLanguageMode(
-            "azunote",
-            "Azunote",
-            new AzunoteSyntaxProvider(),
-            [".", "(", "{", "[", "->"],
-            fileExtensions: [".toml"],
-            patterns: AzunoteLanguageDefinition.Patterns);
-        foreach (var language in BuiltInSyntaxLanguages.All)
+        AddLanguageMode(_languageModeCatalog.Entries[1]);
+        for (var index = 2; index < _languageModeCatalog.Entries.Count; index++)
         {
-            AddLanguageMode(
-                language.Id,
-                language.DisplayName,
-                language,
-                language.CompletionTriggerCharacters,
-                patterns: language.Patterns);
-        }
-
-        var additionalModes = customModes?
-            .Where(language => !_languageModes.ContainsKey(language.Id))
-            .ToArray() ?? Array.Empty<SyntaxLanguageDefinition>();
-        if (additionalModes.Length > 0)
-        {
-            LanguageModeMenuItem.Items.Add(new MenuFlyoutSeparator());
-            foreach (var language in additionalModes)
+            if (index == _languageModeCatalog.CustomModeStartIndex)
             {
-                AddLanguageMode(
-                    language.Id,
-                    language.DisplayName,
-                    language,
-                    language.CompletionTriggerCharacters,
-                    patterns: language.Patterns);
+                LanguageModeMenuItem.Items.Add(new MenuFlyoutSeparator());
             }
+
+            AddLanguageMode(_languageModeCatalog.Entries[index]);
         }
 
-        if (!_languageModes.ContainsKey(selectedMode))
+        if (!_languageModeCatalog.TryGet(selectedMode, out _))
         {
             selectedMode = "plain-text";
         }
@@ -371,35 +262,15 @@ public sealed partial class MainWindow : Window, IDisposable
         SetLanguageMode(selectedMode, refresh: customModes is not null);
     }
 
-    private void AddLanguageMode(
-        string id,
-        string displayName,
-        ISyntaxProvider? provider,
-        IReadOnlyList<string>? completionTriggerCharacters = null,
-        IReadOnlyList<string>? fileExtensions = null,
-        IReadOnlyList<string>? patterns = null)
+    private void AddLanguageMode(LanguageModeEntry mode)
     {
-        _languageModes.Add(id, provider);
-        _languageModeCompletionTriggers.Add(
-            id,
-            completionTriggerCharacters ?? Array.Empty<string>());
-        _languageModeExtensions.Add(
-            id,
-            fileExtensions
-                ?? (provider as SyntaxLanguageDefinition)?.FileExtensions
-                ?? Array.Empty<string>());
-        _languageModePatterns.Add(
-            id,
-            patterns
-                ?? (provider as SyntaxLanguageDefinition)?.Patterns
-                ?? Array.Empty<string>());
         var item = new ToggleMenuFlyoutItem
         {
-            Text = displayName,
-            Tag = id
+            Text = mode.DisplayName,
+            Tag = mode.Id
         };
         item.Click += LanguageModeItem_Click;
-        _languageModeItems.Add(id, item);
+        _languageModeItems.Add(mode.Id, item);
         LanguageModeMenuItem.Items.Add(item);
     }
 
@@ -414,23 +285,20 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private void SetLanguageMode(string id, bool refresh)
     {
-        if (!_languageModes.TryGetValue(id, out var provider))
+        if (!_languageModeCatalog.TryGet(id, out var mode))
         {
             return;
         }
 
         _languageModeId = id;
-        Editor.CompletionTriggerCharacters =
-            _languageModeCompletionTriggers.TryGetValue(id, out var completionTriggers)
-                ? completionTriggers
-                : Array.Empty<string>();
+        Editor.CompletionTriggerCharacters = mode.CompletionTriggers;
         var isAzunote = string.Equals(id, "azunote", StringComparison.OrdinalIgnoreCase);
         var azunoteSchemas = isAzunote
-            ? AzunoteSchemaCatalog.ForPath(_filePath)
+            ? AzunoteSchemaCatalog.ForPath(CurrentFilePath)
             : Array.Empty<AzunoteSchemaDefinition>();
         Editor.Providers.Syntax = isAzunote
             ? new AzunoteSyntaxProvider()
-            : provider;
+            : mode.Provider;
         Editor.Providers.Completion = isAzunote
             ? new AzunoteCompletionProvider(azunoteSchemas)
             : null;
@@ -449,17 +317,7 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private void SelectLanguageModeForPath(string path)
     {
-        var selectedModeId = "plain-text";
-        var bestScore = -1;
-        foreach (var pair in _languageModePatterns)
-        {
-            var score = SyntaxLanguageDefinition.GetPatternMatchScore(path, pair.Value);
-            if (score > bestScore)
-            {
-                bestScore = score;
-                selectedModeId = pair.Key;
-            }
-        }
+        var selectedModeId = _languageModeCatalog.SelectForPath(path);
 
         if (!string.Equals(_languageModeId, selectedModeId, StringComparison.OrdinalIgnoreCase))
         {
@@ -468,48 +326,7 @@ public sealed partial class MainWindow : Window, IDisposable
     }
 
     private IReadOnlyList<FileDialogFilter> GetFileDialogFilters()
-    {
-        var modeFilters = _languageModes
-            .Select(pair => new FileDialogFilter(
-                pair.Key,
-                _languageModeItems[pair.Key].Text,
-                _languageModeExtensions.TryGetValue(pair.Key, out var extensions)
-                    ? NormalizeFileExtensions(extensions)
-                    : Array.Empty<string>()))
-            .ToArray();
-        var supportedExtensions = NormalizeFileExtensions(
-            modeFilters.SelectMany(filter => filter.Extensions));
-
-        return
-        [
-            new FileDialogFilter(
-                "supported",
-                "Supported files",
-                supportedExtensions),
-            ..modeFilters,
-            new FileDialogFilter("all", "All files", ["*"])
-        ];
-    }
-
-    private static string[] NormalizeFileExtensions(
-        IEnumerable<string> extensions)
-    {
-        return extensions
-            .Where(extension => !string.IsNullOrWhiteSpace(extension))
-            .Select(extension => extension.Trim())
-            .Select(extension => extension is "*" or "*.*"
-                ? "*"
-                : extension.StartsWith('*')
-                    ? NormalizeFileExtension(extension[1..])
-                    : NormalizeFileExtension(extension))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-    }
-
-    private static string NormalizeFileExtension(string extension)
-    {
-        return extension.StartsWith('.') ? extension : $".{extension}";
-    }
+        => _languageModeCatalog.GetFileDialogFilters();
 
     private async void AboutMenuItem_Click(object sender, RoutedEventArgs e)
     {
@@ -582,8 +399,8 @@ public sealed partial class MainWindow : Window, IDisposable
     {
         try
         {
-            await SettingsFileService.EnsureExistsAsync(_settingsDirectory);
-            var folder = await StorageFolder.GetFolderFromPathAsync(_settingsDirectory);
+            await _settingsController.EnsureExistsAsync();
+            var folder = await StorageFolder.GetFolderFromPathAsync(_settingsController.Directory);
             if (!await Launcher.LaunchFolderAsync(folder))
             {
                 throw new InvalidOperationException("Windows could not open the settings folder.");
@@ -599,7 +416,7 @@ public sealed partial class MainWindow : Window, IDisposable
     {
         ConfiguredExternalToolsMenuItem.Items.Clear();
 
-        if (_settings.ExternalToolMenu.Count == 0)
+        if (_settingsController.Current.ExternalToolMenu.Count == 0)
         {
             ConfiguredExternalToolsMenuItem.Items.Add(
                 new MenuFlyoutItem
@@ -610,7 +427,9 @@ public sealed partial class MainWindow : Window, IDisposable
             return;
         }
 
-        AddExternalToolMenuItems(ConfiguredExternalToolsMenuItem, _settings.ExternalToolMenu);
+        AddExternalToolMenuItems(
+            ConfiguredExternalToolsMenuItem,
+            _settingsController.Current.ExternalToolMenu);
     }
 
     private void AddExternalToolMenuItems(
@@ -656,13 +475,12 @@ public sealed partial class MainWindow : Window, IDisposable
     {
         try
         {
-            var settings = await SettingsFileService.LoadAsync(_settingsDirectory);
-            _settings = settings;
+            var settings = await _settingsController.LoadAsync();
             RefreshExternalToolMenu();
             InitializeLanguageModeMenu(settings.CustomSyntaxModes);
-            if (!_languageModeManuallySelected && _filePath is not null)
+            if (!_languageModeManuallySelected && CurrentFilePath is not null)
             {
-                SelectLanguageModeForPath(_filePath);
+                SelectLanguageModeForPath(CurrentFilePath);
             }
 
             return true;
@@ -682,67 +500,53 @@ public sealed partial class MainWindow : Window, IDisposable
     {
         StopSettingsWatcher();
 
-        var directory = Path.GetFullPath(_settingsDirectory);
+        var directory = Path.GetFullPath(_settingsController.Directory);
         if (!Directory.Exists(directory))
         {
             return;
         }
 
-        _settingsWatcher = new FileSystemWatcher(directory)
-        {
-            IncludeSubdirectories = true,
-            NotifyFilter = NotifyFilters.LastWrite
-                | NotifyFilters.Size
-                | NotifyFilters.FileName
-                | NotifyFilters.DirectoryName
-        };
-        _settingsWatcher.Changed += SettingsWatcher_Changed;
-        _settingsWatcher.Created += SettingsWatcher_Changed;
-        _settingsWatcher.Deleted += SettingsWatcher_Changed;
-        _settingsWatcher.Renamed += SettingsWatcher_Renamed;
-        _settingsWatcher.EnableRaisingEvents = true;
+        _settingsChangeMonitor = new DebouncedFileChangeMonitor(
+            directory,
+            includeSubdirectories: true);
+        _settingsChangeMonitor.Changed += SettingsWatcher_Changed;
     }
 
     private void StopSettingsWatcher()
     {
-        if (_settingsWatcher is null)
+        if (_settingsChangeMonitor is null)
         {
             return;
         }
 
-        _settingsWatcher.EnableRaisingEvents = false;
-        _settingsWatcher.Changed -= SettingsWatcher_Changed;
-        _settingsWatcher.Created -= SettingsWatcher_Changed;
-        _settingsWatcher.Deleted -= SettingsWatcher_Changed;
-        _settingsWatcher.Renamed -= SettingsWatcher_Renamed;
-        _settingsWatcher.Dispose();
-        _settingsWatcher = null;
+        _settingsChangeMonitor.Changed -= SettingsWatcher_Changed;
+        _settingsChangeMonitor.Dispose();
+        _settingsChangeMonitor = null;
     }
 
-    private void SettingsWatcher_Changed(object sender, FileSystemEventArgs args) => QueueSettingsReload();
-
-    private void SettingsWatcher_Renamed(object sender, RenamedEventArgs args) => QueueSettingsReload();
-
-    private void QueueSettingsReload()
+    private void SettingsWatcher_Changed(
+        object? sender,
+        FileChangeDetectedEventArgs args)
     {
-        _settingsChangeDebounce?.Cancel();
-        _settingsChangeDebounce?.Dispose();
-        _settingsChangeDebounce = new CancellationTokenSource();
-        var cancellationToken = _settingsChangeDebounce.Token;
-        DispatcherQueue.TryEnqueue(() => _ = HandleSettingsChangedAsync(cancellationToken));
+        if (ReferenceEquals(sender, _settingsChangeMonitor))
+        {
+            QueueSettingsReload();
+        }
     }
+
+    private void QueueSettingsReload() =>
+        DispatcherQueue.TryEnqueue(() => _ = HandleSettingsChangedAsync(CancellationToken.None));
 
     private async Task HandleSettingsChangedAsync(CancellationToken cancellationToken)
     {
         try
         {
-            await Task.Delay(150, cancellationToken);
             if (cancellationToken.IsCancellationRequested)
             {
                 return;
             }
 
-            await SettingsFileService.EnsureExistsAsync(_settingsDirectory, cancellationToken);
+            await _settingsController.EnsureExistsAsync(cancellationToken);
 
             await TryLoadSettingsAsync(showError: true);
         }
@@ -829,21 +633,17 @@ public sealed partial class MainWindow : Window, IDisposable
             return;
         }
 
+        StopFileWatcher();
         _isLoading = true;
         try
         {
-            StopFileWatcher();
-            Editor.SetText(string.Empty);
+            _documentController.NewDocument();
         }
         finally
         {
             _isLoading = false;
         }
 
-        _filePath = null;
-        _savedText = string.Empty;
-        _encoding = TextEncodingKind.Utf8;
-        _lineEnding = GetDefaultLineEnding();
         UpdateStatus();
         UpdateTitle();
         Editor.Focus(FocusState.Programmatic);
@@ -851,62 +651,50 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private async Task LoadDocumentAsync(string path)
     {
-        var document = await TextFileService.ReadAsync(path);
-
+        StopFileWatcher();
         _isLoading = true;
         try
         {
-            StopFileWatcher();
-            Editor.SetText(document.Text);
+            await _documentController.OpenAsync(path);
         }
         finally
         {
             _isLoading = false;
         }
 
-        _filePath = Path.GetFullPath(path);
         _languageModeManuallySelected = false;
-        SelectLanguageModeForPath(_filePath);
-        _savedText = document.Text;
-        _encoding = document.Encoding;
-        _lineEnding = GetLineEndingOrDefault(document.LineEnding);
-        UpdateStatus(document.LineEnding);
+        if (CurrentFilePath is { } filePath)
+        {
+            SelectLanguageModeForPath(filePath);
+        }
+
+        UpdateStatus(TextFileService.DetectLineEnding(Editor.Text));
         UpdateTitle();
         Editor.Focus(FocusState.Programmatic);
-        Editor.SetDocumentSelection(TextSelection.Caret(0));
-        StartFileWatcher(_filePath);
+        StartFileWatcher();
     }
 
     private async Task ReloadDocumentFromDiskAsync()
     {
-        if (_filePath is null)
+        if (CurrentFilePath is null)
         {
             return;
         }
 
-        var selection = new TextSelection(Editor.SelectionStart, Editor.SelectionStart + Editor.SelectionLength);
-        var document = await TextFileService.ReadAsync(_filePath);
+        StopFileWatcher();
         _isLoading = true;
         try
         {
-            StopFileWatcher();
-            Editor.SetText(document.Text);
+            await _documentController.ReloadFromDiskAsync();
         }
         finally
         {
             _isLoading = false;
         }
 
-        _savedText = document.Text;
-        _encoding = document.Encoding;
-        _lineEnding = GetLineEndingOrDefault(document.LineEnding);
-        var restoredSelection = new TextSelection(
-            Math.Min(selection.Anchor, document.Text.Length),
-            Math.Min(selection.Active, document.Text.Length));
-        Editor.SetDocumentSelection(restoredSelection);
-        UpdateStatus(document.LineEnding);
+        UpdateStatus(TextFileService.DetectLineEnding(Editor.Text));
         UpdateTitle();
-        StartFileWatcher(_filePath);
+        StartFileWatcher();
     }
 
     private async Task ReloadDocumentFromTemporaryFileAsync(string path)
@@ -919,78 +707,33 @@ public sealed partial class MainWindow : Window, IDisposable
             return;
         }
 
-        var selection = new TextSelection(Editor.SelectionStart, Editor.SelectionStart + Editor.SelectionLength);
-        var document = await TextFileService.ReadAsync(path);
         _isLoading = true;
         try
         {
-            Editor.SetText(document.Text);
+            await _documentController.ReloadFromTemporaryFileAsync(path);
         }
         finally
         {
             _isLoading = false;
         }
 
-        // The temporary file represents the current buffer, not the saved
-        // version on disk. Keep _savedText unchanged so the document remains
-        // dirty when it was dirty before the tool ran.
-        _encoding = document.Encoding;
-        _lineEnding = GetLineEndingOrDefault(document.LineEnding);
-        Editor.SetDocumentSelection(new TextSelection(
-            Math.Min(selection.Anchor, document.Text.Length),
-            Math.Min(selection.Active, document.Text.Length)));
-        UpdateStatus(document.LineEnding);
+        UpdateStatus(TextFileService.DetectLineEnding(Editor.Text));
         UpdateTitle();
-    }
-
-    private string CreateExternalToolTemporaryFilePath()
-    {
-        var extension = _filePath is null ? ".txt" : Path.GetExtension(_filePath);
-        if (string.IsNullOrWhiteSpace(extension))
-        {
-            extension = ".txt";
-        }
-
-        return Path.Combine(
-            Path.GetTempPath(),
-            $"azunote-external-{Guid.NewGuid():N}{extension}");
-    }
-
-    private static void DeleteExternalToolTemporaryFile(string? path)
-    {
-        if (path is null)
-        {
-            return;
-        }
-
-        try
-        {
-            File.Delete(path);
-        }
-        catch (IOException)
-        {
-            // Cleanup must not hide the external tool result.
-        }
-        catch (UnauthorizedAccessException)
-        {
-            // Cleanup must not hide the external tool result.
-        }
     }
 
     private async Task<bool> SaveAsync()
     {
-        if (_filePath is null)
+        if (CurrentFilePath is null)
         {
             return await SaveAsAsync();
         }
 
         try
         {
-            await TextFileService.WriteAsync(_filePath, Editor.Text, _encoding, _lineEnding);
-            _savedText = Editor.Text;
-            UpdateStatus(_lineEnding);
+            await _documentController.SaveAsync();
+            UpdateStatus();
             UpdateTitle();
-            StartFileWatcher(_filePath);
+            StartFileWatcher();
             return true;
         }
         catch (Exception exception)
@@ -1006,9 +749,9 @@ public sealed partial class MainWindow : Window, IDisposable
         {
             var save = NativeSaveFileDialog.Show(
                 _windowHandle,
-                _filePath is null ? "Untitled.txt" : Path.GetFileName(_filePath),
-                _encoding,
-                GetLineEndingOrDefault(_lineEnding),
+                CurrentFilePath is null ? "Untitled.txt" : Path.GetFileName(CurrentFilePath),
+                CurrentEncoding,
+                CurrentLineEnding,
                 GetFileDialogFilters(),
                 _languageModeId);
             if (save is null)
@@ -1016,18 +759,10 @@ public sealed partial class MainWindow : Window, IDisposable
                 return false;
             }
 
-            await TextFileService.WriteAsync(
-                save.Path,
-                Editor.Text,
-                save.Encoding,
-                save.LineEnding);
-            _filePath = Path.GetFullPath(save.Path);
-            _savedText = Editor.Text;
-            _encoding = save.Encoding;
-            _lineEnding = save.LineEnding;
-            UpdateStatus(_lineEnding);
+            await _documentController.SaveAsAsync(save);
+            UpdateStatus();
             UpdateTitle();
-            StartFileWatcher(_filePath);
+            StartFileWatcher();
             return true;
         }
         catch (Exception exception)
@@ -1038,30 +773,7 @@ public sealed partial class MainWindow : Window, IDisposable
     }
 
     private async Task<bool> ConfirmPendingChangesAsync()
-    {
-        if (!IsDirty)
-        {
-            return true;
-        }
-
-        var dialog = new ContentDialog
-        {
-            Title = "Save changes?",
-            Content = "The current document has unsaved changes.",
-            PrimaryButtonText = "Save",
-            SecondaryButtonText = "Don't save",
-            CloseButtonText = "Cancel",
-            XamlRoot = RootGrid.XamlRoot
-        };
-
-        var result = await dialog.ShowAsync();
-        return result switch
-        {
-            ContentDialogResult.Primary => await SaveAsync(),
-            ContentDialogResult.Secondary => true,
-            _ => false
-        };
-    }
+        => await _documentController.ConfirmPendingChangesAsync(SaveAsync);
 
     private async void AppWindow_Closing(AppWindow sender, AppWindowClosingEventArgs args)
     {
@@ -1088,95 +800,77 @@ public sealed partial class MainWindow : Window, IDisposable
         }
 
         _disposed = true;
-        _fileChangeDebounce?.Cancel();
-        _fileChangeDebounce?.Dispose();
-        _fileChangeDebounce = null;
-        _settingsChangeDebounce?.Cancel();
-        _settingsChangeDebounce?.Dispose();
-        _settingsChangeDebounce = null;
-        Editor.Dispose();
         StopFileWatcher();
         StopSettingsWatcher();
+        Editor.Dispose();
     }
 
     private void MainWindow_Closed(object sender, WindowEventArgs args) => Dispose();
 
-    private void StartFileWatcher(string path)
+    private void StartFileWatcher()
     {
         StopFileWatcher();
 
-        var fullPath = Path.GetFullPath(path);
-        var directory = Path.GetDirectoryName(fullPath);
-        var fileName = Path.GetFileName(fullPath);
-        if (string.IsNullOrWhiteSpace(directory) || string.IsNullOrWhiteSpace(fileName))
+        if (CurrentFilePath is not { } path)
         {
             return;
         }
 
-        _fileWatcher = new FileSystemWatcher(directory, fileName)
-        {
-            NotifyFilter = NotifyFilters.LastWrite
-                | NotifyFilters.Size
-                | NotifyFilters.FileName
-        };
-        _fileWatcher.Changed += FileWatcher_Changed;
-        _fileWatcher.Created += FileWatcher_Changed;
-        _fileWatcher.Renamed += FileWatcher_Renamed;
-        _fileWatcher.EnableRaisingEvents = true;
+        _fileChangeMonitor = new DebouncedFileChangeMonitor(path, includeSubdirectories: false);
+        _fileChangeMonitor.Changed += FileWatcher_Changed;
     }
 
     private void StopFileWatcher()
     {
-        if (_fileWatcher is null)
+        if (_fileChangeMonitor is null)
         {
             return;
         }
 
-        _fileWatcher.EnableRaisingEvents = false;
-        _fileWatcher.Changed -= FileWatcher_Changed;
-        _fileWatcher.Created -= FileWatcher_Changed;
-        _fileWatcher.Renamed -= FileWatcher_Renamed;
-        _fileWatcher.Dispose();
-        _fileWatcher = null;
+        _fileChangeMonitor.Changed -= FileWatcher_Changed;
+        _fileChangeMonitor.Dispose();
+        _fileChangeMonitor = null;
     }
 
-    private void FileWatcher_Changed(object sender, FileSystemEventArgs args) => QueueFileReload();
-
-    private void FileWatcher_Renamed(object sender, RenamedEventArgs args) => QueueFileReload();
-
-    private void QueueFileReload()
+    private void FileWatcher_Changed(
+        object? sender,
+        FileChangeDetectedEventArgs args)
     {
-        _fileChangeDebounce?.Cancel();
-        _fileChangeDebounce?.Dispose();
-        _fileChangeDebounce = new CancellationTokenSource();
-        var cancellationToken = _fileChangeDebounce.Token;
-        DispatcherQueue.TryEnqueue(() => _ = HandleFileChangedAsync(cancellationToken));
+        if (ReferenceEquals(sender, _fileChangeMonitor)
+            && CurrentFilePath is { } path)
+        {
+            QueueFileReload(path);
+        }
     }
 
-    private async Task HandleFileChangedAsync(CancellationToken cancellationToken)
+    private void QueueFileReload(string expectedPath) =>
+        DispatcherQueue.TryEnqueue(() =>
+            _ = HandleFileChangedAsync(expectedPath, CancellationToken.None));
+
+    private async Task HandleFileChangedAsync(
+        string expectedPath,
+        CancellationToken cancellationToken)
     {
         try
         {
-            await Task.Delay(150, cancellationToken);
-            if (cancellationToken.IsCancellationRequested || _filePath is null || !File.Exists(_filePath))
+            if (cancellationToken.IsCancellationRequested
+                || CurrentFilePath is not { } path
+                || !string.Equals(
+                    Path.GetFullPath(expectedPath),
+                    Path.GetFullPath(path),
+                    StringComparison.OrdinalIgnoreCase)
+                || !File.Exists(path))
             {
                 return;
             }
 
-            var document = await TextFileService.ReadAsync(_filePath, cancellationToken);
-            if (string.Equals(document.Text, _savedText, StringComparison.Ordinal))
+            var document = await _textFileStore.ReadAsync(path, cancellationToken);
+            if (_documentSession.IsSameAsSaved(document.Text))
             {
                 return;
             }
 
-            if (IsDirty)
-            {
-                await ResolveExternalFileConflictAsync(document, cancellationToken);
-            }
-            else
-            {
-                await ApplyExternalFileChangeAsync(document);
-            }
+            await ApplyExternalFileChangeAsync(document, cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -1188,11 +882,13 @@ public sealed partial class MainWindow : Window, IDisposable
         }
     }
 
-    private async Task ResolveExternalFileConflictAsync(
+    private async Task ApplyExternalFileChangeAsync(
         TextFileData document,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
-        if (_externalChangeDialogOpen || cancellationToken.IsCancellationRequested)
+        if (CurrentFilePath is null
+            || _externalChangeDialogOpen
+            || cancellationToken.IsCancellationRequested)
         {
             return;
         }
@@ -1200,56 +896,19 @@ public sealed partial class MainWindow : Window, IDisposable
         _externalChangeDialogOpen = true;
         try
         {
-            var dialog = new ContentDialog
-            {
-                Title = "File changed externally",
-                Content = "The file changed outside Azunote while this document has unsaved changes.",
-                PrimaryButtonText = "Reload file",
-                SecondaryButtonText = "Keep my changes",
-                CloseButtonText = "Cancel",
-                XamlRoot = RootGrid.XamlRoot
-            };
-            var result = await dialog.ShowAsync();
-            if (result == ContentDialogResult.Primary)
-            {
-                await ApplyExternalFileChangeAsync(document);
-            }
-        }
-        finally
-        {
-            _externalChangeDialogOpen = false;
-        }
-    }
-
-    private async Task ApplyExternalFileChangeAsync(TextFileData document)
-    {
-        if (_filePath is null)
-        {
-            return;
-        }
-
-        var selection = new TextSelection(Editor.SelectionStart, Editor.SelectionStart + Editor.SelectionLength);
-        _isLoading = true;
-        try
-        {
             StopFileWatcher();
-            Editor.SetText(document.Text);
+            _isLoading = true;
+            await _documentController.ApplyExternalChangeAsync(document, cancellationToken);
         }
         finally
         {
             _isLoading = false;
+            _externalChangeDialogOpen = false;
         }
 
-        _savedText = document.Text;
-        _encoding = document.Encoding;
-        _lineEnding = GetLineEndingOrDefault(document.LineEnding);
-        Editor.SetDocumentSelection(new TextSelection(
-            Math.Min(selection.Anchor, document.Text.Length),
-            Math.Min(selection.Active, document.Text.Length)));
-        UpdateStatus(document.LineEnding);
+        UpdateStatus(TextFileService.DetectLineEnding(Editor.Text));
         UpdateTitle();
-        StartFileWatcher(_filePath);
-        await Task.CompletedTask;
+        StartFileWatcher();
     }
 
     private void SetStartupPosition(int? line, int? column)
@@ -1274,6 +933,7 @@ public sealed partial class MainWindow : Window, IDisposable
             return;
         }
 
+        _documentSession.ObserveText(Editor.Text);
         UpdateStatus();
         UpdateTitle();
     }
@@ -1404,18 +1064,14 @@ public sealed partial class MainWindow : Window, IDisposable
             return;
         }
 
-        var comparison = StringComparison.CurrentCultureIgnoreCase;
-        var count = 0;
-        var position = 0;
-        while ((position = Editor.Text.IndexOf(query, position, comparison)) >= 0)
-        {
-            count++;
-            position += query.Length;
-        }
+        var count = FindReplaceService.Count(Editor.Text, query);
 
         if (count > 0)
         {
-            Editor.Text = Editor.Text.Replace(query, ReplaceTextBox.Text, comparison);
+            Editor.Text = FindReplaceService.ReplaceAll(
+                Editor.Text,
+                query,
+                ReplaceTextBox.Text);
         }
 
         FindResultText.Text = $"{count} replaced";
@@ -1437,7 +1093,7 @@ public sealed partial class MainWindow : Window, IDisposable
             return;
         }
 
-        if (Editor.SelectionLength > 0 && string.Equals(Editor.SelectedText, query, StringComparison.OrdinalIgnoreCase))
+        if (Editor.SelectionLength > 0 && FindReplaceService.IsMatch(Editor.SelectedText, query))
         {
             var selectionStart = Editor.SelectionStart;
             Editor.SelectedText = ReplaceTextBox.Text;
@@ -1460,22 +1116,17 @@ public sealed partial class MainWindow : Window, IDisposable
             return;
         }
 
-        var comparison = StringComparison.CurrentCultureIgnoreCase;
         var start = Editor.SelectionStart + Editor.SelectionLength;
-        var index = Editor.Text.IndexOf(query, start, comparison);
-        if (index < 0 && start > 0)
-        {
-            index = Editor.Text.IndexOf(query, 0, comparison);
-        }
+        var match = FindReplaceService.FindNext(Editor.Text, query, start);
 
-        if (index < 0)
+        if (match is not { } found)
         {
             FindResultText.Text = "Not found";
             return;
         }
 
         Editor.Focus(FocusState.Programmatic);
-        Editor.Select(index, query.Length);
+        Editor.Select(found.Start, found.Length);
         FindResultText.Text = "Found";
     }
 
@@ -1489,25 +1140,17 @@ public sealed partial class MainWindow : Window, IDisposable
         var column = lineColumn.Column + 1;
 
         PositionStatus.Text = $"Ln {line}, Col {column}";
-        EncodingStatus.Text = TextFileService.GetEncodingDisplayName(_encoding);
-        LineEndingStatus.Text = TextFileService.GetLineEndingDisplayName(lineEnding ?? _lineEnding);
+        EncodingStatus.Text = TextFileService.GetEncodingDisplayName(CurrentEncoding);
+        LineEndingStatus.Text = TextFileService.GetLineEndingDisplayName(lineEnding ?? CurrentLineEnding);
         IndentationStatus.Text = TextEditorCommands.GetIndentationSettings(
             snapshot,
             selectionStart).DisplayName;
-        FilePathStatus.Text = _filePath ?? "Untitled";
+        FilePathStatus.Text = CurrentFilePath ?? "Untitled";
     }
-
-    private static LineEndingKind GetDefaultLineEnding() =>
-        OperatingSystem.IsWindows() ? LineEndingKind.CrLf : LineEndingKind.Lf;
-
-    private static LineEndingKind GetLineEndingOrDefault(LineEndingKind lineEnding) =>
-        lineEnding is LineEndingKind.CrLf or LineEndingKind.Lf or LineEndingKind.Cr
-            ? lineEnding
-            : GetDefaultLineEnding();
 
     private void UpdateTitle()
     {
-        var name = _filePath is null ? "Untitled" : Path.GetFileName(_filePath);
+        var name = CurrentFilePath is null ? "Untitled" : Path.GetFileName(CurrentFilePath);
         var dirtyMarker = IsDirty ? "*" : string.Empty;
         if (_appWindow is not null)
         {
