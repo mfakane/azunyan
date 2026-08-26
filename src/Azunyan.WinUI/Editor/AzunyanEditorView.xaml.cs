@@ -401,10 +401,30 @@ public sealed partial class AzunyanEditorView : UserControl
             && !_applyingCompletion
             && InputEditor.FocusState != FocusState.Unfocused)
         {
-            _explicitCompletionRequested = false;
-            _completionRequested = args.Kind == DocumentChangeKind.Edit
+            var completionWasRequested = _completionRequested || IsCompletionPopupOpen;
+            var isEdit = args.Kind == DocumentChangeKind.Edit;
+            var isTriggerInsertion = isEdit
                 && args.Change.IsInsertion
                 && IsCompletionTrigger(args.NewSnapshot.Text, args.NewSelection.CaretPosition);
+
+            if (isTriggerInsertion)
+            {
+                _explicitCompletionRequested = false;
+                _completionRequested = true;
+            }
+            else if (isEdit && completionWasRequested)
+            {
+                // Keep the request alive while the user types or deletes a
+                // prefix so the provider can refresh and filter the popup.
+                // In particular, an explicit Ctrl+Space request must not be
+                // dismissed by the first typed character.
+                _completionRequested = true;
+            }
+            else
+            {
+                _explicitCompletionRequested = false;
+                _completionRequested = false;
+            }
         }
     }
 

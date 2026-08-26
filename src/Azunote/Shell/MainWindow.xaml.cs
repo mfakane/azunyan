@@ -40,6 +40,7 @@ public sealed partial class MainWindow : Window
     private bool _externalChangeDialogOpen;
     private string _languageModeId = "plain-text";
     private bool _languageModeManuallySelected;
+    private bool _completionShortcutInvoked;
 
     public MainWindow()
     {
@@ -91,6 +92,17 @@ public sealed partial class MainWindow : Window
         var newDocument = new KeyboardAccelerator { Key = VirtualKey.N, Modifiers = VirtualKeyModifiers.Control };
         newDocument.Invoked += NewAccelerator_Invoked;
         RootGrid.KeyboardAccelerators.Add(newDocument);
+
+        // MenuFlyoutItems are not always in the active keyboard-accelerator
+        // scope while the editor has focus. Register this command on the
+        // window root, while keeping the shortcut displayed on the menu item.
+        var showCompletion = new KeyboardAccelerator
+        {
+            Key = VirtualKey.Space,
+            Modifiers = VirtualKeyModifiers.Control
+        };
+        showCompletion.Invoked += ShowCompletionAccelerator_Invoked;
+        RootGrid.KeyboardAccelerators.Add(showCompletion);
     }
 
     private bool IsDirty => !string.Equals(Editor.Text, _savedText, StringComparison.Ordinal);
@@ -835,6 +847,7 @@ public sealed partial class MainWindow : Window
         KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = true;
+        _completionShortcutInvoked = true;
         ShowCompletion();
     }
 
@@ -1337,7 +1350,17 @@ public sealed partial class MainWindow : Window
         // reusable Azunyan component remains unaware of this shortcut.
         if (e.Key == VirtualKey.Space && IsKeyDown(VirtualKey.Control))
         {
+            // Normally the root KeyboardAccelerator has already invoked the
+            // command. Keep a fallback here for native text hosts that route
+            // KeyDown without running the root accelerator first.
+            var acceleratorInvoked = _completionShortcutInvoked;
+            _completionShortcutInvoked = false;
             e.Handled = true;
+            if (!acceleratorInvoked)
+            {
+                ShowCompletion();
+            }
+
             return;
         }
 

@@ -33,9 +33,18 @@
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="Find..." Click="FindButton_Click" />
                 <MenuFlyoutItem Text="Replace..." Click="ReplaceButton_Click" />
-                <MenuFlyoutItem Text="Show Completions" Click="ShowCompletionMenuItem_Click">
+                <MenuFlyoutItem
+                    Text="Show Completions"
+                    Click="ShowCompletionMenuItem_Click"
+                    KeyboardAcceleratorTextOverride="Ctrl+Space">
                     <MenuFlyoutItem.KeyboardAccelerators>
-                        <KeyboardAccelerator Key="Space" Modifiers="Control" Invoked="ShowCompletionAccelerator_Invoked" />
+                        <!-- Keep the shortcut attached to the command; the
+                             root registration is the always-active fallback
+                             when the flyout item is outside the accelerator scope. -->
+                        <KeyboardAccelerator
+                            Key="Space"
+                            Modifiers="Control"
+                            Invoked="ShowCompletionAccelerator_Invoked" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
             </MenuBarItem>
