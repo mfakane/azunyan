@@ -263,25 +263,22 @@ internal sealed class MainWindowRuntime : IDisposable
 
     private ExternalToolMenuState GetExternalToolMenuState(ExternalToolSettings tool)
     {
-        var snapshot = _view.Snapshot;
-        var lineColumn = snapshot.Lines.GetLineColumn(_view.CaretPosition);
-        var selectionStart = snapshot.Lines.GetLineColumn(_view.Selection.Start);
-        var selectionEnd = snapshot.Lines.GetLineColumn(_view.Selection.End);
+        var editorSnapshot = EditorBufferSnapshot.Capture(_view);
         var state = _session.State;
         var context = new ExternalToolContext(
             state.FilePath,
             state.FilePath,
-            _view.Text,
-            _view.SelectedText,
-            lineColumn.Line + 1,
-            lineColumn.Column + 1,
+            editorSnapshot.Text,
+            editorSnapshot.SelectedText,
+            editorSnapshot.Caret.Line + 1,
+            editorSnapshot.Caret.Column + 1,
             _languageModes.CurrentModeId,
             tool.DefinitionDirectory,
             state.Encoding,
             state.LineEnding,
             state.IsDirty,
-            selectionStart,
-            selectionEnd);
+            editorSnapshot.SelectionStart,
+            editorSnapshot.SelectionEnd);
         return ExternalToolAvailability.Evaluate(tool, context);
     }
 

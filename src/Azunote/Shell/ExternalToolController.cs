@@ -34,11 +34,8 @@ public sealed class ExternalToolController
     {
         ArgumentNullException.ThrowIfNull(definition);
 
-        var selection = _editor.Selection;
-        var snapshot = _editor.Snapshot;
-        var lineColumn = snapshot.Lines.GetLineColumn(_editor.CaretPosition);
-        var selectionStart = snapshot.Lines.GetLineColumn(selection.Start);
-        var selectionEnd = snapshot.Lines.GetLineColumn(selection.End);
+        var editorSnapshot = EditorBufferSnapshot.Capture(_editor);
+        var selection = editorSnapshot.Selection;
         var filePath = _documents.Session.State.FilePath;
         var temporaryFilePath = _documents.Session.State.IsDirty || filePath is null
             ? CreateTemporaryFilePath(filePath)
@@ -49,7 +46,7 @@ public sealed class ExternalToolController
             {
                 await _files.WriteAsync(
                     temporaryFilePath,
-                    _editor.Text,
+                    editorSnapshot.Text,
                     _documents.Session.State.Encoding,
                     _documents.Session.State.LineEnding,
                     cancellationToken);
@@ -58,17 +55,17 @@ public sealed class ExternalToolController
             var context = new ExternalToolContext(
                 filePath,
                 temporaryFilePath ?? filePath,
-                _editor.Text,
-                _editor.SelectedText,
-                lineColumn.Line + 1,
-                lineColumn.Column + 1,
+                editorSnapshot.Text,
+                editorSnapshot.SelectedText,
+                editorSnapshot.Caret.Line + 1,
+                editorSnapshot.Caret.Column + 1,
                 _languageModeId(),
                 definition.DefinitionDirectory,
                 _documents.Session.State.Encoding,
                 _documents.Session.State.LineEnding,
                 _documents.Session.State.IsDirty,
-                selectionStart,
-                selectionEnd);
+                editorSnapshot.SelectionStart,
+                editorSnapshot.SelectionEnd);
             var result = await ExternalToolRunner.RunAsync(
                 definition,
                 context,
