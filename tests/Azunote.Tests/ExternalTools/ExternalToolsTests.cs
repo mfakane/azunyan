@@ -191,6 +191,78 @@ public sealed class ExternalToolsTests
     }
 
     [Fact]
+    public async Task Runner_launches_cmd_scripts_automatically()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            $"azunote external tool {Guid.NewGuid():N}");
+        var scriptPath = Path.Combine(root, "echo arguments.cmd");
+        try
+        {
+            Directory.CreateDirectory(root);
+            await File.WriteAllTextAsync(
+                scriptPath,
+                "@echo off\r\necho %~1\r\n");
+
+            var result = await ExternalToolRunner.RunAsync(
+                new ExternalToolDefinition(scriptPath, ["value with spaces"]),
+                new ExternalToolContext(null, string.Empty, string.Empty));
+
+            Assert.True(result.Succeeded, result.StandardError);
+            Assert.Equal("value with spaces", result.StandardOutput.Trim());
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Runner_launches_powershell_scripts_automatically()
+    {
+        if (!OperatingSystem.IsWindows()
+            || !new[] { "pwsh.exe", "powershell.exe" }
+                .Any(command => ExternalToolLaunchResolver.Resolve(command, null) is not null))
+        {
+            return;
+        }
+
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            $"azunote external tool {Guid.NewGuid():N}");
+        var scriptPath = Path.Combine(root, "echo arguments.ps1");
+        try
+        {
+            Directory.CreateDirectory(root);
+            await File.WriteAllTextAsync(
+                scriptPath,
+                "Write-Output $args[0]\r\n");
+
+            var result = await ExternalToolRunner.RunAsync(
+                new ExternalToolDefinition(scriptPath, ["value with spaces"]),
+                new ExternalToolContext(null, string.Empty, string.Empty));
+
+            Assert.True(result.Succeeded, result.StandardError);
+            Assert.Equal("value with spaces", result.StandardOutput.Trim());
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task Text_file_service_normalizes_lone_carriage_returns_when_saving()
     {
         var root = Path.Combine(Path.GetTempPath(), $"azunyan-text-{Guid.NewGuid():N}");

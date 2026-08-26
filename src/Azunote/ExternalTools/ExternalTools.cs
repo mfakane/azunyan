@@ -372,6 +372,226 @@ public sealed record ExternalToolMenuState(
     bool IsEnabled,
     string? DisabledReason = null);
 
+internal enum ExternalToolLaunchKind
+{
+    Direct,
+    CommandShell,
+    PowerShell
+}
+
+internal sealed record ExternalToolLaunchPlan(
+    string RequestedCommand,
+    string ResolvedPath,
+    string LauncherPath,
+    ExternalToolLaunchKind Kind)
+{
+    public void AddArguments(
+        ProcessStartInfo startInfo,
+        IReadOnlyList<string> arguments)
+    {
+        switch (Kind)
+        {
+            case ExternalToolLaunchKind.Direct:
+                AddAll(startInfo, arguments);
+                break;
+            case ExternalToolLaunchKind.CommandShell:
+                startInfo.Arguments = "/d /s /c "
+                    + BuildCommandShellCommand(ResolvedPath, arguments);
+                break;
+            case ExternalToolLaunchKind.PowerShell:
+                startInfo.ArgumentList.Add("-NoLogo");
+                startInfo.ArgumentList.Add("-NoProfile");
+                startInfo.ArgumentList.Add("-NonInteractive");
+                startInfo.ArgumentList.Add("-File");
+                startInfo.ArgumentList.Add(ResolvedPath);
+                AddAll(startInfo, arguments);
+                break;
+            default:
+                throw new InvalidOperationException(
+                    $"Unsupported external tool launch kind: {Kind}.");
+        }
+    }
+
+    private static void AddAll(
+        ProcessStartInfo startInfo,
+        IReadOnlyList<string> arguments)
+    {
+        foreach (var argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+    }
+
+    private static string BuildCommandShellCommand(
+        string scriptPath,
+        IReadOnlyList<string> arguments)
+    {
+        var commandParts = new List<string>(arguments.Count + 2)
+        {
+            "call",
+            QuoteCommandShellArgument(scriptPath)
+        };
+        commandParts.AddRange(arguments.Select(QuoteCommandShellArgument));
+        return string.Join(' ', commandParts);
+    }
+
+    private static string QuoteCommandShellArgument(string value) =>
+        $"\"{value.Replace("\"", "\\\"", StringComparison.Ordinal)}\"";
+}
+
+internal static class ExternalToolLaunchResolver
+{
+    public static ExternalToolLaunchPlan? Resolve(
+        string command,
+        string? definitionDirectory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(command);
+
+        var resolvedPath = ResolveExecutable(command, definitionDirectory);
+        if (resolvedPath is null)
+        {
+            return null;
+        }
+
+        var extension = Path.GetExtension(resolvedPath);
+        if (OperatingSystem.IsWindows())
+        {
+            if (extension.Equals(".cmd", StringComparison.OrdinalIgnoreCase)
+                || extension.Equals(".bat", StringComparison.OrdinalIgnoreCase))
+            {
+                var commandShell = ResolveCommandShell();
+                return commandShell is null
+                    ? null
+                    : new ExternalToolLaunchPlan(
+                        command,
+                        resolvedPath,
+                        commandShell,
+                        ExternalToolLaunchKind.CommandShell);
+            }
+
+            if (extension.Equals(".ps1", StringComparison.OrdinalIgnoreCase))
+            {
+                var powerShell = ResolvePowerShell();
+                return powerShell is null
+                    ? null
+                    : new ExternalToolLaunchPlan(
+                        command,
+                        resolvedPath,
+                        powerShell,
+                        ExternalToolLaunchKind.PowerShell);
+            }
+        }
+
+        return new ExternalToolLaunchPlan(
+            command,
+            resolvedPath,
+            resolvedPath,
+            ExternalToolLaunchKind.Direct);
+    }
+
+    private static string? ResolveExecutable(
+        string command,
+        string? definitionDirectory)
+    {
+        command = command.Trim();
+        var hasPath = Path.IsPathRooted(command)
+            || command.Contains(Path.DirectorySeparatorChar)
+            || command.Contains(Path.AltDirectorySeparatorChar);
+        if (hasPath)
+        {
+            var path = Path.IsPathRooted(command) || string.IsNullOrWhiteSpace(definitionDirectory)
+                ? command
+                : Path.Combine(definitionDirectory, command);
+            return ResolvePath(path, allowExtensionless: true);
+        }
+
+        var pathVariable = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+        foreach (var rawDirectory in pathVariable.Split(
+                     Path.PathSeparator,
+                     StringSplitOptions.RemoveEmptyEntries))
+        {
+            var directory = rawDirectory.Trim().Trim('"');
+            if (directory.Length == 0)
+            {
+                continue;
+            }
+
+            var path = Path.Combine(directory, command);
+            var resolved = ResolvePath(path, allowExtensionless: false);
+            if (resolved is not null)
+            {
+                return resolved;
+            }
+        }
+
+        return null;
+    }
+
+    private static string? ResolvePath(string path, bool allowExtensionless)
+    {
+        var fullPath = Path.GetFullPath(path);
+        if (File.Exists(fullPath)
+            && (allowExtensionless || Path.GetExtension(fullPath).Length > 0))
+        {
+            return fullPath;
+        }
+
+        if (!OperatingSystem.IsWindows() || Path.GetExtension(fullPath).Length > 0)
+        {
+            return null;
+        }
+
+        foreach (var extension in GetWindowsExecutableExtensions())
+        {
+            var candidate = fullPath + extension;
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<string> GetWindowsExecutableExtensions()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            yield break;
+        }
+
+        var pathExtensions = Environment.GetEnvironmentVariable("PATHEXT")
+            ?? ".COM;.EXE;.BAT;.CMD";
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var extension in pathExtensions.Split(
+                     ';',
+                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (seen.Add(extension))
+            {
+                yield return extension;
+            }
+        }
+
+        if (seen.Add(".PS1"))
+        {
+            yield return ".PS1";
+        }
+    }
+
+    private static string? ResolveCommandShell()
+    {
+        var systemCommandShell = Path.Combine(Environment.SystemDirectory, "cmd.exe");
+        return File.Exists(systemCommandShell)
+            ? systemCommandShell
+            : ResolveExecutable("cmd.exe", null);
+    }
+
+    private static string? ResolvePowerShell() =>
+        ResolveExecutable("pwsh.exe", null)
+        ?? ResolveExecutable("powershell.exe", null);
+}
+
 public static class ExternalToolAvailability
 {
     public static ExternalToolMenuState Evaluate(
@@ -392,7 +612,10 @@ public static class ExternalToolAvailability
 
         var definition = settings.ToDefinition();
         var command = context.Expand(definition.FileName);
-        if (!IsCommandAvailable(command, definition.DefinitionDirectory))
+        var launchPlan = ExternalToolLaunchResolver.Resolve(
+            command,
+            definition.DefinitionDirectory);
+        if (launchPlan is null)
         {
             var reason = $"Command '{command}' was not found.";
             return visibility == ExternalToolVisibility.Always
@@ -484,53 +707,6 @@ public static class ExternalToolAvailability
         return null;
     }
 
-    private static bool IsCommandAvailable(string command, string? definitionDirectory)
-    {
-        if (string.IsNullOrWhiteSpace(command))
-        {
-            return false;
-        }
-
-        if (Path.IsPathRooted(command))
-        {
-            return File.Exists(command);
-        }
-
-        if (command.Contains(Path.DirectorySeparatorChar)
-            || command.Contains(Path.AltDirectorySeparatorChar))
-        {
-            var relative = string.IsNullOrWhiteSpace(definitionDirectory)
-                ? Path.GetFullPath(command)
-                : Path.GetFullPath(Path.Combine(definitionDirectory, command));
-            return File.Exists(relative);
-        }
-
-        var path = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
-        var extensions = OperatingSystem.IsWindows()
-            ? (Environment.GetEnvironmentVariable("PATHEXT") ?? ".COM;.EXE;.BAT;.CMD")
-                .Split(';', StringSplitOptions.RemoveEmptyEntries)
-            : [string.Empty];
-        foreach (var directory in path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
-        {
-            foreach (var extension in extensions)
-            {
-                var candidate = Path.Combine(directory, command);
-                if (!string.IsNullOrEmpty(extension)
-                    && string.IsNullOrEmpty(Path.GetExtension(candidate)))
-                {
-                    candidate += extension;
-                }
-
-                if (File.Exists(candidate))
-                {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
     private static string NormalizeExtension(string extension)
     {
         extension = extension.Trim();
@@ -563,9 +739,10 @@ public sealed record ExternalToolResult(
 }
 
 /// <summary>
-/// Runs a tool without invoking a shell. This makes arguments predictable and
-/// avoids turning document text into shell syntax. A caller can explicitly use
-/// PowerShell, cmd, Python, or another shell as the process file when needed.
+/// Runs a tool directly when possible and uses the appropriate Windows
+/// launcher for command and PowerShell scripts. Arguments remain separate for
+/// direct and PowerShell launches; command-shell arguments are quoted into the
+/// single command string required by cmd.exe.
 /// </summary>
 public sealed class ExternalToolRunner
 {
@@ -580,9 +757,27 @@ public sealed class ExternalToolRunner
         var input = definition.InputMode == ExternalToolInputMode.None
             ? null
             : context.GetInput(definition.InputMode);
+        var command = context.Expand(definition.FileName);
+        var launchPlan = ExternalToolLaunchResolver.Resolve(
+            command,
+            definition.DefinitionDirectory);
+        if (launchPlan is null)
+        {
+            var exception = new InvalidOperationException(
+                $"Could not resolve external tool '{command}'.");
+            ErrorReporter.LogException(
+                "External tool launch could not be resolved",
+                new InvalidOperationException(
+                    $"Command: {command}{Environment.NewLine}"
+                    + $"DefinitionDirectory: {definition.DefinitionDirectory}",
+                    exception));
+            throw exception;
+        }
+
+        var arguments = context.Expand(definition.Arguments);
         var startInfo = new ProcessStartInfo
         {
-            FileName = context.Expand(definition.FileName),
+            FileName = launchPlan.LauncherPath,
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardInput = true,
@@ -595,10 +790,7 @@ public sealed class ExternalToolRunner
             startInfo.Environment[environmentVariable.Key] = context.Expand(environmentVariable.Value);
         }
 
-        foreach (var argument in context.Expand(definition.Arguments))
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
+        launchPlan.AddArguments(startInfo, arguments);
 
         using var process = new Process { StartInfo = startInfo };
         try
@@ -608,6 +800,19 @@ public sealed class ExternalToolRunner
                 throw new InvalidOperationException(
                     $"Could not start external tool: {startInfo.FileName}");
             }
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            ErrorReporter.LogException(
+                $"External tool launch failed: {startInfo.FileName}",
+                new InvalidOperationException(
+                    DescribeLaunch(definition, launchPlan, startInfo, arguments, context),
+                    exception));
+            throw;
+        }
+
+        try
+        {
 
             var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
             var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
@@ -634,6 +839,58 @@ public sealed class ExternalToolRunner
             TryKill(process);
             throw;
         }
+    }
+
+    private static string DescribeLaunch(
+        ExternalToolDefinition definition,
+        ExternalToolLaunchPlan launchPlan,
+        ProcessStartInfo startInfo,
+        string[] arguments,
+        ExternalToolContext context)
+    {
+        var formattedArguments = arguments.Length > 0
+            ? string.Join(
+                Environment.NewLine,
+                arguments.Select(argument =>
+                    $"  {MaskDocumentText(argument, context)}"))
+            : "(none)";
+        var environmentVariables = definition.Environment.Count == 0
+            ? "(none)"
+            : string.Join(", ", definition.Environment.Keys.Order(StringComparer.OrdinalIgnoreCase));
+
+        return $"RequestedCommand: {launchPlan.RequestedCommand}{Environment.NewLine}"
+            + $"ResolvedPath: {launchPlan.ResolvedPath}{Environment.NewLine}"
+            + $"Launcher: {launchPlan.LauncherPath}{Environment.NewLine}"
+            + $"LaunchKind: {launchPlan.Kind}{Environment.NewLine}"
+            + $"FileName: {startInfo.FileName}{Environment.NewLine}"
+            + $"Arguments:{Environment.NewLine}{formattedArguments}{Environment.NewLine}"
+            + $"WorkingDirectory: {startInfo.WorkingDirectory}{Environment.NewLine}"
+            + $"InputMode: {definition.InputMode}{Environment.NewLine}"
+            + $"OutputMode: {definition.OutputMode}{Environment.NewLine}"
+            + $"EnvironmentVariables: {environmentVariables}";
+    }
+
+    private static string MaskDocumentText(
+        string argument,
+        ExternalToolContext context)
+    {
+        if (!string.IsNullOrEmpty(context.Document))
+        {
+            argument = argument.Replace(
+                context.Document,
+                "<document text>",
+                StringComparison.Ordinal);
+        }
+
+        if (!string.IsNullOrEmpty(context.Selection))
+        {
+            argument = argument.Replace(
+                context.Selection,
+                "<selection text>",
+                StringComparison.Ordinal);
+        }
+
+        return argument;
     }
 
     private static string ResolveWorkingDirectory(
