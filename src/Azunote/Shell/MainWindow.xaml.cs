@@ -65,44 +65,9 @@ public sealed partial class MainWindow : Window
 
     private void RegisterKeyboardAccelerators()
     {
-        var open = new KeyboardAccelerator { Key = VirtualKey.O, Modifiers = VirtualKeyModifiers.Control };
-        open.Invoked += OpenAccelerator_Invoked;
-        RootGrid.KeyboardAccelerators.Add(open);
-
-        var save = new KeyboardAccelerator { Key = VirtualKey.S, Modifiers = VirtualKeyModifiers.Control };
-        save.Invoked += SaveAccelerator_Invoked;
-        RootGrid.KeyboardAccelerators.Add(save);
-
-        var saveAs = new KeyboardAccelerator { Key = VirtualKey.S, Modifiers = VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift };
-        saveAs.Invoked += SaveAsAccelerator_Invoked;
-        RootGrid.KeyboardAccelerators.Add(saveAs);
-
-        var find = new KeyboardAccelerator { Key = VirtualKey.F, Modifiers = VirtualKeyModifiers.Control };
-        find.Invoked += FindAccelerator_Invoked;
-        RootGrid.KeyboardAccelerators.Add(find);
-
-        var replace = new KeyboardAccelerator { Key = VirtualKey.H, Modifiers = VirtualKeyModifiers.Control };
-        replace.Invoked += ReplaceAccelerator_Invoked;
-        RootGrid.KeyboardAccelerators.Add(replace);
-
         var escape = new KeyboardAccelerator { Key = VirtualKey.Escape };
         escape.Invoked += EscapeAccelerator_Invoked;
         RootGrid.KeyboardAccelerators.Add(escape);
-
-        var newDocument = new KeyboardAccelerator { Key = VirtualKey.N, Modifiers = VirtualKeyModifiers.Control };
-        newDocument.Invoked += NewAccelerator_Invoked;
-        RootGrid.KeyboardAccelerators.Add(newDocument);
-
-        // MenuFlyoutItems are not always in the active keyboard-accelerator
-        // scope while the editor has focus. Register this command on the
-        // window root, while keeping the shortcut displayed on the menu item.
-        var showCompletion = new KeyboardAccelerator
-        {
-            Key = VirtualKey.Space,
-            Modifiers = VirtualKeyModifiers.Control
-        };
-        showCompletion.Invoked += ShowCompletionAccelerator_Invoked;
-        RootGrid.KeyboardAccelerators.Add(showCompletion);
     }
 
     private bool IsDirty => !string.Equals(Editor.Text, _savedText, StringComparison.Ordinal);
@@ -289,12 +254,6 @@ public sealed partial class MainWindow : Window
     private async void OpenButton_Click(object sender, RoutedEventArgs e) => await OpenFileAsync();
 
     private async void NewMenuItem_Click(object sender, RoutedEventArgs e) => await NewDocumentAsync();
-
-    private void NewAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        args.Handled = true;
-        _ = NewDocumentAsync();
-    }
 
     private async void SaveButton_Click(object sender, RoutedEventArgs e) => await SaveAsync();
 
@@ -810,36 +769,6 @@ public sealed partial class MainWindow : Window
         ReplaceCurrent();
     }
 
-    private void OpenAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        args.Handled = true;
-        _ = OpenFileAsync();
-    }
-
-    private void SaveAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        args.Handled = true;
-        _ = SaveAsync();
-    }
-
-    private void SaveAsAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        args.Handled = true;
-        _ = SaveAsAsync();
-    }
-
-    private void FindAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        args.Handled = true;
-        ShowFindPanel(replace: false);
-    }
-
-    private void ReplaceAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        args.Handled = true;
-        ShowFindPanel(replace: true);
-    }
-
     private void ShowCompletionMenuItem_Click(object sender, RoutedEventArgs e) => ShowCompletion();
 
     private void ShowCompletionAccelerator_Invoked(
@@ -1350,9 +1279,9 @@ public sealed partial class MainWindow : Window
         // reusable Azunyan component remains unaware of this shortcut.
         if (e.Key == VirtualKey.Space && IsKeyDown(VirtualKey.Control))
         {
-            // Normally the root KeyboardAccelerator has already invoked the
-            // command. Keep a fallback here for native text hosts that route
-            // KeyDown without running the root accelerator first.
+            // Normally the menu item's KeyboardAccelerator has already
+            // invoked the command. Keep a fallback here for native text hosts
+            // that route KeyDown without running the item accelerator first.
             var acceleratorInvoked = _completionShortcutInvoked;
             _completionShortcutInvoked = false;
             e.Handled = true;
