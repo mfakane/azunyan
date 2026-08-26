@@ -4,7 +4,7 @@ namespace Azunote;
 /// Owns FileSystemWatcher lifetime and notification coalescing. UI dispatch
 /// remains the responsibility of the subscriber.
 /// </summary>
-internal sealed class DebouncedFileChangeMonitor : IDisposable
+internal sealed class DebouncedFileChangeMonitor : IFileChangeMonitor
 {
     private const int DebounceMilliseconds = 150;
     private readonly FileSystemWatcher _watcher;
@@ -104,4 +104,10 @@ internal sealed class FileChangeDetectedEventArgs : EventArgs
     }
 
     public string MonitoredPath { get; }
+}
+
+internal sealed class DefaultFileChangeMonitorFactory : IFileChangeMonitorFactory
+{
+    public IFileChangeMonitor Create(string path, bool includeSubdirectories) =>
+        new DebouncedFileChangeMonitor(path, includeSubdirectories);
 }

@@ -27,6 +27,11 @@ public sealed class DocumentController
 
     public DocumentSession Session => _session;
 
+    public Task<TextFileData> ReadAsync(
+        string path,
+        CancellationToken cancellationToken = default) =>
+        _files.ReadAsync(path, cancellationToken);
+
     public async Task<bool> ConfirmPendingChangesAsync(Func<Task<bool>> saveAsync)
     {
         ArgumentNullException.ThrowIfNull(saveAsync);

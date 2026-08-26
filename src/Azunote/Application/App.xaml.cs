@@ -3,13 +3,12 @@ using System.Runtime.InteropServices;
 
 namespace Azunote;
 
-public partial class App : Application
+public partial class App : Application, IDisposable
 {
     private const uint MessageBoxOk = 0x00000000;
     private const uint MessageBoxIconError = 0x00000010;
     private static int _unhandledDialogShown;
-
-    public static MainWindow? MainWindow { get; private set; }
+    private readonly ApplicationCoordinator _application = new();
 
     public App()
     {
@@ -32,40 +31,7 @@ public partial class App : Application
             ErrorReporter.LogMessage("Invalid command line", exception.Message);
         }
 
-        MainWindow = new MainWindow();
-        MainWindow.Activate();
-        _ = MainWindow.InitializeSettingsAsync();
-
-        if (options.ReadStandardInput)
-        {
-            _ = OpenStandardInputAsync(MainWindow, options);
-        }
-        else if (!string.IsNullOrWhiteSpace(options.FilePath))
-        {
-            _ = MainWindow.OpenStartupDocumentAsync(
-                options.FilePath,
-                options.Line,
-                options.Column);
-        }
-        else if (options.ShowHelp)
-        {
-            _ = MainWindow.ShowCommandLineHelpAsync();
-        }
-    }
-
-    private static async Task OpenStandardInputAsync(
-        MainWindow window,
-        AzunoteCommandLineOptions options)
-    {
-        try
-        {
-            var text = await Console.In.ReadToEndAsync();
-            await window.OpenStartupTextAsync(text, options.Line, options.Column);
-        }
-        catch (Exception exception)
-        {
-            await window.ShowStartupErrorAsync("Could not read standard input", exception.Message);
-        }
+        _application.Launch(options);
     }
 
     private void OnUnhandledException(
@@ -76,7 +42,7 @@ public partial class App : Application
         args.Handled = true;
     }
 
-    private static void OnAppDomainUnhandledException(
+    private void OnAppDomainUnhandledException(
         object? sender,
         System.UnhandledExceptionEventArgs args)
     {
@@ -107,7 +73,7 @@ public partial class App : Application
         args.SetObserved();
     }
 
-    private static void ReportUnhandledException(string source, Exception exception)
+    private void ReportUnhandledException(string source, Exception exception)
     {
         var logPath = ErrorReporter.LogException(source, exception);
         if (Interlocked.Exchange(ref _unhandledDialogShown, 1) != 0)
@@ -121,14 +87,16 @@ public partial class App : Application
         var message = $"{detail}{Environment.NewLine}{Environment.NewLine}"
             + $"Details were written to:{Environment.NewLine}{logPath}";
 
-        if (MainWindow is { } window)
-        {
-            window.ShowUnhandledError(exception, logPath);
-        }
-        else
+        if (!_application.TryShowUnhandledError(exception, logPath))
         {
             ShowFallbackErrorDialog("Azunote encountered an unexpected error", message);
         }
+    }
+
+    public void Dispose()
+    {
+        _application.Dispose();
+        GC.SuppressFinalize(this);
     }
 
     private static void ShowFallbackErrorDialog(string title, string message)
