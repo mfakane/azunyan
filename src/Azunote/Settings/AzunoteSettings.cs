@@ -35,25 +35,116 @@ public sealed class AzunoteSettings
     WriteIndented = true)]
 [TomlSerializable(typeof(AzunoteSettings))]
 [TomlSerializable(typeof(ExternalToolSettings))]
+[TomlSerializable(typeof(ExternalToolLaunchSettings))]
+[TomlSerializable(typeof(ExternalToolWhenSettings))]
 [TomlSerializable(typeof(CustomSyntaxModeSettings))]
 [TomlSerializable(typeof(CustomSyntaxRuleSettings))]
 internal sealed partial class AzunoteTomlSerializerContext : TomlSerializerContext
 {
 }
 
+public enum ExternalToolVisibility
+{
+    Always,
+    WhenAvailable
+}
+
+public enum ExternalToolFileCondition
+{
+    Any,
+    Backed,
+    Untitled
+}
+
+public enum ExternalToolSelectionCondition
+{
+    Any,
+    Empty,
+    NonEmpty
+}
+
+public enum ExternalToolDocumentCondition
+{
+    Any,
+    Clean,
+    Dirty
+}
+
+internal static class ExternalToolEnumValues
+{
+    public static string ToTomlValue<TEnum>(TEnum value)
+        where TEnum : struct, Enum
+    {
+        var name = value.ToString();
+        return name.Length == 0
+            ? name
+            : char.ToLowerInvariant(name[0]) + name[1..];
+    }
+
+    public static TEnum Parse<TEnum>(string? value, string propertyName)
+        where TEnum : struct, Enum
+    {
+        foreach (var enumValue in Enum.GetValues<TEnum>())
+        {
+            if (string.Equals(
+                    ToTomlValue(enumValue),
+                    value,
+                    StringComparison.Ordinal))
+            {
+                return enumValue;
+            }
+        }
+
+        throw new SettingsFileException(
+            $"Invalid {propertyName} value '{value}'. Expected a camelCase {typeof(TEnum).Name} value.");
+    }
+}
+
+public sealed class ExternalToolLaunchSettings
+{
+    public string Command { get; set; } = string.Empty;
+
+    [TomlPropertyName("args")]
+    public string[] Arguments { get; set; } = [];
+
+    public string? WorkingDirectory { get; set; }
+
+    public string Input { get; set; } = ExternalToolEnumValues.ToTomlValue(ExternalToolInputMode.None);
+
+    public string Output { get; set; } = ExternalToolEnumValues.ToTomlValue(ExternalToolOutputMode.Ignore);
+}
+
+public sealed class ExternalToolWhenSettings
+{
+    public string[] Extensions { get; set; } = [];
+
+    public string[] Patterns { get; set; } = [];
+
+    public string[] Languages { get; set; } = [];
+
+    public string File { get; set; } = ExternalToolEnumValues.ToTomlValue(ExternalToolFileCondition.Any);
+
+    public string Selection { get; set; } = ExternalToolEnumValues.ToTomlValue(ExternalToolSelectionCondition.Any);
+
+    public string Document { get; set; } = ExternalToolEnumValues.ToTomlValue(ExternalToolDocumentCondition.Any);
+
+    public string[] Os { get; set; } = [];
+}
+
 public sealed class ExternalToolSettings
 {
     public string Name { get; set; } = string.Empty;
 
-    public string Command { get; set; } = string.Empty;
+    public string? Shortcut { get; set; }
 
-    public string[] Arguments { get; set; } = [];
+    public string Visibility { get; set; } = ExternalToolEnumValues.ToTomlValue(ExternalToolVisibility.Always);
 
-    public string Input { get; set; } = nameof(ExternalToolInputMode.None);
+    public ExternalToolLaunchSettings Launch { get; set; } = new();
 
-    public string Output { get; set; } = nameof(ExternalToolOutputMode.Ignore);
+    public ExternalToolWhenSettings When { get; set; } = new();
 
-    public string? WorkingDirectory { get; set; }
+    [TomlPropertyName("env")]
+    public Dictionary<string, string> Environment { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// The directory containing this tool definition. This is metadata from
@@ -66,55 +157,52 @@ public sealed class ExternalToolSettings
     {
         Validate();
 
-        var workingDirectory = WorkingDirectory;
-        if (!string.IsNullOrWhiteSpace(workingDirectory)
-            && !Path.IsPathRooted(workingDirectory)
-            && !string.IsNullOrWhiteSpace(DefinitionDirectory))
-        {
-            workingDirectory = Path.GetFullPath(Path.Combine(DefinitionDirectory, workingDirectory));
-        }
-        else if (string.IsNullOrWhiteSpace(workingDirectory))
-        {
-            workingDirectory = DefinitionDirectory;
-        }
-
         return new ExternalToolDefinition(
-            Command,
-            Arguments,
-            ParseEnum<ExternalToolInputMode>(Input, nameof(Input)),
-            ParseEnum<ExternalToolOutputMode>(Output, nameof(Output)),
-            workingDirectory);
+            Launch.Command,
+            Launch.Arguments,
+            ExternalToolEnumValues.Parse<ExternalToolInputMode>(Launch.Input, "launch.input"),
+            ExternalToolEnumValues.Parse<ExternalToolOutputMode>(Launch.Output, "launch.output"),
+            Launch.WorkingDirectory,
+            Environment,
+            DefinitionDirectory);
     }
 
     internal void Validate()
     {
-        Arguments ??= [];
+        Launch ??= new();
+        Launch.Arguments ??= [];
+        Environment ??= new(StringComparer.OrdinalIgnoreCase);
+        When ??= new();
+        When.Extensions ??= [];
+        When.Patterns ??= [];
+        When.Languages ??= [];
+        When.Os ??= [];
 
         if (string.IsNullOrWhiteSpace(Name))
         {
             throw new SettingsFileException("Each external tool needs a non-empty name.");
         }
 
-        if (string.IsNullOrWhiteSpace(Command))
+        if (string.IsNullOrWhiteSpace(Launch.Command))
         {
             throw new SettingsFileException($"External tool '{Name}' needs a command.");
         }
 
-        _ = ParseEnum<ExternalToolInputMode>(Input, nameof(Input));
-        _ = ParseEnum<ExternalToolOutputMode>(Output, nameof(Output));
-    }
+        _ = ExternalToolEnumValues.Parse<ExternalToolInputMode>(Launch.Input, "launch.input");
+        _ = ExternalToolEnumValues.Parse<ExternalToolOutputMode>(Launch.Output, "launch.output");
+        _ = ExternalToolEnumValues.Parse<ExternalToolVisibility>(Visibility, nameof(Visibility));
+        _ = ExternalToolEnumValues.Parse<ExternalToolFileCondition>(When.File, "when.file");
+        _ = ExternalToolEnumValues.Parse<ExternalToolSelectionCondition>(When.Selection, "when.selection");
+        _ = ExternalToolEnumValues.Parse<ExternalToolDocumentCondition>(When.Document, "when.document");
 
-    private static TEnum ParseEnum<TEnum>(string? value, string propertyName)
-        where TEnum : struct, Enum
-    {
-        if (!Enum.TryParse<TEnum>(value, ignoreCase: true, out var parsed))
+        Shortcut = string.IsNullOrWhiteSpace(Shortcut) ? null : Shortcut.Trim();
+        if (Shortcut is not null && !ExternalToolShortcut.TryParse(Shortcut, out _))
         {
             throw new SettingsFileException(
-                $"Invalid {propertyName} value '{value}'. Expected a {typeof(TEnum).Name} value.");
+                $"Invalid shortcut '{Shortcut}' for external tool '{Name}'.");
         }
-
-        return parsed;
     }
+
 }
 
 public sealed class SettingsFileException : Exception
@@ -209,9 +297,15 @@ public static class SettingsFileService
         CancellationToken cancellationToken = default)
     {
         var directory = GetFullDirectoryPath(settingsDirectory);
+        var toolsDirectory = Path.Combine(directory, ToolsDirectoryName);
+        var toolsDirectoryExisted = Directory.Exists(toolsDirectory);
         Directory.CreateDirectory(directory);
-        Directory.CreateDirectory(Path.Combine(directory, ToolsDirectoryName));
+        Directory.CreateDirectory(toolsDirectory);
         await EnsureDefaultModesAsync(directory, cancellationToken);
+        if (!toolsDirectoryExisted)
+        {
+            await EnsureDefaultToolsAsync(directory, cancellationToken);
+        }
 
         var settingsPath = Path.Combine(directory, SettingsFileName);
         if (!File.Exists(settingsPath))
@@ -331,6 +425,46 @@ public static class SettingsFileService
             if (!string.IsNullOrWhiteSpace(destinationDirectory))
             {
                 Directory.CreateDirectory(destinationDirectory);
+            }
+
+            await using var source = File.OpenRead(sourcePath);
+            await using var destination = File.Create(destinationPath);
+            await source.CopyToAsync(destination, cancellationToken);
+        }
+    }
+
+    private static async Task EnsureDefaultToolsAsync(
+        string settingsDirectory,
+        CancellationToken cancellationToken)
+    {
+        var defaultToolsDirectory = Path.Combine(
+            AppContext.BaseDirectory,
+            "Resources",
+            "DefaultAppData",
+            ToolsDirectoryName);
+        var toolsDirectory = GetToolsDirectoryPath(settingsDirectory);
+        if (!Directory.Exists(defaultToolsDirectory))
+        {
+            return;
+        }
+
+        foreach (var sourcePath in Directory.EnumerateFiles(
+                     defaultToolsDirectory,
+                     "*",
+                     SearchOption.AllDirectories))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var relativePath = Path.GetRelativePath(defaultToolsDirectory, sourcePath);
+            var destinationPath = Path.Combine(toolsDirectory, relativePath);
+            var destinationDirectory = Path.GetDirectoryName(destinationPath);
+            if (!string.IsNullOrWhiteSpace(destinationDirectory))
+            {
+                Directory.CreateDirectory(destinationDirectory);
+            }
+
+            if (File.Exists(destinationPath))
+            {
+                continue;
             }
 
             await using var source = File.OpenRead(sourcePath);

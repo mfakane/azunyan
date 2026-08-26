@@ -3,8 +3,9 @@ using Azunyan.WinUI;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
-using Windows.System;
+using Microsoft.UI.Xaml.Input;
 using WinRT.Interop;
 
 namespace Azunote;
@@ -268,9 +269,11 @@ internal sealed class MainWindowViewAdapter :
 
     public void Render(
         IReadOnlyList<ExternalToolMenuNode> nodes,
+        Func<ExternalToolSettings, ExternalToolMenuState> getState,
         Func<ExternalToolSettings, Task> onSelected)
     {
         ArgumentNullException.ThrowIfNull(nodes);
+        ArgumentNullException.ThrowIfNull(getState);
         ArgumentNullException.ThrowIfNull(onSelected);
         _externalToolsMenu.Items.Clear();
         if (nodes.Count == 0)
@@ -283,7 +286,7 @@ internal sealed class MainWindowViewAdapter :
             return;
         }
 
-        AddExternalToolMenuItems(_externalToolsMenu, nodes, onSelected);
+        AddExternalToolMenuItems(_externalToolsMenu, nodes, getState, onSelected);
     }
 
     public void DisposeEditor() => _editor.Dispose();
@@ -291,24 +294,50 @@ internal sealed class MainWindowViewAdapter :
     private static void AddExternalToolMenuItems(
         MenuFlyoutSubItem parent,
         IReadOnlyList<ExternalToolMenuNode> nodes,
+        Func<ExternalToolSettings, ExternalToolMenuState> getState,
         Func<ExternalToolSettings, Task> onSelected)
     {
         foreach (var node in nodes)
         {
             if (node.Tool is { } tool)
             {
-                var menuItem = new MenuFlyoutItem { Text = node.Name };
+                var state = getState(tool);
+                if (!state.IsVisible)
+                {
+                    continue;
+                }
+
+                var menuItem = new MenuFlyoutItem
+                {
+                    Text = node.Name,
+                    IsEnabled = state.IsEnabled
+                };
+                AutomationProperties.SetHelpText(menuItem, state.DisabledReason ?? string.Empty);
+                if (state.DisabledReason is { } reason)
+                {
+                    ToolTipService.SetToolTip(menuItem, reason);
+                }
                 menuItem.Click += (_, _) => _ = onSelected(tool);
+                if (ExternalToolShortcut.TryParse(tool.Shortcut, out var shortcut))
+                {
+                    menuItem.KeyboardAccelerators.Add(new KeyboardAccelerator
+                    {
+                        Key = shortcut!.Key,
+                        Modifiers = shortcut.Modifiers
+                    });
+                }
+
                 parent.Items.Add(menuItem);
                 continue;
             }
 
             var subMenu = new MenuFlyoutSubItem { Text = node.Name };
-            AddExternalToolMenuItems(subMenu, node.Children, onSelected);
+            AddExternalToolMenuItems(subMenu, node.Children, getState, onSelected);
             if (subMenu.Items.Count > 0)
             {
                 parent.Items.Add(subMenu);
             }
         }
     }
+
 }

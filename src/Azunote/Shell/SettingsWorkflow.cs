@@ -11,6 +11,8 @@ internal sealed class SettingsWorkflow : IDisposable
     private readonly ISettingsFolderOpener _folderOpener;
     private readonly Func<string?> _currentFilePath;
     private readonly Func<ExternalToolSettings, Task> _runConfiguredTool;
+    private readonly Func<ExternalToolSettings, ExternalToolMenuState> _getToolState;
+    private IReadOnlyList<ExternalToolMenuNode> _externalToolMenu = [];
     private IFileChangeMonitor? _settingsMonitor;
     private bool _disposed;
 
@@ -23,7 +25,8 @@ internal sealed class SettingsWorkflow : IDisposable
         IUserPrompt prompt,
         ISettingsFolderOpener folderOpener,
         Func<string?> currentFilePath,
-        Func<ExternalToolSettings, Task> runConfiguredTool)
+        Func<ExternalToolSettings, Task> runConfiguredTool,
+        Func<ExternalToolSettings, ExternalToolMenuState>? getToolState = null)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _languageModes = languageModes ?? throw new ArgumentNullException(nameof(languageModes));
@@ -34,6 +37,7 @@ internal sealed class SettingsWorkflow : IDisposable
         _folderOpener = folderOpener ?? throw new ArgumentNullException(nameof(folderOpener));
         _currentFilePath = currentFilePath ?? throw new ArgumentNullException(nameof(currentFilePath));
         _runConfiguredTool = runConfiguredTool ?? throw new ArgumentNullException(nameof(runConfiguredTool));
+        _getToolState = getToolState ?? (_ => new ExternalToolMenuState(true, true));
     }
 
     public AzunoteSettings Current => _settings.Current;
@@ -76,18 +80,22 @@ internal sealed class SettingsWorkflow : IDisposable
         StopWatcher();
     }
 
+    public void RefreshExternalToolsMenu() => RenderExternalTools();
+
     private async Task<bool> ReloadAsync(bool showError)
     {
         try
         {
             var settings = await _settings.LoadAsync();
-            _externalToolsMenu.Render(settings.ExternalToolMenu, _runConfiguredTool);
             _languageModes.Initialize(settings.CustomSyntaxModes);
             if (!_languageModes.IsManuallySelected
                 && _currentFilePath() is { } path)
             {
                 _languageModes.SelectForPath(path);
             }
+
+            _externalToolMenu = settings.ExternalToolMenu;
+            RenderExternalTools();
 
             return true;
         }
@@ -101,6 +109,9 @@ internal sealed class SettingsWorkflow : IDisposable
             return false;
         }
     }
+
+    private void RenderExternalTools() =>
+        _externalToolsMenu.Render(_externalToolMenu, _getToolState, _runConfiguredTool);
 
     private void StartWatcher()
     {

@@ -26,6 +26,8 @@ internal sealed class LanguageModeController
 
     public bool IsManuallySelected => _manuallySelected;
 
+    public event EventHandler? Changed;
+
     public IReadOnlyList<FileDialogFilter> GetFileDialogFilters() =>
         _catalog.GetFileDialogFilters();
 
@@ -94,5 +96,7 @@ internal sealed class LanguageModeController
         {
             _editor.RefreshProviders();
         }
+
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 }

@@ -34,6 +34,9 @@
     <None Include="Resources\DefaultAppData\modes\**\*"
           CopyToOutputDirectory="PreserveNewest"
           CopyToPublishDirectory="PreserveNewest" />
+    <None Include="Resources\DefaultAppData\tools\**\*"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

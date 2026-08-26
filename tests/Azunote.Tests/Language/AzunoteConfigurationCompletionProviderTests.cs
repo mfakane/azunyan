@@ -18,9 +18,9 @@ public sealed class AzunoteConfigurationCompletionProviderTests
     }
 
     [Fact]
-    public async Task Tool_schema_completes_root_fields()
+    public async Task Tool_schema_completes_launch_fields()
     {
-        const string text = "com";
+        const string text = "[launch]\ncom";
         var provider = new AzunoteConfigurationCompletionProvider(
             [AzunoteSchemaCatalog.ExternalTool]);
 
@@ -31,14 +31,14 @@ public sealed class AzunoteConfigurationCompletionProviderTests
                 TextSelection.Caret(text.Length)));
 
         Assert.NotNull(result);
-        Assert.Equal(new TextRange(0, 3), result!.ReplacementRange);
+        Assert.Equal(new TextRange(9, 3), result!.ReplacementRange);
         Assert.Contains(result.Items, item => item.Label == "command");
     }
 
     [Fact]
     public async Task Tool_schema_completes_enum_values_inside_a_string()
     {
-        const string text = "input = \"Fi";
+        const string text = "[launch]\ninput = \"fi";
         var provider = new AzunoteConfigurationCompletionProvider(
             [AzunoteSchemaCatalog.ExternalTool]);
 
@@ -49,9 +49,9 @@ public sealed class AzunoteConfigurationCompletionProviderTests
                 TextSelection.Caret(text.Length)));
 
         Assert.NotNull(result);
-        Assert.Equal(new TextRange(8, 3), result!.ReplacementRange);
-        var item = Assert.Single(result.Items, candidate => candidate.Label == "\"FilePath\"");
-        Assert.Equal("\"FilePath\"", item.InsertText);
+        Assert.Equal(new TextRange(17, 3), result!.ReplacementRange);
+        var item = Assert.Single(result.Items, candidate => candidate.Label == "\"filePath\"");
+        Assert.Equal("\"filePath\"", item.InsertText);
     }
 
     [Fact]

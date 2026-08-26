@@ -1,0 +1,15 @@
+name = "Prettier"
+shortcut = "Alt+Shift+F"
+visibility = "whenAvailable"
+
+[launch]
+command = "prettier"
+args = ["--write", "${file}"]   # or "--write ${file}"
+workingDirectory = "${documentDir}"
+output = "reloadFile"
+
+[when]
+extensions = [".js", ".jsx", ".ts", ".tsx", ".json", ".css", ".scss", ".html"]
+
+[env]
+NODE_ENV = "development"

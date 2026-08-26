@@ -175,6 +175,7 @@ internal sealed class FakeExternalToolMenuView : IExternalToolMenuView
 
     public void Render(
         IReadOnlyList<ExternalToolMenuNode> nodes,
+        Func<ExternalToolSettings, ExternalToolMenuState> getState,
         Func<ExternalToolSettings, Task> onSelected) => Nodes = nodes;
 }
 

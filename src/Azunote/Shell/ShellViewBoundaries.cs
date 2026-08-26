@@ -95,6 +95,7 @@ internal interface IExternalToolMenuView
 {
     void Render(
         IReadOnlyList<ExternalToolMenuNode> nodes,
+        Func<ExternalToolSettings, ExternalToolMenuState> getState,
         Func<ExternalToolSettings, Task> onSelected);
 }
 

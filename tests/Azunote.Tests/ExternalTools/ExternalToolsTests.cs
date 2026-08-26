@@ -60,6 +60,88 @@ public sealed class ExternalToolsTests
     }
 
     [Fact]
+    public void Context_distinguishes_document_and_execution_files()
+    {
+        var documentPath = Path.Combine("folder", "notes.md");
+        var temporaryPath = Path.Combine(Path.GetTempPath(), "azunote-external-notes.md");
+        var context = new ExternalToolContext(
+            documentPath,
+            temporaryPath,
+            "document",
+            string.Empty,
+            languageId: "markdown",
+            toolDirectory: Path.Combine("tools", "Format"),
+            encoding: TextEncodingKind.Utf8Bom,
+            lineEnding: LineEndingKind.CrLf,
+            isDirty: true);
+
+        Assert.Equal(Path.GetFullPath(temporaryPath), context.FilePath);
+        Assert.Equal(Path.GetFullPath(documentPath), context.DocumentFilePath);
+        Assert.Equal(Path.GetFullPath(temporaryPath), context.TempFile);
+        Assert.Equal("notes.md", context.Expand("${documentName}"));
+        Assert.Equal("markdown|Utf8Bom|CrLf", context.Expand("${languageId}|${encoding}|${lineEnding}"));
+    }
+
+    [Fact]
+    public void Availability_evaluates_all_when_conditions_and_visibility()
+    {
+        var settings = new ExternalToolSettings
+        {
+            Name = "Format",
+            Launch = new ExternalToolLaunchSettings { Command = "cmd.exe" },
+            Visibility = "always",
+            When = new ExternalToolWhenSettings
+            {
+                Extensions = [".md"],
+                Languages = ["markdown"],
+                File = "backed",
+                Selection = "nonEmpty",
+                Document = "dirty",
+                Os = ["windows"]
+            }
+        };
+        var context = new ExternalToolContext(
+            Path.Combine("folder", "notes.md"),
+            Path.Combine("folder", "notes.md"),
+            "document",
+            "selection",
+            languageId: "markdown",
+            isDirty: true);
+
+        var state = ExternalToolAvailability.Evaluate(settings, context);
+
+        Assert.True(state.IsVisible);
+        Assert.True(state.IsEnabled);
+        Assert.Null(state.DisabledReason);
+    }
+
+    [Fact]
+    public void Availability_hides_when_available_tools_when_conditions_do_not_match()
+    {
+        var settings = new ExternalToolSettings
+        {
+            Name = "Format",
+            Launch = new ExternalToolLaunchSettings { Command = "cmd.exe" },
+            Visibility = "whenAvailable",
+            When = new ExternalToolWhenSettings
+            {
+                Extensions = [".md"]
+            }
+        };
+        var context = new ExternalToolContext(
+            Path.Combine("folder", "notes.txt"),
+            Path.Combine("folder", "notes.txt"),
+            "document",
+            string.Empty);
+
+        var state = ExternalToolAvailability.Evaluate(settings, context);
+
+        Assert.False(state.IsVisible);
+        Assert.False(state.IsEnabled);
+        Assert.NotNull(state.DisabledReason);
+    }
+
+    [Fact]
     public void Output_interpreter_maps_success_and_failure_without_mutating_text()
     {
         var replace = ExternalToolOutputInterpreter.Interpret(
@@ -176,10 +258,12 @@ public sealed class ExternalToolsTests
                 toolPath,
                 """
                 name = "Format document"
+
+                [launch]
                 command = "prettier"
-                arguments = ["--write", "${file}"]
-                input = "FilePath"
-                output = "ReloadFile"
+                args = ["--write", "${file}"]
+                input = "filePath"
+                output = "reloadFile"
                 """);
 
             var settings = await SettingsFileService.LoadAsync(root);
@@ -208,6 +292,61 @@ public sealed class ExternalToolsTests
     }
 
     [Fact]
+    public async Task Settings_service_loads_nested_tool_definition_with_when_and_environment()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"azunote-settings-{Guid.NewGuid():N}");
+        var tools = Path.Combine(root, SettingsFileService.ToolsDirectoryName);
+        var toolPath = Path.Combine(tools, "Format.tool.toml");
+        Directory.CreateDirectory(tools);
+        try
+        {
+            await File.WriteAllTextAsync(
+                toolPath,
+                """
+                name = "Format document"
+                shortcut = "Alt+Shift+F"
+                visibility = "whenAvailable"
+
+                [launch]
+                command = "cmd.exe"
+                args = ["/c", "more"]
+                workingDirectory = "${documentDir}"
+                input = "document"
+                output = "replaceDocument"
+
+                [when]
+                extensions = [".md"]
+                languages = ["markdown"]
+                file = "backed"
+                selection = "any"
+                document = "dirty"
+                os = ["windows"]
+
+                [env]
+                NODE_ENV = "development"
+                """);
+
+            var settings = await SettingsFileService.LoadAsync(root);
+            var tool = Assert.Single(settings.ExternalTools);
+
+            Assert.Equal("Alt+Shift+F", tool.Shortcut);
+            Assert.Equal("whenAvailable", tool.Visibility);
+            Assert.Equal("cmd.exe", tool.ToDefinition().FileName);
+            Assert.Equal(["/c", "more"], tool.ToDefinition().Arguments);
+            Assert.Equal("development", tool.ToDefinition().Environment["NODE_ENV"]);
+            Assert.Equal([".md"], tool.When.Extensions);
+            Assert.Equal("backed", tool.When.File);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task Settings_service_treats_a_tool_bundle_directory_as_one_tool()
     {
         var root = Path.Combine(Path.GetTempPath(), $"azunyan-settings-{Guid.NewGuid():N}");
@@ -223,9 +362,11 @@ public sealed class ExternalToolsTests
                 Path.Combine(bundle, "manifest.toml"),
                 """
                 name = "Markdown preview"
+
+                [launch]
                 command = "markdown-preview"
-                input = "Document"
-                output = "NewDocument"
+                input = "document"
+                output = "newDocument"
                 """);
 
             var settings = await SettingsFileService.LoadAsync(root);
@@ -259,7 +400,7 @@ public sealed class ExternalToolsTests
             var settingsText = await File.ReadAllTextAsync(SettingsFileService.GetSettingsFilePath(root));
             Assert.Contains("TOML", settingsText, StringComparison.OrdinalIgnoreCase);
             var settings = await SettingsFileService.LoadAsync(root);
-            Assert.Empty(settings.ExternalTools);
+            Assert.Contains(settings.ExternalTools, tool => tool.Name == "Prettier");
             await SettingsFileService.SaveAsync(root, settings);
             Assert.Contains("TOML", await File.ReadAllTextAsync(SettingsFileService.GetSettingsFilePath(root)), StringComparison.OrdinalIgnoreCase);
         }

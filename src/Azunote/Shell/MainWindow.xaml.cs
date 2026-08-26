@@ -159,8 +159,11 @@ public sealed partial class MainWindow : Window, IDisposable
     private void Editor_TextChanged(object sender, TextChangedEventArgs e) =>
         _runtime.ObserveTextChanged();
 
-    private void Editor_SelectionChanged(object sender, RoutedEventArgs e) =>
+    private void Editor_SelectionChanged(object sender, RoutedEventArgs e)
+    {
         _runtime.RefreshStatus();
+        _runtime.RefreshExternalToolsMenu();
+    }
 
     private void Editor_KeyDown(object sender, KeyRoutedEventArgs e)
     {

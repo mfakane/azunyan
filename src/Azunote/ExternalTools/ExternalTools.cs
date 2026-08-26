@@ -1,5 +1,8 @@
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using Azunyan.Core;
+using Azunyan.Syntax;
+using Windows.System;
 
 namespace Azunote;
 
@@ -20,13 +23,75 @@ public enum ExternalToolOutputMode
     ReloadFile
 }
 
+public sealed record ExternalToolShortcut(
+    VirtualKey Key,
+    VirtualKeyModifiers Modifiers)
+{
+    public static bool TryParse(
+        string? value,
+        out ExternalToolShortcut? shortcut)
+    {
+        shortcut = null;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var parts = value.Split(
+            '+',
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 0)
+        {
+            return false;
+        }
+
+        var modifiers = VirtualKeyModifiers.None;
+        foreach (var modifier in parts[..^1])
+        {
+            switch (modifier.ToLowerInvariant())
+            {
+                case "ctrl":
+                case "control":
+                    modifiers |= VirtualKeyModifiers.Control;
+                    break;
+                case "alt":
+                case "menu":
+                    modifiers |= VirtualKeyModifiers.Menu;
+                    break;
+                case "shift":
+                    modifiers |= VirtualKeyModifiers.Shift;
+                    break;
+                case "win":
+                case "windows":
+                    modifiers |= VirtualKeyModifiers.Windows;
+                    break;
+                default:
+                    return false;
+            }
+        }
+
+        var keyName = parts[^1];
+        if (string.Equals(keyName, "Esc", StringComparison.OrdinalIgnoreCase))
+        {
+            keyName = nameof(VirtualKey.Escape);
+        }
+
+        if (!Enum.TryParse<VirtualKey>(keyName, ignoreCase: true, out var key)
+            || key == VirtualKey.None)
+        {
+            return false;
+        }
+
+        shortcut = new ExternalToolShortcut(key, modifiers);
+        return true;
+    }
+}
+
 /// <summary>
-/// A declarative external process invocation. Arguments may contain
-/// <c>${file}</c>, <c>${fileDir}</c>, <c>${fileName}</c>,
-/// <c>${document}</c>, <c>${selection}</c>, <c>${userHome}</c>,
-/// <c>${lineNumber}</c>, and <c>${columnNumber}</c> placeholders. Environment
-/// variables use <c>${env:NAME}</c>. Text payloads are normally better passed
-/// through stdin so quoting remains the tool's concern.
+/// A declarative external process invocation. Arguments may contain the
+/// placeholders exposed by <see cref="ExternalToolContext"/>. Text payloads
+/// are normally better passed through stdin so quoting remains the tool's
+/// concern.
 /// </summary>
 public sealed record ExternalToolDefinition
 {
@@ -35,7 +100,9 @@ public sealed record ExternalToolDefinition
         string[]? arguments = null,
         ExternalToolInputMode inputMode = ExternalToolInputMode.None,
         ExternalToolOutputMode outputMode = ExternalToolOutputMode.Ignore,
-        string? workingDirectory = null)
+        string? workingDirectory = null,
+        IReadOnlyDictionary<string, string>? environment = null,
+        string? definitionDirectory = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
 
@@ -44,6 +111,10 @@ public sealed record ExternalToolDefinition
         InputMode = inputMode;
         OutputMode = outputMode;
         WorkingDirectory = workingDirectory;
+        Environment = environment ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        DefinitionDirectory = string.IsNullOrWhiteSpace(definitionDirectory)
+            ? null
+            : Path.GetFullPath(definitionDirectory);
     }
 
     public string FileName { get; }
@@ -55,6 +126,10 @@ public sealed record ExternalToolDefinition
     public ExternalToolOutputMode OutputMode { get; }
 
     public string? WorkingDirectory { get; }
+
+    public IReadOnlyDictionary<string, string> Environment { get; }
+
+    public string? DefinitionDirectory { get; }
 
     public static string[] ParseArguments(string arguments)
     {
@@ -105,26 +180,95 @@ public sealed partial record ExternalToolContext
         string selection,
         int lineNumber = 1,
         int columnNumber = 1)
+        : this(
+            filePath,
+            filePath,
+            document,
+            selection,
+            lineNumber,
+            columnNumber,
+            selectionStart: new LineColumn(lineNumber - 1, columnNumber - 1),
+            selectionEnd: new LineColumn(lineNumber - 1, columnNumber - 1))
+    {
+    }
+
+    public ExternalToolContext(
+        string? documentFilePath,
+        string? executionFilePath,
+        string document,
+        string selection,
+        int lineNumber = 1,
+        int columnNumber = 1,
+        string? languageId = null,
+        string? toolDirectory = null,
+        TextEncodingKind encoding = TextEncodingKind.Utf8,
+        LineEndingKind lineEnding = LineEndingKind.Lf,
+        bool isDirty = false,
+        LineColumn? selectionStart = null,
+        LineColumn? selectionEnd = null)
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(selection);
         ArgumentOutOfRangeException.ThrowIfLessThan(lineNumber, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(columnNumber, 1);
 
-        FilePath = string.IsNullOrWhiteSpace(filePath)
+        DocumentFilePath = string.IsNullOrWhiteSpace(documentFilePath)
             ? null
-            : Path.GetFullPath(filePath);
+            : Path.GetFullPath(documentFilePath);
+        ExecutionFilePath = string.IsNullOrWhiteSpace(executionFilePath)
+            ? null
+            : Path.GetFullPath(executionFilePath);
+        ToolDirectory = string.IsNullOrWhiteSpace(toolDirectory)
+            ? null
+            : Path.GetFullPath(toolDirectory);
         Document = document;
         Selection = selection;
         LineNumber = lineNumber;
         ColumnNumber = columnNumber;
+        LanguageId = languageId ?? string.Empty;
+        Encoding = encoding;
+        LineEnding = lineEnding;
+        IsDirty = isDirty;
+        SelectionStart = selectionStart ?? new LineColumn(lineNumber - 1, columnNumber - 1);
+        SelectionEnd = selectionEnd ?? SelectionStart;
     }
 
-    public string? FilePath { get; }
+    public string? FilePath => ExecutionFilePath;
+
+    public string? ExecutionFilePath { get; }
 
     public string? FileDir => FilePath is null ? null : Path.GetDirectoryName(FilePath);
 
     public string? FileName => FilePath is null ? null : Path.GetFileName(FilePath);
+
+    public string? FileStem => FileName is null ? null : Path.GetFileNameWithoutExtension(FileName);
+
+    public string? FileExtension => FileName is null ? null : Path.GetExtension(FileName);
+
+    public string? DocumentFilePath { get; }
+
+    public string? DocumentDir => DocumentFilePath is null
+        ? null
+        : Path.GetDirectoryName(DocumentFilePath);
+
+    public string? DocumentFileName => DocumentFilePath is null
+        ? null
+        : Path.GetFileName(DocumentFilePath);
+
+    public string? DocumentStem => DocumentFileName is null
+        ? null
+        : Path.GetFileNameWithoutExtension(DocumentFileName);
+
+    public string? DocumentExtension => DocumentFileName is null
+        ? null
+        : Path.GetExtension(DocumentFileName);
+
+    public string? TempFile => ExecutionFilePath is null ||
+        string.Equals(DocumentFilePath, ExecutionFilePath, StringComparison.OrdinalIgnoreCase)
+            ? null
+            : ExecutionFilePath;
+
+    public string? ToolDirectory { get; }
 
     public string Document { get; }
 
@@ -133,6 +277,18 @@ public sealed partial record ExternalToolContext
     public int LineNumber { get; }
 
     public int ColumnNumber { get; }
+
+    public string LanguageId { get; }
+
+    public TextEncodingKind Encoding { get; }
+
+    public LineEndingKind LineEnding { get; }
+
+    public bool IsDirty { get; }
+
+    public LineColumn SelectionStart { get; }
+
+    public LineColumn SelectionEnd { get; }
 
     public static string UserHome
     {
@@ -163,13 +319,34 @@ public sealed partial record ExternalToolContext
             {
                 "file" => FilePath ?? string.Empty,
                 "filePath" => FilePath ?? string.Empty,
+                "executionFile" => ExecutionFilePath ?? string.Empty,
                 "fileDir" => FileDir ?? string.Empty,
                 "fileName" => FileName ?? string.Empty,
+                "fileStem" => FileStem ?? string.Empty,
+                "fileExtension" => FileExtension ?? string.Empty,
+                "documentFile" => DocumentFilePath ?? string.Empty,
+                "documentDir" => DocumentDir ?? string.Empty,
+                "documentName" => DocumentFileName ?? string.Empty,
+                "documentStem" => DocumentStem ?? string.Empty,
+                "documentExtension" => DocumentExtension ?? string.Empty,
+                "tempFile" => TempFile ?? string.Empty,
+                "toolDir" => ToolDirectory ?? string.Empty,
                 "document" => Document,
                 "selection" => Selection,
                 "userHome" => UserHome,
+                "languageId" => LanguageId,
+                "encoding" => Encoding.ToString(),
+                "lineEnding" => LineEnding.ToString(),
+                "platform" => OperatingSystem.IsWindows() ? "windows" :
+                    OperatingSystem.IsLinux() ? "linux" :
+                    OperatingSystem.IsMacOS() ? "macos" : "unknown",
+                "architecture" => System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant(),
                 "lineNumber" => LineNumber.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 "columnNumber" => ColumnNumber.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                "selectionStartLine" => (SelectionStart.Line + 1).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                "selectionStartColumn" => (SelectionStart.Column + 1).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                "selectionEndLine" => (SelectionEnd.Line + 1).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                "selectionEndColumn" => (SelectionEnd.Column + 1).ToString(System.Globalization.CultureInfo.InvariantCulture),
                 _ => match.Value
             };
         });
@@ -188,6 +365,193 @@ public sealed partial record ExternalToolContext
         _ => throw new ArgumentOutOfRangeException(nameof(inputMode))
     };
 
+}
+
+public sealed record ExternalToolMenuState(
+    bool IsVisible,
+    bool IsEnabled,
+    string? DisabledReason = null);
+
+public static class ExternalToolAvailability
+{
+    public static ExternalToolMenuState Evaluate(
+        ExternalToolSettings settings,
+        ExternalToolContext context)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(context);
+
+        var conditionFailure = CheckConditions(settings.When ?? new(), context);
+        var visibility = ParseVisibility(settings.Visibility);
+        if (conditionFailure is not null)
+        {
+            return visibility == ExternalToolVisibility.Always
+                ? new ExternalToolMenuState(true, false, conditionFailure)
+                : new ExternalToolMenuState(false, false, conditionFailure);
+        }
+
+        var definition = settings.ToDefinition();
+        var command = context.Expand(definition.FileName);
+        if (!IsCommandAvailable(command, definition.DefinitionDirectory))
+        {
+            var reason = $"Command '{command}' was not found.";
+            return visibility == ExternalToolVisibility.Always
+                ? new ExternalToolMenuState(true, false, reason)
+                : new ExternalToolMenuState(false, false, reason);
+        }
+
+        return new ExternalToolMenuState(true, true);
+    }
+
+    private static string? CheckConditions(
+        ExternalToolWhenSettings when,
+        ExternalToolContext context)
+    {
+        var documentPath = context.DocumentFilePath;
+        var extensions = when.Extensions ?? [];
+        var patterns = when.Patterns ?? [];
+
+        if (extensions.Length > 0
+            && (documentPath is null || !extensions.Any(extension =>
+                string.Equals(
+                    NormalizeExtension(extension),
+                    context.DocumentExtension,
+                    StringComparison.OrdinalIgnoreCase))))
+        {
+            return "The current document has an unsupported file extension.";
+        }
+
+        if (patterns.Length > 0
+            && (documentPath is null
+                || SyntaxLanguageDefinition.GetPatternMatchScore(documentPath, patterns) < 0))
+        {
+            return "The current document does not match the configured file pattern.";
+        }
+
+        if (when.Languages is { Length: > 0 }
+            && !when.Languages.Contains(context.LanguageId, StringComparer.OrdinalIgnoreCase))
+        {
+            return "The current language mode is not supported by this tool.";
+        }
+
+        var fileCondition = ExternalToolEnumValues.Parse<ExternalToolFileCondition>(
+            when.File,
+            "when.file");
+        if (fileCondition == ExternalToolFileCondition.Backed && documentPath is null)
+        {
+            return "This tool requires a file-backed document.";
+        }
+
+        if (fileCondition == ExternalToolFileCondition.Untitled && documentPath is not null)
+        {
+            return "This tool is only available for untitled documents.";
+        }
+
+        var selectionCondition = ExternalToolEnumValues.Parse<ExternalToolSelectionCondition>(
+            when.Selection,
+            "when.selection");
+        if (selectionCondition == ExternalToolSelectionCondition.Empty
+            && context.Selection.Length > 0)
+        {
+            return "This tool requires an empty selection.";
+        }
+
+        if (selectionCondition == ExternalToolSelectionCondition.NonEmpty
+            && context.Selection.Length == 0)
+        {
+            return "This tool requires a selection.";
+        }
+
+        var documentCondition = ExternalToolEnumValues.Parse<ExternalToolDocumentCondition>(
+            when.Document,
+            "when.document");
+        if (documentCondition == ExternalToolDocumentCondition.Clean && context.IsDirty)
+        {
+            return "This tool requires a clean document.";
+        }
+
+        if (documentCondition == ExternalToolDocumentCondition.Dirty && !context.IsDirty)
+        {
+            return "This tool requires unsaved document changes.";
+        }
+
+        if (when.Os is { Length: > 0 }
+            && !when.Os.Contains(GetOperatingSystemName(), StringComparer.OrdinalIgnoreCase))
+        {
+            return "This tool is not available on the current operating system.";
+        }
+
+        return null;
+    }
+
+    private static bool IsCommandAvailable(string command, string? definitionDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(command))
+        {
+            return false;
+        }
+
+        if (Path.IsPathRooted(command))
+        {
+            return File.Exists(command);
+        }
+
+        if (command.Contains(Path.DirectorySeparatorChar)
+            || command.Contains(Path.AltDirectorySeparatorChar))
+        {
+            var relative = string.IsNullOrWhiteSpace(definitionDirectory)
+                ? Path.GetFullPath(command)
+                : Path.GetFullPath(Path.Combine(definitionDirectory, command));
+            return File.Exists(relative);
+        }
+
+        var path = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+        var extensions = OperatingSystem.IsWindows()
+            ? (Environment.GetEnvironmentVariable("PATHEXT") ?? ".COM;.EXE;.BAT;.CMD")
+                .Split(';', StringSplitOptions.RemoveEmptyEntries)
+            : [string.Empty];
+        foreach (var directory in path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+        {
+            foreach (var extension in extensions)
+            {
+                var candidate = Path.Combine(directory, command);
+                if (!string.IsNullOrEmpty(extension)
+                    && string.IsNullOrEmpty(Path.GetExtension(candidate)))
+                {
+                    candidate += extension;
+                }
+
+                if (File.Exists(candidate))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static string NormalizeExtension(string extension)
+    {
+        extension = extension.Trim();
+        if (extension.StartsWith('*'))
+        {
+            extension = extension[1..];
+        }
+
+        return extension.StartsWith('.') ? extension : $".{extension}";
+    }
+
+    private static ExternalToolVisibility ParseVisibility(string? value) =>
+        ExternalToolEnumValues.Parse<ExternalToolVisibility>(
+            value,
+            nameof(ExternalToolVisibility));
+
+    private static string GetOperatingSystemName() =>
+        OperatingSystem.IsWindows() ? "windows" :
+        OperatingSystem.IsLinux() ? "linux" :
+        OperatingSystem.IsMacOS() ? "macos" :
+        "unknown";
 }
 
 public sealed record ExternalToolResult(
@@ -219,7 +583,6 @@ public sealed class ExternalToolRunner
         var startInfo = new ProcessStartInfo
         {
             FileName = context.Expand(definition.FileName),
-            Arguments = string.Join(" ", context.Expand(definition.Arguments).Select(x => x.Contains(' ') ? $"\"{x}\"" : x)),
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardInput = true,
@@ -227,6 +590,15 @@ public sealed class ExternalToolRunner
             RedirectStandardError = true,
             WorkingDirectory = ResolveWorkingDirectory(definition, context)
         };
+        foreach (var environmentVariable in definition.Environment)
+        {
+            startInfo.Environment[environmentVariable.Key] = context.Expand(environmentVariable.Value);
+        }
+
+        foreach (var argument in context.Expand(definition.Arguments))
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
 
         using var process = new Process { StartInfo = startInfo };
         try
@@ -269,8 +641,15 @@ public sealed class ExternalToolRunner
         ExternalToolContext context)
     {
         var configured = definition.WorkingDirectory is null
-            ? context.FileDir
+            ? context.DocumentDir ?? context.FileDir
             : context.Expand(definition.WorkingDirectory);
+
+        if (!string.IsNullOrWhiteSpace(configured)
+            && !Path.IsPathRooted(configured)
+            && !string.IsNullOrWhiteSpace(definition.DefinitionDirectory))
+        {
+            configured = Path.GetFullPath(Path.Combine(definition.DefinitionDirectory, configured));
+        }
 
         return string.IsNullOrWhiteSpace(configured) || !Directory.Exists(configured)
             ? Environment.CurrentDirectory

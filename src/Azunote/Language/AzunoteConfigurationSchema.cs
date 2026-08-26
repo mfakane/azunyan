@@ -60,17 +60,28 @@ public static class AzunoteSchemaCatalog
                 string.Empty,
                 [
                     Field("name", AzunoteSchemaValueKind.String, "property", documentation: "The tool name shown in the Tools menu."),
+                    Field("shortcut", AzunoteSchemaValueKind.String, "property", documentation: "Optional keyboard shortcut, such as Alt+Shift+F."),
+                    EnumField("visibility", "always", "whenAvailable")
+                ]),
+            new AzunoteSchemaTable(
+                "launch",
+                [
                     Field("command", AzunoteSchemaValueKind.String, "command"),
-                    Field("arguments", AzunoteSchemaValueKind.Array, "property"),
-                    EnumField("input", "None", "Document", "Selection", "FilePath"),
-                    EnumField("output", "Ignore", "ReplaceDocument", "ReplaceSelection", "NewDocument", "ReloadFile"),
-                    Field("workingDirectory", AzunoteSchemaValueKind.String, "path")
+                    Field("args", AzunoteSchemaValueKind.Array, "property"),
+                    Field("workingDirectory", AzunoteSchemaValueKind.String, "path"),
+                    EnumField("input", "none", "filePath", "document", "selection"),
+                    EnumField("output", "ignore", "replaceDocument", "replaceSelection", "newDocument", "reloadFile")
                 ]),
             new AzunoteSchemaTable(
                 "when",
                 [
-                    Field("extension", AzunoteSchemaValueKind.Array, "property"),
-                    Field("pattern", AzunoteSchemaValueKind.Array, "property")
+                    Field("extensions", AzunoteSchemaValueKind.Array, "property"),
+                    Field("patterns", AzunoteSchemaValueKind.Array, "property"),
+                    Field("languages", AzunoteSchemaValueKind.Array, "property"),
+                    EnumField("file", "any", "backed", "untitled"),
+                    EnumField("selection", "any", "empty", "nonEmpty"),
+                    EnumField("document", "any", "clean", "dirty"),
+                    Field("os", AzunoteSchemaValueKind.Array, "property")
                 ]),
             new AzunoteSchemaTable(
                 "env",

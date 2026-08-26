@@ -12,17 +12,20 @@ public sealed class ExternalToolController
     private readonly DocumentController _documents;
     private readonly ITextFileStore _files;
     private readonly IUserPrompt _prompt;
+    private readonly Func<string> _languageModeId;
 
     public ExternalToolController(
         IEditorBuffer editor,
         DocumentController documents,
         ITextFileStore files,
-        IUserPrompt prompt)
+        IUserPrompt prompt,
+        Func<string>? languageModeId = null)
     {
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
         _documents = documents ?? throw new ArgumentNullException(nameof(documents));
         _files = files ?? throw new ArgumentNullException(nameof(files));
         _prompt = prompt ?? throw new ArgumentNullException(nameof(prompt));
+        _languageModeId = languageModeId ?? (() => string.Empty);
     }
 
     public async Task<ExternalToolResult> RunAsync(
@@ -32,7 +35,10 @@ public sealed class ExternalToolController
         ArgumentNullException.ThrowIfNull(definition);
 
         var selection = _editor.Selection;
-        var lineColumn = _editor.Snapshot.Lines.GetLineColumn(_editor.CaretPosition);
+        var snapshot = _editor.Snapshot;
+        var lineColumn = snapshot.Lines.GetLineColumn(_editor.CaretPosition);
+        var selectionStart = snapshot.Lines.GetLineColumn(selection.Start);
+        var selectionEnd = snapshot.Lines.GetLineColumn(selection.End);
         var filePath = _documents.Session.State.FilePath;
         var temporaryFilePath = _documents.Session.State.IsDirty || filePath is null
             ? CreateTemporaryFilePath(filePath)
@@ -50,11 +56,19 @@ public sealed class ExternalToolController
             }
 
             var context = new ExternalToolContext(
+                filePath,
                 temporaryFilePath ?? filePath,
                 _editor.Text,
                 _editor.SelectedText,
                 lineColumn.Line + 1,
-                lineColumn.Column + 1);
+                lineColumn.Column + 1,
+                _languageModeId(),
+                definition.DefinitionDirectory,
+                _documents.Session.State.Encoding,
+                _documents.Session.State.LineEnding,
+                _documents.Session.State.IsDirty,
+                selectionStart,
+                selectionEnd);
             var result = await ExternalToolRunner.RunAsync(
                 definition,
                 context,

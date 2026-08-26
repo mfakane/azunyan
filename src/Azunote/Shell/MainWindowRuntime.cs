@@ -26,17 +26,19 @@ internal sealed class MainWindowRuntime : IDisposable
         _dispatcher = new DispatcherQueueUiDispatcher(_view.DispatcherQueue);
         var files = new TextFileStore();
         var documents = new DocumentController(_view, _session, files, _prompt);
-        var externalTools = new ExternalToolController(
-            _view,
-            documents,
-            files,
-            _prompt);
         var settings = new SettingsController(SettingsFileService.GetDefaultDirectory());
         _languageModes = new LanguageModeController(
             _view,
             _view,
             () => _session.State.FilePath);
         _languageModes.Initialize();
+
+        var externalTools = new ExternalToolController(
+            _view,
+            documents,
+            files,
+            _prompt,
+            () => _languageModes.CurrentModeId);
 
         _documents = new DocumentWorkflow(
             _view,
@@ -57,7 +59,8 @@ internal sealed class MainWindowRuntime : IDisposable
             _prompt,
             new WinUiSettingsFolderOpener(),
             () => _session.State.FilePath,
-            RunConfiguredExternalToolAsync);
+            RunConfiguredExternalToolAsync,
+            GetExternalToolMenuState);
         _editorCommands = new EditorCommandController(_view, _view);
         _status = new DocumentStatusPresenter(_view, _session, _view, _view);
         _findReplace = new FindReplaceController(
@@ -69,6 +72,7 @@ internal sealed class MainWindowRuntime : IDisposable
         _externalToolDialog = new WinUiExternalToolDialog(() => _view.XamlRoot);
 
         _documents.Changed += Documents_Changed;
+        _languageModes.Changed += LanguageModes_Changed;
         RefreshDocumentView();
     }
 
@@ -172,6 +176,8 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public void RefreshStatus() => _status.Refresh();
 
+    public void RefreshExternalToolsMenu() => _settings.RefreshExternalToolsMenu();
+
     public void OpenDroppedFile(string path) => _documents.OpenDroppedFile(path);
 
     public void Dispose()
@@ -182,6 +188,7 @@ internal sealed class MainWindowRuntime : IDisposable
         }
 
         _disposed = true;
+        _languageModes.Changed -= LanguageModes_Changed;
         _documents.Changed -= Documents_Changed;
         _documents.Dispose();
         _settings.Dispose();
@@ -201,6 +208,16 @@ internal sealed class MainWindowRuntime : IDisposable
     {
         try
         {
+            var state = GetExternalToolMenuState(tool);
+            if (!state.IsEnabled)
+            {
+                await _prompt.ShowErrorAsync(
+                    "External tool is unavailable",
+                    state.DisabledReason ?? "The external tool cannot run in the current context.");
+                RefreshExternalToolsMenu();
+                return;
+            }
+
             await RunExternalToolAsync(tool.ToDefinition());
         }
         catch (OperationCanceledException)
@@ -238,11 +255,40 @@ internal sealed class MainWindowRuntime : IDisposable
 
         _status.Refresh(args.LineEnding);
         _status.RefreshTitle();
+        RefreshExternalToolsMenu();
+    }
+
+    private void LanguageModes_Changed(object? sender, EventArgs args) =>
+        RefreshExternalToolsMenu();
+
+    private ExternalToolMenuState GetExternalToolMenuState(ExternalToolSettings tool)
+    {
+        var snapshot = _view.Snapshot;
+        var lineColumn = snapshot.Lines.GetLineColumn(_view.CaretPosition);
+        var selectionStart = snapshot.Lines.GetLineColumn(_view.Selection.Start);
+        var selectionEnd = snapshot.Lines.GetLineColumn(_view.Selection.End);
+        var state = _session.State;
+        var context = new ExternalToolContext(
+            state.FilePath,
+            state.FilePath,
+            _view.Text,
+            _view.SelectedText,
+            lineColumn.Line + 1,
+            lineColumn.Column + 1,
+            _languageModes.CurrentModeId,
+            tool.DefinitionDirectory,
+            state.Encoding,
+            state.LineEnding,
+            state.IsDirty,
+            selectionStart,
+            selectionEnd);
+        return ExternalToolAvailability.Evaluate(tool, context);
     }
 
     private void RefreshDocumentView()
     {
         _status.Refresh();
         _status.RefreshTitle();
+        RefreshExternalToolsMenu();
     }
 }

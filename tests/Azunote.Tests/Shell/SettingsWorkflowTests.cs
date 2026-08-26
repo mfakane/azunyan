@@ -31,7 +31,7 @@ public sealed class SettingsWorkflowTests
 
             Assert.Empty(prompt.Errors);
             Assert.NotEmpty(languageMenu.Entries);
-            Assert.Empty(externalMenu.Nodes);
+            Assert.Contains(externalMenu.Nodes, node => node.Name == "Format");
         }
         finally
         {
