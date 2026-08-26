@@ -1,8 +1,13 @@
 using Azunyan.Core;
 using Azunyan.Syntax;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Azunote;
 
+[SuppressMessage(
+    "Design",
+    "CA1720",
+    Justification = "These names intentionally match the configuration schema's value-kind terminology.")]
 public enum AzunoteSchemaValueKind
 {
     String,
@@ -218,7 +223,7 @@ public sealed class AzunoteConfigurationCompletionProvider : ICompletionProvider
         }
 
         var keyPrefix = beforeCaret[keyStart..];
-        if (beforeCaret[..keyStart].TrimEnd().EndsWith("=", StringComparison.Ordinal))
+        if (beforeCaret[..keyStart].TrimEnd().EndsWith('='))
         {
             return ValueTask.FromResult<CompletionResult?>(null);
         }
@@ -237,7 +242,7 @@ public sealed class AzunoteConfigurationCompletionProvider : ICompletionProvider
                 keyItems));
     }
 
-    private IReadOnlyList<AzunoteSchemaField> FindFields(string tablePath) =>
+    private AzunoteSchemaField[] FindFields(string tablePath) =>
         _schemas
             .SelectMany(schema => schema.Tables)
             .Where(table => string.Equals(table.Path, tablePath, StringComparison.OrdinalIgnoreCase))
@@ -257,8 +262,8 @@ public sealed class AzunoteConfigurationCompletionProvider : ICompletionProvider
             {
                 tablePath = text[2..^2].Trim();
             }
-            else if (text.StartsWith("[", StringComparison.Ordinal)
-                && text.EndsWith("]", StringComparison.Ordinal))
+            else if (text.StartsWith('[')
+                && text.EndsWith(']'))
             {
                 tablePath = text[1..^1].Trim();
             }

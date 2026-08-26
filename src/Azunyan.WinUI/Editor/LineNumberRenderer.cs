@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
@@ -36,12 +37,12 @@ internal sealed class LineNumberRenderer : IAzunyanEditorRenderer
         else if (context.ShowLineNumbers)
         {
             var lineCount = context.Snapshot.Lines.LineCount;
-            var digits = Math.Max(1, lineCount.ToString().Length);
+            var digits = Math.Max(1, lineCount.ToString(CultureInfo.InvariantCulture).Length);
             for (var line = context.FirstVisibleLine; line <= context.LastVisibleLine; line++)
             {
                 var number = new TextBlock
                 {
-                    Text = (line + 1).ToString(),
+                    Text = (line + 1).ToString(CultureInfo.InvariantCulture),
                     FontFamily = context.FontFamily,
                     FontSize = context.FontSize,
                     Foreground = new SolidColorBrush(context.ColorScheme.GutterForeground),

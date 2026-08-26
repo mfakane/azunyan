@@ -455,7 +455,7 @@ internal sealed partial class ProjectedTextRangeProvider : ITextRangeProvider
         char.IsLetterOrDigit(value) || value == '_';
 
     private static int FindUnitContaining(
-        IReadOnlyList<TextRange> units,
+        List<TextRange> units,
         int position)
     {
         for (var index = 0; index < units.Count; index++)

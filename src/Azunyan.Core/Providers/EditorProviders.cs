@@ -173,10 +173,7 @@ public sealed record GutterItem
 {
     public GutterItem(int line, string text, string? kind = null, string? toolTip = null)
     {
-        if (line < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(line));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegative(line);
 
         ArgumentNullException.ThrowIfNull(text);
         Line = line;
@@ -462,12 +459,12 @@ public sealed class EditorProviderCoordinator : IDisposable
             gutterTask.Result.Where(item => item.Line < context.Snapshot.Lines.LineCount).ToArray());
     }
 
-    private static IReadOnlyList<SyntaxSpan> FilterRanges(
+    private static SyntaxSpan[] FilterRanges(
         IReadOnlyList<SyntaxSpan> spans,
         TextSnapshot snapshot) =>
         spans.Where(span => IsValidRange(span.Range, snapshot)).ToArray();
 
-    private static IReadOnlyList<TextDecoration> FilterRanges(
+    private static TextDecoration[] FilterRanges(
         IReadOnlyList<TextDecoration> decorations,
         TextSnapshot snapshot) =>
         decorations.Where(decoration => IsValidRange(decoration.Range, snapshot)).ToArray();

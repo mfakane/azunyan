@@ -1,4 +1,5 @@
 using Azunyan.Core;
+using System.Globalization;
 using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI;
 using Microsoft.UI.Input;
@@ -24,7 +25,7 @@ namespace Azunyan.WinUI;
 /// draws the visible text from snapshot-bound projection data, so native glyphs
 /// are not painted underneath a second syntax layer.
 /// </summary>
-public sealed partial class AzunyanEditorView : UserControl
+public sealed partial class AzunyanEditorView : UserControl, IDisposable
 {
     private readonly AzunyanEditorRenderer _defaultRenderer;
     private AzunyanColorScheme _colorScheme;
@@ -43,7 +44,8 @@ public sealed partial class AzunyanEditorView : UserControl
     private bool _explicitCompletionRequested;
     private bool _applyingCompletion;
     private IReadOnlyList<CompletionItem>? _displayedCompletionItems;
-    private IReadOnlyList<string> _completionTriggerCharacters = Array.Empty<string>();
+    private string[] _completionTriggerCharacters = Array.Empty<string>();
+    private bool _disposed;
     private int _hoverPosition = -1;
 
     public AzunyanEditorView()
@@ -78,6 +80,17 @@ public sealed partial class AzunyanEditorView : UserControl
         InputEditor.IsTextPredictionEnabled = false;
         ApplyColorScheme();
         UpdateTextSurfaceMode();
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _providerScheduler.Dispose();
     }
 
     public static readonly DependencyProperty ShowLineNumbersProperty =
@@ -360,6 +373,11 @@ public sealed partial class AzunyanEditorView : UserControl
 
     private void OnLoaded(object sender, RoutedEventArgs args)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         _scrollViewer = FindDescendant<ScrollViewer>(InputEditor);
         if (_scrollViewer is not null)
         {
@@ -373,6 +391,11 @@ public sealed partial class AzunyanEditorView : UserControl
 
     private void OnUnloaded(object sender, RoutedEventArgs args)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         _providerScheduler.CancelAll();
         if (_scrollViewer is not null)
         {
@@ -661,7 +684,7 @@ public sealed partial class AzunyanEditorView : UserControl
             Math.Max(0, lineCount - 1));
 
         var currentFrame = GetCurrentFrame();
-        var digits = Math.Max(1, lineCount.ToString().Length);
+        var digits = Math.Max(1, lineCount.ToString(CultureInfo.InvariantCulture).Length);
         var providerGutter = currentFrame?.Viewport?.Gutter;
         var supportsLogicalLineGutter = IsProjectedTextSurface;
         var hasProviderGutter = supportsLogicalLineGutter && providerGutter is { Count: > 0 };
@@ -900,7 +923,7 @@ public sealed partial class AzunyanEditorView : UserControl
         bool requestPosition,
         bool requestCompletion = false)
     {
-        if (!IsLoaded)
+        if (_disposed || !IsLoaded)
         {
             return;
         }
@@ -1583,7 +1606,7 @@ public sealed partial class AzunyanEditorView : UserControl
 
     private bool IsCompletionTrigger(string text, int caretPosition)
     {
-        if (_completionTriggerCharacters.Count == 0
+        if (_completionTriggerCharacters.Length == 0
             || caretPosition <= 0
             || caretPosition > text.Length)
         {

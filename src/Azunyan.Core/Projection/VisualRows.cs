@@ -74,7 +74,7 @@ public sealed class VisualRow
 /// </summary>
 public sealed class VisualRowMapBuilder
 {
-    public VisualRowMap Build(
+    public static VisualRowMap Build(
         TextProjection projection,
         IEnumerable<BlockAdornment>? blockAdornments = null,
         int wrapColumns = 0,
@@ -82,10 +82,7 @@ public sealed class VisualRowMapBuilder
         IReadOnlyDictionary<int, IReadOnlyList<int>>? wrappedLineBreaksByVisualLine = null)
     {
         ArgumentNullException.ThrowIfNull(projection);
-        if (wrapColumns < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(wrapColumns));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegative(wrapColumns);
 
         if (wrappedLineBreaks is not null
             && wrappedLineBreaks.Count != projection.Lines.Count)
@@ -150,7 +147,7 @@ public sealed class VisualRowMapBuilder
     }
 
     private static void AddTextRows(
-        ICollection<VisualRow> rows,
+        List<VisualRow> rows,
         ProjectedLine line,
         int wrapColumns,
         IReadOnlyList<int>? measuredBreaks)
@@ -204,7 +201,7 @@ public sealed class VisualRowMapBuilder
         }
     }
 
-    private static IReadOnlyList<BlockAdornment> NormalizeBlocks(
+    private static List<BlockAdornment> NormalizeBlocks(
         TextProjection projection,
         IEnumerable<BlockAdornment> candidates)
     {

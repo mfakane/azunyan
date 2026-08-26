@@ -94,8 +94,8 @@ public sealed class EditorProviderScheduler : IDisposable
         return RequestAsync(
             _document,
             context,
-            cancellationToken,
-            CollectDocumentAsync);
+            CollectDocumentAsync,
+            cancellationToken);
     }
 
     public Task<ViewportProviderResults?> RequestViewportAsync(
@@ -113,25 +113,25 @@ public sealed class EditorProviderScheduler : IDisposable
         return RequestAsync(
             _viewport,
             context,
-            cancellationToken,
-            CollectViewportAsync);
+            CollectViewportAsync,
+            cancellationToken);
     }
 
     public Task<PositionProviderResults?> RequestPositionAsync(
         TextSnapshot snapshot,
         int position,
         TextSelection selection,
-        CancellationToken cancellationToken = default,
-        bool includeCompletion = true)
+        bool includeCompletion = true,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         var context = new EditorProviderContext(snapshot, position, selection);
         return RequestAsync(
             _position,
             context,
-            cancellationToken,
             (requestId, providerContext, token) =>
-                CollectPositionAsync(requestId, providerContext, includeCompletion, token));
+                CollectPositionAsync(requestId, providerContext, includeCompletion, token),
+            cancellationToken);
     }
 
     public void CancelAll()
@@ -164,8 +164,8 @@ public sealed class EditorProviderScheduler : IDisposable
     private async Task<TResult?> RequestAsync<TResult>(
         ChannelState channel,
         EditorProviderContext context,
-        CancellationToken cancellationToken,
-        Func<long, EditorProviderContext, CancellationToken, Task<TResult>> collect)
+        Func<long, EditorProviderContext, CancellationToken, Task<TResult>> collect,
+        CancellationToken cancellationToken)
         where TResult : class
     {
         RequestState request;
@@ -297,7 +297,7 @@ public sealed class EditorProviderScheduler : IDisposable
                 : null);
     }
 
-    private async Task CompleteWhenFinishedAsync<TResult>(
+    private static async Task CompleteWhenFinishedAsync<TResult>(
         Task<TResult> work,
         ChannelState channel,
         RequestState request)

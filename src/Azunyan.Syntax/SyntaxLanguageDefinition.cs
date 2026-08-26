@@ -105,7 +105,7 @@ public sealed class SyntaxLanguageDefinition : ISyntaxProvider
         if (!normalized.Contains('*')
             && !normalized.Contains('?')
             && !normalized.Contains('/')
-            && normalized.StartsWith(".", StringComparison.Ordinal))
+            && normalized.StartsWith('.'))
         {
             return $"*{normalized}";
         }

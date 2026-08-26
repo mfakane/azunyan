@@ -9,7 +9,7 @@ public sealed class ProjectionTests
     public void Inline_adornment_preserves_document_positions_and_affinity()
     {
         var snapshot = new TextSnapshot("abc\ndef");
-        var projection = new TextProjectionBuilder().Build(
+        var projection = TextProjectionBuilder.Build(
             snapshot,
             inlays: new[]
             {
@@ -33,11 +33,10 @@ public sealed class ProjectionTests
     {
         var document = new Document("aa\nbb\ncc");
         var oldSnapshot = document.Snapshot;
-        var builder = new TextProjectionBuilder();
-        var previous = builder.Build(oldSnapshot);
+        var previous = TextProjectionBuilder.Build(oldSnapshot);
 
         var change = document.Insert(4, "X");
-        var incremental = builder.BuildIncremental(
+        var incremental = TextProjectionBuilder.BuildIncremental(
             oldSnapshot,
             document.Snapshot,
             previous,
@@ -57,11 +56,10 @@ public sealed class ProjectionTests
     {
         var document = new Document("a\nb\nc");
         var oldSnapshot = document.Snapshot;
-        var builder = new TextProjectionBuilder();
-        var previous = builder.Build(oldSnapshot);
+        var previous = TextProjectionBuilder.Build(oldSnapshot);
 
         var change = document.Insert(2, "\n");
-        var incremental = builder.BuildIncremental(
+        var incremental = TextProjectionBuilder.BuildIncremental(
             oldSnapshot,
             document.Snapshot,
             previous,
@@ -80,7 +78,7 @@ public sealed class ProjectionTests
     public void Folded_ranges_hide_middle_lines_and_map_hidden_positions_to_placeholder()
     {
         var snapshot = new TextSnapshot("a\nb\nc");
-        var projection = new TextProjectionBuilder().Build(
+        var projection = TextProjectionBuilder.Build(
             snapshot,
             folds: new[] { new FoldRange("body", new TextRange(2, 2)) });
 
@@ -108,7 +106,7 @@ public sealed class ProjectionTests
     public void Overlapping_folds_are_normalized_deterministically()
     {
         var snapshot = new TextSnapshot("0123456789");
-        var projection = new TextProjectionBuilder().Build(
+        var projection = TextProjectionBuilder.Build(
             snapshot,
             folds: new[]
             {

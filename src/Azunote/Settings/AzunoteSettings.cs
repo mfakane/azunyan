@@ -37,7 +37,7 @@ public sealed class AzunoteSettings
 [TomlSerializable(typeof(ExternalToolSettings))]
 [TomlSerializable(typeof(CustomSyntaxModeSettings))]
 [TomlSerializable(typeof(CustomSyntaxRuleSettings))]
-internal partial class AzunoteTomlSerializerContext : TomlSerializerContext
+internal sealed partial class AzunoteTomlSerializerContext : TomlSerializerContext
 {
 }
 

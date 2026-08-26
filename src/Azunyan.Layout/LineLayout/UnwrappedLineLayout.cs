@@ -52,10 +52,7 @@ public sealed record LayoutRun
         string? adornmentKind = null)
     {
         ArgumentNullException.ThrowIfNull(text);
-        if (visualStart < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(visualStart));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegative(visualStart);
 
         Kind = kind;
         Text = text;
@@ -306,7 +303,7 @@ public sealed class MonospaceLineLayoutEngine : IUnwrappedLineLayoutEngine
     }
 
     private static void AddTextRuns(
-        ICollection<LayoutRun> runs,
+        List<LayoutRun> runs,
         TextSnapshot snapshot,
         TextRange source,
         IReadOnlyList<SyntaxSpan> syntax,

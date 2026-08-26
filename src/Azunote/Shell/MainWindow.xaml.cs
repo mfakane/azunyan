@@ -14,11 +14,10 @@ using WinRT.Interop;
 
 namespace Azunote;
 
-public sealed partial class MainWindow : Window
+public sealed partial class MainWindow : Window, IDisposable
 {
     private readonly IntPtr _windowHandle;
     private readonly AppWindow? _appWindow;
-    private readonly ExternalToolRunner _externalToolRunner = new();
     private readonly Dictionary<string, ISyntaxProvider?> _languageModes = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, IReadOnlyList<string>> _languageModeCompletionTriggers = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, IReadOnlyList<string>> _languageModeExtensions = new(StringComparer.OrdinalIgnoreCase);
@@ -41,6 +40,7 @@ public sealed partial class MainWindow : Window
     private string _languageModeId = "plain-text";
     private bool _languageModeManuallySelected;
     private bool _completionShortcutInvoked;
+    private bool _disposed;
 
     public MainWindow()
     {
@@ -168,7 +168,7 @@ public sealed partial class MainWindow : Window
                 Editor.SelectedText,
                 lineColumn.Line + 1,
                 lineColumn.Column + 1);
-            result = await _externalToolRunner.RunAsync(definition, context, cancellationToken);
+            result = await ExternalToolRunner.RunAsync(definition, context, cancellationToken);
 
             var output = ExternalToolOutputInterpreter.Interpret(definition, result);
             if (!output.IsSuccess)
@@ -491,7 +491,7 @@ public sealed partial class MainWindow : Window
         ];
     }
 
-    private static IReadOnlyList<string> NormalizeFileExtensions(
+    private static string[] NormalizeFileExtensions(
         IEnumerable<string> extensions)
     {
         return extensions
@@ -1080,17 +1080,26 @@ public sealed partial class MainWindow : Window
         Close();
     }
 
-    private void MainWindow_Closed(object sender, WindowEventArgs args)
+    public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
         _fileChangeDebounce?.Cancel();
         _fileChangeDebounce?.Dispose();
         _fileChangeDebounce = null;
         _settingsChangeDebounce?.Cancel();
         _settingsChangeDebounce?.Dispose();
         _settingsChangeDebounce = null;
+        Editor.Dispose();
         StopFileWatcher();
         StopSettingsWatcher();
     }
+
+    private void MainWindow_Closed(object sender, WindowEventArgs args) => Dispose();
 
     private void StartFileWatcher(string path)
     {
@@ -1428,7 +1437,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        if (Editor.SelectionLength > 0 && string.Equals(Editor.SelectedText, query, StringComparison.CurrentCultureIgnoreCase))
+        if (Editor.SelectionLength > 0 && string.Equals(Editor.SelectedText, query, StringComparison.OrdinalIgnoreCase))
         {
             var selectionStart = Editor.SelectionStart;
             Editor.SelectedText = ReplaceTextBox.Text;

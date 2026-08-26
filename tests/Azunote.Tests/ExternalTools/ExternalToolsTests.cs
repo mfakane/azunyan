@@ -51,7 +51,7 @@ public sealed class ExternalToolsTests
         Assert.Equal("notes.md", context.FileName);
         Assert.EndsWith("folder", context.FileDir, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(
-            $"{context.FilePath}|{context.FileDir}|notes.md|whole document|selected text|12|7|{context.UserHome}",
+            $"{context.FilePath}|{context.FileDir}|notes.md|whole document|selected text|12|7|{ExternalToolContext.UserHome}",
             context.Expand("${file}|${fileDir}|${fileName}|${document}|${selection}|${lineNumber}|${columnNumber}|${userHome}"));
         Assert.Equal(
             Environment.GetEnvironmentVariable("PATH") ?? string.Empty,
@@ -100,7 +100,7 @@ public sealed class ExternalToolsTests
             isWindows ? "cmd.exe" : "/bin/cat",
             ExternalToolDefinition.ParseArguments(isWindows ? "/c more" : string.Empty),
             ExternalToolInputMode.Document);
-        var result = await new ExternalToolRunner().RunAsync(
+        var result = await ExternalToolRunner.RunAsync(
             definition,
             new ExternalToolContext(null, "stdin payload", string.Empty));
 

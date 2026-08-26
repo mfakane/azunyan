@@ -1,6 +1,7 @@
 using Azunyan.Core;
 using Azunyan.Layout;
 using Azunyan.WinUI;
+using System.Globalization;
 using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.UI;
 using Microsoft.Graphics.Canvas.UI.Xaml;
@@ -193,7 +194,7 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
     }
 
     private void AddInlineAutomationTarget(
-        ICollection<ProjectedTextAutomationTarget> targets,
+        List<ProjectedTextAutomationTarget> targets,
         ProjectedTextRenderFrame frame,
         int rowIndex,
         VisualRow row,
@@ -687,7 +688,7 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
             context.CharacterWidth,
             context.LineHeight,
             Math.Min(context.LineHeight * 0.8, context.LineHeight));
-        var layouts = new ViewportLayoutEngine().LayoutVisibleRows(
+        var layouts = ViewportLayoutEngine.LayoutVisibleRows(
             context.Snapshot,
             layoutState.Rows,
             layoutState.Heights,
@@ -795,7 +796,7 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
         }
 
         return context.ShowLineNumbers
-            ? (row.LogicalLine + 1).ToString()
+            ? (row.LogicalLine + 1).ToString(CultureInfo.InvariantCulture)
             : null;
     }
 
@@ -913,26 +914,26 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
     private TextProjection TryBuildIncrementalProjection(
         AzunyanEditorRenderContext context,
         ProjectedTextLayoutState? cached,
-        IReadOnlyList<string> collapsedFoldIds,
+        string[] collapsedFoldIds,
         IReadOnlyList<InlineAdornment>? inlays,
-        IReadOnlyList<FoldRange> folds)
+        FoldRange[] folds)
     {
         if (cached is not null
             && _pendingDocumentChange is { } change
             && ReferenceEquals(change.OldSnapshot, cached.Snapshot)
             && ReferenceEquals(change.NewSnapshot, context.Snapshot)
-            && collapsedFoldIds.Count == 0
-            && folds.Count == 0
+            && collapsedFoldIds.Length == 0
+            && folds.Length == 0
             && (inlays is null || inlays.Count == 0))
         {
-            return new TextProjectionBuilder().BuildIncremental(
+            return TextProjectionBuilder.BuildIncremental(
                 change.OldSnapshot,
                 context.Snapshot,
                 cached.Rows.Projection,
                 change.Change);
         }
 
-        return new TextProjectionBuilder().Build(
+        return TextProjectionBuilder.Build(
             context.Snapshot,
             folds,
             inlays ?? Array.Empty<InlineAdornment>());
@@ -949,7 +950,7 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
         TextProjection projection,
         IReadOnlyDictionary<int, IReadOnlyList<int>> measuredBreaks)
     {
-        var rows = new VisualRowMapBuilder().Build(
+        var rows = VisualRowMapBuilder.Build(
             projection,
             blocks ?? Array.Empty<BlockAdornment>(),
             wrapColumns,
@@ -1250,7 +1251,7 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
         public IReadOnlyList<ViewportRowLayout> Layouts { get; }
     }
 
-    private IReadOnlyDictionary<int, IReadOnlyList<int>> MeasureVisibleWrapBreaks(
+    private Dictionary<int, IReadOnlyList<int>> MeasureVisibleWrapBreaks(
         AzunyanEditorRenderContext context,
         ProjectedTextLayoutState layout,
         double wrapWidth)

@@ -8,15 +8,8 @@ public readonly record struct TextRange
 {
     public TextRange(int start, int length)
     {
-        if (start < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(start));
-        }
-
-        if (length < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(length));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegative(start);
+        ArgumentOutOfRangeException.ThrowIfNegative(length);
 
         _ = checked(start + length);
         Start = start;

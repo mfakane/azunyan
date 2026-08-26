@@ -8,10 +8,7 @@ public readonly record struct DocumentPosition
 {
     public DocumentPosition(int offset)
     {
-        if (offset < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(offset));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
 
         Offset = offset;
     }
@@ -48,15 +45,8 @@ public readonly record struct VisualPosition
 {
     public VisualPosition(int visualLine, int caretStop)
     {
-        if (visualLine < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(visualLine));
-        }
-
-        if (caretStop < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(caretStop));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegative(visualLine);
+        ArgumentOutOfRangeException.ThrowIfNegative(caretStop);
 
         VisualLine = visualLine;
         CaretStop = caretStop;
@@ -397,7 +387,7 @@ public sealed class ProjectedLine
             }
         }
 
-        return Inlines.LastOrDefault() is FoldPlaceholder lastFold
+        return Inlines[^1] is FoldPlaceholder lastFold
             ? DocumentAnchor.After(lastFold.HiddenSource.End)
             : DocumentAnchor.After(SourceRange.End);
     }
@@ -511,7 +501,7 @@ public sealed class TextProjection
 
 public sealed class TextProjectionBuilder
 {
-    public TextProjection Build(
+    public static TextProjection Build(
         TextSnapshot snapshot,
         IEnumerable<FoldRange>? folds = null,
         IEnumerable<InlineAdornment>? inlays = null)
@@ -522,7 +512,7 @@ public sealed class TextProjectionBuilder
         var lines = new List<ProjectedLine>();
         var logicalToVisual = Enumerable.Repeat(-1, snapshot.Lines.LineCount).ToArray();
 
-        if (normalizedFolds.Count == 0 && normalizedInlays.Count == 0)
+        if (normalizedFolds.Count == 0 && normalizedInlays.Length == 0)
         {
             BuildPlainProjection(snapshot, lines, logicalToVisual);
             return new TextProjection(snapshot, lines, normalizedFolds, logicalToVisual);
@@ -550,7 +540,7 @@ public sealed class TextProjectionBuilder
     /// intentionally delegated to <see cref="Build"/> because their anchors
     /// can change across a wider provider result than the text edit itself.
     /// </summary>
-    public TextProjection BuildIncremental(
+    public static TextProjection BuildIncremental(
         TextSnapshot oldSnapshot,
         TextSnapshot snapshot,
         TextProjection previous,
@@ -636,8 +626,8 @@ public sealed class TextProjectionBuilder
 
     private static void BuildPlainProjection(
         TextSnapshot snapshot,
-        ICollection<ProjectedLine> lines,
-        IList<int> logicalToVisual)
+        List<ProjectedLine> lines,
+        int[] logicalToVisual)
     {
         for (var logicalLine = 0; logicalLine < snapshot.Lines.LineCount; logicalLine++)
         {
@@ -650,7 +640,7 @@ public sealed class TextProjectionBuilder
         }
     }
 
-    private static IReadOnlyList<ProjectionInline>? BuildLineInlines(
+    private static List<ProjectionInline>? BuildLineInlines(
         TextRange line,
         IReadOnlyList<FoldRange> folds,
         IReadOnlyList<InlineAdornment> inlays)
@@ -694,7 +684,7 @@ public sealed class TextProjectionBuilder
     }
 
     private static void AppendText(
-        ICollection<ProjectionInline> result,
+        List<ProjectionInline> result,
         int start,
         int end,
         IReadOnlyList<InlineAdornment> inlays,
@@ -729,7 +719,7 @@ public sealed class TextProjectionBuilder
         }
     }
 
-    private static IReadOnlyList<FoldRange> NormalizeFolds(
+    private static List<FoldRange> NormalizeFolds(
         TextSnapshot snapshot,
         IEnumerable<FoldRange> candidates)
     {
@@ -752,7 +742,7 @@ public sealed class TextProjectionBuilder
         return accepted;
     }
 
-    private static IReadOnlyList<InlineAdornment> NormalizeInlays(
+    private static InlineAdornment[] NormalizeInlays(
         TextSnapshot snapshot,
         IEnumerable<InlineAdornment> candidates) => candidates
         .Where(inlay => inlay.Anchor.Position.Offset <= snapshot.Length)

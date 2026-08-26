@@ -215,10 +215,10 @@ public static class UnicodeText
         return TextRange.FromBounds(start, end);
     }
 
-    private static int FindElementAt(IReadOnlyList<int> starts, int position)
+    private static int FindElementAt(int[] starts, int position)
     {
         var low = 0;
-        var high = starts.Count - 1;
+        var high = starts.Length - 1;
         while (low <= high)
         {
             var middle = low + ((high - low) / 2);

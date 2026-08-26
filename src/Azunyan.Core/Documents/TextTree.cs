@@ -63,10 +63,7 @@ internal sealed class TextTree
     public char GetCharAt(int position)
     {
         ValidatePosition(position);
-        if (position == Length)
-        {
-            throw new ArgumentOutOfRangeException(nameof(position));
-        }
+        ArgumentOutOfRangeException.ThrowIfEqual(position, Length);
 
         var node = _root;
         var offset = position;

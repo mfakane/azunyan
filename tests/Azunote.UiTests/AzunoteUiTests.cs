@@ -23,8 +23,8 @@ public sealed class AzunoteUiTests : IClassFixture<AzunoteUiFixture>
     public void Projected_editor_exposes_snapshot_text_and_visible_ranges()
     {
         var editor = _fixture.Editor;
-        var textPattern = _fixture.WaitForTextPattern(editor);
-        var text = _fixture.WaitForDocumentText(
+        var textPattern = AzunoteUiFixture.WaitForTextPattern(editor);
+        var text = AzunoteUiFixture.WaitForDocumentText(
             textPattern,
             expected => expected.Contains("日本語", StringComparison.Ordinal));
 
@@ -58,13 +58,13 @@ public sealed class AzunoteUiTests : IClassFixture<AzunoteUiFixture>
     public void Text_range_can_find_and_select_projected_document_text()
     {
         var editor = _fixture.Editor;
-        var textPattern = _fixture.WaitForTextPattern(editor);
+        var textPattern = AzunoteUiFixture.WaitForTextPattern(editor);
         var documentRange = textPattern.DocumentRange;
         var targetRange = documentRange.FindText("日本語", false, false);
         Assert.NotNull(targetRange);
 
         targetRange!.Select();
-        var selectedText = _fixture.WaitForSelectionText(
+        var selectedText = AzunoteUiFixture.WaitForSelectionText(
             textPattern,
             expected => string.Equals(expected, "日本語", StringComparison.Ordinal));
         Assert.Equal("日本語", selectedText);
@@ -90,7 +90,7 @@ public sealed class AzunoteUiFixture : IDisposable
         }
     }
 
-    public TextPattern WaitForTextPattern(AutomationElement editor)
+    public static TextPattern WaitForTextPattern(AutomationElement editor)
     {
         return WaitFor(
             () => editor.TryGetCurrentPattern(TextPattern.Pattern, out var pattern)
@@ -100,7 +100,7 @@ public sealed class AzunoteUiFixture : IDisposable
             "The projected editor did not expose TextPattern.");
     }
 
-    public string WaitForDocumentText(
+    public static string WaitForDocumentText(
         TextPattern textPattern,
         Func<string, bool> predicate)
     {
@@ -120,7 +120,7 @@ public sealed class AzunoteUiFixture : IDisposable
             "The projected document did not reach the expected text.");
     }
 
-    public string WaitForSelectionText(
+    public static string WaitForSelectionText(
         TextPattern textPattern,
         Func<string, bool> predicate)
     {

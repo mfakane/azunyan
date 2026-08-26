@@ -17,10 +17,7 @@ public sealed class Document
     public Document(string text = "", int undoLimit = 1000)
     {
         ArgumentNullException.ThrowIfNull(text);
-        if (undoLimit < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(undoLimit));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegative(undoLimit);
 
         _undoLimit = undoLimit;
         _tree = new TextTree(text);

@@ -134,7 +134,7 @@ public sealed partial record ExternalToolContext
 
     public int ColumnNumber { get; }
 
-    public string UserHome
+    public static string UserHome
     {
         get
         {
@@ -205,7 +205,7 @@ public sealed record ExternalToolResult(
 /// </summary>
 public sealed class ExternalToolRunner
 {
-    public async Task<ExternalToolResult> RunAsync(
+    public static async Task<ExternalToolResult> RunAsync(
         ExternalToolDefinition definition,
         ExternalToolContext context,
         CancellationToken cancellationToken = default)
@@ -329,7 +329,7 @@ public static class ExternalToolOutputInterpreter
                 new ExternalToolOutput(result.StandardOutput, false, null),
             ExternalToolOutputMode.ReloadFile =>
                 new ExternalToolOutput(null, true, null),
-            _ => throw new ArgumentOutOfRangeException(nameof(definition.OutputMode))
+            _ => throw new ArgumentOutOfRangeException(nameof(definition), "Unsupported output mode.")
         };
     }
 }

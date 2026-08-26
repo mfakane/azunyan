@@ -15,7 +15,7 @@ public static class AzunoteLanguageDefinition
 /// </summary>
 public sealed class AzunoteSyntaxProvider : ISyntaxProvider
 {
-    private static readonly ISyntaxProvider Provider = BuiltInSyntaxLanguages.Toml;
+    private static readonly SyntaxLanguageDefinition Provider = BuiltInSyntaxLanguages.Toml;
 
     public ValueTask<IReadOnlyList<SyntaxSpan>> GetSyntaxAsync(
         EditorProviderContext context,
@@ -49,7 +49,7 @@ public sealed class AzunoteCompletionProvider : ICompletionProvider
 /// </summary>
 public sealed class AzunoteTooltipProvider : ITooltipProvider
 {
-    private static readonly IReadOnlyDictionary<string, string> Descriptions =
+    private static readonly Dictionary<string, string> Descriptions =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["TODO"] = "A task or follow-up item.",

@@ -110,7 +110,7 @@ public static class AzunoteCommandLine
                 continue;
             }
 
-            if (positionalsAllowed && argument.StartsWith("-", StringComparison.Ordinal))
+            if (positionalsAllowed && argument.StartsWith('-'))
             {
                 throw new CommandLineParseException($"Unknown option: {argument}");
             }

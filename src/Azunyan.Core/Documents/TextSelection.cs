@@ -9,15 +9,8 @@ public readonly record struct TextSelection
 {
     public TextSelection(int anchor, int active)
     {
-        if (anchor < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(anchor));
-        }
-
-        if (active < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(active));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegative(anchor);
+        ArgumentOutOfRangeException.ThrowIfNegative(active);
 
         Anchor = anchor;
         Active = active;
@@ -43,7 +36,7 @@ public readonly record struct TextSelection
 
     public static TextSelection Caret(int position) => new(position, position);
 
-    public TextSelection CollapseTo(int position) => Caret(position);
+    public static TextSelection CollapseTo(int position) => Caret(position);
 
     public override string ToString() => IsEmpty
         ? $"Caret({CaretPosition})"
@@ -58,10 +51,7 @@ public readonly record struct TextCaret
 {
     public TextCaret(int position)
     {
-        if (position < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(position));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegative(position);
 
         Position = position;
     }
@@ -76,15 +66,8 @@ public readonly record struct LineColumn
 {
     public LineColumn(int line, int column)
     {
-        if (line < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(line));
-        }
-
-        if (column < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(column));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegative(line);
+        ArgumentOutOfRangeException.ThrowIfNegative(column);
 
         Line = line;
         Column = column;

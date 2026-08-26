@@ -54,7 +54,7 @@ public sealed class ViewportRowLayout
 /// </summary>
 public sealed class ViewportLayoutEngine
 {
-    public IReadOnlyList<ViewportRowLayout> LayoutVisibleRows(
+    public static IReadOnlyList<ViewportRowLayout> LayoutVisibleRows(
         TextSnapshot snapshot,
         VisualRowMap rowMap,
         VisualLineHeightIndex heights,
@@ -124,7 +124,7 @@ public sealed class ViewportLayoutEngine
             : full.Slice(row.TextStartColumn, row.TextLength);
     }
 
-    public IReadOnlyList<UnwrappedLineLayout> LayoutVisible(
+    public static IReadOnlyList<UnwrappedLineLayout> LayoutVisible(
         TextSnapshot snapshot,
         TextProjection projection,
         VisualLineHeightIndex heights,

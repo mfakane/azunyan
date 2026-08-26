@@ -86,7 +86,7 @@ public sealed class CompositeSyntaxProviderTests
     }
 
     private static async Task<IReadOnlyList<SyntaxSpan>> GetAsync(
-        ISyntaxProvider provider,
+        CompositeSyntaxProvider provider,
         string text,
         CancellationToken cancellationToken = default)
     {
