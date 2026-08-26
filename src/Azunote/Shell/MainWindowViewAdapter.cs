@@ -276,44 +276,40 @@ internal sealed class MainWindowViewAdapter :
         ArgumentNullException.ThrowIfNull(getState);
         ArgumentNullException.ThrowIfNull(onSelected);
         _externalToolsMenu.Items.Clear();
-        if (nodes.Count == 0)
+        var visibleEntries = ExternalToolMenuBuilder.Build(nodes, getState);
+        if (visibleEntries.Count == 0)
         {
             _externalToolsMenu.Items.Add(new MenuFlyoutItem
             {
-                Text = "No tools configured",
+                Text = "No tools available",
                 IsEnabled = false
             });
             return;
         }
 
-        AddExternalToolMenuItems(_externalToolsMenu, nodes, getState, onSelected);
+        AddExternalToolMenuItems(_externalToolsMenu, visibleEntries, onSelected);
     }
 
     public void DisposeEditor() => _editor.Dispose();
 
     private static void AddExternalToolMenuItems(
         MenuFlyoutSubItem parent,
-        IReadOnlyList<ExternalToolMenuNode> nodes,
-        Func<ExternalToolSettings, ExternalToolMenuState> getState,
+        IReadOnlyList<ExternalToolMenuEntry> nodes,
         Func<ExternalToolSettings, Task> onSelected)
     {
         foreach (var node in nodes)
         {
             if (node.Tool is { } tool)
             {
-                var state = getState(tool);
-                if (!state.IsVisible)
-                {
-                    continue;
-                }
-
                 var menuItem = new MenuFlyoutItem
                 {
                     Text = node.Name,
-                    IsEnabled = state.IsEnabled
+                    IsEnabled = node.State!.IsEnabled
                 };
-                AutomationProperties.SetHelpText(menuItem, state.DisabledReason ?? string.Empty);
-                if (state.DisabledReason is { } reason)
+                AutomationProperties.SetHelpText(
+                    menuItem,
+                    node.State.DisabledReason ?? string.Empty);
+                if (node.State.DisabledReason is { } reason)
                 {
                     ToolTipService.SetToolTip(menuItem, reason);
                 }
@@ -332,11 +328,8 @@ internal sealed class MainWindowViewAdapter :
             }
 
             var subMenu = new MenuFlyoutSubItem { Text = node.Name };
-            AddExternalToolMenuItems(subMenu, node.Children, getState, onSelected);
-            if (subMenu.Items.Count > 0)
-            {
-                parent.Items.Add(subMenu);
-            }
+            AddExternalToolMenuItems(subMenu, node.Children, onSelected);
+            parent.Items.Add(subMenu);
         }
     }
 

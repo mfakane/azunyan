@@ -81,7 +81,7 @@
             </MenuBarItem>
             <MenuBarItem Title="Tools">
                 <MenuFlyoutSubItem x:Name="ConfiguredExternalToolsMenuItem" Text="External Tools">
-                    <MenuFlyoutItem Text="No tools configured" IsEnabled="False" />
+                    <MenuFlyoutItem Text="No tools available" IsEnabled="False" />
                 </MenuFlyoutSubItem>
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="Run External Tool..." Click="RunExternalToolMenuItem_Click" />
