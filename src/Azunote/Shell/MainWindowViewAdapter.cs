@@ -36,6 +36,7 @@ internal sealed class MainWindowViewAdapter :
     private readonly TextBlock _lineEndingStatus;
     private readonly TextBlock _indentationStatus;
     private readonly TextBlock _filePathStatus;
+    private readonly List<KeyboardAccelerator> _externalToolAccelerators = [];
     private readonly Dictionary<string, ToggleMenuFlyoutItem> _languageModeItems =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -275,6 +276,7 @@ internal sealed class MainWindowViewAdapter :
         ArgumentNullException.ThrowIfNull(nodes);
         ArgumentNullException.ThrowIfNull(getState);
         ArgumentNullException.ThrowIfNull(onSelected);
+        ClearExternalToolAccelerators();
         _externalToolsMenu.Items.Clear();
         var visibleEntries = ExternalToolMenuBuilder.Build(nodes, getState);
         if (visibleEntries.Count == 0)
@@ -292,7 +294,17 @@ internal sealed class MainWindowViewAdapter :
 
     public void DisposeEditor() => _editor.Dispose();
 
-    private static void AddExternalToolMenuItems(
+    private void ClearExternalToolAccelerators()
+    {
+        foreach (var accelerator in _externalToolAccelerators)
+        {
+            _rootGrid.KeyboardAccelerators.Remove(accelerator);
+        }
+
+        _externalToolAccelerators.Clear();
+    }
+
+    private void AddExternalToolMenuItems(
         MenuFlyoutSubItem parent,
         IReadOnlyList<ExternalToolMenuEntry> nodes,
         Func<ExternalToolSettings, Task> onSelected)
@@ -316,11 +328,27 @@ internal sealed class MainWindowViewAdapter :
                 menuItem.Click += (_, _) => _ = onSelected(tool);
                 if (ExternalToolShortcut.TryParse(tool.Shortcut, out var shortcut))
                 {
-                    menuItem.KeyboardAccelerators.Add(new KeyboardAccelerator
+                    menuItem.KeyboardAcceleratorTextOverride = tool.Shortcut;
+                    if (node.State.IsEnabled)
                     {
-                        Key = shortcut!.Key,
-                        Modifiers = shortcut.Modifiers
-                    });
+                        // MenuFlyoutSubItem descendants created at runtime are
+                        // only registered for keyboard accelerators while the
+                        // submenu is open. Register the shortcut on the
+                        // always-loaded root instead; the menu item only keeps
+                        // the display text for the same shortcut.
+                        var accelerator = new KeyboardAccelerator
+                        {
+                            Key = shortcut!.Key,
+                            Modifiers = shortcut.Modifiers
+                        };
+                        accelerator.Invoked += (sender, args) =>
+                        {
+                            args.Handled = true;
+                            _ = onSelected(tool);
+                        };
+                        _rootGrid.KeyboardAccelerators.Add(accelerator);
+                        _externalToolAccelerators.Add(accelerator);
+                    }
                 }
 
                 parent.Items.Add(menuItem);
