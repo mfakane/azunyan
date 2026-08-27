@@ -1,18 +1,59 @@
+using Microsoft.UI.Dispatching;
+
 namespace Azunote;
 
 internal sealed class ApplicationCoordinator : IDisposable
 {
     private readonly WindowRegistry<WindowRegistration> _windows = new();
+    private DispatcherQueue? _dispatcherQueue;
     private bool _disposed;
 
     public MainWindow? Window => _windows.Active?.Window;
 
-    public void Launch(AzunoteCommandLineOptions options)
+    public void Launch(IReadOnlyList<string> arguments)
     {
-        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(arguments);
         ObjectDisposedException.ThrowIf(_disposed, nameof(ApplicationCoordinator));
 
-        var runtime = CreateWindow().Runtime;
+        var registration = CreateWindowRegistration();
+        _dispatcherQueue = registration.Window.DispatcherQueue;
+        _ = ProcessInitialCommandLineAsync(registration, arguments);
+    }
+
+    internal Task HandleForwardedCommandLineAsync(SingleInstanceCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ObjectDisposedException.ThrowIf(_disposed, nameof(ApplicationCoordinator));
+
+        var dispatcher = _dispatcherQueue
+            ?? throw new InvalidOperationException("The application has not launched.");
+        var completion = new TaskCompletionSource<object?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        if (dispatcher.HasThreadAccess)
+        {
+            _ = ProcessForwardedCommandLineAsync(command, completion);
+        }
+        else if (!dispatcher.TryEnqueue(() =>
+            _ = ProcessForwardedCommandLineAsync(command, completion)))
+        {
+            completion.SetException(
+                new InvalidOperationException("The Azunote UI dispatcher is unavailable."));
+        }
+
+        return completion.Task;
+    }
+
+    internal void ActivateActiveWindow()
+    {
+        _windows.Active?.Window.ActivateWindow();
+    }
+
+    private static Task ProcessInitialCommandLineAsync(
+        WindowRegistration registration,
+        IReadOnlyList<string> arguments)
+    {
+        var options = ParseCommandLine(arguments);
+        var runtime = registration.Window.Runtime;
 
         if (options.ReadStandardInput)
         {
@@ -29,18 +70,61 @@ internal sealed class ApplicationCoordinator : IDisposable
         {
             _ = runtime.ShowCommandLineHelpAsync();
         }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task ProcessForwardedCommandLineAsync(
+        SingleInstanceCommand command,
+        TaskCompletionSource<object?> completion)
+    {
+        try
+        {
+            var options = ParseCommandLine(command.Arguments);
+            ActivateActiveWindow();
+
+            if (options.ReadStandardInput)
+            {
+                var registration = CreateWindowRegistration();
+                await registration.Window.Runtime.OpenStartupTextAsync(
+                    command.StandardInput ?? string.Empty,
+                    options.Line,
+                    options.Column);
+                await WaitForCloseIfRequestedAsync(registration, options);
+            }
+            else if (!string.IsNullOrWhiteSpace(options.FilePath))
+            {
+                var registration = CreateWindowRegistration();
+                var path = ResolvePath(options.FilePath, command.WorkingDirectory);
+                await registration.Window.Runtime.OpenStartupDocumentAsync(
+                    path,
+                    options.Line,
+                    options.Column);
+                await WaitForCloseIfRequestedAsync(registration, options);
+            }
+            else if (options.ShowHelp && _windows.Active is { } active)
+            {
+                await active.Window.Runtime.ShowCommandLineHelpAsync();
+            }
+
+            completion.TrySetResult(null);
+        }
+        catch (Exception exception)
+        {
+            completion.TrySetException(exception);
+        }
     }
 
     internal Task CreateNewDocumentWindowAsync()
     {
-        CreateWindow();
+        CreateWindowRegistration();
         return Task.CompletedTask;
     }
 
     internal async Task OpenFileInNewWindowAsync(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        var window = CreateWindow();
+        var window = CreateWindowRegistration().Window;
         await window.Runtime.OpenStartupDocumentAsync(path);
     }
 
@@ -94,6 +178,7 @@ internal sealed class ApplicationCoordinator : IDisposable
         }
 
         _windows.Unregister(registration);
+        registration.MarkClosed();
         RefreshWindowMenus();
     }
 
@@ -137,21 +222,23 @@ internal sealed class ApplicationCoordinator : IDisposable
         foreach (var registration in _windows.Windows.ToArray())
         {
             registration.Window.Dispose();
+            registration.MarkClosed();
             _windows.Unregister(registration);
         }
     }
 
-    private MainWindow CreateWindow()
+    private WindowRegistration CreateWindowRegistration()
     {
         ObjectDisposedException.ThrowIf(_disposed, nameof(ApplicationCoordinator));
 
         var window = new MainWindow(this);
-        _windows.Register(new WindowRegistration(window));
+        var registration = new WindowRegistration(window);
+        _windows.Register(registration);
         window.Activate();
         window.FocusEditor();
         _ = window.Runtime.InitializeSettingsAsync();
         RefreshWindowMenus();
-        return window;
+        return registration;
     }
 
     private void ActivateWindowById(string id)
@@ -164,6 +251,39 @@ internal sealed class ApplicationCoordinator : IDisposable
     private WindowRegistration? FindRegistration(MainWindow window) =>
         _windows.Windows.FirstOrDefault(
             registration => ReferenceEquals(registration.Window, window));
+
+    private static AzunoteCommandLineOptions ParseCommandLine(
+        IReadOnlyList<string> arguments)
+    {
+        try
+        {
+            return AzunoteCommandLine.Parse(arguments);
+        }
+        catch (CommandLineParseException exception)
+        {
+            ErrorReporter.LogMessage("Invalid command line", exception.Message);
+            return new AzunoteCommandLineOptions { ShowHelp = true };
+        }
+    }
+
+    private static string ResolvePath(string path, string workingDirectory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        ArgumentException.ThrowIfNullOrWhiteSpace(workingDirectory);
+        return Path.IsPathRooted(path)
+            ? path
+            : Path.GetFullPath(path, workingDirectory);
+    }
+
+    private static async Task WaitForCloseIfRequestedAsync(
+        WindowRegistration registration,
+        AzunoteCommandLineOptions options)
+    {
+        if (options.WaitForExit)
+        {
+            await registration.Closed.ConfigureAwait(true);
+        }
+    }
 
     private static async Task OpenStandardInputAsync(
         MainWindowRuntime runtime,
@@ -191,5 +311,12 @@ internal sealed class ApplicationCoordinator : IDisposable
         public string Id { get; }
 
         public MainWindow Window { get; }
+
+        public Task Closed => _closed.Task;
+
+        public void MarkClosed() => _closed.TrySetResult(null);
+
+        private readonly TaskCompletionSource<object?> _closed = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
     }
 }

@@ -95,9 +95,11 @@ Get-Content input.md | Azunote.exe --stdin
 Azunote.exe +12:4 path\to\file.txt
 ```
 
-Line and column are one-based and are clamped to the opened document. `--wait`
-is accepted as the external-editor wait contract; because Azunote is a desktop
-application, its process remains alive until the editor window closes.
+Line and column are one-based and are clamped to the opened document. Azunote
+uses one process per user session: launching `Azunote.exe` again activates the
+running instance and forwards the command line to it. A forwarded path is
+opened in a new document window. `--wait` keeps the launching process blocked
+until that document window is closed, including any save confirmation.
 
 External commands are available from Tools > Run External Tool... and through
 the `ExternalToolRunner` API. Commands run without a shell and can receive

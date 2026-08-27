@@ -9,6 +9,7 @@ public partial class App : Application, IDisposable
     private const uint MessageBoxIconError = 0x00000010;
     private static int _unhandledDialogShown;
     private readonly ApplicationCoordinator _application = new();
+    private readonly SingleInstanceHost _singleInstance = new();
 
     public App()
     {
@@ -20,18 +21,36 @@ public partial class App : Application, IDisposable
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
-        AzunoteCommandLineOptions options;
-        try
+        var arguments = Environment.GetCommandLineArgs().Skip(1).ToArray();
+        if (!_singleInstance.TryAcquire())
         {
-            options = AzunoteCommandLine.Parse(Environment.GetCommandLineArgs().Skip(1));
-        }
-        catch (CommandLineParseException exception)
-        {
-            options = new AzunoteCommandLineOptions { ShowHelp = true };
-            ErrorReporter.LogMessage("Invalid command line", exception.Message);
+            var exitCode = 0;
+            try
+            {
+                var standardInput = ReadStandardInputForForwarding(arguments);
+                _singleInstance
+                    .ForwardAsync(arguments, standardInput)
+                    .GetAwaiter()
+                    .GetResult();
+            }
+            catch (Exception exception)
+            {
+                exitCode = 1;
+                var logPath = ErrorReporter.LogException(
+                    "Could not contact the running Azunote instance",
+                    exception);
+                ShowFallbackErrorDialog(
+                    "Azunote could not be opened",
+                    $"The running Azunote instance could not process the command.{Environment.NewLine}"
+                    + $"{Environment.NewLine}Details were written to:{Environment.NewLine}{logPath}");
+            }
+
+            Environment.Exit(exitCode);
+            return;
         }
 
-        _application.Launch(options);
+        _application.Launch(arguments);
+        _singleInstance.Start(_application.HandleForwardedCommandLineAsync);
     }
 
     private void OnUnhandledException(
@@ -95,8 +114,23 @@ public partial class App : Application, IDisposable
 
     public void Dispose()
     {
+        _singleInstance.Dispose();
         _application.Dispose();
         GC.SuppressFinalize(this);
+    }
+
+    private static string? ReadStandardInputForForwarding(IReadOnlyList<string> arguments)
+    {
+        try
+        {
+            var options = AzunoteCommandLine.Parse(arguments);
+            return options.ReadStandardInput ? Console.In.ReadToEnd() : null;
+        }
+        catch (CommandLineParseException)
+        {
+            // Let the primary instance parse and report the original arguments.
+            return null;
+        }
     }
 
     private static void ShowFallbackErrorDialog(string title, string message)
