@@ -180,6 +180,8 @@ internal sealed class MainWindowRuntime : IDisposable
         _status.Refresh();
     }
 
+    public void ShowIndentationSizeMenu() => _view.ShowIndentationSizeMenu();
+
     public void ToggleStatusBar() => _editorCommands.ToggleStatusBar();
 
     public void ToggleAlwaysOnTop() => _view.ToggleAlwaysOnTop();

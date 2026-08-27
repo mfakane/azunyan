@@ -7,6 +7,19 @@
     <Grid
         x:Name="RootGrid"
         KeyboardAcceleratorPlacementMode="Hidden">
+        <Grid.Resources>
+            <MenuFlyout x:Key="StatusTabDisplaySizeMenu">
+                <ToggleMenuFlyoutItem Text="2" Tag="2" Click="TabDisplaySizeMenuItem_Click" />
+                <ToggleMenuFlyoutItem Text="4" Tag="4" IsChecked="True" Click="TabDisplaySizeMenuItem_Click" />
+                <ToggleMenuFlyoutItem Text="8" Tag="8" Click="TabDisplaySizeMenuItem_Click" />
+            </MenuFlyout>
+            <MenuFlyout x:Key="StatusIndentSizeMenu">
+                <ToggleMenuFlyoutItem Text="Auto" Tag="auto" IsChecked="True" Click="IndentSizeMenuItem_Click" />
+                <ToggleMenuFlyoutItem Text="2" Tag="2" Click="IndentSizeMenuItem_Click" />
+                <ToggleMenuFlyoutItem Text="4" Tag="4" Click="IndentSizeMenuItem_Click" />
+                <ToggleMenuFlyoutItem Text="8" Tag="8" Click="IndentSizeMenuItem_Click" />
+            </MenuFlyout>
+        </Grid.Resources>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -176,7 +189,8 @@
                 <TextBlock x:Name="PositionStatus" Grid.Column="0" Text="Ln 1, Col 1" />
                 <TextBlock x:Name="EncodingStatus" Grid.Column="1" Text="UTF-8" />
                 <TextBlock x:Name="LineEndingStatus" Grid.Column="2" Text="LF" />
-                <TextBlock x:Name="IndentationStatus" Grid.Column="3" Text="Spaces: 2" />
+                <TextBlock x:Name="IndentationStatus" Grid.Column="3" Text="Spaces: 2"
+                           Tapped="IndentationStatus_Tapped" />
                 <TextBlock x:Name="FilePathStatus" Grid.Column="4" HorizontalAlignment="Right" Text="Untitled" TextTrimming="CharacterEllipsis" />
             </Grid>
         </Border>

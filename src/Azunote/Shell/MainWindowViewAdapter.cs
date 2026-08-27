@@ -34,7 +34,9 @@ internal sealed class MainWindowViewAdapter :
     private readonly MenuBarItem _toolsMenu;
     private readonly MenuFlyoutItem _wordWrapMenuItem;
     private readonly IReadOnlyDictionary<int, ToggleMenuFlyoutItem> _tabDisplaySizeMenuItems;
+    private readonly MenuFlyout _statusTabDisplaySizeMenu;
     private readonly IReadOnlyList<(int? Size, ToggleMenuFlyoutItem Item)> _indentSizeMenuItems;
+    private readonly MenuFlyout _statusIndentSizeMenu;
     private readonly IReadOnlyList<(IndentationInputMode Mode, ToggleMenuFlyoutItem Item)> _indentationInputModeMenuItems;
     private readonly Border _statusBarPanel;
     private readonly TextBlock _positionStatus;
@@ -65,10 +67,12 @@ internal sealed class MainWindowViewAdapter :
         ToggleMenuFlyoutItem tabDisplaySize2MenuItem,
         ToggleMenuFlyoutItem tabDisplaySize4MenuItem,
         ToggleMenuFlyoutItem tabDisplaySize8MenuItem,
+        MenuFlyout statusTabDisplaySizeMenu,
         ToggleMenuFlyoutItem indentSizeAutoMenuItem,
         ToggleMenuFlyoutItem indentSize2MenuItem,
         ToggleMenuFlyoutItem indentSize4MenuItem,
         ToggleMenuFlyoutItem indentSize8MenuItem,
+        MenuFlyout statusIndentSizeMenu,
         ToggleMenuFlyoutItem indentationInputModeAutoMenuItem,
         ToggleMenuFlyoutItem indentationInputModeTabMenuItem,
         ToggleMenuFlyoutItem indentationInputModeSpacesMenuItem,
@@ -98,6 +102,8 @@ internal sealed class MainWindowViewAdapter :
             [4] = tabDisplaySize4MenuItem ?? throw new ArgumentNullException(nameof(tabDisplaySize4MenuItem)),
             [8] = tabDisplaySize8MenuItem ?? throw new ArgumentNullException(nameof(tabDisplaySize8MenuItem))
         };
+        _statusTabDisplaySizeMenu = statusTabDisplaySizeMenu
+            ?? throw new ArgumentNullException(nameof(statusTabDisplaySizeMenu));
         _indentSizeMenuItems =
         [
             (null, indentSizeAutoMenuItem ?? throw new ArgumentNullException(nameof(indentSizeAutoMenuItem))),
@@ -105,6 +111,8 @@ internal sealed class MainWindowViewAdapter :
             (4, indentSize4MenuItem ?? throw new ArgumentNullException(nameof(indentSize4MenuItem))),
             (8, indentSize8MenuItem ?? throw new ArgumentNullException(nameof(indentSize8MenuItem)))
         ];
+        _statusIndentSizeMenu = statusIndentSizeMenu
+            ?? throw new ArgumentNullException(nameof(statusIndentSizeMenu));
         _indentationInputModeMenuItems =
         [
             (IndentationInputMode.Auto, indentationInputModeAutoMenuItem ?? throw new ArgumentNullException(nameof(indentationInputModeAutoMenuItem))),
@@ -331,6 +339,13 @@ internal sealed class MainWindowViewAdapter :
         {
             item.Value.IsChecked = item.Key == size;
         }
+
+        foreach (var item in GetToggleMenuItems(_statusTabDisplaySizeMenu))
+        {
+            item.IsChecked = item.Tag is string tag
+                && int.TryParse(tag, out var itemSize)
+                && itemSize == size;
+        }
     }
 
     public void SetIndentSizeLabel(int? size)
@@ -338,6 +353,14 @@ internal sealed class MainWindowViewAdapter :
         foreach (var item in _indentSizeMenuItems)
         {
             item.Item.IsChecked = item.Size == size;
+        }
+
+        foreach (var item in GetToggleMenuItems(_statusIndentSizeMenu))
+        {
+            item.IsChecked = item.Tag is string tag
+                && (string.Equals(tag, "auto", StringComparison.Ordinal)
+                    ? size is null
+                    : int.TryParse(tag, out var itemSize) && itemSize == size);
         }
     }
 
@@ -347,6 +370,20 @@ internal sealed class MainWindowViewAdapter :
         {
             item.Item.IsChecked = item.Mode == mode;
         }
+    }
+
+    public void ShowIndentationSizeMenu()
+    {
+        var settings = TextEditorCommands.GetIndentationSettings(
+            _editor.Snapshot,
+            _editorBuffer.CaretPosition,
+            _editor.IndentSize,
+            _editor.TabDisplaySize,
+            _editor.IndentationInputMode);
+        var menu = settings.Kind == IndentationKind.Tabs
+            ? _statusTabDisplaySizeMenu
+            : _statusIndentSizeMenu;
+        menu.ShowAt(_indentationStatus);
     }
 
     public void Show(bool replace)
@@ -487,6 +524,17 @@ internal sealed class MainWindowViewAdapter :
         }
 
         _windowMenuItems.Clear();
+    }
+
+    private static IEnumerable<ToggleMenuFlyoutItem> GetToggleMenuItems(MenuFlyout menu)
+    {
+        foreach (var item in menu.Items)
+        {
+            if (item is ToggleMenuFlyoutItem toggleItem)
+            {
+                yield return toggleItem;
+            }
+        }
     }
 
     private List<MenuFlyoutItemBase> CreateExternalToolMenuItems(

@@ -27,6 +27,10 @@ public sealed partial class MainWindow : Window, IDisposable
     {
         _application = application ?? throw new ArgumentNullException(nameof(application));
         InitializeComponent();
+        var statusTabDisplaySizeMenu = RootGrid.Resources["StatusTabDisplaySizeMenu"] as MenuFlyout
+            ?? throw new InvalidOperationException("The status tab display size menu is missing.");
+        var statusIndentSizeMenu = RootGrid.Resources["StatusIndentSizeMenu"] as MenuFlyout
+            ?? throw new InvalidOperationException("The status indent size menu is missing.");
         _view = new MainWindowViewAdapter(
             this,
             Editor,
@@ -43,10 +47,12 @@ public sealed partial class MainWindow : Window, IDisposable
             TabDisplaySize2MenuItem,
             TabDisplaySize4MenuItem,
             TabDisplaySize8MenuItem,
+            statusTabDisplaySizeMenu,
             IndentSizeAutoMenuItem,
             IndentSize2MenuItem,
             IndentSize4MenuItem,
             IndentSize8MenuItem,
+            statusIndentSizeMenu,
             TabInputModeAutoMenuItem,
             TabInputModeTabMenuItem,
             TabInputModeSpacesMenuItem,
@@ -170,6 +176,9 @@ public sealed partial class MainWindow : Window, IDisposable
             _runtime.SetIndentationInputMode(selectedMode);
         }
     }
+
+    private void IndentationStatus_Tapped(object sender, TappedRoutedEventArgs e) =>
+        _runtime.ShowIndentationSizeMenu();
 
     private void StatusBarMenuItem_Click(object sender, RoutedEventArgs e) => _runtime.ToggleStatusBar();
 
