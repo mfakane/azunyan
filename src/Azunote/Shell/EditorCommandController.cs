@@ -1,3 +1,5 @@
+using Azunyan.Core;
+
 namespace Azunote;
 
 internal sealed class EditorCommandController
@@ -53,6 +55,17 @@ internal sealed class EditorCommandController
 
         _editor.SetIndentSize(size);
         _window.SetIndentSizeLabel(size);
+    }
+
+    public void SetIndentationInputMode(IndentationInputMode mode)
+    {
+        if (!Enum.IsDefined(mode))
+        {
+            throw new ArgumentOutOfRangeException(nameof(mode));
+        }
+
+        _editor.SetIndentationInputMode(mode);
+        _window.SetIndentationInputModeLabel(mode);
     }
 
     public void ToggleStatusBar() =>

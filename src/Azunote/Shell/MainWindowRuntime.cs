@@ -174,6 +174,12 @@ internal sealed class MainWindowRuntime : IDisposable
         _status.Refresh();
     }
 
+    public void SetIndentationInputMode(IndentationInputMode mode)
+    {
+        _editorCommands.SetIndentationInputMode(mode);
+        _status.Refresh();
+    }
+
     public void ToggleStatusBar() => _editorCommands.ToggleStatusBar();
 
     public void ToggleAlwaysOnTop() => _view.ToggleAlwaysOnTop();

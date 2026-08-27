@@ -19,6 +19,7 @@ public sealed partial class AzunyanEditorControl : TextBox
 {
     private bool _synchronizing;
     private int? _indentSize;
+    private IndentationInputMode _indentationInputMode;
     private TextRange? _compositionRange;
 
     public AzunyanEditorControl()
@@ -69,6 +70,24 @@ public sealed partial class AzunyanEditorControl : TextBox
             }
 
             _indentSize = value;
+        }
+    }
+
+    /// <summary>
+    /// Selects whether Tab and Shift+Tab follow the current line's
+    /// indentation, insert literal tabs, or insert spaces.
+    /// </summary>
+    public IndentationInputMode IndentationInputMode
+    {
+        get => _indentationInputMode;
+        set
+        {
+            if (!Enum.IsDefined(value))
+            {
+                throw new ArgumentOutOfRangeException(nameof(value));
+            }
+
+            _indentationInputMode = value;
         }
     }
 
@@ -346,7 +365,8 @@ public sealed partial class AzunyanEditorControl : TextBox
                 TextEditorCommands.IndentSelection(
                     Document,
                     extendSelection,
-                    IndentSize);
+                    IndentSize,
+                    IndentationInputMode);
                 ApplyDocumentState();
                 args.Handled = true;
                 break;

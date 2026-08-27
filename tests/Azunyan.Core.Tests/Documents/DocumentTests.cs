@@ -270,8 +270,8 @@ public sealed class DocumentTests
 
         TextEditorCommands.IndentSelection(document);
 
-        Assert.Equal("a  b", document.Text);
-        Assert.Equal(3, document.CaretPosition);
+        Assert.Equal("a\tb", document.Text);
+        Assert.Equal(2, document.CaretPosition);
     }
 
     [Fact]
@@ -282,8 +282,8 @@ public sealed class DocumentTests
 
         TextEditorCommands.IndentSelection(document);
 
-        Assert.Equal("  a\n  b\nc", document.Text);
-        Assert.Equal(new TextSelection(2, 7), document.Selection);
+        Assert.Equal("\ta\n\tb\nc", document.Text);
+        Assert.Equal(new TextSelection(1, 5), document.Selection);
     }
 
     [Fact]
@@ -320,6 +320,51 @@ public sealed class DocumentTests
 
         Assert.Equal("        abc", document.Text);
         Assert.Equal(8, document.CaretPosition);
+    }
+
+    [Fact]
+    public void Tab_input_mode_inserts_a_literal_tab()
+    {
+        var document = new Document("abc");
+        document.SetCaret(0);
+
+        TextEditorCommands.IndentSelection(
+            document,
+            inputMode: IndentationInputMode.Tab);
+
+        Assert.Equal("\tabc", document.Text);
+        Assert.Equal(1, document.CaretPosition);
+    }
+
+    [Fact]
+    public void Spaces_input_mode_inserts_configured_spaces()
+    {
+        var document = new Document("\tabc");
+        document.SetCaret(0);
+
+        TextEditorCommands.IndentSelection(
+            document,
+            indentSize: 4,
+            inputMode: IndentationInputMode.Spaces);
+
+        Assert.Equal("    \tabc", document.Text);
+        Assert.Equal(4, document.CaretPosition);
+    }
+
+    [Fact]
+    public void Tab_input_mode_shift_tab_removes_a_space_indent_unit()
+    {
+        var document = new Document("    abc");
+        document.SetCaret(document.Length);
+
+        TextEditorCommands.IndentSelection(
+            document,
+            dedent: true,
+            indentSize: 4,
+            inputMode: IndentationInputMode.Tab);
+
+        Assert.Equal("abc", document.Text);
+        Assert.Equal(3, document.CaretPosition);
     }
 
     [Fact]
@@ -362,6 +407,9 @@ public sealed class DocumentTests
         Assert.Equal(
             new IndentationSettings(IndentationKind.Spaces, 2),
             TextEditorCommands.GetIndentationSettings(new TextSnapshot("{\n  value"), 8));
+        Assert.Equal(
+            new IndentationSettings(IndentationKind.Tabs, 4),
+            TextEditorCommands.GetIndentationSettings(new TextSnapshot("value"), 0));
         Assert.Equal(
             new IndentationSettings(IndentationKind.Tabs, 4),
             TextEditorCommands.GetIndentationSettings(new TextSnapshot("{\n\tvalue"), 7));

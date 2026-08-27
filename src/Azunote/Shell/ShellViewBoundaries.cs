@@ -26,6 +26,8 @@ internal interface IEditorView : IEditorBuffer
 
     int? IndentSize { get; }
 
+    IndentationInputMode IndentationInputMode { get; }
+
     void Focus();
 
     void Undo();
@@ -54,6 +56,8 @@ internal interface IEditorView : IEditorBuffer
 
     void SetIndentSize(int? size);
 
+    void SetIndentationInputMode(IndentationInputMode mode);
+
     void SetStartupPosition(int? line, int? column);
 }
 
@@ -75,6 +79,8 @@ internal interface IWindowChromeView
     void SetTabDisplaySizeLabel(int size);
 
     void SetIndentSizeLabel(int? size);
+
+    void SetIndentationInputModeLabel(IndentationInputMode mode);
 }
 
 internal interface IWindowMenuView

@@ -121,6 +121,13 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             typeof(AzunyanEditorView),
             new PropertyMetadata(null, OnIndentSizeChanged));
 
+    public static readonly DependencyProperty IndentationInputModeProperty =
+        DependencyProperty.Register(
+            nameof(IndentationInputMode),
+            typeof(IndentationInputMode),
+            typeof(AzunyanEditorView),
+            new PropertyMetadata(IndentationInputMode.Auto, OnIndentationInputModeChanged));
+
     public static readonly DependencyProperty AcceptsReturnProperty =
         DependencyProperty.Register(
             nameof(AcceptsReturn),
@@ -293,6 +300,20 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
     }
 
+    public IndentationInputMode IndentationInputMode
+    {
+        get => (IndentationInputMode)GetValue(IndentationInputModeProperty);
+        set
+        {
+            if (!Enum.IsDefined(value))
+            {
+                throw new ArgumentOutOfRangeException(nameof(value));
+            }
+
+            SetValue(IndentationInputModeProperty, value);
+        }
+    }
+
     public bool AcceptsReturn
     {
         get => (bool)GetValue(AcceptsReturnProperty);
@@ -410,6 +431,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private static void OnIndentSizeChanged(DependencyObject sender, DependencyPropertyChangedEventArgs args) =>
         ((AzunyanEditorView)sender).ApplyIndentSize();
 
+    private static void OnIndentationInputModeChanged(DependencyObject sender, DependencyPropertyChangedEventArgs args) =>
+        ((AzunyanEditorView)sender).ApplyIndentationInputMode();
+
     private static void OnAcceptsReturnChanged(DependencyObject sender, DependencyPropertyChangedEventArgs args)
     {
         ((AzunyanEditorView)sender).InputEditor.AcceptsReturn = (bool)args.NewValue;
@@ -429,6 +453,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         ApplyIndentSize();
+        ApplyIndentationInputMode();
         UpdateTextSurfaceMode();
         RenderViewport();
         RequestProviderResults(true, true, true);
@@ -1314,6 +1339,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     }
 
     private void ApplyIndentSize() => InputEditor.IndentSize = IndentSize;
+
+    private void ApplyIndentationInputMode() =>
+        InputEditor.IndentationInputMode = IndentationInputMode;
 
     private void ApplyColorScheme()
     {

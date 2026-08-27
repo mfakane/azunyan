@@ -32,6 +32,8 @@ internal sealed class FakeEditorView : IEditorView
 
     public int? IndentSize { get; private set; }
 
+    public IndentationInputMode IndentationInputMode { get; private set; }
+
     public EditorLanguageConfiguration? LanguageConfiguration { get; private set; }
 
     public TextSelection? LastStartupSelection { get; private set; }
@@ -83,6 +85,9 @@ internal sealed class FakeEditorView : IEditorView
 
     public void SetIndentSize(int? size) => IndentSize = size;
 
+    public void SetIndentationInputMode(IndentationInputMode mode) =>
+        IndentationInputMode = mode;
+
     public void SetStartupPosition(int? line, int? column)
     {
         if (line is null && column is null)
@@ -121,6 +126,8 @@ internal sealed class FakeWindowChromeView : IWindowChromeView
 
     public int? IndentSize { get; private set; }
 
+    public IndentationInputMode IndentationInputMode { get; private set; }
+
     public void SetTitle(string title) => Title = title;
 
     public void SetStatusBarVisible(bool visible) => IsStatusBarVisible = visible;
@@ -130,6 +137,9 @@ internal sealed class FakeWindowChromeView : IWindowChromeView
     public void SetTabDisplaySizeLabel(int size) => TabDisplaySize = size;
 
     public void SetIndentSizeLabel(int? size) => IndentSize = size;
+
+    public void SetIndentationInputModeLabel(IndentationInputMode mode) =>
+        IndentationInputMode = mode;
 }
 
 internal sealed class FakeFindReplaceView : IFindReplaceView

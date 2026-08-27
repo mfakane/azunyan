@@ -1,4 +1,5 @@
 using Microsoft.UI.Input;
+using Azunyan.Core;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -46,6 +47,9 @@ public sealed partial class MainWindow : Window, IDisposable
             IndentSize2MenuItem,
             IndentSize4MenuItem,
             IndentSize8MenuItem,
+            TabInputModeAutoMenuItem,
+            TabInputModeTabMenuItem,
+            TabInputModeSpacesMenuItem,
             StatusBarPanel,
             PositionStatus,
             EncodingStatus,
@@ -144,6 +148,26 @@ public sealed partial class MainWindow : Window, IDisposable
         else if (int.TryParse(tag, out var size))
         {
             _runtime.SetIndentSize(size);
+        }
+    }
+
+    private void TabInputModeMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ToggleMenuFlyoutItem { Tag: string tag })
+        {
+            return;
+        }
+
+        var mode = tag switch
+        {
+            "auto" => IndentationInputMode.Auto,
+            "tab" => IndentationInputMode.Tab,
+            "spaces" => IndentationInputMode.Spaces,
+            _ => (IndentationInputMode?)null
+        };
+        if (mode is { } selectedMode)
+        {
+            _runtime.SetIndentationInputMode(selectedMode);
         }
     }
 

@@ -6,6 +6,13 @@ public enum IndentationKind
     Tabs,
 }
 
+public enum IndentationInputMode
+{
+    Auto,
+    Tab,
+    Spaces,
+}
+
 public readonly record struct IndentationSettings(IndentationKind Kind, int Size)
 {
     public string DisplayName => Kind == IndentationKind.Tabs
@@ -22,6 +29,7 @@ public readonly record struct IndentationSettings(IndentationKind Kind, int Size
 public static class TextEditorCommands
 {
     private const string DefaultIndentation = "  ";
+    private const string DefaultTabIndentation = "\t";
     private const int DefaultTabSize = 4;
 
     public static void MoveCaretByGrapheme(Document document, int count, bool extendSelection = false)
@@ -111,17 +119,23 @@ public static class TextEditorCommands
     /// touched by a selection. A selection is expanded to complete lines so
     /// that a multi-line Tab operation behaves like a normal code editor. When
     /// the active line uses spaces, <paramref name="indentSize"/> controls the
-    /// indentation unit used by Tab and Shift+Tab.
+    /// indentation unit used by Tab and Shift+Tab. Auto mode uses a literal
+    /// tab when no indentation style can be inferred.
     /// </summary>
     public static TextChange IndentSelection(
         Document document,
         bool dedent = false,
-        int? indentSize = null)
+        int? indentSize = null,
+        IndentationInputMode inputMode = IndentationInputMode.Auto)
     {
         ArgumentNullException.ThrowIfNull(document);
         if (indentSize is { } configuredIndentSize)
         {
             ArgumentOutOfRangeException.ThrowIfLessThan(configuredIndentSize, 1);
+        }
+        if (!Enum.IsDefined(inputMode))
+        {
+            throw new ArgumentOutOfRangeException(nameof(inputMode));
         }
 
         var selection = document.Selection;
@@ -129,14 +143,32 @@ public static class TextEditorCommands
         {
             var line = document.Snapshot.Lines.GetLine(selection.CaretPosition);
             var lineStart = document.Snapshot.Lines.GetLineStart(line);
-            var indentationUnit = GetIndentationUnit(document.Snapshot, line, indentSize);
+            var defaultIndentation = inputMode == IndentationInputMode.Auto
+                ? DefaultTabIndentation
+                : DefaultIndentation;
+            var indentationUnit = GetIndentationUnit(
+                document.Snapshot,
+                line,
+                indentSize,
+                inputMode,
+                defaultIndentation);
+            var spaceIndentationUnitLength = inputMode == IndentationInputMode.Tab
+                ? GetIndentationUnit(
+                    document.Snapshot,
+                    line,
+                    indentSize,
+                    IndentationInputMode.Spaces).Length
+                : 1;
             if (!dedent)
             {
                 return document.Insert(selection.CaretPosition, indentationUnit);
             }
 
             var indentation = GetLineIndentation(document.Snapshot, selection.CaretPosition);
-            var removalLength = GetIndentationRemovalLength(indentation, indentationUnit);
+            var removalLength = GetIndentationRemovalLength(
+                indentation,
+                indentationUnit,
+                spaceIndentationUnitLength);
             if (removalLength == 0)
             {
                 return document.Replace(TextRange.Empty(selection.CaretPosition), string.Empty);
@@ -156,7 +188,22 @@ public static class TextEditorCommands
         var lastLine = snapshot.Lines.GetLine(selection.End - 1);
         var firstLineStart = snapshot.Lines.GetLineStart(firstLine);
         var lastLineEnd = snapshot.Lines.GetLineEnd(lastLine);
-        var indentationUnitForSelection = GetIndentationUnit(snapshot, firstLine, indentSize);
+        var defaultIndentationForSelection = inputMode == IndentationInputMode.Auto
+            ? DefaultTabIndentation
+            : DefaultIndentation;
+        var indentationUnitForSelection = GetIndentationUnit(
+            snapshot,
+            firstLine,
+            indentSize,
+            inputMode,
+            defaultIndentationForSelection);
+        var spaceIndentationUnitLengthForSelection = inputMode == IndentationInputMode.Tab
+            ? GetIndentationUnit(
+                snapshot,
+                firstLine,
+                indentSize,
+                IndentationInputMode.Spaces).Length
+            : 1;
         var edits = new List<IndentationEdit>();
         var replacement = new System.Text.StringBuilder();
 
@@ -170,7 +217,8 @@ public static class TextEditorCommands
             {
                 var removalLength = GetIndentationRemovalLength(
                     GetLineIndentation(snapshot, lineStart),
-                    indentationUnitForSelection);
+                    indentationUnitForSelection,
+                    spaceIndentationUnitLengthForSelection);
                 if (removalLength > 0)
                 {
                     edits.Add(new IndentationEdit(lineStart, -removalLength));
@@ -332,12 +380,14 @@ public static class TextEditorCommands
     /// <paramref name="position"/>. An explicit <paramref name="indentSize"/>
     /// overrides the inferred width for spaces, while
     /// <paramref name="tabDisplaySize"/> controls the reported width for tabs.
+    /// When no indentation style can be inferred, tabs are the default.
     /// </summary>
     public static IndentationSettings GetIndentationSettings(
         TextSnapshot snapshot,
         int position,
         int? indentSize = null,
-        int tabDisplaySize = DefaultTabSize)
+        int tabDisplaySize = DefaultTabSize,
+        IndentationInputMode inputMode = IndentationInputMode.Auto)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         if (indentSize is { } configuredIndentSize)
@@ -345,9 +395,20 @@ public static class TextEditorCommands
             ArgumentOutOfRangeException.ThrowIfLessThan(configuredIndentSize, 1);
         }
         ArgumentOutOfRangeException.ThrowIfLessThan(tabDisplaySize, 1);
+        if (!Enum.IsDefined(inputMode))
+        {
+            throw new ArgumentOutOfRangeException(nameof(inputMode));
+        }
 
         var line = snapshot.Lines.GetLine(position);
-        var unit = GetIndentationUnit(snapshot, line);
+        var unit = GetIndentationUnit(
+            snapshot,
+            line,
+            indentSize,
+            inputMode,
+            inputMode == IndentationInputMode.Auto
+                ? DefaultTabIndentation
+                : DefaultIndentation);
         return unit.Contains('\t')
             ? new IndentationSettings(
                 IndentationKind.Tabs,
@@ -469,12 +530,16 @@ public static class TextEditorCommands
     private static string GetIndentationUnit(
         TextSnapshot snapshot,
         int line,
-        int? indentSize = null)
+        int? indentSize = null,
+        IndentationInputMode inputMode = IndentationInputMode.Auto,
+        string defaultIndentation = DefaultIndentation)
     {
         var currentIndentation = GetLineIndentation(
             snapshot,
             snapshot.Lines.GetLineStart(line));
-        if (currentIndentation.Contains('\t'))
+        if (inputMode == IndentationInputMode.Tab
+            || (inputMode == IndentationInputMode.Auto
+                && currentIndentation.Contains('\t')))
         {
             return "\t";
         }
@@ -507,11 +572,14 @@ public static class TextEditorCommands
         }
 
         return greatestCommonDivisor == 0
-            ? DefaultIndentation
+            ? defaultIndentation
             : new string(' ', greatestCommonDivisor);
     }
 
-    private static int GetIndentationRemovalLength(string indentation, string indentationUnit)
+    private static int GetIndentationRemovalLength(
+        string indentation,
+        string indentationUnit,
+        int spaceIndentationUnitLength)
     {
         if (indentation.Length == 0)
         {
@@ -520,7 +588,21 @@ public static class TextEditorCommands
 
         if (indentationUnit == "\t")
         {
-            return indentation[0] == '\t' ? 1 : 1;
+            if (indentation[0] == '\t')
+            {
+                return 1;
+            }
+
+            var leadingSpaces = 0;
+            while (leadingSpaces < indentation.Length
+                && indentation[leadingSpaces] == ' ')
+            {
+                leadingSpaces++;
+            }
+
+            return leadingSpaces == 0
+                ? 0
+                : Math.Min(leadingSpaces, Math.Max(spaceIndentationUnitLength, 1));
         }
 
         var spaces = 0;

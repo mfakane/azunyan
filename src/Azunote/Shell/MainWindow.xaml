@@ -76,6 +76,7 @@
             </MenuBarItem>
             <MenuBarItem Title="View">
                 <MenuFlyoutSubItem x:Name="LanguageModeMenuItem" Text="Language Mode" />
+                <MenuFlyoutSeparator />
                 <MenuFlyoutSubItem x:Name="TabDisplaySizeMenuItem" Text="Tab Display Size">
                     <ToggleMenuFlyoutItem x:Name="TabDisplaySize2MenuItem" Text="2" Tag="2" Click="TabDisplaySizeMenuItem_Click" />
                     <ToggleMenuFlyoutItem x:Name="TabDisplaySize4MenuItem" Text="4" Tag="4" IsChecked="True" Click="TabDisplaySizeMenuItem_Click" />
@@ -86,6 +87,14 @@
                     <ToggleMenuFlyoutItem x:Name="IndentSize2MenuItem" Text="2" Tag="2" Click="IndentSizeMenuItem_Click" />
                     <ToggleMenuFlyoutItem x:Name="IndentSize4MenuItem" Text="4" Tag="4" Click="IndentSizeMenuItem_Click" />
                     <ToggleMenuFlyoutItem x:Name="IndentSize8MenuItem" Text="8" Tag="8" Click="IndentSizeMenuItem_Click" />
+                </MenuFlyoutSubItem>
+                <MenuFlyoutSubItem x:Name="TabInputModeMenuItem" Text="Indentation Mode">
+                    <ToggleMenuFlyoutItem x:Name="TabInputModeAutoMenuItem" Text="Auto" Tag="auto" IsChecked="True"
+                                          Click="TabInputModeMenuItem_Click" />
+                    <ToggleMenuFlyoutItem x:Name="TabInputModeTabMenuItem" Text="Tab" Tag="tab"
+                                          Click="TabInputModeMenuItem_Click" />
+                    <ToggleMenuFlyoutItem x:Name="TabInputModeSpacesMenuItem" Text="Spaces" Tag="spaces"
+                                          Click="TabInputModeMenuItem_Click" />
                 </MenuFlyoutSubItem>
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem x:Name="WordWrapMenuItem" Text="Word Wrap" Click="WordWrapMenuItem_Click" />

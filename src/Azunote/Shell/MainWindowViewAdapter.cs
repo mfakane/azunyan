@@ -35,6 +35,7 @@ internal sealed class MainWindowViewAdapter :
     private readonly MenuFlyoutItem _wordWrapMenuItem;
     private readonly IReadOnlyDictionary<int, ToggleMenuFlyoutItem> _tabDisplaySizeMenuItems;
     private readonly IReadOnlyList<(int? Size, ToggleMenuFlyoutItem Item)> _indentSizeMenuItems;
+    private readonly IReadOnlyList<(IndentationInputMode Mode, ToggleMenuFlyoutItem Item)> _indentationInputModeMenuItems;
     private readonly Border _statusBarPanel;
     private readonly TextBlock _positionStatus;
     private readonly TextBlock _encodingStatus;
@@ -68,6 +69,9 @@ internal sealed class MainWindowViewAdapter :
         ToggleMenuFlyoutItem indentSize2MenuItem,
         ToggleMenuFlyoutItem indentSize4MenuItem,
         ToggleMenuFlyoutItem indentSize8MenuItem,
+        ToggleMenuFlyoutItem indentationInputModeAutoMenuItem,
+        ToggleMenuFlyoutItem indentationInputModeTabMenuItem,
+        ToggleMenuFlyoutItem indentationInputModeSpacesMenuItem,
         Border statusBarPanel,
         TextBlock positionStatus,
         TextBlock encodingStatus,
@@ -101,6 +105,12 @@ internal sealed class MainWindowViewAdapter :
             (4, indentSize4MenuItem ?? throw new ArgumentNullException(nameof(indentSize4MenuItem))),
             (8, indentSize8MenuItem ?? throw new ArgumentNullException(nameof(indentSize8MenuItem)))
         ];
+        _indentationInputModeMenuItems =
+        [
+            (IndentationInputMode.Auto, indentationInputModeAutoMenuItem ?? throw new ArgumentNullException(nameof(indentationInputModeAutoMenuItem))),
+            (IndentationInputMode.Tab, indentationInputModeTabMenuItem ?? throw new ArgumentNullException(nameof(indentationInputModeTabMenuItem))),
+            (IndentationInputMode.Spaces, indentationInputModeSpacesMenuItem ?? throw new ArgumentNullException(nameof(indentationInputModeSpacesMenuItem)))
+        ];
         _statusBarPanel = statusBarPanel ?? throw new ArgumentNullException(nameof(statusBarPanel));
         _positionStatus = positionStatus ?? throw new ArgumentNullException(nameof(positionStatus));
         _encodingStatus = encodingStatus ?? throw new ArgumentNullException(nameof(encodingStatus));
@@ -124,6 +134,8 @@ internal sealed class MainWindowViewAdapter :
     public int TabDisplaySize => _editor.TabDisplaySize;
 
     public int? IndentSize => _editor.IndentSize;
+
+    public IndentationInputMode IndentationInputMode => _editor.IndentationInputMode;
 
     public Microsoft.UI.Dispatching.DispatcherQueue DispatcherQueue =>
         _rootGrid.DispatcherQueue;
@@ -222,6 +234,9 @@ internal sealed class MainWindowViewAdapter :
     public void SetTabDisplaySize(int size) => _editor.TabDisplaySize = size;
 
     public void SetIndentSize(int? size) => _editor.IndentSize = size;
+
+    public void SetIndentationInputMode(IndentationInputMode mode) =>
+        _editor.IndentationInputMode = mode;
 
     public void SetStartupPosition(int? line, int? column)
     {
@@ -323,6 +338,14 @@ internal sealed class MainWindowViewAdapter :
         foreach (var item in _indentSizeMenuItems)
         {
             item.Item.IsChecked = item.Size == size;
+        }
+    }
+
+    public void SetIndentationInputModeLabel(IndentationInputMode mode)
+    {
+        foreach (var item in _indentationInputModeMenuItems)
+        {
+            item.Item.IsChecked = item.Mode == mode;
         }
     }
 
