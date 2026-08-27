@@ -123,6 +123,27 @@ TOML-based `settings.toml` plus `tools` and `modes` folders. Azunyan watches
 the settings folder recursively and reloads valid external changes without
 replacing the previous tool or language-mode menu when a definition is invalid.
 
+The status bar's `Open Folder in Terminal` command can be configured in
+`settings.toml`. The default is equivalent to:
+
+```toml
+[terminal]
+command = "wt.exe"
+args = ["-d", "${documentDir}"]
+workingDirectory = "${documentDir}"
+
+[explorer]
+command = "explorer.exe"
+args = ["/select,\"${file}\""]
+workingDirectory = "${documentDir}"
+```
+
+`terminal.*` and `explorer.*` support the same placeholders as external tools,
+including `${documentDir}`, `${file}`, `${fileName}`, and `${env:NAME}`. If
+`workingDirectory` is omitted, the current document's folder is used. The
+bundled example is copied from `Resources/DefaultAppData/settings.toml` when
+the settings file is created.
+
 Every file ending in `.tool.toml` below `tools` is one tool definition. Normal
 folders become menu submenus, so a file at `tools\Formatting\CSharp\format.tool.toml`
 appears under Tools > External Tools > Formatting > CSharp. A folder whose name

@@ -38,6 +38,7 @@ internal sealed class MainWindowViewAdapter :
     private readonly IReadOnlyList<(int? Size, ToggleMenuFlyoutItem Item)> _indentSizeMenuItems;
     private readonly MenuFlyout _statusIndentSizeMenu;
     private readonly IReadOnlyList<(IndentationInputMode Mode, ToggleMenuFlyoutItem Item)> _indentationInputModeMenuItems;
+    private readonly MenuFlyout _statusFilePathMenu;
     private readonly Border _statusBarPanel;
     private readonly TextBlock _positionStatus;
     private readonly TextBlock _encodingStatus;
@@ -76,6 +77,7 @@ internal sealed class MainWindowViewAdapter :
         ToggleMenuFlyoutItem indentationInputModeAutoMenuItem,
         ToggleMenuFlyoutItem indentationInputModeTabMenuItem,
         ToggleMenuFlyoutItem indentationInputModeSpacesMenuItem,
+        MenuFlyout statusFilePathMenu,
         Border statusBarPanel,
         TextBlock positionStatus,
         TextBlock encodingStatus,
@@ -119,6 +121,8 @@ internal sealed class MainWindowViewAdapter :
             (IndentationInputMode.Tab, indentationInputModeTabMenuItem ?? throw new ArgumentNullException(nameof(indentationInputModeTabMenuItem))),
             (IndentationInputMode.Spaces, indentationInputModeSpacesMenuItem ?? throw new ArgumentNullException(nameof(indentationInputModeSpacesMenuItem)))
         ];
+        _statusFilePathMenu = statusFilePathMenu
+            ?? throw new ArgumentNullException(nameof(statusFilePathMenu));
         _statusBarPanel = statusBarPanel ?? throw new ArgumentNullException(nameof(statusBarPanel));
         _positionStatus = positionStatus ?? throw new ArgumentNullException(nameof(positionStatus));
         _encodingStatus = encodingStatus ?? throw new ArgumentNullException(nameof(encodingStatus));
@@ -268,6 +272,7 @@ internal sealed class MainWindowViewAdapter :
         _lineEndingStatus.Text = state.LineEnding;
         _indentationStatus.Text = state.Indentation;
         _filePathStatus.Text = state.FilePath;
+        SetFilePathMenuState(state.HasFilePath);
     }
 
     public void SetTitle(string title)
@@ -385,6 +390,8 @@ internal sealed class MainWindowViewAdapter :
             : _statusIndentSizeMenu;
         menu.ShowAt(_indentationStatus);
     }
+
+    public void ShowFilePathMenu() => _statusFilePathMenu.ShowAt(_filePathStatus);
 
     public void Show(bool replace)
     {
@@ -533,6 +540,19 @@ internal sealed class MainWindowViewAdapter :
             if (item is ToggleMenuFlyoutItem toggleItem)
             {
                 yield return toggleItem;
+            }
+        }
+    }
+
+    private void SetFilePathMenuState(bool hasFilePath)
+    {
+        foreach (var item in _statusFilePathMenu.Items)
+        {
+            if (item is MenuFlyoutItem menuItem
+                && (string.Equals(menuItem.Tag as string, "show-in-explorer", StringComparison.Ordinal)
+                    || string.Equals(menuItem.Tag as string, "open-folder-in-terminal", StringComparison.Ordinal)))
+            {
+                menuItem.IsEnabled = hasFilePath;
             }
         }
     }

@@ -8,6 +8,18 @@ namespace Azunote;
 
 public sealed class AzunoteSettings
 {
+    public ShellCommandSettings Terminal { get; set; } = new()
+    {
+        Command = "wt.exe",
+        Arguments = ["-d", "${documentDir}"]
+    };
+
+    public ShellCommandSettings Explorer { get; set; } = new()
+    {
+        Command = "explorer.exe",
+        Arguments = ["/select,\"${file}\""]
+    };
+
     /// <summary>
     /// The tools discovered below the settings directory's tools folder.
     /// These values are derived from tool definition files and are not written
@@ -34,6 +46,7 @@ public sealed class AzunoteSettings
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     WriteIndented = true)]
 [TomlSerializable(typeof(AzunoteSettings))]
+[TomlSerializable(typeof(ShellCommandSettings))]
 [TomlSerializable(typeof(ExternalToolSettings))]
 [TomlSerializable(typeof(ExternalToolLaunchSettings))]
 [TomlSerializable(typeof(ExternalToolWhenSettings))]
@@ -41,6 +54,26 @@ public sealed class AzunoteSettings
 [TomlSerializable(typeof(CustomSyntaxRuleSettings))]
 internal sealed partial class AzunoteTomlSerializerContext : TomlSerializerContext
 {
+}
+
+public sealed class ShellCommandSettings
+{
+    public string Command { get; set; } = string.Empty;
+
+    [TomlPropertyName("args")]
+    public string[] Arguments { get; set; } = [];
+
+    public string? WorkingDirectory { get; set; }
+
+    internal void Validate(string sectionName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sectionName);
+        Arguments ??= [];
+        if (string.IsNullOrWhiteSpace(Command))
+        {
+            throw new SettingsFileException($"The {sectionName} needs a command.");
+        }
+    }
 }
 
 public enum ExternalToolVisibility
@@ -267,11 +300,6 @@ public static class SettingsFileService
     public const string ToolsDirectoryName = "tools";
     public const string ModesDirectoryName = "modes";
 
-    private const string DefaultSettingsText = """
-        # Azunote settings. This file uses TOML syntax.
-        # External tools are defined below the tools/ directory.
-        """ + "\n";
-
     public static string GetDefaultDirectory()
     {
         var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
@@ -310,11 +338,7 @@ public static class SettingsFileService
         var settingsPath = Path.Combine(directory, SettingsFileName);
         if (!File.Exists(settingsPath))
         {
-            await File.WriteAllTextAsync(
-                settingsPath,
-                DefaultSettingsText,
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
-                cancellationToken);
+            await EnsureDefaultSettingsAsync(settingsPath, cancellationToken);
         }
     }
 
@@ -330,6 +354,10 @@ public static class SettingsFileService
                 AzunoteTomlSerializerContext.Default.AzunoteSettings,
                 cancellationToken)
             : new AzunoteSettings();
+        settings.Terminal ??= new();
+        settings.Terminal.Validate("terminal");
+        settings.Explorer ??= new();
+        settings.Explorer.Validate("explorer");
 
         var catalog = await ExternalToolDiscovery.LoadAsync(
             Path.Combine(directory, ToolsDirectoryName),
@@ -431,6 +459,30 @@ public static class SettingsFileService
             await using var destination = File.Create(destinationPath);
             await source.CopyToAsync(destination, cancellationToken);
         }
+    }
+
+    private static async Task EnsureDefaultSettingsAsync(
+        string settingsPath,
+        CancellationToken cancellationToken)
+    {
+        var defaultSettingsPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "Resources",
+            "DefaultAppData",
+            SettingsFileName);
+        if (!File.Exists(defaultSettingsPath))
+        {
+            await File.WriteAllTextAsync(
+                settingsPath,
+                string.Empty,
+                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+                cancellationToken);
+            return;
+        }
+
+        await using var source = File.OpenRead(defaultSettingsPath);
+        await using var destination = File.Create(settingsPath);
+        await source.CopyToAsync(destination, cancellationToken);
     }
 
     private static async Task EnsureDefaultToolsAsync(

@@ -364,6 +364,47 @@ public sealed class ExternalToolsTests
     }
 
     [Fact]
+    public async Task Settings_service_loads_terminal_configuration()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"azunyan-settings-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            await File.WriteAllTextAsync(
+                SettingsFileService.GetSettingsFilePath(root),
+                """
+                [terminal]
+                command = "conhost.exe"
+                args = ["cmd.exe", "/K", "cd", "/d", "${documentDir}"]
+                workingDirectory = "${documentDir}"
+
+                [explorer]
+                command = "explorer.exe"
+                args = ["/select,\"${file}\""]
+                workingDirectory = "${documentDir}"
+                """);
+
+            var settings = await SettingsFileService.LoadAsync(root);
+
+            Assert.Equal("conhost.exe", settings.Terminal.Command);
+            Assert.Equal(
+                ["cmd.exe", "/K", "cd", "/d", "${documentDir}"],
+                settings.Terminal.Arguments);
+            Assert.Equal("${documentDir}", settings.Terminal.WorkingDirectory);
+            Assert.Equal("explorer.exe", settings.Explorer.Command);
+            Assert.Equal(["/select,\"${file}\""], settings.Explorer.Arguments);
+            Assert.Equal("${documentDir}", settings.Explorer.WorkingDirectory);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task Settings_service_loads_nested_tool_definition_with_when_and_environment()
     {
         var root = Path.Combine(Path.GetTempPath(), $"azunote-settings-{Guid.NewGuid():N}");
@@ -471,7 +512,11 @@ public sealed class ExternalToolsTests
             Assert.True(Directory.Exists(SettingsFileService.GetToolsDirectoryPath(root)));
             var settingsText = await File.ReadAllTextAsync(SettingsFileService.GetSettingsFilePath(root));
             Assert.Contains("TOML", settingsText, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("[terminal]", settingsText, StringComparison.Ordinal);
+            Assert.Contains("[explorer]", settingsText, StringComparison.Ordinal);
             var settings = await SettingsFileService.LoadAsync(root);
+            Assert.Equal("wt.exe", settings.Terminal.Command);
+            Assert.Equal("explorer.exe", settings.Explorer.Command);
             Assert.Contains(settings.ExternalTools, tool => tool.Name == "Prettier");
             await SettingsFileService.SaveAsync(root, settings);
             Assert.Contains("TOML", await File.ReadAllTextAsync(SettingsFileService.GetSettingsFilePath(root)), StringComparison.OrdinalIgnoreCase);

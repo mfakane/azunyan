@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
 using Windows.System;
 using UiDispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue;
@@ -36,6 +38,71 @@ internal sealed class WinUiSettingsFolderOpener : ISettingsFolderOpener
             throw new InvalidOperationException("Windows could not open the settings folder.");
         }
     }
+}
+
+internal sealed class WinUiFilePathActions : IFilePathActions
+{
+    public void CopyFilePath(string filePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+
+        var dataPackage = new DataPackage();
+        dataPackage.SetText(filePath);
+        Clipboard.SetContent(dataPackage);
+    }
+
+    public Task OpenExplorerAsync(
+        string command,
+        IReadOnlyList<string> arguments,
+        string workingDirectory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(command);
+        ArgumentNullException.ThrowIfNull(arguments);
+        ArgumentException.ThrowIfNullOrWhiteSpace(workingDirectory);
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = command,
+            Arguments = string.Join(" ", arguments.Select(x => x.Contains(' ') ? QuoteCommandShellArgument(x) : x)),
+            WorkingDirectory = workingDirectory,
+            UseShellExecute = true
+        };
+
+        if (Process.Start(startInfo) is null)
+        {
+            throw new InvalidOperationException($"Windows could not open command '{command}'.");
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task OpenTerminalAsync(
+        string command,
+        IReadOnlyList<string> arguments,
+        string workingDirectory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(command);
+        ArgumentNullException.ThrowIfNull(arguments);
+        ArgumentException.ThrowIfNullOrWhiteSpace(workingDirectory);
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = command,
+            Arguments = string.Join(" ", arguments.Select(x => x.Contains(' ') ? QuoteCommandShellArgument(x) : x)),
+            WorkingDirectory = workingDirectory,
+            UseShellExecute = true
+        };
+
+        if (Process.Start(startInfo) is null)
+        {
+            throw new InvalidOperationException($"Windows could not open terminal '{command}'.");
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static string QuoteCommandShellArgument(string value) =>
+        $"\"{value.Replace("\"", "\\\"", StringComparison.Ordinal)}\"";
 }
 
 internal sealed class WinUiMessageDialog : IMessageDialog

@@ -31,6 +31,7 @@ public sealed class DocumentStatusPresenterTests
         Assert.Equal("UTF-8 BOM", status.State?.Encoding);
         Assert.Equal("LF", status.State?.LineEnding);
         Assert.Equal("Spaces: 8", status.State?.Indentation);
+        Assert.True(status.State?.HasFilePath);
         Assert.Equal("notes.txt - Azunote", chrome.Title);
     }
 
@@ -52,5 +53,19 @@ public sealed class DocumentStatusPresenterTests
         presenter.Refresh();
 
         Assert.Equal("Tab Size: 8", status.State?.Indentation);
+    }
+
+    [Fact]
+    public void Refresh_disables_file_reveal_for_untitled_documents()
+    {
+        var editor = new FakeEditorView();
+        var session = new DocumentSession();
+        var status = new FakeStatusBarView();
+        var chrome = new FakeWindowChromeView();
+        var presenter = new DocumentStatusPresenter(editor, session, status, chrome);
+
+        presenter.Refresh();
+
+        Assert.False(status.State?.HasFilePath);
     }
 }

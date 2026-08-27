@@ -23,9 +23,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <EnablePreviewMsixTooling>false</EnablePreviewMsixTooling>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <!-- AzunoteSettings intentionally has no persisted TOML members. Tomlyn's
-         source generator emits an empty switch for that valid empty root type. -->
-    <NoWarn>$(NoWarn);CS1522</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -35,6 +32,9 @@
           CopyToOutputDirectory="PreserveNewest"
           CopyToPublishDirectory="PreserveNewest" />
     <None Include="Resources\DefaultAppData\tools\**\*"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Include="Resources\DefaultAppData\settings.toml"
           CopyToOutputDirectory="PreserveNewest"
           CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>

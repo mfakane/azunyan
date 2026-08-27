@@ -38,7 +38,8 @@ internal sealed class DocumentStatusPresenter
                 _editor.IndentSize,
                 _editor.TabDisplaySize,
                 _editor.IndentationInputMode).DisplayName,
-            _session.State.FilePath ?? "Untitled");
+            _session.State.FilePath ?? "Untitled",
+            _session.State.FilePath is not null);
         _statusBar.Apply(state);
     }
 

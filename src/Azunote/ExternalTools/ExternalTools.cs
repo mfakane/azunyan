@@ -399,11 +399,7 @@ internal sealed record ExternalToolLaunchPlan(
                     + BuildCommandShellCommand(ResolvedPath, arguments);
                 break;
             case ExternalToolLaunchKind.PowerShell:
-                startInfo.ArgumentList.Add("-NoLogo");
-                startInfo.ArgumentList.Add("-NoProfile");
-                startInfo.ArgumentList.Add("-NonInteractive");
-                startInfo.ArgumentList.Add("-File");
-                startInfo.ArgumentList.Add(ResolvedPath);
+                startInfo.Arguments = "-NoLogo -NoProfile -NonInteractive -File " + QuoteCommandShellArgument(ResolvedPath);
                 AddAll(startInfo, arguments);
                 break;
             default:
@@ -416,10 +412,7 @@ internal sealed record ExternalToolLaunchPlan(
         ProcessStartInfo startInfo,
         IReadOnlyList<string> arguments)
     {
-        foreach (var argument in arguments)
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
+        startInfo.Arguments += (startInfo.Arguments.Length > 0 ? " " : "") + string.Join(" ", arguments.Select(x => x.Contains(' ') ? QuoteCommandShellArgument(x) : x));
     }
 
     private static string BuildCommandShellCommand(

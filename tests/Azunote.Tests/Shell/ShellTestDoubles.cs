@@ -112,6 +112,10 @@ internal sealed class FakeStatusBarView : IStatusBarView
     public StatusBarState? State { get; private set; }
 
     public void Apply(StatusBarState state) => State = state;
+
+    public void ShowFilePathMenu()
+    {
+    }
 }
 
 internal sealed class FakeWindowChromeView : IWindowChromeView

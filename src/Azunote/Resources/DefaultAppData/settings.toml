@@ -1,0 +1,14 @@
+# Azunote settings. This file uses TOML syntax.
+# External tools are defined below the tools/ directory.
+
+# Configure the status bar's "Open Folder in Terminal" command here.
+[terminal]
+command = "wt.exe"
+args = ["-d", "${documentDir}"]
+workingDirectory = "${documentDir}"
+
+# Configure the status bar's "Show in Explorer" command here.
+[explorer]
+command = "explorer.exe"
+args = ["/select,\"${file}\""]
+workingDirectory = "${documentDir}"

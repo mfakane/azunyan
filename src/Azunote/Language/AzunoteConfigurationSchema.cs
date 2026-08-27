@@ -50,7 +50,15 @@ public static class AzunoteSchemaCatalog
     public static AzunoteSchemaDefinition Settings { get; } = new(
         "azunote.settings",
         ["settings.toml"],
-        []);
+        [
+            new AzunoteSchemaTable(
+                "terminal",
+                [
+                    Field("command", AzunoteSchemaValueKind.String, "command"),
+                    Field("args", AzunoteSchemaValueKind.Array, "property"),
+                    Field("workingDirectory", AzunoteSchemaValueKind.String, "path")
+                ])
+        ]);
 
     public static AzunoteSchemaDefinition ExternalTool { get; } = new(
         "azunote.tool",

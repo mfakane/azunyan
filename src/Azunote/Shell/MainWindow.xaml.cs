@@ -31,6 +31,8 @@ public sealed partial class MainWindow : Window, IDisposable
             ?? throw new InvalidOperationException("The status tab display size menu is missing.");
         var statusIndentSizeMenu = RootGrid.Resources["StatusIndentSizeMenu"] as MenuFlyout
             ?? throw new InvalidOperationException("The status indent size menu is missing.");
+        var statusFilePathMenu = RootGrid.Resources["StatusFilePathMenu"] as MenuFlyout
+            ?? throw new InvalidOperationException("The status file path menu is missing.");
         _view = new MainWindowViewAdapter(
             this,
             Editor,
@@ -56,6 +58,7 @@ public sealed partial class MainWindow : Window, IDisposable
             TabInputModeAutoMenuItem,
             TabInputModeTabMenuItem,
             TabInputModeSpacesMenuItem,
+            statusFilePathMenu,
             StatusBarPanel,
             PositionStatus,
             EncodingStatus,
@@ -67,7 +70,8 @@ public sealed partial class MainWindow : Window, IDisposable
             _view,
             application.CreateNewDocumentWindowAsync,
             application.OpenFileInNewWindowAsync,
-            application.RefreshWindowMenus);
+            application.RefreshWindowMenus,
+            new WinUiFilePathActions());
         RegisterKeyboardAccelerators();
 
         _appWindow = _view.AppWindow;
@@ -179,6 +183,18 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private void IndentationStatus_Tapped(object sender, TappedRoutedEventArgs e) =>
         _runtime.ShowIndentationSizeMenu();
+
+    private void FilePathStatus_Tapped(object sender, TappedRoutedEventArgs e) =>
+        _runtime.ShowFilePathMenu();
+
+    private void CopyFilePathMenuItem_Click(object sender, RoutedEventArgs e) =>
+        _runtime.CopyFilePath();
+
+    private async void ShowFileInExplorerMenuItem_Click(object sender, RoutedEventArgs e) =>
+        await _runtime.ShowFileInExplorerAsync();
+
+    private async void OpenFolderInTerminalMenuItem_Click(object sender, RoutedEventArgs e) =>
+        await _runtime.OpenFolderInTerminalAsync();
 
     private void StatusBarMenuItem_Click(object sender, RoutedEventArgs e) => _runtime.ToggleStatusBar();
 

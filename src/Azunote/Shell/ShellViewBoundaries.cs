@@ -13,7 +13,8 @@ internal sealed record StatusBarState(
     string Encoding,
     string LineEnding,
     string Indentation,
-    string FilePath);
+    string FilePath,
+    bool HasFilePath = false);
 
 internal sealed record WindowMenuEntry(
     string Id,
@@ -64,6 +65,23 @@ internal interface IEditorView : IEditorBuffer
 internal interface IStatusBarView
 {
     void Apply(StatusBarState state);
+
+    void ShowFilePathMenu();
+}
+
+internal interface IFilePathActions
+{
+    void CopyFilePath(string filePath);
+
+    Task OpenExplorerAsync(
+        string command,
+        IReadOnlyList<string> arguments,
+        string workingDirectory);
+
+    Task OpenTerminalAsync(
+        string command,
+        IReadOnlyList<string> arguments,
+        string workingDirectory);
 }
 
 internal interface IWindowChromeView

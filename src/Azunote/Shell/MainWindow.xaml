@@ -19,6 +19,11 @@
                 <ToggleMenuFlyoutItem Text="4" Tag="4" Click="IndentSizeMenuItem_Click" />
                 <ToggleMenuFlyoutItem Text="8" Tag="8" Click="IndentSizeMenuItem_Click" />
             </MenuFlyout>
+            <MenuFlyout x:Key="StatusFilePathMenu">
+                <MenuFlyoutItem Text="Copy File Path" Tag="copy-file-path" Click="CopyFilePathMenuItem_Click" />
+                <MenuFlyoutItem Text="Show in Explorer" Tag="show-in-explorer" Click="ShowFileInExplorerMenuItem_Click" />
+                <MenuFlyoutItem Text="Open Folder in Terminal" Tag="open-folder-in-terminal" Click="OpenFolderInTerminalMenuItem_Click" />
+            </MenuFlyout>
         </Grid.Resources>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -191,7 +196,8 @@
                 <TextBlock x:Name="LineEndingStatus" Grid.Column="2" Text="LF" />
                 <TextBlock x:Name="IndentationStatus" Grid.Column="3" Text="Spaces: 2"
                            Tapped="IndentationStatus_Tapped" />
-                <TextBlock x:Name="FilePathStatus" Grid.Column="4" HorizontalAlignment="Right" Text="Untitled" TextTrimming="CharacterEllipsis" />
+                <TextBlock x:Name="FilePathStatus" Grid.Column="4" HorizontalAlignment="Right" Text="Untitled" TextTrimming="CharacterEllipsis"
+                           Tapped="FilePathStatus_Tapped" />
             </Grid>
         </Border>
 

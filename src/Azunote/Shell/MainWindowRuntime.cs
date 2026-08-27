@@ -14,6 +14,7 @@ internal sealed class MainWindowRuntime : IDisposable
     private readonly EditorCommandController _editorCommands;
     private readonly FindReplaceController _findReplace;
     private readonly DocumentStatusPresenter _status;
+    private readonly IFilePathActions _filePathActions;
     private readonly WinUiMessageDialog _messageDialog;
     private readonly WinUiExternalToolDialog _externalToolDialog;
     private readonly Action _refreshWindowMenus;
@@ -23,10 +24,12 @@ internal sealed class MainWindowRuntime : IDisposable
         MainWindowViewAdapter view,
         Func<Task> createNewWindow,
         Func<string, Task> openFileInNewWindow,
-        Action refreshWindowMenus)
+        Action refreshWindowMenus,
+        IFilePathActions filePathActions)
     {
         _view = view ?? throw new ArgumentNullException(nameof(view));
         _refreshWindowMenus = refreshWindowMenus ?? throw new ArgumentNullException(nameof(refreshWindowMenus));
+        _filePathActions = filePathActions ?? throw new ArgumentNullException(nameof(filePathActions));
         _session = new DocumentSession();
         _prompt = new WinUiUserPrompt(() => _view.XamlRoot);
         _dispatcher = new DispatcherQueueUiDispatcher(_view.DispatcherQueue);
@@ -182,6 +185,63 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public void ShowIndentationSizeMenu() => _view.ShowIndentationSizeMenu();
 
+    public void ShowFilePathMenu() => _view.ShowFilePathMenu();
+
+    public void CopyFilePath() =>
+        _filePathActions.CopyFilePath(_session.State.FilePath ?? "Untitled");
+
+    public async Task ShowFileInExplorerAsync()
+    {
+        if (_session.State.FilePath is not { } path
+            || Path.GetDirectoryName(path) is not { } directory)
+        {
+            return;
+        }
+
+        try
+        {
+            var explorer = _settings.Current.Explorer ?? new ShellCommandSettings();
+            var context = CreateExternalToolContext();
+            var invocation = ResolveShellCommand(
+                explorer,
+                "explorer",
+                context,
+                directory);
+            await _filePathActions.OpenExplorerAsync(
+                invocation.Command,
+                invocation.Arguments,
+                invocation.WorkingDirectory);
+        }
+        catch (Exception exception)
+        {
+            await _prompt.ShowErrorAsync("Could not show file in Explorer", exception.Message);
+        }
+    }
+
+    public async Task OpenFolderInTerminalAsync()
+    {
+        if (_session.State.FilePath is not { } path
+            || Path.GetDirectoryName(path) is not { } directory)
+        {
+            return;
+        }
+
+        try
+        {
+            var terminal = _settings.Current.Terminal ?? new ShellCommandSettings();
+            var context = CreateExternalToolContext();
+            var invocation = ResolveShellCommand(terminal, "terminal", context, directory);
+            await _filePathActions.OpenTerminalAsync(
+                invocation.Command,
+                invocation.Arguments,
+                invocation.WorkingDirectory);
+        }
+        catch (Exception exception)
+        {
+            await _prompt.ShowErrorAsync("Could not open folder in Terminal", exception.Message);
+        }
+    }
+
     public void ToggleStatusBar() => _editorCommands.ToggleStatusBar();
 
     public void ToggleAlwaysOnTop() => _view.ToggleAlwaysOnTop();
@@ -296,9 +356,15 @@ internal sealed class MainWindowRuntime : IDisposable
 
     private ExternalToolMenuState GetExternalToolMenuState(ExternalToolSettings tool)
     {
+        var context = CreateExternalToolContext(tool.DefinitionDirectory);
+        return ExternalToolAvailability.Evaluate(tool, context);
+    }
+
+    private ExternalToolContext CreateExternalToolContext(string? toolDirectory = null)
+    {
         var editorSnapshot = EditorBufferSnapshot.Capture(_view);
         var state = _session.State;
-        var context = new ExternalToolContext(
+        return new ExternalToolContext(
             state.FilePath,
             state.FilePath,
             editorSnapshot.Text,
@@ -306,14 +372,43 @@ internal sealed class MainWindowRuntime : IDisposable
             editorSnapshot.Caret.Line + 1,
             editorSnapshot.Caret.Column + 1,
             _languageModes.CurrentModeId,
-            tool.DefinitionDirectory,
+            toolDirectory,
             state.Encoding,
             state.LineEnding,
             state.IsDirty,
             editorSnapshot.SelectionStart,
             editorSnapshot.SelectionEnd);
-        return ExternalToolAvailability.Evaluate(tool, context);
     }
+
+    private static ShellCommandInvocation ResolveShellCommand(
+        ShellCommandSettings settings,
+        string sectionName,
+        ExternalToolContext context,
+        string defaultWorkingDirectory)
+    {
+        settings.Validate(sectionName);
+        var command = context.Expand(settings.Command);
+        var arguments = context.Expand(settings.Arguments);
+        var workingDirectory = string.IsNullOrWhiteSpace(settings.WorkingDirectory)
+            ? defaultWorkingDirectory
+            : context.Expand(settings.WorkingDirectory);
+        if (string.IsNullOrWhiteSpace(workingDirectory))
+        {
+            workingDirectory = defaultWorkingDirectory;
+        }
+
+        if (!Path.IsPathRooted(workingDirectory))
+        {
+            workingDirectory = Path.GetFullPath(workingDirectory, defaultWorkingDirectory);
+        }
+
+        return new ShellCommandInvocation(command, arguments, workingDirectory);
+    }
+
+    private sealed record ShellCommandInvocation(
+        string Command,
+        string[] Arguments,
+        string WorkingDirectory);
 
     private void RefreshDocumentView()
     {
