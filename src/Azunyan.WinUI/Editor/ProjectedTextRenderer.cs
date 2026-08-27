@@ -846,7 +846,8 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
                 blocks,
                 collapsedFoldIds,
                 wrapColumns,
-                wrapWidth))
+                wrapWidth,
+                context.TabDisplaySize))
         {
             if (context.TextWrapping != TextWrapping.Wrap
                 || !_textSurface.ReadyToDraw)
@@ -964,6 +965,7 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
             collapsedFoldIds,
             wrapColumns,
             wrapWidth,
+            context.TabDisplaySize,
             measuredBreaks,
             rows,
             new VisualLineHeightIndex(rows.Rows.Select(row => row.BlockAdornment is { } block
@@ -1018,7 +1020,8 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
                 Math.Max(1, (float)(line.Width + context.CharacterWidth)),
                 (float)context.LineHeight,
                 (float)context.LineHeight,
-                Math.Min((float)context.LineHeight * 0.8f, (float)context.LineHeight));
+                Math.Min((float)context.LineHeight * 0.8f, (float)context.LineHeight),
+                (float)(context.CharacterWidth * context.TabDisplaySize));
             _textLayouts.Add(rowIndex, textLayout);
         }
 
@@ -1178,6 +1181,7 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
             IReadOnlyList<string> collapsedFoldIds,
             int wrapColumns,
             double wrapWidth,
+            int tabDisplaySize,
             IReadOnlyDictionary<int, IReadOnlyList<int>> measuredBreaks,
             VisualRowMap rows,
             VisualLineHeightIndex heights)
@@ -1190,6 +1194,7 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
             CollapsedFoldIds = collapsedFoldIds;
             WrapColumns = wrapColumns;
             WrapWidth = wrapWidth;
+            TabDisplaySize = tabDisplaySize;
             WrapBreaks = measuredBreaks;
             Rows = rows;
             Heights = heights;
@@ -1211,6 +1216,8 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
 
         public double WrapWidth { get; }
 
+        public int TabDisplaySize { get; }
+
         public IReadOnlyDictionary<int, IReadOnlyList<int>> WrapBreaks { get; }
 
         public VisualRowMap Rows { get; }
@@ -1225,7 +1232,8 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
             IReadOnlyList<BlockAdornment>? blocks,
             IReadOnlyList<string> collapsedFoldIds,
             int wrapColumns,
-            double wrapWidth) =>
+            double wrapWidth,
+            int tabDisplaySize) =>
             ReferenceEquals(Snapshot, snapshot)
             && LineHeight == lineHeight
             && ReferenceEquals(Folds, folds)
@@ -1233,7 +1241,8 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
             && ReferenceEquals(Blocks, blocks)
             && CollapsedFoldIds.SequenceEqual(collapsedFoldIds, StringComparer.Ordinal)
             && WrapColumns == wrapColumns
-            && WrapWidth == wrapWidth;
+            && WrapWidth == wrapWidth
+            && TabDisplaySize == tabDisplaySize;
     }
 
     private sealed class ProjectedTextRenderFrame
@@ -1298,7 +1307,8 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
                 (float)context.FontSize,
                 (float)wrapWidth,
                 (float)context.LineHeight,
-                Math.Min((float)context.LineHeight * 0.8f, (float)context.LineHeight));
+                Math.Min((float)context.LineHeight * 0.8f, (float)context.LineHeight),
+                (float)(context.CharacterWidth * context.TabDisplaySize));
         }
 
         return measuredBreaks;

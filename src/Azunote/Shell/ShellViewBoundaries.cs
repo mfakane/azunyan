@@ -22,6 +22,10 @@ internal sealed record WindowMenuEntry(
 
 internal interface IEditorView : IEditorBuffer
 {
+    int TabDisplaySize { get; }
+
+    int? IndentSize { get; }
+
     void Focus();
 
     void Undo();
@@ -46,6 +50,10 @@ internal interface IEditorView : IEditorBuffer
 
     void SetWordWrap(bool enabled);
 
+    void SetTabDisplaySize(int size);
+
+    void SetIndentSize(int? size);
+
     void SetStartupPosition(int? line, int? column);
 }
 
@@ -63,6 +71,10 @@ internal interface IWindowChromeView
     void SetStatusBarVisible(bool visible);
 
     void SetWordWrapLabel(bool enabled);
+
+    void SetTabDisplaySizeLabel(int size);
+
+    void SetIndentSizeLabel(int? size);
 }
 
 internal interface IWindowMenuView

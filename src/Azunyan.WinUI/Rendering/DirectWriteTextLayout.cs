@@ -58,7 +58,8 @@ public sealed class DirectWriteTextLayout : IDisposable
         float requestedWidth,
         float requestedHeight,
         float lineHeight,
-        float baseline)
+        float baseline,
+        float incrementalTabStop = 0)
     {
         ArgumentNullException.ThrowIfNull(resourceCreator);
         ArgumentNullException.ThrowIfNull(runs);
@@ -88,6 +89,11 @@ public sealed class DirectWriteTextLayout : IDisposable
             throw new ArgumentOutOfRangeException(nameof(baseline));
         }
 
+        if (!float.IsFinite(incrementalTabStop) || incrementalTabStop < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(incrementalTabStop));
+        }
+
         var text = string.Concat(runs.Select(run => run.Text));
         using var format = new CanvasTextFormat
         {
@@ -104,6 +110,10 @@ public sealed class DirectWriteTextLayout : IDisposable
             HorizontalAlignment = CanvasHorizontalAlignment.Left,
             VerticalAlignment = CanvasVerticalAlignment.Top
         };
+        if (incrementalTabStop > 0)
+        {
+            format.IncrementalTabStop = incrementalTabStop;
+        }
         var layout = new CanvasTextLayout(
             resourceCreator,
             text,
@@ -143,7 +153,8 @@ public sealed class DirectWriteTextLayout : IDisposable
         float fontSize,
         float requestedWidth,
         float lineHeight,
-        float baseline)
+        float baseline,
+        float incrementalTabStop = 0)
     {
         ArgumentNullException.ThrowIfNull(resourceCreator);
         ArgumentNullException.ThrowIfNull(runs);
@@ -168,6 +179,11 @@ public sealed class DirectWriteTextLayout : IDisposable
             throw new ArgumentOutOfRangeException(nameof(baseline));
         }
 
+        if (!float.IsFinite(incrementalTabStop) || incrementalTabStop < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(incrementalTabStop));
+        }
+
         var text = string.Concat(runs.Select(run => run.Text));
         if (text.Length == 0)
         {
@@ -189,6 +205,10 @@ public sealed class DirectWriteTextLayout : IDisposable
             HorizontalAlignment = CanvasHorizontalAlignment.Left,
             VerticalAlignment = CanvasVerticalAlignment.Top
         };
+        if (incrementalTabStop > 0)
+        {
+            format.IncrementalTabStop = incrementalTabStop;
+        }
         using var layout = new CanvasTextLayout(
             resourceCreator,
             text,

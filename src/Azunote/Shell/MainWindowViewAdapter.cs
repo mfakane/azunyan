@@ -33,6 +33,8 @@ internal sealed class MainWindowViewAdapter :
     private readonly ToggleMenuFlyoutItem _alwaysOnTopMenuItem;
     private readonly MenuBarItem _toolsMenu;
     private readonly MenuFlyoutItem _wordWrapMenuItem;
+    private readonly IReadOnlyDictionary<int, ToggleMenuFlyoutItem> _tabDisplaySizeMenuItems;
+    private readonly IReadOnlyList<(int? Size, ToggleMenuFlyoutItem Item)> _indentSizeMenuItems;
     private readonly Border _statusBarPanel;
     private readonly TextBlock _positionStatus;
     private readonly TextBlock _encodingStatus;
@@ -59,6 +61,13 @@ internal sealed class MainWindowViewAdapter :
         ToggleMenuFlyoutItem alwaysOnTopMenuItem,
         MenuBarItem toolsMenu,
         MenuFlyoutItem wordWrapMenuItem,
+        ToggleMenuFlyoutItem tabDisplaySize2MenuItem,
+        ToggleMenuFlyoutItem tabDisplaySize4MenuItem,
+        ToggleMenuFlyoutItem tabDisplaySize8MenuItem,
+        ToggleMenuFlyoutItem indentSizeAutoMenuItem,
+        ToggleMenuFlyoutItem indentSize2MenuItem,
+        ToggleMenuFlyoutItem indentSize4MenuItem,
+        ToggleMenuFlyoutItem indentSize8MenuItem,
         Border statusBarPanel,
         TextBlock positionStatus,
         TextBlock encodingStatus,
@@ -79,6 +88,19 @@ internal sealed class MainWindowViewAdapter :
         _alwaysOnTopMenuItem = alwaysOnTopMenuItem ?? throw new ArgumentNullException(nameof(alwaysOnTopMenuItem));
         _toolsMenu = toolsMenu ?? throw new ArgumentNullException(nameof(toolsMenu));
         _wordWrapMenuItem = wordWrapMenuItem ?? throw new ArgumentNullException(nameof(wordWrapMenuItem));
+        _tabDisplaySizeMenuItems = new Dictionary<int, ToggleMenuFlyoutItem>
+        {
+            [2] = tabDisplaySize2MenuItem ?? throw new ArgumentNullException(nameof(tabDisplaySize2MenuItem)),
+            [4] = tabDisplaySize4MenuItem ?? throw new ArgumentNullException(nameof(tabDisplaySize4MenuItem)),
+            [8] = tabDisplaySize8MenuItem ?? throw new ArgumentNullException(nameof(tabDisplaySize8MenuItem))
+        };
+        _indentSizeMenuItems =
+        [
+            (null, indentSizeAutoMenuItem ?? throw new ArgumentNullException(nameof(indentSizeAutoMenuItem))),
+            (2, indentSize2MenuItem ?? throw new ArgumentNullException(nameof(indentSize2MenuItem))),
+            (4, indentSize4MenuItem ?? throw new ArgumentNullException(nameof(indentSize4MenuItem))),
+            (8, indentSize8MenuItem ?? throw new ArgumentNullException(nameof(indentSize8MenuItem)))
+        ];
         _statusBarPanel = statusBarPanel ?? throw new ArgumentNullException(nameof(statusBarPanel));
         _positionStatus = positionStatus ?? throw new ArgumentNullException(nameof(positionStatus));
         _encodingStatus = encodingStatus ?? throw new ArgumentNullException(nameof(encodingStatus));
@@ -98,6 +120,10 @@ internal sealed class MainWindowViewAdapter :
     public bool IsAlwaysOnTop =>
         _appWindow?.Presenter is OverlappedPresenter presenter
             && presenter.IsAlwaysOnTop;
+
+    public int TabDisplaySize => _editor.TabDisplaySize;
+
+    public int? IndentSize => _editor.IndentSize;
 
     public Microsoft.UI.Dispatching.DispatcherQueue DispatcherQueue =>
         _rootGrid.DispatcherQueue;
@@ -193,6 +219,10 @@ internal sealed class MainWindowViewAdapter :
             : TextWrapping.NoWrap;
     }
 
+    public void SetTabDisplaySize(int size) => _editor.TabDisplaySize = size;
+
+    public void SetIndentSize(int? size) => _editor.IndentSize = size;
+
     public void SetStartupPosition(int? line, int? column)
     {
         if (line is null && column is null)
@@ -279,6 +309,22 @@ internal sealed class MainWindowViewAdapter :
 
     public void SetWordWrapLabel(bool enabled) =>
         _wordWrapMenuItem.Text = enabled ? "Word Wrap ✓" : "Word Wrap";
+
+    public void SetTabDisplaySizeLabel(int size)
+    {
+        foreach (var item in _tabDisplaySizeMenuItems)
+        {
+            item.Value.IsChecked = item.Key == size;
+        }
+    }
+
+    public void SetIndentSizeLabel(int? size)
+    {
+        foreach (var item in _indentSizeMenuItems)
+        {
+            item.Item.IsChecked = item.Size == size;
+        }
+    }
 
     public void Show(bool replace)
     {

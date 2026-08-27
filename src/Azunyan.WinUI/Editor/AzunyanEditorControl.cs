@@ -18,6 +18,7 @@ namespace Azunyan.WinUI;
 public sealed partial class AzunyanEditorControl : TextBox
 {
     private bool _synchronizing;
+    private int? _indentSize;
     private TextRange? _compositionRange;
 
     public AzunyanEditorControl()
@@ -51,6 +52,25 @@ public sealed partial class AzunyanEditorControl : TextBox
     /// Enter action, such as completion acceptance, owns the key.
     /// </summary>
     public bool AutoIndentOnEnter { get; set; } = true;
+
+    /// <summary>
+    /// The number of spaces used for Tab and Shift+Tab on space-indented
+    /// lines. A null value infers the indentation size from the document.
+    /// Tab-indented lines continue to use a literal tab character.
+    /// </summary>
+    public int? IndentSize
+    {
+        get => _indentSize;
+        set
+        {
+            if (value is { } size)
+            {
+                ArgumentOutOfRangeException.ThrowIfLessThan(size, 1);
+            }
+
+            _indentSize = value;
+        }
+    }
 
     /// <summary>
     /// Raised when the native text service starts, updates, or ends an IME
@@ -323,7 +343,10 @@ public sealed partial class AzunyanEditorControl : TextBox
                 && !control
                 && !menu:
                 SyncDocumentSelection();
-                TextEditorCommands.IndentSelection(Document, extendSelection);
+                TextEditorCommands.IndentSelection(
+                    Document,
+                    extendSelection,
+                    IndentSize);
                 ApplyDocumentState();
                 args.Handled = true;
                 break;

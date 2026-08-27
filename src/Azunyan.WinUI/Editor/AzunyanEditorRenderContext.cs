@@ -36,6 +36,7 @@ public sealed class AzunyanEditorRenderContext
         double contentTop,
         bool showLineNumbers,
         TextWrapping textWrapping,
+        int tabDisplaySize,
         IReadOnlySet<string> collapsedFoldIds,
         EditorProviderFrame? providerFrame)
     {
@@ -61,6 +62,7 @@ public sealed class AzunyanEditorRenderContext
         ContentTop = contentTop;
         ShowLineNumbers = showLineNumbers;
         TextWrapping = textWrapping;
+        TabDisplaySize = tabDisplaySize;
         CollapsedFoldIds = collapsedFoldIds;
         ProviderFrame = providerFrame;
         ProviderResults = providerFrame?.ToLegacyResults();
@@ -114,6 +116,8 @@ public sealed class AzunyanEditorRenderContext
     public bool ShowLineNumbers { get; }
 
     public TextWrapping TextWrapping { get; }
+
+    public int TabDisplaySize { get; }
 
     public IReadOnlySet<string> CollapsedFoldIds { get; }
 

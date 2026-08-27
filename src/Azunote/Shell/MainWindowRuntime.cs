@@ -162,6 +162,18 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public void ToggleWordWrap() => _editorCommands.ToggleWordWrap();
 
+    public void SetTabDisplaySize(int size)
+    {
+        _editorCommands.SetTabDisplaySize(size);
+        _status.Refresh();
+    }
+
+    public void SetIndentSize(int? size)
+    {
+        _editorCommands.SetIndentSize(size);
+        _status.Refresh();
+    }
+
     public void ToggleStatusBar() => _editorCommands.ToggleStatusBar();
 
     public void ToggleAlwaysOnTop() => _view.ToggleAlwaysOnTop();

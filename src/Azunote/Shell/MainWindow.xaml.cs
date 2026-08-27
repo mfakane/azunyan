@@ -39,6 +39,13 @@ public sealed partial class MainWindow : Window, IDisposable
             AlwaysOnTopMenuItem,
             ToolsMenuItem,
             WordWrapMenuItem,
+            TabDisplaySize2MenuItem,
+            TabDisplaySize4MenuItem,
+            TabDisplaySize8MenuItem,
+            IndentSizeAutoMenuItem,
+            IndentSize2MenuItem,
+            IndentSize4MenuItem,
+            IndentSize8MenuItem,
             StatusBarPanel,
             PositionStatus,
             EncodingStatus,
@@ -113,6 +120,32 @@ public sealed partial class MainWindow : Window, IDisposable
     private void SelectAllMenuItem_Click(object sender, RoutedEventArgs e) => _runtime.SelectAll();
 
     private void WordWrapMenuItem_Click(object sender, RoutedEventArgs e) => _runtime.ToggleWordWrap();
+
+    private void TabDisplaySizeMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is ToggleMenuFlyoutItem { Tag: string tag }
+            && int.TryParse(tag, out var size))
+        {
+            _runtime.SetTabDisplaySize(size);
+        }
+    }
+
+    private void IndentSizeMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ToggleMenuFlyoutItem { Tag: string tag })
+        {
+            return;
+        }
+
+        if (string.Equals(tag, "auto", StringComparison.Ordinal))
+        {
+            _runtime.SetIndentSize(null);
+        }
+        else if (int.TryParse(tag, out var size))
+        {
+            _runtime.SetIndentSize(size);
+        }
+    }
 
     private void StatusBarMenuItem_Click(object sender, RoutedEventArgs e) => _runtime.ToggleStatusBar();
 

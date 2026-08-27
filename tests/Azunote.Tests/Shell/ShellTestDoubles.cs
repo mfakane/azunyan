@@ -28,6 +28,10 @@ internal sealed class FakeEditorView : IEditorView
 
     public bool WordWrapEnabled { get; private set; }
 
+    public int TabDisplaySize { get; private set; } = 4;
+
+    public int? IndentSize { get; private set; }
+
     public EditorLanguageConfiguration? LanguageConfiguration { get; private set; }
 
     public TextSelection? LastStartupSelection { get; private set; }
@@ -75,6 +79,10 @@ internal sealed class FakeEditorView : IEditorView
 
     public void SetWordWrap(bool enabled) => WordWrapEnabled = enabled;
 
+    public void SetTabDisplaySize(int size) => TabDisplaySize = size;
+
+    public void SetIndentSize(int? size) => IndentSize = size;
+
     public void SetStartupPosition(int? line, int? column)
     {
         if (line is null && column is null)
@@ -109,11 +117,19 @@ internal sealed class FakeWindowChromeView : IWindowChromeView
 
     public bool WordWrapEnabled { get; private set; }
 
+    public int TabDisplaySize { get; private set; } = 4;
+
+    public int? IndentSize { get; private set; }
+
     public void SetTitle(string title) => Title = title;
 
     public void SetStatusBarVisible(bool visible) => IsStatusBarVisible = visible;
 
     public void SetWordWrapLabel(bool enabled) => WordWrapEnabled = enabled;
+
+    public void SetTabDisplaySizeLabel(int size) => TabDisplaySize = size;
+
+    public void SetIndentSizeLabel(int? size) => IndentSize = size;
 }
 
 internal sealed class FakeFindReplaceView : IFindReplaceView

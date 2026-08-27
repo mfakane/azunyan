@@ -107,6 +107,20 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             typeof(AzunyanEditorView),
             new PropertyMetadata(TextWrapping.NoWrap, OnTextWrappingChanged));
 
+    public static readonly DependencyProperty TabDisplaySizeProperty =
+        DependencyProperty.Register(
+            nameof(TabDisplaySize),
+            typeof(int),
+            typeof(AzunyanEditorView),
+            new PropertyMetadata(4, OnTabDisplaySizeChanged));
+
+    public static readonly DependencyProperty IndentSizeProperty =
+        DependencyProperty.Register(
+            nameof(IndentSize),
+            typeof(int?),
+            typeof(AzunyanEditorView),
+            new PropertyMetadata(null, OnIndentSizeChanged));
+
     public static readonly DependencyProperty AcceptsReturnProperty =
         DependencyProperty.Register(
             nameof(AcceptsReturn),
@@ -255,6 +269,30 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         set => SetValue(TextWrappingProperty, value);
     }
 
+    public int TabDisplaySize
+    {
+        get => (int)GetValue(TabDisplaySizeProperty);
+        set
+        {
+            ArgumentOutOfRangeException.ThrowIfLessThan(value, 1);
+            SetValue(TabDisplaySizeProperty, value);
+        }
+    }
+
+    public int? IndentSize
+    {
+        get => (int?)GetValue(IndentSizeProperty);
+        set
+        {
+            if (value is { } size)
+            {
+                ArgumentOutOfRangeException.ThrowIfLessThan(size, 1);
+            }
+
+            SetValue(IndentSizeProperty, value);
+        }
+    }
+
     public bool AcceptsReturn
     {
         get => (bool)GetValue(AcceptsReturnProperty);
@@ -366,6 +404,12 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         view.RenderViewport();
     }
 
+    private static void OnTabDisplaySizeChanged(DependencyObject sender, DependencyPropertyChangedEventArgs args) =>
+        ((AzunyanEditorView)sender).RenderViewport();
+
+    private static void OnIndentSizeChanged(DependencyObject sender, DependencyPropertyChangedEventArgs args) =>
+        ((AzunyanEditorView)sender).ApplyIndentSize();
+
     private static void OnAcceptsReturnChanged(DependencyObject sender, DependencyPropertyChangedEventArgs args)
     {
         ((AzunyanEditorView)sender).InputEditor.AcceptsReturn = (bool)args.NewValue;
@@ -384,6 +428,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             _scrollViewer.ViewChanged += OnViewportChanged;
         }
 
+        ApplyIndentSize();
         UpdateTextSurfaceMode();
         RenderViewport();
         RequestProviderResults(true, true, true);
@@ -743,6 +788,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             InputEditor.Padding.Top,
             showLogicalLineNumbers,
             TextWrapping,
+            TabDisplaySize,
             _collapsedFoldIds,
             currentFrame);
         _renderer?.Render(context);
@@ -1266,6 +1312,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         sample.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         _characterWidth = Math.Max(1, sample.DesiredSize.Width);
     }
+
+    private void ApplyIndentSize() => InputEditor.IndentSize = IndentSize;
 
     private void ApplyColorScheme()
     {

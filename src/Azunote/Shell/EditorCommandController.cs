@@ -37,6 +37,24 @@ internal sealed class EditorCommandController
         _window.SetWordWrapLabel(_wordWrapEnabled);
     }
 
+    public void SetTabDisplaySize(int size)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(size, 1);
+        _editor.SetTabDisplaySize(size);
+        _window.SetTabDisplaySizeLabel(size);
+    }
+
+    public void SetIndentSize(int? size)
+    {
+        if (size is { } configuredSize)
+        {
+            ArgumentOutOfRangeException.ThrowIfLessThan(configuredSize, 1);
+        }
+
+        _editor.SetIndentSize(size);
+        _window.SetIndentSizeLabel(size);
+    }
+
     public void ToggleStatusBar() =>
         _window.SetStatusBarVisible(!_window.IsStatusBarVisible);
 

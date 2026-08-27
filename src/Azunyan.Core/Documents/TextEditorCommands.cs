@@ -109,18 +109,27 @@ public static class TextEditorCommands
     /// <summary>
     /// Inserts one indentation unit at a caret, or indents/dedents every line
     /// touched by a selection. A selection is expanded to complete lines so
-    /// that a multi-line Tab operation behaves like a normal code editor.
+    /// that a multi-line Tab operation behaves like a normal code editor. When
+    /// the active line uses spaces, <paramref name="indentSize"/> controls the
+    /// indentation unit used by Tab and Shift+Tab.
     /// </summary>
-    public static TextChange IndentSelection(Document document, bool dedent = false)
+    public static TextChange IndentSelection(
+        Document document,
+        bool dedent = false,
+        int? indentSize = null)
     {
         ArgumentNullException.ThrowIfNull(document);
+        if (indentSize is { } configuredIndentSize)
+        {
+            ArgumentOutOfRangeException.ThrowIfLessThan(configuredIndentSize, 1);
+        }
 
         var selection = document.Selection;
         if (selection.IsEmpty)
         {
             var line = document.Snapshot.Lines.GetLine(selection.CaretPosition);
             var lineStart = document.Snapshot.Lines.GetLineStart(line);
-            var indentationUnit = GetIndentationUnit(document.Snapshot, line);
+            var indentationUnit = GetIndentationUnit(document.Snapshot, line, indentSize);
             if (!dedent)
             {
                 return document.Insert(selection.CaretPosition, indentationUnit);
@@ -147,7 +156,7 @@ public static class TextEditorCommands
         var lastLine = snapshot.Lines.GetLine(selection.End - 1);
         var firstLineStart = snapshot.Lines.GetLineStart(firstLine);
         var lastLineEnd = snapshot.Lines.GetLineEnd(lastLine);
-        var indentationUnitForSelection = GetIndentationUnit(snapshot, firstLine);
+        var indentationUnitForSelection = GetIndentationUnit(snapshot, firstLine, indentSize);
         var edits = new List<IndentationEdit>();
         var replacement = new System.Text.StringBuilder();
 
@@ -320,20 +329,32 @@ public static class TextEditorCommands
 
     /// <summary>
     /// Returns the indentation convention inferred from the document near
-    /// <paramref name="position"/>. Tabs use the conventional four-column
-    /// display width because a tab's visual width is not encoded in text.
+    /// <paramref name="position"/>. An explicit <paramref name="indentSize"/>
+    /// overrides the inferred width for spaces, while
+    /// <paramref name="tabDisplaySize"/> controls the reported width for tabs.
     /// </summary>
     public static IndentationSettings GetIndentationSettings(
         TextSnapshot snapshot,
-        int position)
+        int position,
+        int? indentSize = null,
+        int tabDisplaySize = DefaultTabSize)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
+        if (indentSize is { } configuredIndentSize)
+        {
+            ArgumentOutOfRangeException.ThrowIfLessThan(configuredIndentSize, 1);
+        }
+        ArgumentOutOfRangeException.ThrowIfLessThan(tabDisplaySize, 1);
 
         var line = snapshot.Lines.GetLine(position);
         var unit = GetIndentationUnit(snapshot, line);
         return unit.Contains('\t')
-            ? new IndentationSettings(IndentationKind.Tabs, DefaultTabSize)
-            : new IndentationSettings(IndentationKind.Spaces, Math.Max(unit.Length, 1));
+            ? new IndentationSettings(
+                IndentationKind.Tabs,
+                tabDisplaySize)
+            : new IndentationSettings(
+                IndentationKind.Spaces,
+                indentSize ?? Math.Max(unit.Length, 1));
     }
 
     /// <summary>
@@ -445,7 +466,10 @@ public static class TextEditorCommands
         return -1;
     }
 
-    private static string GetIndentationUnit(TextSnapshot snapshot, int line)
+    private static string GetIndentationUnit(
+        TextSnapshot snapshot,
+        int line,
+        int? indentSize = null)
     {
         var currentIndentation = GetLineIndentation(
             snapshot,
@@ -453,6 +477,11 @@ public static class TextEditorCommands
         if (currentIndentation.Contains('\t'))
         {
             return "\t";
+        }
+
+        if (indentSize is { } configuredIndentSize)
+        {
+            return new string(' ', configuredIndentSize);
         }
 
         var greatestCommonDivisor = 0;

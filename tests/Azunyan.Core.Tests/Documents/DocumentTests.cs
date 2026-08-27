@@ -311,6 +311,42 @@ public sealed class DocumentTests
     }
 
     [Fact]
+    public void Indent_size_controls_space_indentation()
+    {
+        var document = new Document("abc");
+        document.SetCaret(0);
+
+        TextEditorCommands.IndentSelection(document, indentSize: 8);
+
+        Assert.Equal("        abc", document.Text);
+        Assert.Equal(8, document.CaretPosition);
+    }
+
+    [Fact]
+    public void Auto_indent_size_infers_the_document_space_indentation()
+    {
+        var document = new Document("    parent\n        child");
+        document.SetCaret(0);
+
+        TextEditorCommands.IndentSelection(document);
+
+        Assert.Equal("        parent\n        child", document.Text);
+        Assert.Equal(4, document.CaretPosition);
+    }
+
+    [Fact]
+    public void Shift_tab_removes_up_to_the_configured_space_indentation_size()
+    {
+        var document = new Document("        abc");
+        document.SetCaret(document.Length);
+
+        TextEditorCommands.IndentSelection(document, dedent: true, indentSize: 4);
+
+        Assert.Equal("    abc", document.Text);
+        Assert.Equal(7, document.CaretPosition);
+    }
+
+    [Fact]
     public void Newline_auto_indent_ignores_delimiters_in_strings_and_comments()
     {
         var snapshot = new TextSnapshot(
@@ -329,6 +365,18 @@ public sealed class DocumentTests
         Assert.Equal(
             new IndentationSettings(IndentationKind.Tabs, 4),
             TextEditorCommands.GetIndentationSettings(new TextSnapshot("{\n\tvalue"), 7));
+        Assert.Equal(
+            new IndentationSettings(IndentationKind.Spaces, 8),
+            TextEditorCommands.GetIndentationSettings(
+                new TextSnapshot("{\n  value"),
+                8,
+                indentSize: 8));
+        Assert.Equal(
+            new IndentationSettings(IndentationKind.Tabs, 8),
+            TextEditorCommands.GetIndentationSettings(
+                new TextSnapshot("{\n\tvalue"),
+                7,
+                tabDisplaySize: 8));
     }
 
     [Fact]

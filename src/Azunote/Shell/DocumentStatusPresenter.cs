@@ -4,13 +4,13 @@ namespace Azunote;
 
 internal sealed class DocumentStatusPresenter
 {
-    private readonly IEditorBuffer _editor;
+    private readonly IEditorView _editor;
     private readonly DocumentSession _session;
     private readonly IStatusBarView _statusBar;
     private readonly IWindowChromeView _window;
 
     public DocumentStatusPresenter(
-        IEditorBuffer editor,
+        IEditorView editor,
         DocumentSession session,
         IStatusBarView statusBar,
         IWindowChromeView window)
@@ -34,7 +34,9 @@ internal sealed class DocumentStatusPresenter
                 lineEnding ?? _session.State.LineEnding),
             TextEditorCommands.GetIndentationSettings(
                 snapshot,
-                selectionStart).DisplayName,
+                selectionStart,
+                _editor.IndentSize,
+                _editor.TabDisplaySize).DisplayName,
             _session.State.FilePath ?? "Untitled");
         _statusBar.Apply(state);
     }
