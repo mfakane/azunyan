@@ -44,7 +44,7 @@ internal sealed class DocumentStatusPresenter
         var name = _session.State.FilePath is null
             ? "Untitled"
             : Path.GetFileName(_session.State.FilePath);
-        var dirtyMarker = _session.State.IsDirty ? "*" : string.Empty;
-        _window.SetTitle($"{dirtyMarker}{name} — Azunote");
+        var dirtyMarker = _session.State.IsDirty ? " *" : string.Empty;
+        _window.SetTitle($"{name}{dirtyMarker} - Azunote");
     }
 }

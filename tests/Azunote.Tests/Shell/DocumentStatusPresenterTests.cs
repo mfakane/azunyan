@@ -28,6 +28,6 @@ public sealed class DocumentStatusPresenterTests
         Assert.Equal("Ln 2, Col 1", status.State?.Position);
         Assert.Equal("UTF-8 BOM", status.State?.Encoding);
         Assert.Equal("LF", status.State?.LineEnding);
-        Assert.Equal("notes.txt — Azunote", chrome.Title);
+        Assert.Equal("notes.txt - Azunote", chrome.Title);
     }
 }
