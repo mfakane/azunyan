@@ -33,7 +33,7 @@ public sealed partial class MainWindow : Window, IDisposable
             ReplaceTextBox,
             FindResultText,
             LanguageModeMenuItem,
-            ConfiguredExternalToolsMenuItem,
+            ToolsMenuItem,
             WordWrapMenuItem,
             StatusBarPanel,
             PositionStatus,

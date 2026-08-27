@@ -79,10 +79,7 @@
                 <MenuFlyoutItem x:Name="WordWrapMenuItem" Text="Word Wrap" Click="WordWrapMenuItem_Click" />
                 <MenuFlyoutItem Text="Status Bar" Click="StatusBarMenuItem_Click" />
             </MenuBarItem>
-            <MenuBarItem Title="Tools">
-                <MenuFlyoutSubItem x:Name="ConfiguredExternalToolsMenuItem" Text="External Tools">
-                    <MenuFlyoutItem Text="No tools available" IsEnabled="False" />
-                </MenuFlyoutSubItem>
+            <MenuBarItem x:Name="ToolsMenuItem" Title="Tools">
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="Run External Tool..." Click="RunExternalToolMenuItem_Click" />
                 <MenuFlyoutItem Text="Preferences..." Click="PreferencesMenuItem_Click" />

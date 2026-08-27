@@ -28,7 +28,7 @@ internal sealed class MainWindowViewAdapter :
     private readonly TextBox _replaceTextBox;
     private readonly TextBlock _findResultText;
     private readonly MenuFlyoutSubItem _languageModeMenu;
-    private readonly MenuFlyoutSubItem _externalToolsMenu;
+    private readonly MenuBarItem _toolsMenu;
     private readonly MenuFlyoutItem _wordWrapMenuItem;
     private readonly Border _statusBarPanel;
     private readonly TextBlock _positionStatus;
@@ -37,6 +37,7 @@ internal sealed class MainWindowViewAdapter :
     private readonly TextBlock _indentationStatus;
     private readonly TextBlock _filePathStatus;
     private readonly List<KeyboardAccelerator> _externalToolAccelerators = [];
+    private readonly List<MenuFlyoutItemBase> _externalToolMenuItems = [];
     private readonly Dictionary<string, ToggleMenuFlyoutItem> _languageModeItems =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -49,7 +50,7 @@ internal sealed class MainWindowViewAdapter :
         TextBox replaceTextBox,
         TextBlock findResultText,
         MenuFlyoutSubItem languageModeMenu,
-        MenuFlyoutSubItem externalToolsMenu,
+        MenuBarItem toolsMenu,
         MenuFlyoutItem wordWrapMenuItem,
         Border statusBarPanel,
         TextBlock positionStatus,
@@ -67,7 +68,7 @@ internal sealed class MainWindowViewAdapter :
         _replaceTextBox = replaceTextBox ?? throw new ArgumentNullException(nameof(replaceTextBox));
         _findResultText = findResultText ?? throw new ArgumentNullException(nameof(findResultText));
         _languageModeMenu = languageModeMenu ?? throw new ArgumentNullException(nameof(languageModeMenu));
-        _externalToolsMenu = externalToolsMenu ?? throw new ArgumentNullException(nameof(externalToolsMenu));
+        _toolsMenu = toolsMenu ?? throw new ArgumentNullException(nameof(toolsMenu));
         _wordWrapMenuItem = wordWrapMenuItem ?? throw new ArgumentNullException(nameof(wordWrapMenuItem));
         _statusBarPanel = statusBarPanel ?? throw new ArgumentNullException(nameof(statusBarPanel));
         _positionStatus = positionStatus ?? throw new ArgumentNullException(nameof(positionStatus));
@@ -277,19 +278,26 @@ internal sealed class MainWindowViewAdapter :
         ArgumentNullException.ThrowIfNull(getState);
         ArgumentNullException.ThrowIfNull(onSelected);
         ClearExternalToolAccelerators();
-        _externalToolsMenu.Items.Clear();
+        ClearExternalToolMenuItems();
         var visibleEntries = ExternalToolMenuBuilder.Build(nodes, getState);
         if (visibleEntries.Count == 0)
         {
-            _externalToolsMenu.Items.Add(new MenuFlyoutItem
+            var emptyItem = new MenuFlyoutItem
             {
                 Text = "No tools available",
                 IsEnabled = false
-            });
+            };
+            _toolsMenu.Items.Insert(0, emptyItem);
+            _externalToolMenuItems.Add(emptyItem);
             return;
         }
 
-        AddExternalToolMenuItems(_externalToolsMenu, visibleEntries, onSelected);
+        var menuItems = CreateExternalToolMenuItems(visibleEntries, onSelected);
+        for (var index = 0; index < menuItems.Count; index++)
+        {
+            _toolsMenu.Items.Insert(index, menuItems[index]);
+            _externalToolMenuItems.Add(menuItems[index]);
+        }
     }
 
     public void DisposeEditor() => _editor.Dispose();
@@ -304,11 +312,21 @@ internal sealed class MainWindowViewAdapter :
         _externalToolAccelerators.Clear();
     }
 
-    private void AddExternalToolMenuItems(
-        MenuFlyoutSubItem parent,
+    private void ClearExternalToolMenuItems()
+    {
+        foreach (var item in _externalToolMenuItems)
+        {
+            _toolsMenu.Items.Remove(item);
+        }
+
+        _externalToolMenuItems.Clear();
+    }
+
+    private List<MenuFlyoutItemBase> CreateExternalToolMenuItems(
         IReadOnlyList<ExternalToolMenuEntry> nodes,
         Func<ExternalToolSettings, Task> onSelected)
     {
+        var items = new List<MenuFlyoutItemBase>(nodes.Count);
         foreach (var node in nodes)
         {
             if (node.Tool is { } tool)
@@ -351,14 +369,20 @@ internal sealed class MainWindowViewAdapter :
                     }
                 }
 
-                parent.Items.Add(menuItem);
+                items.Add(menuItem);
                 continue;
             }
 
             var subMenu = new MenuFlyoutSubItem { Text = node.Name };
-            AddExternalToolMenuItems(subMenu, node.Children, onSelected);
-            parent.Items.Add(subMenu);
+            foreach (var child in CreateExternalToolMenuItems(node.Children, onSelected))
+            {
+                subMenu.Items.Add(child);
+            }
+
+            items.Add(subMenu);
         }
+
+        return items;
     }
 
 }
