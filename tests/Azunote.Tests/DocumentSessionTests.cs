@@ -36,6 +36,20 @@ public sealed class DocumentSessionTests
     }
 
     [Fact]
+    public void Observing_text_ignores_line_ending_representation_changes()
+    {
+        var session = new DocumentSession();
+        session.Load(
+            "notes.txt",
+            new TextFileData("before\r\nafter", TextEncodingKind.Utf8, LineEndingKind.CrLf));
+
+        session.ObserveText("before\nafter");
+
+        Assert.False(session.State.IsDirty);
+        Assert.True(session.IsSameAsSaved("before\nafter"));
+    }
+
+    [Fact]
     public void Temporary_reload_preserves_saved_text_and_file_identity()
     {
         var session = new DocumentSession();

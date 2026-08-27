@@ -24,7 +24,10 @@ public sealed class DocumentSession
     public bool IsSameAsSaved(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
-        return string.Equals(text, _savedText, StringComparison.Ordinal);
+        return string.Equals(
+            NormalizeLineEndings(text),
+            NormalizeLineEndings(_savedText),
+            StringComparison.Ordinal);
     }
 
     public void ObserveText(string text)
@@ -120,6 +123,34 @@ public sealed class DocumentSession
 
         _state = state;
         StateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private static string NormalizeLineEndings(string text)
+    {
+        if (text.IndexOf('\r') < 0)
+        {
+            return text;
+        }
+
+        var normalized = new System.Text.StringBuilder(text.Length);
+        for (var index = 0; index < text.Length; index++)
+        {
+            if (text[index] == '\r')
+            {
+                if (index + 1 < text.Length && text[index + 1] == '\n')
+                {
+                    index++;
+                }
+
+                normalized.Append('\n');
+            }
+            else
+            {
+                normalized.Append(text[index]);
+            }
+        }
+
+        return normalized.ToString();
     }
 }
 
