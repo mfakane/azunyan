@@ -28,6 +28,8 @@ internal sealed class DocumentWorkflow : IDisposable
     private readonly IUserPrompt _prompt;
     private readonly Func<IReadOnlyList<FileDialogFilter>> _fileDialogFilters;
     private readonly Func<string> _languageModeId;
+    private readonly Func<Task> _createNewWindow;
+    private readonly Func<string, Task> _openFileInNewWindow;
     private IFileChangeMonitor? _fileMonitor;
     private bool _isApplying;
     private bool _externalChangeDialogOpen;
@@ -43,7 +45,9 @@ internal sealed class DocumentWorkflow : IDisposable
         IUiDispatcher dispatcher,
         IUserPrompt prompt,
         Func<IReadOnlyList<FileDialogFilter>> fileDialogFilters,
-        Func<string> languageModeId)
+        Func<string> languageModeId,
+        Func<Task> createNewWindow,
+        Func<string, Task> openFileInNewWindow)
     {
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
         _documents = documents ?? throw new ArgumentNullException(nameof(documents));
@@ -54,6 +58,8 @@ internal sealed class DocumentWorkflow : IDisposable
         _prompt = prompt ?? throw new ArgumentNullException(nameof(prompt));
         _fileDialogFilters = fileDialogFilters ?? throw new ArgumentNullException(nameof(fileDialogFilters));
         _languageModeId = languageModeId ?? throw new ArgumentNullException(nameof(languageModeId));
+        _createNewWindow = createNewWindow ?? throw new ArgumentNullException(nameof(createNewWindow));
+        _openFileInNewWindow = openFileInNewWindow ?? throw new ArgumentNullException(nameof(openFileInNewWindow));
     }
 
     public event EventHandler<DocumentWorkflowChangedEventArgs>? Changed;
@@ -64,6 +70,10 @@ internal sealed class DocumentWorkflow : IDisposable
 
     public string? CurrentFilePath => State.FilePath;
 
+    public string CurrentDocumentName => CurrentFilePath is { } path
+        ? Path.GetFileName(path)
+        : "Untitled";
+
     public TextEncodingKind CurrentEncoding => State.Encoding;
 
     public LineEndingKind CurrentLineEnding => State.LineEnding;
@@ -72,11 +82,6 @@ internal sealed class DocumentWorkflow : IDisposable
 
     public async Task OpenFileAsync()
     {
-        if (!await ConfirmPendingChangesAsync())
-        {
-            return;
-        }
-
         try
         {
             var path = _fileDialogs.ShowOpen(_fileDialogFilters());
@@ -85,7 +90,14 @@ internal sealed class DocumentWorkflow : IDisposable
                 return;
             }
 
-            await LoadDocumentAsync(path);
+            if (CurrentFilePath is null && !IsDirty)
+            {
+                await LoadDocumentAsync(path);
+            }
+            else
+            {
+                await _openFileInNewWindow(path);
+            }
         }
         catch (Exception exception)
         {
@@ -125,15 +137,7 @@ internal sealed class DocumentWorkflow : IDisposable
 
     public async Task NewDocumentAsync()
     {
-        if (!await ConfirmPendingChangesAsync())
-        {
-            return;
-        }
-
-        StopFileWatcher();
-        ApplyDocument(_documents.NewDocument);
-        NotifyChanged(lineEnding: null, opened: false);
-        _editor.Focus();
+        await _createNewWindow();
     }
 
     public async Task<bool> SaveAsync()

@@ -16,11 +16,17 @@ internal sealed class MainWindowRuntime : IDisposable
     private readonly DocumentStatusPresenter _status;
     private readonly WinUiMessageDialog _messageDialog;
     private readonly WinUiExternalToolDialog _externalToolDialog;
+    private readonly Action _refreshWindowMenus;
     private bool _disposed;
 
-    public MainWindowRuntime(MainWindowViewAdapter view)
+    public MainWindowRuntime(
+        MainWindowViewAdapter view,
+        Func<Task> createNewWindow,
+        Func<string, Task> openFileInNewWindow,
+        Action refreshWindowMenus)
     {
         _view = view ?? throw new ArgumentNullException(nameof(view));
+        _refreshWindowMenus = refreshWindowMenus ?? throw new ArgumentNullException(nameof(refreshWindowMenus));
         _session = new DocumentSession();
         _prompt = new WinUiUserPrompt(() => _view.XamlRoot);
         _dispatcher = new DispatcherQueueUiDispatcher(_view.DispatcherQueue);
@@ -49,7 +55,9 @@ internal sealed class MainWindowRuntime : IDisposable
             _dispatcher,
             _prompt,
             _languageModes.GetFileDialogFilters,
-            () => _languageModes.CurrentModeId);
+            () => _languageModes.CurrentModeId,
+            createNewWindow,
+            openFileInNewWindow);
         _settings = new SettingsWorkflow(
             settings,
             _languageModes,
@@ -81,6 +89,8 @@ internal sealed class MainWindowRuntime : IDisposable
     public bool IsFindBoxFocused => _view.IsFindBoxFocused;
 
     public bool IsDirty => _documents.IsDirty;
+
+    internal string DocumentName => _documents.CurrentDocumentName;
 
     public Task InitializeSettingsAsync() => _settings.InitializeAsync();
 
@@ -153,6 +163,8 @@ internal sealed class MainWindowRuntime : IDisposable
     public void ToggleWordWrap() => _editorCommands.ToggleWordWrap();
 
     public void ToggleStatusBar() => _editorCommands.ToggleStatusBar();
+
+    public void ToggleAlwaysOnTop() => _view.ToggleAlwaysOnTop();
 
     public void ShowCompletion() => _editorCommands.ShowCompletion();
 
@@ -256,6 +268,7 @@ internal sealed class MainWindowRuntime : IDisposable
         _status.Refresh(args.LineEnding);
         _status.RefreshTitle();
         RefreshExternalToolsMenu();
+        _refreshWindowMenus();
     }
 
     private void LanguageModes_Changed(object? sender, EventArgs args) =>
@@ -287,5 +300,6 @@ internal sealed class MainWindowRuntime : IDisposable
         _status.Refresh();
         _status.RefreshTitle();
         RefreshExternalToolsMenu();
+        _refreshWindowMenus();
     }
 }

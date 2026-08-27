@@ -47,27 +47,159 @@ public sealed class DocumentWorkflowTests
     }
 
     [Fact]
-    public async Task New_document_respects_cancelled_pending_changes()
+    public async Task New_document_opens_a_new_window_without_touching_current_document()
     {
         var editor = new FakeEditorView();
         var session = new DocumentSession();
         var files = new FakeTextFileStore();
-        var prompt = new FakeUserPrompt
-        {
-            PendingDecision = PendingChangesDecision.Cancel
-        };
+        var prompt = new FakeUserPrompt();
+        var newWindowCount = 0;
         var workflow = CreateWorkflow(
             editor,
             session,
             files,
             prompt,
-            new FakeFileDialogService());
+            new FakeFileDialogService(),
+            createNewWindow: () =>
+            {
+                newWindowCount++;
+                return Task.CompletedTask;
+            });
 
         await workflow.OpenStartupTextAsync("draft");
         await workflow.NewDocumentAsync();
 
         Assert.Equal("draft", editor.Text);
         Assert.True(workflow.IsDirty);
+        Assert.Equal(1, newWindowCount);
+    }
+
+    [Fact]
+    public async Task Open_file_reuses_a_clean_untitled_window()
+    {
+        var editor = new FakeEditorView();
+        var session = new DocumentSession();
+        var files = new FakeTextFileStore();
+        var prompt = new FakeUserPrompt();
+        var dialogs = new FakeFileDialogService { OpenPath = "notes.txt" };
+        files.Files[Path.GetFullPath("notes.txt")] = new TextFileData(
+            "hello",
+            TextEncodingKind.Utf8,
+            LineEndingKind.Lf);
+        var newWindowCount = 0;
+        var workflow = CreateWorkflow(
+            editor,
+            session,
+            files,
+            prompt,
+            dialogs,
+            createNewWindow: () =>
+            {
+                newWindowCount++;
+                return Task.CompletedTask;
+            });
+
+        await workflow.OpenFileAsync();
+
+        Assert.Equal("hello", editor.Text);
+        Assert.Equal(Path.GetFullPath("notes.txt"), workflow.CurrentFilePath);
+        Assert.Equal("notes.txt", workflow.CurrentDocumentName);
+        Assert.Equal(0, newWindowCount);
+    }
+
+    [Fact]
+    public async Task Open_file_cancellation_leaves_the_current_window_unchanged()
+    {
+        var editor = new FakeEditorView();
+        var session = new DocumentSession();
+        var files = new FakeTextFileStore();
+        var prompt = new FakeUserPrompt();
+        var newWindowCount = 0;
+        var workflow = CreateWorkflow(
+            editor,
+            session,
+            files,
+            prompt,
+            new FakeFileDialogService(),
+            createNewWindow: () =>
+            {
+                newWindowCount++;
+                return Task.CompletedTask;
+            });
+        await workflow.OpenStartupTextAsync("draft");
+
+        await workflow.OpenFileAsync();
+
+        Assert.Equal("draft", editor.Text);
+        Assert.Null(workflow.CurrentFilePath);
+        Assert.Equal("Untitled", workflow.CurrentDocumentName);
+        Assert.True(workflow.IsDirty);
+        Assert.Equal(0, newWindowCount);
+    }
+
+    [Fact]
+    public async Task Open_file_preserves_a_dirty_untitled_window_and_opens_a_new_one()
+    {
+        var editor = new FakeEditorView();
+        var session = new DocumentSession();
+        var files = new FakeTextFileStore();
+        var prompt = new FakeUserPrompt();
+        var dialogs = new FakeFileDialogService { OpenPath = "notes.txt" };
+        var openedPath = string.Empty;
+        var workflow = CreateWorkflow(
+            editor,
+            session,
+            files,
+            prompt,
+            dialogs,
+            openFileInNewWindow: path =>
+            {
+                openedPath = path;
+                return Task.CompletedTask;
+            });
+        await workflow.OpenStartupTextAsync("draft");
+
+        await workflow.OpenFileAsync();
+
+        Assert.Equal("draft", editor.Text);
+        Assert.Null(workflow.CurrentFilePath);
+        Assert.True(workflow.IsDirty);
+        Assert.Equal("notes.txt", openedPath);
+    }
+
+    [Fact]
+    public async Task Open_file_uses_a_new_window_when_current_document_is_saved()
+    {
+        var editor = new FakeEditorView();
+        var session = new DocumentSession();
+        var files = new FakeTextFileStore();
+        var prompt = new FakeUserPrompt();
+        var dialogs = new FakeFileDialogService { OpenPath = "other.txt" };
+        files.Files[Path.GetFullPath("current.txt")] = new TextFileData(
+            "current",
+            TextEncodingKind.Utf8,
+            LineEndingKind.Lf);
+        var openedPath = string.Empty;
+        var workflow = CreateWorkflow(
+            editor,
+            session,
+            files,
+            prompt,
+            dialogs,
+            openFileInNewWindow: path =>
+            {
+                openedPath = path;
+                return Task.CompletedTask;
+            });
+
+        dialogs.OpenPath = "current.txt";
+        await workflow.OpenFileAsync();
+        dialogs.OpenPath = "other.txt";
+        await workflow.OpenFileAsync();
+
+        Assert.Equal("current", editor.Text);
+        Assert.Equal(Path.GetFullPath("current.txt"), workflow.CurrentFilePath);
+        Assert.Equal("other.txt", openedPath);
     }
 
     [Fact]
@@ -120,7 +252,9 @@ public sealed class DocumentWorkflowTests
         FakeTextFileStore files,
         FakeUserPrompt prompt,
         FakeFileDialogService dialogs,
-        FakeFileChangeMonitorFactory? factory = null)
+        FakeFileChangeMonitorFactory? factory = null,
+        Func<Task>? createNewWindow = null,
+        Func<string, Task>? openFileInNewWindow = null)
     {
         var documents = new DocumentController(editor, session, files, prompt);
         var externalTools = new ExternalToolController(editor, documents, files, prompt);
@@ -134,6 +268,8 @@ public sealed class DocumentWorkflowTests
             new FakeUiDispatcher(),
             prompt,
             modes.GetFileDialogFilters,
-            () => "plain-text");
+            () => "plain-text",
+            createNewWindow ?? (() => Task.CompletedTask),
+            openFileInNewWindow ?? (_ => Task.CompletedTask));
     }
 }

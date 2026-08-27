@@ -1,6 +1,6 @@
 # Azunote
 
-Azunote is a small WinUI 3 single-document text editor using Windows App SDK
+Azunote is a small WinUI 3 document-per-window text editor using Windows App SDK
 2.4.0. Each window owns one document; there is intentionally no project or
 workspace layer in this phase.
 
@@ -139,11 +139,15 @@ input = "FilePath"
 output = "ReloadFile"
 ```
 
-The editor supports File/Edit/View/Help menus, Open, Save, Save As with
+The editor supports File/Edit/View/Window/Help menus, Open, Save, Save As with
 encoding and line-ending choices, UTF-8/UTF-8 BOM/UTF-16 detection,
 line-ending reporting, dirty-title tracking, find/replace, basic editing
 commands, automatic indentation on Enter, keyboard shortcuts, and dropping a
 file onto the editor.
+New creates a new document window. Open reuses a clean Untitled window and
+opens a new window when the current window already contains a file or unsaved
+text. Window provides creation-order cycling with Ctrl+Tab/Ctrl+Shift+Tab,
+restoring or minimizing all windows, and per-window always-on-top control.
 
 The editor surface is `AzunyanEditorControl`, a `TextBox`-derived control that
 keeps Windows' native text-service integration. This provides Japanese IME

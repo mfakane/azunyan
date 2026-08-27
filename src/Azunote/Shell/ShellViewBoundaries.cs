@@ -15,6 +15,11 @@ internal sealed record StatusBarState(
     string Indentation,
     string FilePath);
 
+internal sealed record WindowMenuEntry(
+    string Id,
+    string DocumentName,
+    bool IsCurrent);
+
 internal interface IEditorView : IEditorBuffer
 {
     void Focus();
@@ -58,6 +63,14 @@ internal interface IWindowChromeView
     void SetStatusBarVisible(bool visible);
 
     void SetWordWrapLabel(bool enabled);
+}
+
+internal interface IWindowMenuView
+{
+    void RenderWindowMenu(
+        IReadOnlyList<WindowMenuEntry> entries,
+        bool isAlwaysOnTop,
+        Action<string> onSelected);
 }
 
 internal interface IFindReplaceView

@@ -69,6 +69,27 @@ public sealed class AzunoteUiTests : IClassFixture<AzunoteUiFixture>
             expected => string.Equals(expected, "日本語", StringComparison.Ordinal));
         Assert.Equal("日本語", selectedText);
     }
+
+    [AzunoteUiFact]
+    public void New_file_creates_a_window_and_window_menu_lists_all_instances()
+    {
+        var originalWindow = _fixture.Window;
+        AzunoteUiFixture.InvokeMenuItem(originalWindow, "File", "New");
+
+        var windows = _fixture.WaitForWindows(current => current.Length >= 2);
+        Assert.True(windows.Length >= 2);
+
+        AzunoteUiFixture.OpenMenu(originalWindow, "Window");
+        AzunoteUiFixture.WaitFor(
+            () => originalWindow.FindAll(
+                TreeScope.Descendants,
+                new PropertyCondition(
+                    AutomationElement.NameProperty,
+                    "Untitled")).Count >= 1
+                ? originalWindow
+                : null,
+            "The Window menu did not list the new Untitled window.");
+    }
 }
 
 public sealed class AzunoteUiFixture : IDisposable
@@ -87,6 +108,15 @@ public sealed class AzunoteUiFixture : IDisposable
                 _window!,
                 AutomationElement.NameProperty,
                 "Document editor");
+        }
+    }
+
+    public AutomationElement Window
+    {
+        get
+        {
+            EnsureStarted();
+            return _window!;
         }
     }
 
@@ -141,6 +171,46 @@ public sealed class AzunoteUiFixture : IDisposable
                 }
             },
             "The projected selection did not reach the expected text.");
+    }
+
+    public AutomationElement[] WaitForWindows(Func<AutomationElement[], bool> predicate)
+    {
+        return WaitFor(
+            () =>
+            {
+                var windows = FindWindows();
+                return predicate(windows) ? windows : null;
+            },
+            "Azunote did not reach the expected number of windows.");
+    }
+
+    public static void OpenMenu(AutomationElement window, string name)
+    {
+        var menu = FindRequired(window, AutomationElement.NameProperty, name);
+        if (menu.TryGetCurrentPattern(
+                ExpandCollapsePattern.Pattern,
+                out var expandCollapse)
+            && expandCollapse is ExpandCollapsePattern pattern)
+        {
+            pattern.Expand();
+            return;
+        }
+
+        Invoke(menu);
+    }
+
+    public static void InvokeMenuItem(
+        AutomationElement window,
+        string menuName,
+        string itemName)
+    {
+        OpenMenu(window, menuName);
+        var item = WaitFor(
+            () => window.FindFirst(
+                TreeScope.Descendants,
+                new PropertyCondition(AutomationElement.NameProperty, itemName)),
+            $"Could not find menu item {menuName} > {itemName}.");
+        Invoke(item);
     }
 
     public void Dispose()
@@ -245,6 +315,36 @@ public sealed class AzunoteUiFixture : IDisposable
         return null;
     }
 
+    private AutomationElement[] FindWindows()
+    {
+        if (_process is null || _process.HasExited)
+        {
+            return [];
+        }
+
+        var windows = AutomationElement.RootElement.FindAll(
+            TreeScope.Children,
+            Condition.TrueCondition);
+        var result = new List<AutomationElement>();
+        foreach (AutomationElement window in windows)
+        {
+            try
+            {
+                if (window.Current.ProcessId == _process.Id
+                    && FindEditor(window) is not null)
+                {
+                    result.Add(window);
+                }
+            }
+            catch (ElementNotAvailableException)
+            {
+                // The window was closed while the desktop tree was queried.
+            }
+        }
+
+        return result.ToArray();
+    }
+
     private static AutomationElement? FindEditor(AutomationElement window) =>
         window.FindFirst(
             TreeScope.Descendants,
@@ -261,6 +361,28 @@ public sealed class AzunoteUiFixture : IDisposable
             new PropertyCondition(property, value))
         ?? throw new XunitException(
             $"Could not find UI Automation element {property.ProgrammaticName}={value}.");
+
+    private static void Invoke(AutomationElement element)
+    {
+        if (element.TryGetCurrentPattern(InvokePattern.Pattern, out var invoke)
+            && invoke is InvokePattern invokePattern)
+        {
+            invokePattern.Invoke();
+            return;
+        }
+
+        if (element.TryGetCurrentPattern(
+                SelectionItemPattern.Pattern,
+                out var selection)
+            && selection is SelectionItemPattern selectionPattern)
+        {
+            selectionPattern.Select();
+            return;
+        }
+
+        throw new XunitException(
+            $"UI Automation element {element.Current.Name} is not invokable.");
+    }
 
     private static string ResolveExecutablePath()
     {
@@ -333,7 +455,7 @@ public sealed class AzunoteUiFixture : IDisposable
         }
     }
 
-    private static T WaitFor<T>(Func<T?> action, string message)
+    internal static T WaitFor<T>(Func<T?> action, string message)
         where T : class
     {
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);

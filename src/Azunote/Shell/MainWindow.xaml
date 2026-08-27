@@ -84,6 +84,25 @@
                 <MenuFlyoutItem Text="Run External Tool..." Click="RunExternalToolMenuItem_Click" />
                 <MenuFlyoutItem Text="Preferences..." Click="PreferencesMenuItem_Click" />
             </MenuBarItem>
+            <MenuBarItem x:Name="WindowMenuItem" Title="Window">
+                <ToggleMenuFlyoutItem
+                    x:Name="AlwaysOnTopMenuItem"
+                    Text="Always on Top"
+                    Click="AlwaysOnTopMenuItem_Click" />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="Show All Windows" Click="ShowAllWindowsMenuItem_Click" />
+                <MenuFlyoutItem Text="Minimize All Windows" Click="MinimizeAllWindowsMenuItem_Click" />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem
+                    Text="Next Window"
+                    Click="NextWindowMenuItem_Click"
+                    KeyboardAcceleratorTextOverride="Ctrl+Tab" />
+                <MenuFlyoutItem
+                    Text="Previous Window"
+                    Click="PreviousWindowMenuItem_Click"
+                    KeyboardAcceleratorTextOverride="Ctrl+Shift+Tab" />
+                <MenuFlyoutSeparator />
+            </MenuBarItem>
             <MenuBarItem Title="Help">
                 <MenuFlyoutItem Text="About Azunote" Click="AboutMenuItem_Click" />
             </MenuBarItem>

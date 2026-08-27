@@ -12,6 +12,7 @@ namespace Azunote;
 
 public sealed partial class MainWindow : Window, IDisposable
 {
+    private readonly ApplicationCoordinator _application;
     private readonly MainWindowViewAdapter _view;
     private readonly MainWindowRuntime _runtime;
     private readonly AppWindow? _appWindow;
@@ -21,8 +22,9 @@ public sealed partial class MainWindow : Window, IDisposable
 
     internal MainWindowRuntime Runtime => _runtime;
 
-    public MainWindow()
+    internal MainWindow(ApplicationCoordinator application)
     {
+        _application = application ?? throw new ArgumentNullException(nameof(application));
         InitializeComponent();
         _view = new MainWindowViewAdapter(
             this,
@@ -33,6 +35,8 @@ public sealed partial class MainWindow : Window, IDisposable
             ReplaceTextBox,
             FindResultText,
             LanguageModeMenuItem,
+            WindowMenuItem,
+            AlwaysOnTopMenuItem,
             ToolsMenuItem,
             WordWrapMenuItem,
             StatusBarPanel,
@@ -42,7 +46,11 @@ public sealed partial class MainWindow : Window, IDisposable
             IndentationStatus,
             FilePathStatus);
         _view.ConfigureTheme();
-        _runtime = new MainWindowRuntime(_view);
+        _runtime = new MainWindowRuntime(
+            _view,
+            application.CreateNewDocumentWindowAsync,
+            application.OpenFileInNewWindowAsync,
+            application.RefreshWindowMenus);
         RegisterKeyboardAccelerators();
 
         _appWindow = _view.AppWindow;
@@ -52,6 +60,7 @@ public sealed partial class MainWindow : Window, IDisposable
         }
 
         Closed += MainWindow_Closed;
+        Activated += MainWindow_Activated;
     }
 
     private void RegisterKeyboardAccelerators()
@@ -59,6 +68,22 @@ public sealed partial class MainWindow : Window, IDisposable
         var escape = new KeyboardAccelerator { Key = VirtualKey.Escape };
         escape.Invoked += EscapeAccelerator_Invoked;
         RootGrid.KeyboardAccelerators.Add(escape);
+
+        var nextWindow = new KeyboardAccelerator
+        {
+            Key = VirtualKey.Tab,
+            Modifiers = VirtualKeyModifiers.Control
+        };
+        nextWindow.Invoked += NextWindowAccelerator_Invoked;
+        RootGrid.KeyboardAccelerators.Add(nextWindow);
+
+        var previousWindow = new KeyboardAccelerator
+        {
+            Key = VirtualKey.Tab,
+            Modifiers = VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift
+        };
+        previousWindow.Invoked += PreviousWindowAccelerator_Invoked;
+        RootGrid.KeyboardAccelerators.Add(previousWindow);
     }
 
     private async void OpenButton_Click(object sender, RoutedEventArgs e) =>
@@ -90,6 +115,24 @@ public sealed partial class MainWindow : Window, IDisposable
     private void WordWrapMenuItem_Click(object sender, RoutedEventArgs e) => _runtime.ToggleWordWrap();
 
     private void StatusBarMenuItem_Click(object sender, RoutedEventArgs e) => _runtime.ToggleStatusBar();
+
+    private void NextWindowMenuItem_Click(object sender, RoutedEventArgs e) =>
+        _application.CycleWindow(this, direction: 1);
+
+    private void PreviousWindowMenuItem_Click(object sender, RoutedEventArgs e) =>
+        _application.CycleWindow(this, direction: -1);
+
+    private void ShowAllWindowsMenuItem_Click(object sender, RoutedEventArgs e) =>
+        _application.ShowAllWindows();
+
+    private void MinimizeAllWindowsMenuItem_Click(object sender, RoutedEventArgs e) =>
+        _application.MinimizeAllWindows();
+
+    private void AlwaysOnTopMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        _runtime.ToggleAlwaysOnTop();
+        _application.RefreshWindowMenus();
+    }
 
     private async void AboutMenuItem_Click(object sender, RoutedEventArgs e) =>
         await _runtime.ShowAboutAsync();
@@ -137,6 +180,22 @@ public sealed partial class MainWindow : Window, IDisposable
         }
     }
 
+    private void NextWindowAccelerator_Invoked(
+        KeyboardAccelerator sender,
+        KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = true;
+        _application.CycleWindow(this, direction: 1);
+    }
+
+    private void PreviousWindowAccelerator_Invoked(
+        KeyboardAccelerator sender,
+        KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = true;
+        _application.CycleWindow(this, direction: -1);
+    }
+
     private async void AppWindow_Closing(AppWindow sender, AppWindowClosingEventArgs args)
     {
         if (_allowClose || !_runtime.IsDirty)
@@ -154,7 +213,21 @@ public sealed partial class MainWindow : Window, IDisposable
         Close();
     }
 
-    private void MainWindow_Closed(object sender, WindowEventArgs args) => Dispose();
+    private void MainWindow_Activated(
+        object sender,
+        Microsoft.UI.Xaml.WindowActivatedEventArgs args)
+    {
+        if (args.WindowActivationState != WindowActivationState.Deactivated)
+        {
+            _application.WindowActivated(this);
+        }
+    }
+
+    private void MainWindow_Closed(object sender, WindowEventArgs args)
+    {
+        _application.WindowClosed(this);
+        Dispose();
+    }
 
     private void Editor_TextChanged(object sender, TextChangedEventArgs e) =>
         _runtime.ObserveTextChanged();
@@ -256,4 +329,26 @@ public sealed partial class MainWindow : Window, IDisposable
         _disposed = true;
         _runtime.Dispose();
     }
+
+    internal string DocumentName => _runtime.DocumentName;
+
+    internal bool IsAlwaysOnTop => _view.IsAlwaysOnTop;
+
+    internal void ActivateWindow()
+    {
+        _view.RestoreIfMinimized();
+        Activate();
+    }
+
+    internal void MinimizeWindow() => _view.Minimize();
+
+    internal void RestoreIfMinimized() => _view.RestoreIfMinimized();
+
+    internal void FocusEditor() => _view.Focus();
+
+    internal void RenderWindowMenu(
+        IReadOnlyList<WindowMenuEntry> entries,
+        bool isAlwaysOnTop,
+        Action<string> onSelected) =>
+        _view.RenderWindowMenu(entries, isAlwaysOnTop, onSelected);
 }

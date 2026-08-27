@@ -14,6 +14,7 @@ internal sealed class MainWindowViewAdapter :
     IEditorView,
     IStatusBarView,
     IWindowChromeView,
+    IWindowMenuView,
     IFindReplaceView,
     ILanguageModeMenuView,
     IExternalToolMenuView
@@ -28,6 +29,8 @@ internal sealed class MainWindowViewAdapter :
     private readonly TextBox _replaceTextBox;
     private readonly TextBlock _findResultText;
     private readonly MenuFlyoutSubItem _languageModeMenu;
+    private readonly MenuBarItem _windowMenu;
+    private readonly ToggleMenuFlyoutItem _alwaysOnTopMenuItem;
     private readonly MenuBarItem _toolsMenu;
     private readonly MenuFlyoutItem _wordWrapMenuItem;
     private readonly Border _statusBarPanel;
@@ -38,6 +41,7 @@ internal sealed class MainWindowViewAdapter :
     private readonly TextBlock _filePathStatus;
     private readonly List<KeyboardAccelerator> _externalToolAccelerators = [];
     private readonly List<MenuFlyoutItemBase> _externalToolMenuItems = [];
+    private readonly List<MenuFlyoutItemBase> _windowMenuItems = [];
     private readonly Dictionary<string, ToggleMenuFlyoutItem> _languageModeItems =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -50,6 +54,8 @@ internal sealed class MainWindowViewAdapter :
         TextBox replaceTextBox,
         TextBlock findResultText,
         MenuFlyoutSubItem languageModeMenu,
+        MenuBarItem windowMenu,
+        ToggleMenuFlyoutItem alwaysOnTopMenuItem,
         MenuBarItem toolsMenu,
         MenuFlyoutItem wordWrapMenuItem,
         Border statusBarPanel,
@@ -68,6 +74,8 @@ internal sealed class MainWindowViewAdapter :
         _replaceTextBox = replaceTextBox ?? throw new ArgumentNullException(nameof(replaceTextBox));
         _findResultText = findResultText ?? throw new ArgumentNullException(nameof(findResultText));
         _languageModeMenu = languageModeMenu ?? throw new ArgumentNullException(nameof(languageModeMenu));
+        _windowMenu = windowMenu ?? throw new ArgumentNullException(nameof(windowMenu));
+        _alwaysOnTopMenuItem = alwaysOnTopMenuItem ?? throw new ArgumentNullException(nameof(alwaysOnTopMenuItem));
         _toolsMenu = toolsMenu ?? throw new ArgumentNullException(nameof(toolsMenu));
         _wordWrapMenuItem = wordWrapMenuItem ?? throw new ArgumentNullException(nameof(wordWrapMenuItem));
         _statusBarPanel = statusBarPanel ?? throw new ArgumentNullException(nameof(statusBarPanel));
@@ -85,6 +93,10 @@ internal sealed class MainWindowViewAdapter :
     public IntPtr WindowHandle => _windowHandle;
 
     public AppWindow? AppWindow => _appWindow;
+
+    public bool IsAlwaysOnTop =>
+        _appWindow?.Presenter is OverlappedPresenter presenter
+            && presenter.IsAlwaysOnTop;
 
     public Microsoft.UI.Dispatching.DispatcherQueue DispatcherQueue =>
         _rootGrid.DispatcherQueue;
@@ -193,6 +205,55 @@ internal sealed class MainWindowViewAdapter :
         if (_appWindow is not null)
         {
             _appWindow.Title = title;
+        }
+    }
+
+    public void ToggleAlwaysOnTop()
+    {
+        if (_appWindow?.Presenter is OverlappedPresenter presenter)
+        {
+            presenter.IsAlwaysOnTop = !presenter.IsAlwaysOnTop;
+        }
+    }
+
+    public void Minimize()
+    {
+        if (_appWindow?.Presenter is OverlappedPresenter presenter)
+        {
+            presenter.Minimize();
+        }
+    }
+
+    public void RestoreIfMinimized()
+    {
+        if (_appWindow?.Presenter is OverlappedPresenter presenter
+            && presenter.State == OverlappedPresenterState.Minimized)
+        {
+            presenter.Restore();
+        }
+    }
+
+    public void RenderWindowMenu(
+        IReadOnlyList<WindowMenuEntry> entries,
+        bool isAlwaysOnTop,
+        Action<string> onSelected)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        ArgumentNullException.ThrowIfNull(onSelected);
+
+        ClearWindowMenuItems();
+        _alwaysOnTopMenuItem.IsChecked = isAlwaysOnTop;
+        foreach (var entry in entries)
+        {
+            var menuItem = new ToggleMenuFlyoutItem
+            {
+                Text = entry.DocumentName,
+                IsChecked = entry.IsCurrent,
+                Tag = entry.Id
+            };
+            menuItem.Click += (_, _) => onSelected(entry.Id);
+            _windowMenu.Items.Add(menuItem);
+            _windowMenuItems.Add(menuItem);
         }
     }
 
@@ -320,6 +381,16 @@ internal sealed class MainWindowViewAdapter :
         }
 
         _externalToolMenuItems.Clear();
+    }
+
+    private void ClearWindowMenuItems()
+    {
+        foreach (var item in _windowMenuItems)
+        {
+            _windowMenu.Items.Remove(item);
+        }
+
+        _windowMenuItems.Clear();
     }
 
     private List<MenuFlyoutItemBase> CreateExternalToolMenuItems(
