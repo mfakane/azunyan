@@ -44,6 +44,7 @@ internal sealed class MainWindowViewAdapter :
     private readonly List<MenuFlyoutItemBase> _windowMenuItems = [];
     private readonly Dictionary<string, ToggleMenuFlyoutItem> _languageModeItems =
         new(StringComparer.OrdinalIgnoreCase);
+    private bool _themeConfigured;
 
     public MainWindowViewAdapter(
         MainWindow window,
@@ -103,8 +104,24 @@ internal sealed class MainWindowViewAdapter :
 
     public XamlRoot? XamlRoot => _rootGrid.XamlRoot;
 
-    public void ConfigureTheme() =>
-        _editor.ColorScheme = AzunoteSystemColorScheme.CreateLight();
+    public void ConfigureTheme()
+    {
+        if (!_themeConfigured)
+        {
+            _rootGrid.ActualThemeChanged += OnActualThemeChanged;
+            _rootGrid.Loaded += OnRootGridLoaded;
+            _themeConfigured = true;
+        }
+
+        ApplyTheme();
+    }
+
+    private void OnActualThemeChanged(FrameworkElement sender, object args) => ApplyTheme();
+
+    private void OnRootGridLoaded(object sender, RoutedEventArgs args) => ApplyTheme();
+
+    private void ApplyTheme() =>
+        _editor.ColorScheme = AzunoteSystemColorScheme.Create(_rootGrid.ActualTheme);
 
     public bool IsStatusBarVisible => _statusBarPanel.Visibility == Visibility.Visible;
 
@@ -361,7 +378,17 @@ internal sealed class MainWindowViewAdapter :
         }
     }
 
-    public void DisposeEditor() => _editor.Dispose();
+    public void DisposeEditor()
+    {
+        if (_themeConfigured)
+        {
+            _rootGrid.ActualThemeChanged -= OnActualThemeChanged;
+            _rootGrid.Loaded -= OnRootGridLoaded;
+            _themeConfigured = false;
+        }
+
+        _editor.Dispose();
+    }
 
     private void ClearExternalToolAccelerators()
     {

@@ -1,4 +1,5 @@
 using Azunyan.WinUI;
+using Microsoft.UI.Xaml;
 using Windows.UI;
 using Xunit;
 
@@ -40,5 +41,16 @@ public sealed class AzunyanColorSchemeTests
 
         Assert.Equal(syntaxColors.Length, syntaxColors.Distinct().Count());
         Assert.DoesNotContain(colors.EditorForeground, syntaxColors);
+    }
+
+    [Fact]
+    public void Dark_system_scheme_uses_dark_editor_colors()
+    {
+        var light = AzunoteSystemColorScheme.Create(ElementTheme.Light);
+        var dark = AzunoteSystemColorScheme.Create(ElementTheme.Dark);
+
+        Assert.NotEqual(light.EditorBackground, dark.EditorBackground);
+        Assert.NotEqual(light.EditorForeground, dark.EditorForeground);
+        Assert.NotEqual(light.KeywordForeground, dark.KeywordForeground);
     }
 }
