@@ -20,7 +20,7 @@ dotnet publish src/Azunote/Azunote.csproj -c Release -r win-x64 --self-contained
 ```
 
 The runnable output is written below
-`src/Azunote/bin/Release/net8.0-windows10.0.19041.0/win-x64/publish`.
+`src/Azunote/bin/Release/net10.0-windows10.0.19041.0/win-x64/publish`.
 
 The UI-independent editing model lives in `src/Azunyan.Core` and can be
 tested without WinUI:
