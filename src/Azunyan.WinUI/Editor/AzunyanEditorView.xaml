@@ -80,20 +80,49 @@
                 x:Name="CompletionPopup"
                 IsLightDismissEnabled="False"
                 IsOpen="False">
-            <Border
-                x:Name="CompletionBorder"
-                Width="320"
-                MaxHeight="240"
-                Background="Transparent"
-                BorderBrush="Transparent"
-                BorderThickness="1">
-                    <ListView
-                        x:Name="CompletionList"
-                        MaxHeight="238"
-                        Background="Transparent"
-                        Foreground="Transparent"
-                        IsItemClickEnabled="True"
-                        SelectionMode="Single" />
+                <Border
+                    x:Name="CompletionBorder"
+                    Width="640"
+                    MaxHeight="240"
+                    Background="Transparent"
+                    BorderBrush="Transparent"
+                    BorderThickness="1">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="320" />
+                            <ColumnDefinition Width="320" />
+                        </Grid.ColumnDefinitions>
+                        <ListView
+                            x:Name="CompletionList"
+                            Grid.Column="0"
+                            MaxHeight="238"
+                            Background="Transparent"
+                            Foreground="Transparent"
+                            IsItemClickEnabled="True"
+                            SelectionMode="Single" />
+                        <Border
+                            x:Name="CompletionDetailsBorder"
+                            Grid.Column="1"
+                            Padding="10,7"
+                            Background="Transparent"
+                            BorderBrush="Transparent"
+                            BorderThickness="1,0,0,0"
+                            Visibility="Collapsed">
+                            <ScrollViewer
+                                MaxHeight="238"
+                                VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <TextBlock
+                                        x:Name="CompletionDetailsTitle"
+                                        FontWeight="SemiBold"
+                                        TextWrapping="Wrap" />
+                                    <TextBlock
+                                        x:Name="CompletionDetailsContent"
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Border>
+                    </Grid>
                 </Border>
             </Popup>
             <Popup

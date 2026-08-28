@@ -74,6 +74,11 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         InputEditor.PointerMoved += OnInputPointerMoved;
         InputEditor.PointerExited += OnInputPointerExited;
         CompletionList.ItemClick += OnCompletionItemClick;
+        CompletionList.SelectionChanged += OnCompletionSelectionChanged;
+        CompletionList.AddHandler(
+            UIElement.KeyDownEvent,
+            new KeyEventHandler(OnCompletionListKeyDown),
+            true);
         ProjectedVerticalScrollBar.ValueChanged += OnProjectedVerticalScrollChanged;
         InputEditor.AllowDrop = true;
         InputEditor.IsSpellCheckEnabled = false;
@@ -580,6 +585,48 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             }
         }
 
+    }
+
+    private void OnCompletionListKeyDown(object sender, KeyRoutedEventArgs args)
+    {
+        if (!IsCompletionPopupOpen)
+        {
+            return;
+        }
+
+        switch (args.Key)
+        {
+            case VirtualKey.Down:
+                if (!args.Handled)
+                {
+                    MoveCompletionSelection(1);
+                }
+
+                args.Handled = true;
+                return;
+            case VirtualKey.Up:
+                if (!args.Handled)
+                {
+                    MoveCompletionSelection(-1);
+                }
+
+                args.Handled = true;
+                return;
+            case VirtualKey.Enter:
+            case VirtualKey.Tab when !IsKeyDown(VirtualKey.Shift):
+                if (TryAcceptSelectedCompletion())
+                {
+                    args.Handled = true;
+                }
+
+                return;
+            case VirtualKey.Escape:
+                HideCompletionPopup();
+                _completionRequested = false;
+                _explicitCompletionRequested = false;
+                args.Handled = true;
+                return;
+        }
     }
 
     private static bool IsKeyDown(VirtualKey key) =>
@@ -1352,6 +1399,10 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         CompletionBorder.Background = new SolidColorBrush(_colorScheme.PopupBackground);
         CompletionBorder.BorderBrush = new SolidColorBrush(_colorScheme.PopupBorder);
         CompletionList.Foreground = new SolidColorBrush(_colorScheme.PopupForeground);
+        CompletionDetailsBorder.Background = new SolidColorBrush(_colorScheme.PopupBackground);
+        CompletionDetailsBorder.BorderBrush = new SolidColorBrush(_colorScheme.PopupBorder);
+        CompletionDetailsTitle.Foreground = new SolidColorBrush(_colorScheme.PopupForeground);
+        CompletionDetailsContent.Foreground = new SolidColorBrush(_colorScheme.PopupForeground);
 
         TooltipBorder.Background = new SolidColorBrush(_colorScheme.TooltipBackground);
         TooltipBorder.BorderBrush = new SolidColorBrush(_colorScheme.TooltipBorder);
@@ -1501,6 +1552,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         InputEditor.AutoIndentOnEnter = false;
+        InputEditor.SuppressVerticalCaretNavigation = true;
 
         if (!_defaultRenderer.TextRenderer.TryGetCaretRect(
                 DocumentAnchor.Before(frame.Selection.CaretPosition),
@@ -1535,6 +1587,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         {
             CompletionList.SelectedIndex = 0;
         }
+
+        UpdateCompletionDetails();
 
         var inputOrigin = ProjectedSurfaceHost.TransformToVisual(RootGrid)
             .TransformPoint(new Point(0, 0));
@@ -1615,6 +1669,36 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
         var index = CompletionList.SelectedIndex < 0 ? 0 : CompletionList.SelectedIndex;
         CompletionList.SelectedIndex = (index + direction + count) % count;
+    }
+
+    private void OnCompletionSelectionChanged(
+        object sender,
+        SelectionChangedEventArgs args) =>
+        UpdateCompletionDetails();
+
+    private void UpdateCompletionDetails()
+    {
+        var selectedIndex = CompletionList.SelectedIndex;
+        if (_displayedCompletionItems is not { } items
+            || selectedIndex < 0
+            || selectedIndex >= items.Count)
+        {
+            CompletionDetailsBorder.Visibility = Visibility.Collapsed;
+            CompletionDetailsTitle.Text = string.Empty;
+            CompletionDetailsContent.Text = string.Empty;
+            return;
+        }
+
+        var item = items[selectedIndex];
+        CompletionDetailsTitle.Text = item.Detail ?? string.Empty;
+        CompletionDetailsTitle.Visibility = string.IsNullOrEmpty(item.Detail)
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        CompletionDetailsContent.Text = item.Documentation ?? string.Empty;
+        CompletionDetailsBorder.Visibility = string.IsNullOrEmpty(item.Detail)
+            && string.IsNullOrEmpty(item.Documentation)
+                ? Visibility.Collapsed
+                : Visibility.Visible;
     }
 
     private void OnCompletionItemClick(object sender, ItemClickEventArgs args)
@@ -1720,10 +1804,15 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private void HideCompletionPopup()
     {
         InputEditor.AutoIndentOnEnter = true;
+        InputEditor.SuppressVerticalCaretNavigation = false;
         CompletionPopup.IsOpen = false;
         CompletionList.Items.Clear();
         _displayedCompletionItems = null;
         CompletionList.SelectedIndex = -1;
+        CompletionDetailsTitle.Visibility = Visibility.Visible;
+        CompletionDetailsBorder.Visibility = Visibility.Collapsed;
+        CompletionDetailsTitle.Text = string.Empty;
+        CompletionDetailsContent.Text = string.Empty;
     }
 
     private void HideTooltipPopup()

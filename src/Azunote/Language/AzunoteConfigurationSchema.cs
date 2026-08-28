@@ -27,14 +27,16 @@ public sealed record AzunoteSchemaField(
     AzunoteSchemaValueKind ValueKind,
     string Classification = "property",
     IReadOnlyList<string>? AllowedValues = null,
-    string? Documentation = null)
+    string? Documentation = null,
+    bool SupportsPlaceholders = false)
 {
     public IReadOnlyList<string> Values => AllowedValues ?? Array.Empty<string>();
 }
 
 public sealed record AzunoteSchemaTable(
     string Path,
-    IReadOnlyList<AzunoteSchemaField> Fields);
+    IReadOnlyList<AzunoteSchemaField> Fields,
+    bool AllowsDynamicFields = false);
 
 public sealed record AzunoteSchemaDefinition(
     string Id,
@@ -54,9 +56,16 @@ public static class AzunoteSchemaCatalog
             new AzunoteSchemaTable(
                 "terminal",
                 [
-                    Field("command", AzunoteSchemaValueKind.String, "command"),
-                    Field("args", AzunoteSchemaValueKind.Array, "property"),
-                    Field("workingDirectory", AzunoteSchemaValueKind.String, "path")
+                    Field("command", AzunoteSchemaValueKind.String, "command", supportsPlaceholders: true),
+                    Field("args", AzunoteSchemaValueKind.Array, "property", supportsPlaceholders: true),
+                    Field("workingDirectory", AzunoteSchemaValueKind.String, "path", supportsPlaceholders: true)
+                ]),
+            new AzunoteSchemaTable(
+                "explorer",
+                [
+                    Field("command", AzunoteSchemaValueKind.String, "command", supportsPlaceholders: true),
+                    Field("args", AzunoteSchemaValueKind.Array, "property", supportsPlaceholders: true),
+                    Field("workingDirectory", AzunoteSchemaValueKind.String, "path", supportsPlaceholders: true)
                 ])
         ]);
 
@@ -74,9 +83,9 @@ public static class AzunoteSchemaCatalog
             new AzunoteSchemaTable(
                 "launch",
                 [
-                    Field("command", AzunoteSchemaValueKind.String, "command"),
-                    Field("args", AzunoteSchemaValueKind.Array, "property"),
-                    Field("workingDirectory", AzunoteSchemaValueKind.String, "path"),
+                    Field("command", AzunoteSchemaValueKind.String, "command", supportsPlaceholders: true),
+                    Field("args", AzunoteSchemaValueKind.Array, "property", supportsPlaceholders: true),
+                    Field("workingDirectory", AzunoteSchemaValueKind.String, "path", supportsPlaceholders: true),
                     EnumField("input", "none", "filePath", "document", "selection"),
                     EnumField("output", "ignore", "replaceDocument", "replaceSelection", "newDocument", "reloadFile")
                 ]),
@@ -93,7 +102,8 @@ public static class AzunoteSchemaCatalog
                 ]),
             new AzunoteSchemaTable(
                 "env",
-                [])
+                [],
+                AllowsDynamicFields: true)
         ]);
 
     public static AzunoteSchemaDefinition CustomMode { get; } = new(
@@ -175,13 +185,60 @@ public static class AzunoteSchemaCatalog
         string name,
         AzunoteSchemaValueKind valueKind,
         string classification = "property",
-        string? documentation = null) =>
-        new(name, valueKind, classification, Documentation: documentation);
+        string? documentation = null,
+        bool supportsPlaceholders = false) =>
+        new(
+            name,
+            valueKind,
+            classification,
+            Documentation: documentation,
+            SupportsPlaceholders: supportsPlaceholders);
 
     private static AzunoteSchemaField EnumField(
         string name,
         params string[] values) =>
         new(name, AzunoteSchemaValueKind.Enum, AllowedValues: values);
+}
+
+internal sealed record AzunotePlaceholderDefinition(
+    string Name,
+    string Detail,
+    string Documentation,
+    string Example);
+
+internal static class AzunotePlaceholderCatalog
+{
+    public static IReadOnlyList<AzunotePlaceholderDefinition> BuiltIn { get; } =
+    [
+        new("file", "Placeholder", "Path passed to the external process for the current document.", "${file} -> C:\\work\\notes\\current.azunote"),
+        new("filePath", "Placeholder", "Alias for file: the path passed to the external process.", "${filePath} -> C:\\work\\notes\\current.azunote"),
+        new("executionFile", "Placeholder", "Path of the file used for external-process execution.", "${executionFile} -> C:\\work\\notes\\current.azunote"),
+        new("fileDir", "Placeholder", "Directory containing the execution file.", "${fileDir} -> C:\\work\\notes"),
+        new("fileName", "Placeholder", "Name of the execution file.", "${fileName} -> current.azunote"),
+        new("fileStem", "Placeholder", "Execution file name without its extension.", "${fileStem} -> current"),
+        new("fileExtension", "Placeholder", "Extension of the execution file.", "${fileExtension} -> .azunote"),
+        new("documentFile", "Placeholder", "Path of the document file on disk, when available.", "${documentFile} -> C:\\work\\notes\\current.azunote"),
+        new("documentDir", "Placeholder", "Directory containing the document file.", "${documentDir} -> C:\\work\\notes"),
+        new("documentName", "Placeholder", "Name of the document file.", "${documentName} -> current.azunote"),
+        new("documentStem", "Placeholder", "Document file name without its extension.", "${documentStem} -> current"),
+        new("documentExtension", "Placeholder", "Extension of the document file.", "${documentExtension} -> .azunote"),
+        new("tempFile", "Placeholder", "Temporary execution-file path used when the document is dirty.", "${tempFile} -> C:\\Users\\user\\AppData\\Local\\Temp\\azunote\\current.azunote"),
+        new("toolDir", "Placeholder", "Directory containing the external-tool definition.", "${toolDir} -> C:\\work\\tools"),
+        new("document", "Placeholder", "The complete document text.", "${document} -> # Heading"),
+        new("selection", "Placeholder", "The currently selected text.", "${selection} -> selected text"),
+        new("userHome", "Placeholder", "The current user's home directory.", "${userHome} -> C:\\Users\\user"),
+        new("languageId", "Placeholder", "Identifier of the active language mode.", "${languageId} -> azunote.lang"),
+        new("encoding", "Placeholder", "Encoding of the current document.", "${encoding} -> Utf8"),
+        new("lineEnding", "Placeholder", "Line-ending style of the current document.", "${lineEnding} -> Lf"),
+        new("platform", "Placeholder", "Operating-system identifier, such as windows or linux.", "${platform} -> windows"),
+        new("architecture", "Placeholder", "Process architecture, such as x64 or arm64.", "${architecture} -> x64"),
+        new("lineNumber", "Placeholder", "One-based line number of the caret.", "${lineNumber} -> 42"),
+        new("columnNumber", "Placeholder", "One-based column number of the caret.", "${columnNumber} -> 7"),
+        new("selectionStartLine", "Placeholder", "One-based line number where the selection starts.", "${selectionStartLine} -> 10"),
+        new("selectionStartColumn", "Placeholder", "One-based column number where the selection starts.", "${selectionStartColumn} -> 3"),
+        new("selectionEndLine", "Placeholder", "One-based line number where the selection ends.", "${selectionEndLine} -> 10"),
+        new("selectionEndColumn", "Placeholder", "One-based column number where the selection ends.", "${selectionEndColumn} -> 15")
+    ];
 }
 
 /// <summary>Provides schema fields and enum values for the active TOML file.</summary>
@@ -209,6 +266,23 @@ public sealed class AzunoteConfigurationCompletionProvider : ICompletionProvider
         var column = context.Position - lineStart;
         var beforeCaret = lineText[..Math.Min(column, lineText.Length)];
         var tablePath = FindTablePath(snapshot, line);
+
+        if (TryGetPlaceholderContext(
+                beforeCaret,
+                tablePath,
+                context.Position < snapshot.Length && snapshot.Text[context.Position] == '}',
+                out var placeholderStart,
+                out var placeholderPrefix,
+                out var preserveClosingBrace))
+        {
+            var items = CreatePlaceholderItems(placeholderPrefix, preserveClosingBrace, cancellationToken);
+            return ValueTask.FromResult<CompletionResult?>(
+                new CompletionResult(
+                    TextRange.FromBounds(
+                        lineStart + placeholderStart + (preserveClosingBrace ? 2 : 0),
+                        context.Position),
+                    items));
+        }
 
         if (TryGetValueContext(beforeCaret, out var valueStart, out var valuePrefix, out var key))
         {
@@ -269,6 +343,133 @@ public sealed class AzunoteConfigurationCompletionProvider : ICompletionProvider
             .GroupBy(field => field.Name, StringComparer.OrdinalIgnoreCase)
             .Select(group => group.First())
             .ToArray();
+
+    private bool TryGetPlaceholderContext(
+        string text,
+        string tablePath,
+        bool hasClosingBrace,
+        out int placeholderStart,
+        out string placeholderPrefix,
+        out bool preserveClosingBrace)
+    {
+        placeholderStart = 0;
+        placeholderPrefix = string.Empty;
+        preserveClosingBrace = false;
+
+        if (!TryGetValueContext(text, out _, out _, out var key)
+            || !SupportsPlaceholders(tablePath, key))
+        {
+            return false;
+        }
+
+        var opening = text.LastIndexOf("${", StringComparison.Ordinal);
+        if (opening < 0)
+        {
+            return false;
+        }
+
+        var prefix = text[(opening + 2)..];
+        if (prefix.Contains('{') || prefix.Contains('}'))
+        {
+            return false;
+        }
+
+        placeholderStart = opening;
+        placeholderPrefix = prefix;
+        preserveClosingBrace = hasClosingBrace;
+        return true;
+    }
+
+    private bool SupportsPlaceholders(string tablePath, string key)
+    {
+        var table = _schemas
+            .SelectMany(schema => schema.Tables)
+            .FirstOrDefault(candidate =>
+                string.Equals(candidate.Path, tablePath, StringComparison.OrdinalIgnoreCase));
+        if (table is null)
+        {
+            return false;
+        }
+
+        if (table.AllowsDynamicFields)
+        {
+            return true;
+        }
+
+        return FindFields(tablePath)
+            .FirstOrDefault(field =>
+                string.Equals(field.Name, key, StringComparison.OrdinalIgnoreCase))
+            ?.SupportsPlaceholders == true;
+    }
+
+    private static CompletionItem[] CreatePlaceholderItems(
+        string prefix,
+        bool preserveClosingBrace,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var items = new List<CompletionItem>();
+        if (prefix.StartsWith("env:", StringComparison.Ordinal))
+        {
+            var environmentPrefix = prefix[4..];
+            var environmentNames = Environment.GetEnvironmentVariables()
+                .Keys
+                .OfType<string>()
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase);
+            foreach (var environmentName in environmentNames)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!environmentName.StartsWith(environmentPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                items.Add(CreatePlaceholderItem(
+                    $"env:{environmentName}",
+                    "Environment variable",
+                    FormatPlaceholderDocumentation(
+                        $"${{env:{environmentName}}} -> <value of {environmentName}>",
+                        "Expands to the value of the named OS environment variable."),
+                    preserveClosingBrace));
+            }
+
+            return items.ToArray();
+        }
+
+        foreach (var placeholder in AzunotePlaceholderCatalog.BuiltIn)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (placeholder.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                items.Add(CreatePlaceholderItem(
+                    placeholder.Name,
+                    placeholder.Detail,
+                    FormatPlaceholderDocumentation(
+                        placeholder.Example,
+                        placeholder.Documentation),
+                    preserveClosingBrace));
+            }
+        }
+
+        return items.ToArray();
+    }
+
+    private static CompletionItem CreatePlaceholderItem(
+        string name,
+        string detail,
+        string documentation,
+        bool preserveClosingBrace) =>
+        new(
+            $"${{{name}}}",
+            preserveClosingBrace ? name : $"${{{name}}}",
+            detail,
+            documentation);
+
+    private static string FormatPlaceholderDocumentation(
+        string example,
+        string documentation) =>
+        $"{documentation}{Environment.NewLine}{Environment.NewLine}Example: {example}";
 
     private static string FindTablePath(TextSnapshot snapshot, int currentLine)
     {

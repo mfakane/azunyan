@@ -104,9 +104,18 @@ until that document window is closed, including any save confirmation.
 External commands are available from Tools > Run External Tool... and through
 the `ExternalToolRunner` API. Commands run without a shell and can receive
 `FilePath`, `Document`, or `Selection` through stdin. Arguments support the
-placeholders `${file}`, `${fileDir}`, `${fileName}`, `${document}`,
-`${selection}`, `${userHome}`, `${lineNumber}`, and `${columnNumber}`.
-Environment variables are available as `${env:NAME}`. Output can be ignored,
+placeholders `${file}`, `${filePath}`, `${executionFile}`, `${fileDir}`,
+`${fileName}`, `${fileStem}`, `${fileExtension}`, `${documentFile}`,
+`${documentDir}`, `${documentName}`, `${documentStem}`, `${documentExtension}`,
+`${tempFile}`, `${toolDir}`, `${document}`, `${selection}`, `${userHome}`,
+`${languageId}`, `${encoding}`, `${lineEnding}`, `${platform}`,
+`${architecture}`, `${lineNumber}`, `${columnNumber}`, `${selectionStartLine}`,
+`${selectionStartColumn}`, `${selectionEndLine}`, and `${selectionEndColumn}`.
+Azunote mode offers completion for these placeholders in fields that expand
+values. Environment variables are available as `${env:NAME}` and are
+completed from the current process environment. The selected completion hint
+also shows a representative expansion example, such as `${file}` ->
+`C:\work\notes\current.azunote`. Output can be ignored,
 inserted into the document or selection, opened as a new document, or used to
 reload the current file. When the current buffer is unsaved, the tool receives
 a temporary file containing the current text through `${file}` or `FilePath`;

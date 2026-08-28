@@ -55,6 +55,12 @@ public sealed partial class AzunyanEditorControl : TextBox
     public bool AutoIndentOnEnter { get; set; } = true;
 
     /// <summary>
+    /// Gets or sets whether the native text box must leave Up and Down for
+    /// an external completion list instead of moving the document caret.
+    /// </summary>
+    public bool SuppressVerticalCaretNavigation { get; set; }
+
+    /// <summary>
     /// The number of spaces used for Tab and Shift+Tab on space-indented
     /// lines. A null value infers the indentation size from the document.
     /// Tab-indented lines continue to use a literal tab character.
@@ -339,6 +345,18 @@ public sealed partial class AzunyanEditorControl : TextBox
 
         _compositionRange = null;
         CompositionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    protected override void OnKeyDown(KeyRoutedEventArgs e)
+    {
+        if (SuppressVerticalCaretNavigation
+            && e.Key is VirtualKey.Up or VirtualKey.Down)
+        {
+            e.Handled = true;
+            return;
+        }
+
+        base.OnKeyDown(e);
     }
 
     private void OnKeyDown(object sender, KeyRoutedEventArgs args)

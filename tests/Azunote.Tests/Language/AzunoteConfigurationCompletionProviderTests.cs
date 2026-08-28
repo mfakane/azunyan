@@ -53,6 +53,23 @@ public sealed class AzunoteConfigurationCompletionProviderTests
     }
 
     [Fact]
+    public async Task Settings_schema_completes_explorer_fields()
+    {
+        const string text = "[explorer]\nwork";
+        var provider = new AzunoteConfigurationCompletionProvider(
+            [AzunoteSchemaCatalog.Settings]);
+
+        var result = await provider.GetCompletionsAsync(
+            new EditorProviderContext(
+                new TextSnapshot(text),
+                text.Length,
+                TextSelection.Caret(text.Length)));
+
+        Assert.NotNull(result);
+        Assert.Contains(result!.Items, item => item.Label == "workingDirectory");
+    }
+
+    [Fact]
     public async Task Tool_schema_completes_enum_values_inside_a_string()
     {
         const string text = "[launch]\ninput = \"fi";
@@ -86,5 +103,125 @@ public sealed class AzunoteConfigurationCompletionProviderTests
 
         Assert.NotNull(result);
         Assert.Contains(result!.Items, item => item.Label == "\"regex\"");
+    }
+
+    [Fact]
+    public async Task Tool_schema_completes_all_built_in_placeholders_inside_an_argument()
+    {
+        const string text = "[launch]\nargs = [\"${";
+        var provider = new AzunoteConfigurationCompletionProvider(
+            [AzunoteSchemaCatalog.ExternalTool]);
+
+        var result = await provider.GetCompletionsAsync(
+            new EditorProviderContext(
+                new TextSnapshot(text),
+                text.Length,
+                TextSelection.Caret(text.Length)));
+
+        Assert.NotNull(result);
+        Assert.Contains(result!.Items, item => item.Label == "${file}");
+        Assert.Contains(result.Items, item => item.Label == "${selectionEndColumn}");
+        var fileItem = Assert.Single(result.Items, item => item.Label == "${file}");
+        Assert.Equal("${file}", fileItem.InsertText);
+        Assert.Equal("Placeholder", fileItem.Detail);
+        Assert.NotEmpty(fileItem.Documentation);
+        Assert.Contains("Example: ${file} -> C:\\work\\notes\\current.azunote", fileItem.Documentation);
+        Assert.Equal(
+            TextRange.FromBounds(text.IndexOf("${", StringComparison.Ordinal), text.Length),
+            result.ReplacementRange);
+    }
+
+    [Fact]
+    public async Task Tool_schema_completes_placeholders_in_a_command_value()
+    {
+        const string text = "[launch]\ncommand = \"${doc";
+        var provider = new AzunoteConfigurationCompletionProvider(
+            [AzunoteSchemaCatalog.ExternalTool]);
+
+        var result = await provider.GetCompletionsAsync(
+            new EditorProviderContext(
+                new TextSnapshot(text),
+                text.Length,
+                TextSelection.Caret(text.Length)));
+
+        Assert.NotNull(result);
+        Assert.Contains(result!.Items, item => item.Label == "${document}");
+    }
+
+    [Fact]
+    public async Task A_closed_placeholder_replaces_only_its_name()
+    {
+        const string text = "[launch]\nargs = [\"${fi}\"]";
+        var caret = text.IndexOf('}');
+        var provider = new AzunoteConfigurationCompletionProvider(
+            [AzunoteSchemaCatalog.ExternalTool]);
+
+        var result = await provider.GetCompletionsAsync(
+            new EditorProviderContext(
+                new TextSnapshot(text),
+                caret,
+                TextSelection.Caret(caret)));
+
+        Assert.NotNull(result);
+        var opening = text.IndexOf("${", StringComparison.Ordinal);
+        Assert.Equal(TextRange.FromBounds(opening + 2, caret), result!.ReplacementRange);
+        var item = Assert.Single(result.Items, candidate => candidate.Label == "${file}");
+        Assert.Equal("file", item.InsertText);
+    }
+
+    [Fact]
+    public async Task External_tool_schema_completes_current_environment_variables()
+    {
+        var environmentName = Environment.GetEnvironmentVariables()
+            .Keys
+            .OfType<string>()
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault();
+        Assert.NotNull(environmentName);
+
+        var prefixLength = Math.Min(3, environmentName!.Length);
+        var prefix = environmentName[..prefixLength];
+        var text = $"[env]\nTEST = \"${{env:{prefix}";
+        var provider = new AzunoteConfigurationCompletionProvider(
+            [AzunoteSchemaCatalog.ExternalTool]);
+
+        var result = await provider.GetCompletionsAsync(
+            new EditorProviderContext(
+                new TextSnapshot(text),
+                text.Length,
+                TextSelection.Caret(text.Length)));
+
+        Assert.NotNull(result);
+        Assert.Contains(
+            result!.Items,
+            item => string.Equals(
+                item.Label,
+                $"${{env:{environmentName}}}",
+                StringComparison.OrdinalIgnoreCase));
+        var selected = result.Items.First(item => string.Equals(
+            item.Label,
+            $"${{env:{environmentName}}}",
+            StringComparison.OrdinalIgnoreCase));
+        Assert.Equal("Environment variable", selected.Detail);
+        Assert.Equal("${env:" + environmentName + "}", selected.InsertText);
+        Assert.Contains(
+            $"Example: ${{env:{environmentName}}} -> <value of {environmentName}>",
+            selected.Documentation);
+    }
+
+    [Fact]
+    public async Task Non_expandable_schema_values_do_not_offer_placeholders()
+    {
+        const string text = "[when]\nlanguages = [\"${f";
+        var provider = new AzunoteConfigurationCompletionProvider(
+            [AzunoteSchemaCatalog.ExternalTool]);
+
+        var result = await provider.GetCompletionsAsync(
+            new EditorProviderContext(
+                new TextSnapshot(text),
+                text.Length,
+                TextSelection.Caret(text.Length)));
+
+        Assert.Null(result);
     }
 }
