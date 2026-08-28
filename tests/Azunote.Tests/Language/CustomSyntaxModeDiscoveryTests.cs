@@ -21,6 +21,7 @@ public sealed class CustomSyntaxModeDiscoveryTests
             Assert.Equal("ini", mode.Id);
             Assert.Equal("INI", mode.DisplayName);
             Assert.Contains("*.ini", mode.Patterns);
+            Assert.Equal(Path.GetFullPath(modePath), mode.DefinitionPath);
 
             const string text = "; comment\nname = \"a ; b\"\nactive = true\nvalue = 42\n[server]\n";
             var spans = await mode.GetSyntaxAsync(
@@ -74,6 +75,9 @@ public sealed class CustomSyntaxModeDiscoveryTests
             var mode = Assert.Single(settings.CustomSyntaxModes);
             Assert.Equal("example", mode.Id);
             Assert.Equal(["configs/*.example"], mode.Patterns);
+            Assert.Equal(
+                Path.GetFullPath(Path.Combine(modesDirectory, "example.toml")),
+                mode.DefinitionPath);
         }
         finally
         {

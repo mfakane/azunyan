@@ -8,7 +8,7 @@
         x:Name="RootGrid"
         KeyboardAcceleratorPlacementMode="Hidden">
         <Grid.Resources>
-            <Style x:Key="RecentFileSplitMenuFlyoutItemStyle"
+            <Style x:Key="AuxiliarySplitMenuFlyoutItemStyle"
                    TargetType="SplitMenuFlyoutItem"
                    BasedOn="{StaticResource DefaultSplitMenuFlyoutItemStyle}">
                 <Setter Property="Template">

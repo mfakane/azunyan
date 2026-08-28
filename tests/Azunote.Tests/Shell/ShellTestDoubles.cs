@@ -188,7 +188,9 @@ internal sealed class FakeLanguageModeMenuView : ILanguageModeMenuView
     public void Render(
         IReadOnlyList<LanguageModeEntry> entries,
         int customModeStartIndex,
-        Action<string> onSelected)
+        Action<string> onSelected,
+        Func<string, Task> onEditDefinition,
+        Func<string, Task> onShowInExplorer)
     {
         Entries = entries;
         _onSelected = onSelected;
@@ -206,7 +208,9 @@ internal sealed class FakeExternalToolMenuView : IExternalToolMenuView
     public void Render(
         IReadOnlyList<ExternalToolMenuNode> nodes,
         Func<ExternalToolSettings, ExternalToolMenuState> getState,
-        Func<ExternalToolSettings, Task> onSelected) => Nodes = nodes;
+        Func<ExternalToolSettings, Task> onSelected,
+        Func<string, Task> onEditDefinition,
+        Func<string, Task> onShowInExplorer) => Nodes = nodes;
 }
 
 internal sealed class FakeFileDialogService : IFileDialogService

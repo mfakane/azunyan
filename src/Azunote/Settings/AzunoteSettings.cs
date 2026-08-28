@@ -188,6 +188,13 @@ public sealed class ExternalToolSettings
     [JsonIgnore]
     public string? DefinitionDirectory { get; internal set; }
 
+    /// <summary>
+    /// The source file for this tool definition. This is metadata from the
+    /// discovery process, not a TOML property.
+    /// </summary>
+    [JsonIgnore]
+    public string? DefinitionPath { get; internal set; }
+
     public ExternalToolDefinition ToDefinition()
     {
         Validate();

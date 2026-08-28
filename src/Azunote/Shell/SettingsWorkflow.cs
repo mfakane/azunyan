@@ -12,6 +12,8 @@ internal sealed class SettingsWorkflow : IDisposable
     private readonly Func<string?> _currentFilePath;
     private readonly Func<ExternalToolSettings, Task> _runConfiguredTool;
     private readonly Func<ExternalToolSettings, ExternalToolMenuState> _getToolState;
+    private readonly Func<string, Task> _editDefinition;
+    private readonly Func<string, Task> _showDefinitionInExplorer;
     private IReadOnlyList<ExternalToolMenuNode> _externalToolMenu = [];
     private IFileChangeMonitor? _settingsMonitor;
     private bool _disposed;
@@ -26,7 +28,9 @@ internal sealed class SettingsWorkflow : IDisposable
         ISettingsFolderOpener folderOpener,
         Func<string?> currentFilePath,
         Func<ExternalToolSettings, Task> runConfiguredTool,
-        Func<ExternalToolSettings, ExternalToolMenuState>? getToolState = null)
+        Func<ExternalToolSettings, ExternalToolMenuState>? getToolState = null,
+        Func<string, Task>? editDefinition = null,
+        Func<string, Task>? showDefinitionInExplorer = null)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _languageModes = languageModes ?? throw new ArgumentNullException(nameof(languageModes));
@@ -38,6 +42,8 @@ internal sealed class SettingsWorkflow : IDisposable
         _currentFilePath = currentFilePath ?? throw new ArgumentNullException(nameof(currentFilePath));
         _runConfiguredTool = runConfiguredTool ?? throw new ArgumentNullException(nameof(runConfiguredTool));
         _getToolState = getToolState ?? (_ => new ExternalToolMenuState(true, true));
+        _editDefinition = editDefinition ?? (_ => Task.CompletedTask);
+        _showDefinitionInExplorer = showDefinitionInExplorer ?? (_ => Task.CompletedTask);
     }
 
     public AzunoteSettings Current => _settings.Current;
@@ -111,7 +117,12 @@ internal sealed class SettingsWorkflow : IDisposable
     }
 
     private void RenderExternalTools() =>
-        _externalToolsMenu.Render(_externalToolMenu, _getToolState, _runConfiguredTool);
+        _externalToolsMenu.Render(
+            _externalToolMenu,
+            _getToolState,
+            _runConfiguredTool,
+            _editDefinition,
+            _showDefinitionInExplorer);
 
     private void StartWatcher()
     {

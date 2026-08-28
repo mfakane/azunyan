@@ -135,7 +135,9 @@ internal interface ILanguageModeMenuView
     void Render(
         IReadOnlyList<LanguageModeEntry> entries,
         int customModeStartIndex,
-        Action<string> onSelected);
+        Action<string> onSelected,
+        Func<string, Task> onEditDefinition,
+        Func<string, Task> onShowInExplorer);
 
     void Select(string id);
 }
@@ -145,7 +147,9 @@ internal interface IExternalToolMenuView
     void Render(
         IReadOnlyList<ExternalToolMenuNode> nodes,
         Func<ExternalToolSettings, ExternalToolMenuState> getState,
-        Func<ExternalToolSettings, Task> onSelected);
+        Func<ExternalToolSettings, Task> onSelected,
+        Func<string, Task> onEditDefinition,
+        Func<string, Task> onShowInExplorer);
 }
 
 internal interface IFileDialogService

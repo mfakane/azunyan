@@ -85,7 +85,7 @@ public static class CustomSyntaxModeDiscovery
 
             try
             {
-                var definition = CreateDefinition(settings);
+                var definition = CreateDefinition(settings, path);
                 if (!ids.Add(definition.Id))
                 {
                     throw new SettingsFileException(
@@ -111,7 +111,9 @@ public static class CustomSyntaxModeDiscovery
         return modes;
     }
 
-    private static SyntaxLanguageDefinition CreateDefinition(CustomSyntaxModeSettings settings)
+    private static SyntaxLanguageDefinition CreateDefinition(
+        CustomSyntaxModeSettings settings,
+        string definitionPath)
     {
         ArgumentNullException.ThrowIfNull(settings);
         if (string.IsNullOrWhiteSpace(settings.Id))
@@ -147,7 +149,8 @@ public static class CustomSyntaxModeDiscovery
             settings.DisplayName,
             settings.Patterns,
             sources,
-            settings.CompletionTriggerCharacters);
+            settings.CompletionTriggerCharacters,
+            definitionPath);
     }
 
     private static ISyntaxProvider CreateRule(CustomSyntaxRuleSettings settings)

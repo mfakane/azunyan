@@ -155,6 +155,10 @@ contents are not turned into additional menu levels. The tool definition uses
 TOML fields for `name`, `command`, `arguments`, `input`, `output`, and optional
 `workingDirectory`.
 
+Each external tool menu item is a split item: its main area runs the tool, and
+the `...` area provides `Edit...` and `Show in Explorer` for the definition
+file.
+
 For example:
 
 ```toml
@@ -234,6 +238,8 @@ Azunote also discovers custom language modes from
 Resources/DefaultAppData/modes are copied there. Once the folder exists it is
 user-owned and is never overwritten; adding, editing, or removing a .toml
 definition is picked up by the settings watcher.
+Custom entries in View > Language Mode also provide `Edit...` and `Show in
+Explorer` for their definition files.
 When a file is opened, its path is matched against the built-in and custom
 patterns; unmatched files use Plain Text. A manual menu selection
 is kept until another file is opened.

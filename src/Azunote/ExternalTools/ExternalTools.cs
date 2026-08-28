@@ -1066,6 +1066,7 @@ public static class ExternalToolDiscovery
             }
 
             tool.DefinitionDirectory = Path.GetFullPath(definitionDirectory);
+            tool.DefinitionPath = Path.GetFullPath(path);
             tool.Validate();
             return tool;
         }

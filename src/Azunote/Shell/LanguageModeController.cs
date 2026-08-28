@@ -8,6 +8,8 @@ internal sealed class LanguageModeController
     private readonly IEditorView _editor;
     private readonly ILanguageModeMenuView _menu;
     private readonly Func<string?> _currentFilePath;
+    private readonly Func<string, Task> _editDefinition;
+    private readonly Func<string, Task> _showDefinitionInExplorer;
     private LanguageModeCatalog _catalog = LanguageModeCatalog.Create();
     private string _currentModeId = "plain-text";
     private bool _manuallySelected;
@@ -15,11 +17,15 @@ internal sealed class LanguageModeController
     public LanguageModeController(
         IEditorView editor,
         ILanguageModeMenuView menu,
-        Func<string?> currentFilePath)
+        Func<string?> currentFilePath,
+        Func<string, Task>? editDefinition = null,
+        Func<string, Task>? showDefinitionInExplorer = null)
     {
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
         _menu = menu ?? throw new ArgumentNullException(nameof(menu));
         _currentFilePath = currentFilePath ?? throw new ArgumentNullException(nameof(currentFilePath));
+        _editDefinition = editDefinition ?? (_ => Task.CompletedTask);
+        _showDefinitionInExplorer = showDefinitionInExplorer ?? (_ => Task.CompletedTask);
     }
 
     public string CurrentModeId => _currentModeId;
@@ -35,7 +41,12 @@ internal sealed class LanguageModeController
     {
         var selectedMode = _currentModeId;
         _catalog = LanguageModeCatalog.Create(customModes);
-        _menu.Render(_catalog.Entries, _catalog.CustomModeStartIndex, SelectManually);
+        _menu.Render(
+            _catalog.Entries,
+            _catalog.CustomModeStartIndex,
+            SelectManually,
+            _editDefinition,
+            _showDefinitionInExplorer);
         if (!_catalog.TryGet(selectedMode, out _))
         {
             selectedMode = "plain-text";

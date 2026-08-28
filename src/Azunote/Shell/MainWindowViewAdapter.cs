@@ -53,7 +53,7 @@ internal sealed class MainWindowViewAdapter :
     private readonly List<MenuFlyoutItemBase> _windowMenuItems = [];
     private readonly Dictionary<string, RadioMenuFlyoutItem> _languageModeItems =
         new(StringComparer.OrdinalIgnoreCase);
-    private readonly Style _recentFileMenuItemStyle;
+    private readonly Style _auxiliarySplitMenuFlyoutItemStyle;
     private bool _themeConfigured;
 
     public MainWindowViewAdapter(
@@ -94,8 +94,8 @@ internal sealed class MainWindowViewAdapter :
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
         _editorBuffer = new AzunyanEditorBuffer(editor);
         _rootGrid = rootGrid ?? throw new ArgumentNullException(nameof(rootGrid));
-        _recentFileMenuItemStyle = _rootGrid.Resources["RecentFileSplitMenuFlyoutItemStyle"] as Style
-            ?? throw new InvalidOperationException("The recent file menu item style is not defined.");
+        _auxiliarySplitMenuFlyoutItemStyle = _rootGrid.Resources["AuxiliarySplitMenuFlyoutItemStyle"] as Style
+            ?? throw new InvalidOperationException("The auxiliary split menu item style is not defined.");
         _findPanel = findPanel ?? throw new ArgumentNullException(nameof(findPanel));
         _findTextBox = findTextBox ?? throw new ArgumentNullException(nameof(findTextBox));
         _replaceTextBox = replaceTextBox ?? throw new ArgumentNullException(nameof(replaceTextBox));
@@ -453,7 +453,7 @@ internal sealed class MainWindowViewAdapter :
             {
                 Text = GetRecentFileDisplayName(path),
                 Tag = path,
-                Style = _recentFileMenuItemStyle
+                Style = _auxiliarySplitMenuFlyoutItemStyle
             };
             AutomationProperties.SetHelpText(menuItem, path);
             ToolTipService.SetToolTip(menuItem, path);
@@ -506,10 +506,14 @@ internal sealed class MainWindowViewAdapter :
     public void Render(
         IReadOnlyList<LanguageModeEntry> entries,
         int customModeStartIndex,
-        Action<string> onSelected)
+        Action<string> onSelected,
+        Func<string, Task> onEditDefinition,
+        Func<string, Task> onShowInExplorer)
     {
         ArgumentNullException.ThrowIfNull(entries);
         ArgumentNullException.ThrowIfNull(onSelected);
+        ArgumentNullException.ThrowIfNull(onEditDefinition);
+        ArgumentNullException.ThrowIfNull(onShowInExplorer);
         _languageModeMenu.Items.Clear();
         _languageModeItems.Clear();
         for (var index = 0; index < entries.Count; index++)
@@ -520,14 +524,36 @@ internal sealed class MainWindowViewAdapter :
             }
 
             var mode = entries[index];
-            var item = new RadioMenuFlyoutItem
+            MenuFlyoutItemBase item;
+            if (mode.DefinitionPath is { } definitionPath)
             {
-                Text = mode.DisplayName,
-                GroupName = "LanguageModes",
-                Tag = mode.Id
-            };
-            item.Click += (_, _) => onSelected(mode.Id);
-            _languageModeItems[mode.Id] = item;
+                var splitItem = new SplitMenuFlyoutItem
+                {
+                    Text = mode.DisplayName,
+                    Tag = mode.Id,
+                    Style = _auxiliarySplitMenuFlyoutItemStyle
+                };
+                AddDefinitionActions(
+                    splitItem,
+                    definitionPath,
+                    onEditDefinition,
+                    onShowInExplorer);
+                splitItem.Click += (_, _) => onSelected(mode.Id);
+                item = splitItem;
+            }
+            else
+            {
+                var radioItem = new RadioMenuFlyoutItem
+                {
+                    Text = mode.DisplayName,
+                    GroupName = "LanguageModes",
+                    Tag = mode.Id
+                };
+                radioItem.Click += (_, _) => onSelected(mode.Id);
+                _languageModeItems[mode.Id] = radioItem;
+                item = radioItem;
+            }
+
             _languageModeMenu.Items.Add(item);
         }
     }
@@ -546,11 +572,15 @@ internal sealed class MainWindowViewAdapter :
     public void Render(
         IReadOnlyList<ExternalToolMenuNode> nodes,
         Func<ExternalToolSettings, ExternalToolMenuState> getState,
-        Func<ExternalToolSettings, Task> onSelected)
+        Func<ExternalToolSettings, Task> onSelected,
+        Func<string, Task> onEditDefinition,
+        Func<string, Task> onShowInExplorer)
     {
         ArgumentNullException.ThrowIfNull(nodes);
         ArgumentNullException.ThrowIfNull(getState);
         ArgumentNullException.ThrowIfNull(onSelected);
+        ArgumentNullException.ThrowIfNull(onEditDefinition);
+        ArgumentNullException.ThrowIfNull(onShowInExplorer);
         ClearExternalToolAccelerators();
         ClearExternalToolMenuItems();
         var visibleEntries = ExternalToolMenuBuilder.Build(nodes, getState);
@@ -566,7 +596,11 @@ internal sealed class MainWindowViewAdapter :
             return;
         }
 
-        var menuItems = CreateExternalToolMenuItems(visibleEntries, onSelected);
+        var menuItems = CreateExternalToolMenuItems(
+            visibleEntries,
+            onSelected,
+            onEditDefinition,
+            onShowInExplorer);
         for (var index = 0; index < menuItems.Count; index++)
         {
             _toolsMenu.Items.Insert(index, menuItems[index]);
@@ -658,18 +692,43 @@ internal sealed class MainWindowViewAdapter :
 
     private List<MenuFlyoutItemBase> CreateExternalToolMenuItems(
         IReadOnlyList<ExternalToolMenuEntry> nodes,
-        Func<ExternalToolSettings, Task> onSelected)
+        Func<ExternalToolSettings, Task> onSelected,
+        Func<string, Task> onEditDefinition,
+        Func<string, Task> onShowInExplorer)
     {
         var items = new List<MenuFlyoutItemBase>(nodes.Count);
         foreach (var node in nodes)
         {
             if (node.Tool is { } tool)
             {
-                var menuItem = new MenuFlyoutItem
+                MenuFlyoutItemBase menuItem;
+                if (tool.DefinitionPath is { } definitionPath)
                 {
-                    Text = node.Name,
-                    IsEnabled = node.State!.IsEnabled
-                };
+                    var splitItem = new SplitMenuFlyoutItem
+                    {
+                        Text = node.Name,
+                        IsEnabled = node.State!.IsEnabled,
+                        Style = _auxiliarySplitMenuFlyoutItemStyle
+                    };
+                    AddDefinitionActions(
+                        splitItem,
+                        definitionPath,
+                        onEditDefinition,
+                        onShowInExplorer);
+                    splitItem.Click += (_, _) => _ = onSelected(tool);
+                    menuItem = splitItem;
+                }
+                else
+                {
+                    var regularItem = new MenuFlyoutItem
+                    {
+                        Text = node.Name,
+                        IsEnabled = node.State!.IsEnabled
+                    };
+                    regularItem.Click += (_, _) => _ = onSelected(tool);
+                    menuItem = regularItem;
+                }
+
                 AutomationProperties.SetHelpText(
                     menuItem,
                     node.State.DisabledReason ?? string.Empty);
@@ -677,10 +736,12 @@ internal sealed class MainWindowViewAdapter :
                 {
                     ToolTipService.SetToolTip(menuItem, reason);
                 }
-                menuItem.Click += (_, _) => _ = onSelected(tool);
                 if (ExternalToolShortcut.TryParse(tool.Shortcut, out var shortcut))
                 {
-                    menuItem.KeyboardAcceleratorTextOverride = tool.Shortcut;
+                    if (menuItem is MenuFlyoutItem regularItem)
+                    {
+                        regularItem.KeyboardAcceleratorTextOverride = tool.Shortcut;
+                    }
                     if (node.State.IsEnabled)
                     {
                         // MenuFlyoutSubItem descendants created at runtime are
@@ -708,7 +769,11 @@ internal sealed class MainWindowViewAdapter :
             }
 
             var subMenu = new MenuFlyoutSubItem { Text = node.Name };
-            foreach (var child in CreateExternalToolMenuItems(node.Children, onSelected))
+            foreach (var child in CreateExternalToolMenuItems(
+                         node.Children,
+                         onSelected,
+                         onEditDefinition,
+                         onShowInExplorer))
             {
                 subMenu.Items.Add(child);
             }
@@ -717,6 +782,23 @@ internal sealed class MainWindowViewAdapter :
         }
 
         return items;
+    }
+
+    private static void AddDefinitionActions(
+        SplitMenuFlyoutItem menuItem,
+        string definitionPath,
+        Func<string, Task> onEditDefinition,
+        Func<string, Task> onShowInExplorer)
+    {
+        AutomationProperties.SetHelpText(menuItem, definitionPath);
+        ToolTipService.SetToolTip(menuItem, definitionPath);
+
+        var editItem = new MenuFlyoutItem { Text = "Edit..." };
+        editItem.Click += (_, _) => _ = onEditDefinition(definitionPath);
+        var showInExplorerItem = new MenuFlyoutItem { Text = "Show in Explorer" };
+        showInExplorerItem.Click += (_, _) => _ = onShowInExplorer(definitionPath);
+        menuItem.Items.Add(editItem);
+        menuItem.Items.Add(showInExplorerItem);
     }
 
 }

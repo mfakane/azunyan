@@ -12,7 +12,8 @@ public sealed class SyntaxLanguageDefinition : ISyntaxProvider
         string displayName,
         IEnumerable<string> patterns,
         IEnumerable<ISyntaxProvider> sources,
-        IEnumerable<string>? completionTriggerCharacters = null)
+        IEnumerable<string>? completionTriggerCharacters = null,
+        string? definitionPath = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(id);
         ArgumentException.ThrowIfNullOrEmpty(displayName);
@@ -20,6 +21,9 @@ public sealed class SyntaxLanguageDefinition : ISyntaxProvider
         ArgumentNullException.ThrowIfNull(sources);
         Id = id;
         DisplayName = displayName;
+        DefinitionPath = string.IsNullOrWhiteSpace(definitionPath)
+            ? null
+            : Path.GetFullPath(definitionPath);
         Patterns = patterns
             .Select(NormalizePattern)
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -40,6 +44,9 @@ public sealed class SyntaxLanguageDefinition : ISyntaxProvider
     public string Id { get; }
 
     public string DisplayName { get; }
+
+    /// <summary>The source file for a discovered custom definition, if any.</summary>
+    public string? DefinitionPath { get; }
 
     /// <summary>
     /// File-name or path-suffix glob patterns associated with this definition.

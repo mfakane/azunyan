@@ -42,7 +42,9 @@ internal sealed class MainWindowRuntime : IDisposable
         _languageModes = new LanguageModeController(
             _view,
             _view,
-            () => _session.State.FilePath);
+            () => _session.State.FilePath,
+            OpenDefinitionAsync,
+            ShowFileInExplorerAsync);
         _languageModes.Initialize();
 
         var externalTools = new ExternalToolController(
@@ -74,7 +76,9 @@ internal sealed class MainWindowRuntime : IDisposable
             new WinUiSettingsFolderOpener(),
             () => _session.State.FilePath,
             RunConfiguredExternalToolAsync,
-            GetExternalToolMenuState);
+            GetExternalToolMenuState,
+            OpenDefinitionAsync,
+            ShowFileInExplorerAsync);
         _editorCommands = new EditorCommandController(_view, _view);
         _view.SetTabDisplaySizeLabel(_view.TabDisplaySize);
         _view.SetIndentSizeLabel(_view.IndentSize);
@@ -123,6 +127,8 @@ internal sealed class MainWindowRuntime : IDisposable
     public Task OpenFileAsync() => _documents.OpenFileAsync();
 
     public Task OpenRecentFileAsync(string path) => _documents.OpenRecentFileAsync(path);
+
+    public Task OpenDefinitionAsync(string path) => OpenRecentFileAsync(path);
 
     public Task NewDocumentAsync() => _documents.NewDocumentAsync();
 

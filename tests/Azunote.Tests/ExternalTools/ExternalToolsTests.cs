@@ -347,6 +347,7 @@ public sealed class ExternalToolsTests
             Assert.Equal(["--write", "${file}"], definition.Arguments);
             Assert.Equal(ExternalToolInputMode.FilePath, definition.InputMode);
             Assert.Equal(ExternalToolOutputMode.ReloadFile, definition.OutputMode);
+            Assert.Equal(Path.GetFullPath(toolPath), tool.DefinitionPath);
 
             var formatting = Assert.Single(settings.ExternalToolMenu);
             Assert.Equal("Formatting", formatting.Name);
@@ -490,6 +491,9 @@ public sealed class ExternalToolsTests
             Assert.True(bundleNode.IsTool);
             Assert.Equal("Markdown preview", Assert.Single(settings.ExternalTools).Name);
             Assert.EndsWith("markdown.tool", bundleNode.Tool!.DefinitionDirectory, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(
+                Path.GetFullPath(Path.Combine(bundleNode.Tool.DefinitionDirectory!, "manifest.toml")),
+                bundleNode.Tool.DefinitionPath);
         }
         finally
         {
