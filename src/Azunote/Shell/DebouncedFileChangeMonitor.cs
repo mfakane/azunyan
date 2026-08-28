@@ -11,6 +11,7 @@ internal sealed class DebouncedFileChangeMonitor : IFileChangeMonitor
     private readonly string _monitoredPath;
     private readonly object _gate = new();
     private Timer? _timer;
+    private string? _changedPath;
     private bool _disposed;
 
     public DebouncedFileChangeMonitor(string path, bool includeSubdirectories)
@@ -64,11 +65,11 @@ internal sealed class DebouncedFileChangeMonitor : IFileChangeMonitor
         _watcher.Dispose();
     }
 
-    private void OnChanged(object sender, FileSystemEventArgs args) => QueueNotification();
+    private void OnChanged(object sender, FileSystemEventArgs args) => QueueNotification(args.FullPath);
 
-    private void OnRenamed(object sender, RenamedEventArgs args) => QueueNotification();
+    private void OnRenamed(object sender, RenamedEventArgs args) => QueueNotification(args.FullPath);
 
-    private void QueueNotification()
+    private void QueueNotification(string? changedPath)
     {
         lock (_gate)
         {
@@ -77,6 +78,7 @@ internal sealed class DebouncedFileChangeMonitor : IFileChangeMonitor
                 return;
             }
 
+            _changedPath = changedPath;
             _timer ??= new Timer(OnTimerElapsed);
             _timer.Change(DebounceMilliseconds, Timeout.Infinite);
         }
@@ -84,26 +86,33 @@ internal sealed class DebouncedFileChangeMonitor : IFileChangeMonitor
 
     private void OnTimerElapsed(object? state)
     {
+        string? changedPath;
         lock (_gate)
         {
             if (_disposed)
             {
                 return;
             }
+
+            changedPath = _changedPath;
+            _changedPath = null;
         }
 
-        Changed?.Invoke(this, new FileChangeDetectedEventArgs(_monitoredPath));
+        Changed?.Invoke(this, new FileChangeDetectedEventArgs(_monitoredPath, changedPath));
     }
 }
 
 internal sealed class FileChangeDetectedEventArgs : EventArgs
 {
-    public FileChangeDetectedEventArgs(string monitoredPath)
+    public FileChangeDetectedEventArgs(string monitoredPath, string? changedPath = null)
     {
         MonitoredPath = monitoredPath;
+        ChangedPath = changedPath;
     }
 
     public string MonitoredPath { get; }
+
+    public string? ChangedPath { get; }
 }
 
 internal sealed class DefaultFileChangeMonitorFactory : IFileChangeMonitorFactory

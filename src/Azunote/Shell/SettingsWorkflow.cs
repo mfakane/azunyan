@@ -147,11 +147,19 @@ internal sealed class SettingsWorkflow : IDisposable
         object? sender,
         FileChangeDetectedEventArgs args)
     {
-        if (ReferenceEquals(sender, _settingsMonitor))
+        if (ReferenceEquals(sender, _settingsMonitor)
+            && !IsApplicationStateChange(args.ChangedPath))
         {
             _dispatcher.TryEnqueue(() => _ = HandleSettingsChangedAsync());
         }
     }
+
+    private bool IsApplicationStateChange(string? changedPath) =>
+        changedPath is not null
+        && string.Equals(
+            Path.GetFullPath(changedPath),
+            StateFileService.GetStateFilePath(_settings.Directory),
+            StringComparison.OrdinalIgnoreCase);
 
     private async Task HandleSettingsChangedAsync()
     {
