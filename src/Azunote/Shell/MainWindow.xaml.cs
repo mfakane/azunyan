@@ -423,7 +423,7 @@ public sealed partial class MainWindow : Window, IDisposable
     internal void ApplyWindowSize(WindowLayoutState size) => _view.ApplyWindowSize(size);
 
     internal void RenderRecentFiles(IReadOnlyList<string> paths) =>
-        _runtime.RenderRecentFiles(paths);
+        _runtime.RenderRecentFiles(paths, _application.RemoveRecentFile);
 
     internal void ActivateWindow()
     {

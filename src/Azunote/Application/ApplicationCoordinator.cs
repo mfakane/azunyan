@@ -202,6 +202,14 @@ internal sealed class ApplicationCoordinator : IDisposable
         RefreshRecentFileMenus();
     }
 
+    internal void RemoveRecentFile(string path)
+    {
+        if (_state.RemoveRecentFile(path))
+        {
+            RefreshRecentFileMenus();
+        }
+    }
+
     internal void RefreshWindowMenus()
     {
         var entries = _windows.Windows

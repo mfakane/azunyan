@@ -197,16 +197,28 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public async Task ShowFileInExplorerAsync()
     {
-        if (_session.State.FilePath is not { } path
-            || Path.GetDirectoryName(path) is not { } directory)
+        if (_session.State.FilePath is not { } path)
         {
             return;
         }
 
+        await ShowFileInExplorerAsync(path);
+    }
+
+    public async Task ShowFileInExplorerAsync(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
         try
         {
+            var fullPath = Path.GetFullPath(path);
+            if (Path.GetDirectoryName(fullPath) is not { } directory)
+            {
+                return;
+            }
+
             var explorer = _settings.Current.Explorer ?? new ShellCommandSettings();
-            var context = CreateExternalToolContext();
+            var context = CreateExternalToolContext(filePathOverride: fullPath);
             var invocation = ResolveShellCommand(
                 explorer,
                 "explorer",
@@ -277,8 +289,15 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public void OpenDroppedFile(string path) => _documents.OpenDroppedFile(path);
 
-    public void RenderRecentFiles(IReadOnlyList<string> paths) =>
-        _view.RenderRecentFiles(paths, OpenRecentFileAsync);
+    public void RenderRecentFiles(
+        IReadOnlyList<string> paths,
+        Action<string> removeRecentFile) =>
+        _view.RenderRecentFiles(
+            paths,
+            OpenRecentFileAsync,
+            _filePathActions.CopyFilePath,
+            ShowFileInExplorerAsync,
+            removeRecentFile);
 
     public void Dispose()
     {
@@ -369,13 +388,16 @@ internal sealed class MainWindowRuntime : IDisposable
         return ExternalToolAvailability.Evaluate(tool, context);
     }
 
-    private ExternalToolContext CreateExternalToolContext(string? toolDirectory = null)
+    private ExternalToolContext CreateExternalToolContext(
+        string? toolDirectory = null,
+        string? filePathOverride = null)
     {
         var editorSnapshot = EditorBufferSnapshot.Capture(_view);
         var state = _session.State;
+        var filePath = filePathOverride ?? state.FilePath;
         return new ExternalToolContext(
-            state.FilePath,
-            state.FilePath,
+            filePath,
+            filePath,
             editorSnapshot.Text,
             editorSnapshot.SelectedText,
             editorSnapshot.Caret.Line + 1,

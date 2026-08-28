@@ -105,6 +105,58 @@ internal sealed class ApplicationStateController : IDisposable
         }
     }
 
+    public bool RemoveRecentFile(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        string fullPath;
+        try
+        {
+            fullPath = Path.GetFullPath(path);
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException)
+        {
+            return false;
+        }
+
+        lock (_gate)
+        {
+            if (_disposed)
+            {
+                return false;
+            }
+
+            var recentFiles = _current.RecentFiles.ToList();
+            var index = recentFiles.FindIndex(recentPath => string.Equals(
+                recentPath,
+                fullPath,
+                StringComparison.OrdinalIgnoreCase));
+            if (index < 0)
+            {
+                return false;
+            }
+
+            recentFiles.RemoveAt(index);
+            _current.RecentFiles = recentFiles.ToArray();
+            if (!_initialized)
+            {
+                _pendingRecentFiles.RemoveAll(recentPath => string.Equals(
+                    recentPath,
+                    fullPath,
+                    StringComparison.OrdinalIgnoreCase));
+            }
+            else
+            {
+                QueueSaveLocked();
+            }
+
+            return true;
+        }
+    }
+
     public void RecordWindowSize(WindowLayoutState size)
     {
         ArgumentNullException.ThrowIfNull(size);

@@ -53,6 +53,7 @@ internal sealed class MainWindowViewAdapter :
     private readonly List<MenuFlyoutItemBase> _windowMenuItems = [];
     private readonly Dictionary<string, ToggleMenuFlyoutItem> _languageModeItems =
         new(StringComparer.OrdinalIgnoreCase);
+    private readonly Style _recentFileMenuItemStyle;
     private bool _themeConfigured;
 
     public MainWindowViewAdapter(
@@ -93,6 +94,8 @@ internal sealed class MainWindowViewAdapter :
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
         _editorBuffer = new AzunyanEditorBuffer(editor);
         _rootGrid = rootGrid ?? throw new ArgumentNullException(nameof(rootGrid));
+        _recentFileMenuItemStyle = _rootGrid.Resources["RecentFileSplitMenuFlyoutItemStyle"] as Style
+            ?? throw new InvalidOperationException("The recent file menu item style is not defined.");
         _findPanel = findPanel ?? throw new ArgumentNullException(nameof(findPanel));
         _findTextBox = findTextBox ?? throw new ArgumentNullException(nameof(findTextBox));
         _replaceTextBox = replaceTextBox ?? throw new ArgumentNullException(nameof(replaceTextBox));
@@ -419,10 +422,16 @@ internal sealed class MainWindowViewAdapter :
 
     public void RenderRecentFiles(
         IReadOnlyList<string> paths,
-        Func<string, Task> onSelected)
+        Func<string, Task> onSelected,
+        Action<string> onCopyFilePath,
+        Func<string, Task> onShowInExplorer,
+        Action<string> onRemoved)
     {
         ArgumentNullException.ThrowIfNull(paths);
         ArgumentNullException.ThrowIfNull(onSelected);
+        ArgumentNullException.ThrowIfNull(onCopyFilePath);
+        ArgumentNullException.ThrowIfNull(onShowInExplorer);
+        ArgumentNullException.ThrowIfNull(onRemoved);
 
         ClearRecentFileMenuItems();
         if (paths.Count == 0)
@@ -439,13 +448,24 @@ internal sealed class MainWindowViewAdapter :
 
         foreach (var path in paths)
         {
-            var menuItem = new MenuFlyoutItem
+            var menuItem = new SplitMenuFlyoutItem
             {
                 Text = GetRecentFileDisplayName(path),
-                Tag = path
+                Tag = path,
+                Style = _recentFileMenuItemStyle
             };
             AutomationProperties.SetHelpText(menuItem, path);
             ToolTipService.SetToolTip(menuItem, path);
+            var copyFilePathItem = new MenuFlyoutItem { Text = "Copy File Path" };
+            copyFilePathItem.Click += (_, _) => onCopyFilePath(path);
+            var showInExplorerItem = new MenuFlyoutItem { Text = "Show in Explorer" };
+            showInExplorerItem.Click += (_, _) => _ = onShowInExplorer(path);
+            var removeItem = new MenuFlyoutItem { Text = "Remove from list" };
+            removeItem.Click += (_, _) => onRemoved(path);
+            menuItem.Items.Add(copyFilePathItem);
+            menuItem.Items.Add(showInExplorerItem);
+            menuItem.Items.Add(new MenuFlyoutSeparator());
+            menuItem.Items.Add(removeItem);
             menuItem.Click += (_, _) => _ = onSelected(path);
             _openRecentMenu.Items.Add(menuItem);
             _recentFileMenuItems.Add(menuItem);

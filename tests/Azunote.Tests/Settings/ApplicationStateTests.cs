@@ -89,6 +89,32 @@ public sealed class ApplicationStateTests
         }
     }
 
+    [Fact]
+    public async Task Controller_removes_a_recent_file_and_persists_the_change()
+    {
+        var directory = CreateDirectory();
+        try
+        {
+            using (var controller = new ApplicationStateController(directory))
+            {
+                await controller.InitializeAsync();
+                controller.RecordRecentFile("first.txt");
+                controller.RecordRecentFile("second.txt");
+
+                Assert.True(controller.RemoveRecentFile("first.txt"));
+                Assert.False(controller.RemoveRecentFile("missing.txt"));
+                await controller.FlushAsync();
+            }
+
+            var state = await StateFileService.LoadAsync(directory);
+            Assert.Equal([Path.GetFullPath("second.txt")], state.RecentFiles);
+        }
+        finally
+        {
+            DeleteDirectory(directory);
+        }
+    }
+
     private static string CreateDirectory() =>
         Path.Combine(Path.GetTempPath(), $"azunote-state-{Guid.NewGuid():N}");
 
