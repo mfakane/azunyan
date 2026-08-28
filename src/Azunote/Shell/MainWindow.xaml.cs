@@ -139,7 +139,7 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private void TabDisplaySizeMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is ToggleMenuFlyoutItem { Tag: string tag }
+        if (sender is RadioMenuFlyoutItem { Tag: string tag }
             && int.TryParse(tag, out var size))
         {
             _runtime.SetTabDisplaySize(size);
@@ -148,7 +148,7 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private void IndentSizeMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not ToggleMenuFlyoutItem { Tag: string tag })
+        if (sender is not RadioMenuFlyoutItem { Tag: string tag })
         {
             return;
         }
@@ -165,7 +165,7 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private void TabInputModeMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not ToggleMenuFlyoutItem { Tag: string tag })
+        if (sender is not RadioMenuFlyoutItem { Tag: string tag })
         {
             return;
         }

@@ -76,6 +76,9 @@ internal sealed class MainWindowRuntime : IDisposable
             RunConfiguredExternalToolAsync,
             GetExternalToolMenuState);
         _editorCommands = new EditorCommandController(_view, _view);
+        _view.SetTabDisplaySizeLabel(_view.TabDisplaySize);
+        _view.SetIndentSizeLabel(_view.IndentSize);
+        _view.SetIndentationInputModeLabel(_view.IndentationInputMode);
         _status = new DocumentStatusPresenter(_view, _session, _view, _view);
         _findReplace = new FindReplaceController(
             _view,

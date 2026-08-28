@@ -35,11 +35,11 @@ internal sealed class MainWindowViewAdapter :
     private readonly ToggleMenuFlyoutItem _alwaysOnTopMenuItem;
     private readonly MenuBarItem _toolsMenu;
     private readonly MenuFlyoutItem _wordWrapMenuItem;
-    private readonly IReadOnlyDictionary<int, ToggleMenuFlyoutItem> _tabDisplaySizeMenuItems;
+    private readonly IReadOnlyDictionary<int, RadioMenuFlyoutItem> _tabDisplaySizeMenuItems;
     private readonly MenuFlyout _statusTabDisplaySizeMenu;
-    private readonly IReadOnlyList<(int? Size, ToggleMenuFlyoutItem Item)> _indentSizeMenuItems;
+    private readonly IReadOnlyList<(int? Size, RadioMenuFlyoutItem Item)> _indentSizeMenuItems;
     private readonly MenuFlyout _statusIndentSizeMenu;
-    private readonly IReadOnlyList<(IndentationInputMode Mode, ToggleMenuFlyoutItem Item)> _indentationInputModeMenuItems;
+    private readonly IReadOnlyList<(IndentationInputMode Mode, RadioMenuFlyoutItem Item)> _indentationInputModeMenuItems;
     private readonly MenuFlyout _statusFilePathMenu;
     private readonly Border _statusBarPanel;
     private readonly TextBlock _positionStatus;
@@ -51,7 +51,7 @@ internal sealed class MainWindowViewAdapter :
     private readonly List<MenuFlyoutItemBase> _externalToolMenuItems = [];
     private readonly List<MenuFlyoutItemBase> _recentFileMenuItems = [];
     private readonly List<MenuFlyoutItemBase> _windowMenuItems = [];
-    private readonly Dictionary<string, ToggleMenuFlyoutItem> _languageModeItems =
+    private readonly Dictionary<string, RadioMenuFlyoutItem> _languageModeItems =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Style _recentFileMenuItemStyle;
     private bool _themeConfigured;
@@ -70,18 +70,18 @@ internal sealed class MainWindowViewAdapter :
         ToggleMenuFlyoutItem alwaysOnTopMenuItem,
         MenuBarItem toolsMenu,
         MenuFlyoutItem wordWrapMenuItem,
-        ToggleMenuFlyoutItem tabDisplaySize2MenuItem,
-        ToggleMenuFlyoutItem tabDisplaySize4MenuItem,
-        ToggleMenuFlyoutItem tabDisplaySize8MenuItem,
+        RadioMenuFlyoutItem tabDisplaySize2MenuItem,
+        RadioMenuFlyoutItem tabDisplaySize4MenuItem,
+        RadioMenuFlyoutItem tabDisplaySize8MenuItem,
         MenuFlyout statusTabDisplaySizeMenu,
-        ToggleMenuFlyoutItem indentSizeAutoMenuItem,
-        ToggleMenuFlyoutItem indentSize2MenuItem,
-        ToggleMenuFlyoutItem indentSize4MenuItem,
-        ToggleMenuFlyoutItem indentSize8MenuItem,
+        RadioMenuFlyoutItem indentSizeAutoMenuItem,
+        RadioMenuFlyoutItem indentSize2MenuItem,
+        RadioMenuFlyoutItem indentSize4MenuItem,
+        RadioMenuFlyoutItem indentSize8MenuItem,
         MenuFlyout statusIndentSizeMenu,
-        ToggleMenuFlyoutItem indentationInputModeAutoMenuItem,
-        ToggleMenuFlyoutItem indentationInputModeTabMenuItem,
-        ToggleMenuFlyoutItem indentationInputModeSpacesMenuItem,
+        RadioMenuFlyoutItem indentationInputModeAutoMenuItem,
+        RadioMenuFlyoutItem indentationInputModeTabMenuItem,
+        RadioMenuFlyoutItem indentationInputModeSpacesMenuItem,
         MenuFlyout statusFilePathMenu,
         Border statusBarPanel,
         TextBlock positionStatus,
@@ -106,7 +106,7 @@ internal sealed class MainWindowViewAdapter :
         _alwaysOnTopMenuItem = alwaysOnTopMenuItem ?? throw new ArgumentNullException(nameof(alwaysOnTopMenuItem));
         _toolsMenu = toolsMenu ?? throw new ArgumentNullException(nameof(toolsMenu));
         _wordWrapMenuItem = wordWrapMenuItem ?? throw new ArgumentNullException(nameof(wordWrapMenuItem));
-        _tabDisplaySizeMenuItems = new Dictionary<int, ToggleMenuFlyoutItem>
+        _tabDisplaySizeMenuItems = new Dictionary<int, RadioMenuFlyoutItem>
         {
             [2] = tabDisplaySize2MenuItem ?? throw new ArgumentNullException(nameof(tabDisplaySize2MenuItem)),
             [4] = tabDisplaySize4MenuItem ?? throw new ArgumentNullException(nameof(tabDisplaySize4MenuItem)),
@@ -336,9 +336,10 @@ internal sealed class MainWindowViewAdapter :
         _alwaysOnTopMenuItem.IsChecked = isAlwaysOnTop;
         foreach (var entry in entries)
         {
-            var menuItem = new ToggleMenuFlyoutItem
+            var menuItem = new RadioMenuFlyoutItem
             {
                 Text = entry.DocumentName,
+                GroupName = "OpenWindows",
                 IsChecked = entry.IsCurrent,
                 Tag = entry.Id
             };
@@ -361,7 +362,7 @@ internal sealed class MainWindowViewAdapter :
             item.Value.IsChecked = item.Key == size;
         }
 
-        foreach (var item in GetToggleMenuItems(_statusTabDisplaySizeMenu))
+        foreach (var item in GetRadioMenuItems(_statusTabDisplaySizeMenu))
         {
             item.IsChecked = item.Tag is string tag
                 && int.TryParse(tag, out var itemSize)
@@ -376,7 +377,7 @@ internal sealed class MainWindowViewAdapter :
             item.Item.IsChecked = item.Size == size;
         }
 
-        foreach (var item in GetToggleMenuItems(_statusIndentSizeMenu))
+        foreach (var item in GetRadioMenuItems(_statusIndentSizeMenu))
         {
             item.IsChecked = item.Tag is string tag
                 && (string.Equals(tag, "auto", StringComparison.Ordinal)
@@ -519,9 +520,10 @@ internal sealed class MainWindowViewAdapter :
             }
 
             var mode = entries[index];
-            var item = new ToggleMenuFlyoutItem
+            var item = new RadioMenuFlyoutItem
             {
                 Text = mode.DisplayName,
+                GroupName = "LanguageModes",
                 Tag = mode.Id
             };
             item.Click += (_, _) => onSelected(mode.Id);
@@ -624,13 +626,13 @@ internal sealed class MainWindowViewAdapter :
         _windowMenuItems.Clear();
     }
 
-    private static IEnumerable<ToggleMenuFlyoutItem> GetToggleMenuItems(MenuFlyout menu)
+    private static IEnumerable<RadioMenuFlyoutItem> GetRadioMenuItems(MenuFlyout menu)
     {
         foreach (var item in menu.Items)
         {
-            if (item is ToggleMenuFlyoutItem toggleItem)
+            if (item is RadioMenuFlyoutItem radioItem)
             {
-                yield return toggleItem;
+                yield return radioItem;
             }
         }
     }
