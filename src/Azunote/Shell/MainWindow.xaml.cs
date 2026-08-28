@@ -42,6 +42,7 @@ public sealed partial class MainWindow : Window, IDisposable
             ReplaceTextBox,
             FindResultText,
             LanguageModeMenuItem,
+            OpenRecentMenuItem,
             WindowMenuItem,
             AlwaysOnTopMenuItem,
             ToolsMenuItem,
@@ -71,7 +72,8 @@ public sealed partial class MainWindow : Window, IDisposable
             application.CreateNewDocumentWindowAsync,
             application.OpenFileInNewWindowAsync,
             application.RefreshWindowMenus,
-            new WinUiFilePathActions());
+            new WinUiFilePathActions(),
+            application.RecordRecentFile);
         RegisterKeyboardAccelerators();
 
         _appWindow = _view.AppWindow;
@@ -415,6 +417,13 @@ public sealed partial class MainWindow : Window, IDisposable
     internal string DocumentName => _runtime.DocumentName;
 
     internal bool IsAlwaysOnTop => _view.IsAlwaysOnTop;
+
+    internal WindowLayoutState? WindowSize => _view.WindowSize;
+
+    internal void ApplyWindowSize(WindowLayoutState size) => _view.ApplyWindowSize(size);
+
+    internal void RenderRecentFiles(IReadOnlyList<string> paths) =>
+        _runtime.RenderRecentFiles(paths);
 
     internal void ActivateWindow()
     {

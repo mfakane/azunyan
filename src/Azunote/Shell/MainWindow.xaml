@@ -43,6 +43,7 @@
                         <KeyboardAccelerator Key="O" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
+                <MenuFlyoutSubItem x:Name="OpenRecentMenuItem" Text="Open Recent" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="Save" Click="SaveButton_Click" KeyboardAcceleratorPlacementMode="Auto">
                     <MenuFlyoutItem.KeyboardAccelerators>

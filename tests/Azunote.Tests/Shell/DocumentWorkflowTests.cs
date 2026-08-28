@@ -108,6 +108,38 @@ public sealed class DocumentWorkflowTests
     }
 
     [Fact]
+    public async Task Open_recent_file_uses_the_same_window_when_it_is_clean_untitled()
+    {
+        var editor = new FakeEditorView();
+        var session = new DocumentSession();
+        var files = new FakeTextFileStore();
+        var prompt = new FakeUserPrompt();
+        files.Files[Path.GetFullPath("notes.txt")] = new TextFileData(
+            "hello",
+            TextEncodingKind.Utf8,
+            LineEndingKind.Lf);
+        var newWindowCount = 0;
+        var workflow = CreateWorkflow(
+            editor,
+            session,
+            files,
+            prompt,
+            new FakeFileDialogService(),
+            createNewWindow: () =>
+            {
+                newWindowCount++;
+                return Task.CompletedTask;
+            });
+
+        await workflow.OpenRecentFileAsync("notes.txt");
+
+        Assert.Equal("hello", editor.Text);
+        Assert.Equal(Path.GetFullPath("notes.txt"), workflow.CurrentFilePath);
+        Assert.Equal(0, newWindowCount);
+        Assert.Empty(prompt.Errors);
+    }
+
+    [Fact]
     public async Task Open_file_cancellation_leaves_the_current_window_unchanged()
     {
         var editor = new FakeEditorView();

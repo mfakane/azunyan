@@ -105,6 +105,27 @@ internal sealed class DocumentWorkflow : IDisposable
         }
     }
 
+    public async Task OpenRecentFileAsync(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        try
+        {
+            if (CurrentFilePath is null && !IsDirty)
+            {
+                await LoadDocumentAsync(path);
+            }
+            else
+            {
+                await _openFileInNewWindow(path);
+            }
+        }
+        catch (Exception exception)
+        {
+            await _prompt.ShowErrorAsync("Could not open the recent file", exception.Message);
+        }
+    }
+
     public async Task OpenStartupDocumentAsync(
         string path,
         int? line = null,

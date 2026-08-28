@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using WinRT.Interop;
+using Windows.Graphics;
 
 namespace Azunote;
 
@@ -29,6 +30,7 @@ internal sealed class MainWindowViewAdapter :
     private readonly TextBox _replaceTextBox;
     private readonly TextBlock _findResultText;
     private readonly MenuFlyoutSubItem _languageModeMenu;
+    private readonly MenuFlyoutSubItem _openRecentMenu;
     private readonly MenuBarItem _windowMenu;
     private readonly ToggleMenuFlyoutItem _alwaysOnTopMenuItem;
     private readonly MenuBarItem _toolsMenu;
@@ -47,6 +49,7 @@ internal sealed class MainWindowViewAdapter :
     private readonly TextBlock _filePathStatus;
     private readonly List<KeyboardAccelerator> _externalToolAccelerators = [];
     private readonly List<MenuFlyoutItemBase> _externalToolMenuItems = [];
+    private readonly List<MenuFlyoutItemBase> _recentFileMenuItems = [];
     private readonly List<MenuFlyoutItemBase> _windowMenuItems = [];
     private readonly Dictionary<string, ToggleMenuFlyoutItem> _languageModeItems =
         new(StringComparer.OrdinalIgnoreCase);
@@ -61,6 +64,7 @@ internal sealed class MainWindowViewAdapter :
         TextBox replaceTextBox,
         TextBlock findResultText,
         MenuFlyoutSubItem languageModeMenu,
+        MenuFlyoutSubItem openRecentMenu,
         MenuBarItem windowMenu,
         ToggleMenuFlyoutItem alwaysOnTopMenuItem,
         MenuBarItem toolsMenu,
@@ -94,6 +98,7 @@ internal sealed class MainWindowViewAdapter :
         _replaceTextBox = replaceTextBox ?? throw new ArgumentNullException(nameof(replaceTextBox));
         _findResultText = findResultText ?? throw new ArgumentNullException(nameof(findResultText));
         _languageModeMenu = languageModeMenu ?? throw new ArgumentNullException(nameof(languageModeMenu));
+        _openRecentMenu = openRecentMenu ?? throw new ArgumentNullException(nameof(openRecentMenu));
         _windowMenu = windowMenu ?? throw new ArgumentNullException(nameof(windowMenu));
         _alwaysOnTopMenuItem = alwaysOnTopMenuItem ?? throw new ArgumentNullException(nameof(alwaysOnTopMenuItem));
         _toolsMenu = toolsMenu ?? throw new ArgumentNullException(nameof(toolsMenu));
@@ -138,6 +143,14 @@ internal sealed class MainWindowViewAdapter :
     public IntPtr WindowHandle => _windowHandle;
 
     public AppWindow? AppWindow => _appWindow;
+
+    public WindowLayoutState? WindowSize => _appWindow is { } appWindow
+        ? new WindowLayoutState
+        {
+            Width = appWindow.Size.Width,
+            Height = appWindow.Size.Height
+        }
+        : null;
 
     public bool IsAlwaysOnTop =>
         _appWindow?.Presenter is OverlappedPresenter presenter
@@ -391,6 +404,54 @@ internal sealed class MainWindowViewAdapter :
         menu.ShowAt(_indentationStatus);
     }
 
+    public void ApplyWindowSize(WindowLayoutState size)
+    {
+        ArgumentNullException.ThrowIfNull(size);
+        if (_appWindow is not { } appWindow)
+        {
+            return;
+        }
+
+        var normalized = AzunoteStateNormalization.Normalize(
+            new AzunoteState { Window = size }).Window;
+        appWindow.Resize(new SizeInt32(normalized.Width, normalized.Height));
+    }
+
+    public void RenderRecentFiles(
+        IReadOnlyList<string> paths,
+        Func<string, Task> onSelected)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+        ArgumentNullException.ThrowIfNull(onSelected);
+
+        ClearRecentFileMenuItems();
+        if (paths.Count == 0)
+        {
+            var emptyItem = new MenuFlyoutItem
+            {
+                Text = "No Recent Files",
+                IsEnabled = false
+            };
+            _openRecentMenu.Items.Add(emptyItem);
+            _recentFileMenuItems.Add(emptyItem);
+            return;
+        }
+
+        foreach (var path in paths)
+        {
+            var menuItem = new MenuFlyoutItem
+            {
+                Text = GetRecentFileDisplayName(path),
+                Tag = path
+            };
+            AutomationProperties.SetHelpText(menuItem, path);
+            ToolTipService.SetToolTip(menuItem, path);
+            menuItem.Click += (_, _) => _ = onSelected(path);
+            _openRecentMenu.Items.Add(menuItem);
+            _recentFileMenuItems.Add(menuItem);
+        }
+    }
+
     public void ShowFilePathMenu() => _statusFilePathMenu.ShowAt(_filePathStatus);
 
     public void Show(bool replace)
@@ -523,6 +584,16 @@ internal sealed class MainWindowViewAdapter :
         _externalToolMenuItems.Clear();
     }
 
+    private void ClearRecentFileMenuItems()
+    {
+        foreach (var item in _recentFileMenuItems)
+        {
+            _openRecentMenu.Items.Remove(item);
+        }
+
+        _recentFileMenuItems.Clear();
+    }
+
     private void ClearWindowMenuItems()
     {
         foreach (var item in _windowMenuItems)
@@ -542,6 +613,12 @@ internal sealed class MainWindowViewAdapter :
                 yield return toggleItem;
             }
         }
+    }
+
+    private static string GetRecentFileDisplayName(string path)
+    {
+        var fileName = Path.GetFileName(path);
+        return string.IsNullOrWhiteSpace(fileName) ? path : fileName;
     }
 
     private void SetFilePathMenuState(bool hasFilePath)

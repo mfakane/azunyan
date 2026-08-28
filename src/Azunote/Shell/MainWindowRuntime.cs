@@ -18,6 +18,7 @@ internal sealed class MainWindowRuntime : IDisposable
     private readonly WinUiMessageDialog _messageDialog;
     private readonly WinUiExternalToolDialog _externalToolDialog;
     private readonly Action _refreshWindowMenus;
+    private readonly Action<string> _recordRecentFile;
     private bool _disposed;
 
     public MainWindowRuntime(
@@ -25,11 +26,13 @@ internal sealed class MainWindowRuntime : IDisposable
         Func<Task> createNewWindow,
         Func<string, Task> openFileInNewWindow,
         Action refreshWindowMenus,
-        IFilePathActions filePathActions)
+        IFilePathActions filePathActions,
+        Action<string> recordRecentFile)
     {
         _view = view ?? throw new ArgumentNullException(nameof(view));
         _refreshWindowMenus = refreshWindowMenus ?? throw new ArgumentNullException(nameof(refreshWindowMenus));
         _filePathActions = filePathActions ?? throw new ArgumentNullException(nameof(filePathActions));
+        _recordRecentFile = recordRecentFile ?? throw new ArgumentNullException(nameof(recordRecentFile));
         _session = new DocumentSession();
         _prompt = new WinUiUserPrompt(() => _view.XamlRoot);
         _dispatcher = new DispatcherQueueUiDispatcher(_view.DispatcherQueue);
@@ -115,6 +118,8 @@ internal sealed class MainWindowRuntime : IDisposable
         _documents.RunExternalToolAsync(definition, cancellationToken);
 
     public Task OpenFileAsync() => _documents.OpenFileAsync();
+
+    public Task OpenRecentFileAsync(string path) => _documents.OpenRecentFileAsync(path);
 
     public Task NewDocumentAsync() => _documents.NewDocumentAsync();
 
@@ -272,6 +277,9 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public void OpenDroppedFile(string path) => _documents.OpenDroppedFile(path);
 
+    public void RenderRecentFiles(IReadOnlyList<string> paths) =>
+        _view.RenderRecentFiles(paths, OpenRecentFileAsync);
+
     public void Dispose()
     {
         if (_disposed)
@@ -342,6 +350,7 @@ internal sealed class MainWindowRuntime : IDisposable
     {
         if (args.Opened && _documents.CurrentFilePath is { } path)
         {
+            _recordRecentFile(path);
             _languageModes.DocumentOpened(path);
         }
 
