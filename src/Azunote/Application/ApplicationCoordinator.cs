@@ -5,6 +5,8 @@ namespace Azunote;
 internal sealed class ApplicationCoordinator : IDisposable
 {
     private readonly WindowRegistry<WindowRegistration> _windows = new();
+    private readonly ApplicationStateController _state =
+        new(SettingsFileService.GetDefaultDirectory());
     private DispatcherQueue? _dispatcherQueue;
     private bool _disposed;
 
@@ -48,10 +50,17 @@ internal sealed class ApplicationCoordinator : IDisposable
         _windows.Active?.Window.ActivateWindow();
     }
 
-    private static Task ProcessInitialCommandLineAsync(
+    private async Task ProcessInitialCommandLineAsync(
         WindowRegistration registration,
         IReadOnlyList<string> arguments)
     {
+        await _state.InitializeAsync().ConfigureAwait(true);
+        if (!registration.IsClosed)
+        {
+            registration.Window.ApplyWindowSize(_state.Current.Window);
+        }
+        RefreshRecentFileMenus();
+
         var options = ParseCommandLine(arguments);
         var runtime = registration.Window.Runtime;
 
@@ -70,8 +79,6 @@ internal sealed class ApplicationCoordinator : IDisposable
         {
             _ = runtime.ShowCommandLineHelpAsync();
         }
-
-        return Task.CompletedTask;
     }
 
     private async Task ProcessForwardedCommandLineAsync(
@@ -80,6 +87,8 @@ internal sealed class ApplicationCoordinator : IDisposable
     {
         try
         {
+            await _state.InitializeAsync().ConfigureAwait(true);
+            RefreshRecentFileMenus();
             var options = ParseCommandLine(command.Arguments);
             ActivateActiveWindow();
 
@@ -177,9 +186,20 @@ internal sealed class ApplicationCoordinator : IDisposable
             return;
         }
 
+        if (window.WindowSize is { } windowSize)
+        {
+            _state.RecordWindowSize(windowSize);
+        }
+
         _windows.Unregister(registration);
         registration.MarkClosed();
         RefreshWindowMenus();
+    }
+
+    internal void RecordRecentFile(string path)
+    {
+        _state.RecordRecentFile(path);
+        RefreshRecentFileMenus();
     }
 
     internal void RefreshWindowMenus()
@@ -221,10 +241,17 @@ internal sealed class ApplicationCoordinator : IDisposable
         _disposed = true;
         foreach (var registration in _windows.Windows.ToArray())
         {
+            if (registration.Window.WindowSize is { } windowSize)
+            {
+                _state.RecordWindowSize(windowSize);
+            }
+
             registration.Window.Dispose();
             registration.MarkClosed();
             _windows.Unregister(registration);
         }
+
+        _state.Dispose();
     }
 
     private WindowRegistration CreateWindowRegistration()
@@ -232,13 +259,28 @@ internal sealed class ApplicationCoordinator : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, nameof(ApplicationCoordinator));
 
         var window = new MainWindow(this);
+        if (_state.IsInitialized)
+        {
+            window.ApplyWindowSize(_state.Current.Window);
+        }
+
         var registration = new WindowRegistration(window);
         _windows.Register(registration);
         window.Activate();
         window.FocusEditor();
         _ = window.Runtime.InitializeSettingsAsync();
+        window.RenderRecentFiles(_state.Current.RecentFiles);
         RefreshWindowMenus();
         return registration;
+    }
+
+    private void RefreshRecentFileMenus()
+    {
+        var recentFiles = _state.Current.RecentFiles;
+        foreach (var registration in _windows.Windows.ToArray())
+        {
+            registration.Window.RenderRecentFiles(recentFiles);
+        }
     }
 
     private void ActivateWindowById(string id)
@@ -313,6 +355,8 @@ internal sealed class ApplicationCoordinator : IDisposable
         public MainWindow Window { get; }
 
         public Task Closed => _closed.Task;
+
+        public bool IsClosed => _closed.Task.IsCompleted;
 
         public void MarkClosed() => _closed.TrySetResult(null);
 
