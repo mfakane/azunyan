@@ -1673,8 +1673,15 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     private void OnCompletionSelectionChanged(
         object sender,
-        SelectionChangedEventArgs args) =>
+        SelectionChangedEventArgs args)
+    {
+        if (CompletionList.SelectedItem is { } selectedItem)
+        {
+            CompletionList.ScrollIntoView(selectedItem);
+        }
+
         UpdateCompletionDetails();
+    }
 
     private void UpdateCompletionDetails()
     {
