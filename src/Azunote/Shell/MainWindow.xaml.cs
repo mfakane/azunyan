@@ -47,6 +47,7 @@ public sealed partial class MainWindow : Window, IDisposable
             AlwaysOnTopMenuItem,
             ToolsMenuItem,
             WordWrapMenuItem,
+            StatusBarMenuItem,
             TabDisplaySize2MenuItem,
             TabDisplaySize4MenuItem,
             TabDisplaySize8MenuItem,
@@ -73,7 +74,9 @@ public sealed partial class MainWindow : Window, IDisposable
             application.OpenFileInNewWindowAsync,
             application.RefreshWindowMenus,
             new WinUiFilePathActions(),
-            application.RecordRecentFile);
+            application.RecordRecentFile,
+            application.RecordWordWrap,
+            application.RecordStatusBarVisible);
         RegisterKeyboardAccelerators();
 
         _appWindow = _view.AppWindow;
@@ -421,6 +424,8 @@ public sealed partial class MainWindow : Window, IDisposable
     internal WindowLayoutState? WindowSize => _view.WindowSize;
 
     internal void ApplyWindowSize(WindowLayoutState size) => _view.ApplyWindowSize(size);
+
+    internal void ApplyViewState(AzunoteState state) => _runtime.ApplyViewState(state);
 
     internal void RenderRecentFiles(IReadOnlyList<string> paths) =>
         _runtime.RenderRecentFiles(paths, _application.RemoveRecentFile);

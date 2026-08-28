@@ -120,9 +120,9 @@ or keep the local changes.
 The settings folder is `%LOCALAPPDATA%\Azunote`. Tools > Preferences... opens
 that folder in Explorer. The folder is created on first launch and contains a
 TOML-based `settings.toml`, an application-managed `state.toml`, plus `tools`
-and `modes` folders. `state.toml` stores the last window size and up to 20
-recently opened file paths; it is rewritten automatically and should not be
-edited. Azunyan watches
+and `modes` folders. `state.toml` stores the last window size, Word Wrap and
+Status Bar preferences, and up to 20 recently opened file paths; it is
+rewritten automatically and should not be edited. Azunyan watches
 the settings folder recursively and reloads valid external changes without
 replacing the previous tool or language-mode menu when a definition is invalid.
 

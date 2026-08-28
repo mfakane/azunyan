@@ -301,8 +301,11 @@
                                           Click="TabInputModeMenuItem_Click" />
                 </MenuFlyoutSubItem>
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem x:Name="WordWrapMenuItem" Text="Word Wrap" Click="WordWrapMenuItem_Click" />
-                <MenuFlyoutItem Text="Status Bar" Click="StatusBarMenuItem_Click" />
+                <ToggleMenuFlyoutItem x:Name="WordWrapMenuItem" Text="Word Wrap" Click="WordWrapMenuItem_Click" />
+                <ToggleMenuFlyoutItem x:Name="StatusBarMenuItem"
+                                      Text="Status Bar"
+                                      IsChecked="True"
+                                      Click="StatusBarMenuItem_Click" />
             </MenuBarItem>
             <MenuBarItem x:Name="ToolsMenuItem" Title="Tools">
                 <MenuFlyoutSeparator />

@@ -57,7 +57,9 @@ internal sealed class ApplicationCoordinator : IDisposable
         await _state.InitializeAsync().ConfigureAwait(true);
         if (!registration.IsClosed)
         {
-            registration.Window.ApplyWindowSize(_state.Current.Window);
+            var state = _state.Current;
+            registration.Window.ApplyWindowSize(state.Window);
+            registration.Window.ApplyViewState(state);
         }
         RefreshRecentFileMenus();
 
@@ -210,6 +212,24 @@ internal sealed class ApplicationCoordinator : IDisposable
         }
     }
 
+    internal void RecordWordWrap(bool enabled)
+    {
+        _state.RecordWordWrap(enabled);
+        foreach (var registration in _windows.Windows.ToArray())
+        {
+            registration.Window.Runtime.ApplyViewState(_state.Current);
+        }
+    }
+
+    internal void RecordStatusBarVisible(bool visible)
+    {
+        _state.RecordStatusBarVisible(visible);
+        foreach (var registration in _windows.Windows.ToArray())
+        {
+            registration.Window.Runtime.ApplyViewState(_state.Current);
+        }
+    }
+
     internal void RefreshWindowMenus()
     {
         var entries = _windows.Windows
@@ -269,7 +289,9 @@ internal sealed class ApplicationCoordinator : IDisposable
         var window = new MainWindow(this);
         if (_state.IsInitialized)
         {
-            window.ApplyWindowSize(_state.Current.Window);
+            var state = _state.Current;
+            window.ApplyWindowSize(state.Window);
+            window.ApplyViewState(state);
         }
 
         var registration = new WindowRegistration(window);

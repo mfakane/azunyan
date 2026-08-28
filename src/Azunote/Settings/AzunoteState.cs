@@ -14,6 +14,10 @@ public sealed class AzunoteState
     public WindowLayoutState Window { get; set; } = new();
 
     public string[] RecentFiles { get; set; } = [];
+
+    public bool WordWrap { get; set; }
+
+    public bool StatusBarVisible { get; set; } = true;
 }
 
 public sealed class WindowLayoutState
@@ -63,7 +67,9 @@ internal static class AzunoteStateNormalization
                 Width = state.Window.Width,
                 Height = state.Window.Height
             },
-            RecentFiles = [.. state.RecentFiles]
+            RecentFiles = [.. state.RecentFiles],
+            WordWrap = state.WordWrap,
+            StatusBarVisible = state.StatusBarVisible
         };
 }
 

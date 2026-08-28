@@ -32,11 +32,17 @@ internal sealed class EditorCommandController
         _editor.RequestCompletion();
     }
 
-    public void ToggleWordWrap()
+    public bool ToggleWordWrap()
     {
-        _wordWrapEnabled = !_wordWrapEnabled;
-        _editor.SetWordWrap(_wordWrapEnabled);
-        _window.SetWordWrapLabel(_wordWrapEnabled);
+        SetWordWrap(!_wordWrapEnabled);
+        return _wordWrapEnabled;
+    }
+
+    public void SetWordWrap(bool enabled)
+    {
+        _wordWrapEnabled = enabled;
+        _editor.SetWordWrap(enabled);
+        _window.SetWordWrapLabel(enabled);
     }
 
     public void SetTabDisplaySize(int size)
@@ -68,8 +74,15 @@ internal sealed class EditorCommandController
         _window.SetIndentationInputModeLabel(mode);
     }
 
-    public void ToggleStatusBar() =>
-        _window.SetStatusBarVisible(!_window.IsStatusBarVisible);
+    public bool ToggleStatusBar()
+    {
+        var visible = !_window.IsStatusBarVisible;
+        SetStatusBarVisible(visible);
+        return visible;
+    }
+
+    public void SetStatusBarVisible(bool visible) =>
+        _window.SetStatusBarVisible(visible);
 
     private void Execute(Action action)
     {

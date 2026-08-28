@@ -17,11 +17,15 @@ public sealed class ApplicationStateTests
             var text = await File.ReadAllTextAsync(path);
             Assert.Contains("[window]", text, StringComparison.Ordinal);
             Assert.Contains("recentFiles", text, StringComparison.Ordinal);
+            Assert.Contains("wordWrap", text, StringComparison.Ordinal);
+            Assert.Contains("statusBarVisible", text, StringComparison.Ordinal);
 
             var state = await StateFileService.LoadAsync(directory);
             Assert.Equal(WindowLayoutState.DefaultWidth, state.Window.Width);
             Assert.Equal(WindowLayoutState.DefaultHeight, state.Window.Height);
             Assert.Empty(state.RecentFiles);
+            Assert.False(state.WordWrap);
+            Assert.True(state.StatusBarVisible);
         }
         finally
         {
@@ -82,6 +86,30 @@ public sealed class ApplicationStateTests
             var state = await StateFileService.LoadAsync(directory);
             Assert.Equal(WindowLayoutState.DefaultWidth, state.Window.Width);
             Assert.Equal(WindowLayoutState.DefaultHeight, state.Window.Height);
+        }
+        finally
+        {
+            DeleteDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task Controller_persists_view_preferences()
+    {
+        var directory = CreateDirectory();
+        try
+        {
+            using (var controller = new ApplicationStateController(directory))
+            {
+                await controller.InitializeAsync();
+                controller.RecordWordWrap(true);
+                controller.RecordStatusBarVisible(false);
+                await controller.FlushAsync();
+            }
+
+            var state = await StateFileService.LoadAsync(directory);
+            Assert.True(state.WordWrap);
+            Assert.False(state.StatusBarVisible);
         }
         finally
         {

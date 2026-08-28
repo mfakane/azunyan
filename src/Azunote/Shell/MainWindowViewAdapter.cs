@@ -34,7 +34,8 @@ internal sealed class MainWindowViewAdapter :
     private readonly MenuBarItem _windowMenu;
     private readonly ToggleMenuFlyoutItem _alwaysOnTopMenuItem;
     private readonly MenuBarItem _toolsMenu;
-    private readonly MenuFlyoutItem _wordWrapMenuItem;
+    private readonly ToggleMenuFlyoutItem _wordWrapMenuItem;
+    private readonly ToggleMenuFlyoutItem _statusBarMenuItem;
     private readonly IReadOnlyDictionary<int, RadioMenuFlyoutItem> _tabDisplaySizeMenuItems;
     private readonly MenuFlyout _statusTabDisplaySizeMenu;
     private readonly IReadOnlyList<(int? Size, RadioMenuFlyoutItem Item)> _indentSizeMenuItems;
@@ -69,7 +70,8 @@ internal sealed class MainWindowViewAdapter :
         MenuBarItem windowMenu,
         ToggleMenuFlyoutItem alwaysOnTopMenuItem,
         MenuBarItem toolsMenu,
-        MenuFlyoutItem wordWrapMenuItem,
+        ToggleMenuFlyoutItem wordWrapMenuItem,
+        ToggleMenuFlyoutItem statusBarMenuItem,
         RadioMenuFlyoutItem tabDisplaySize2MenuItem,
         RadioMenuFlyoutItem tabDisplaySize4MenuItem,
         RadioMenuFlyoutItem tabDisplaySize8MenuItem,
@@ -106,6 +108,7 @@ internal sealed class MainWindowViewAdapter :
         _alwaysOnTopMenuItem = alwaysOnTopMenuItem ?? throw new ArgumentNullException(nameof(alwaysOnTopMenuItem));
         _toolsMenu = toolsMenu ?? throw new ArgumentNullException(nameof(toolsMenu));
         _wordWrapMenuItem = wordWrapMenuItem ?? throw new ArgumentNullException(nameof(wordWrapMenuItem));
+        _statusBarMenuItem = statusBarMenuItem ?? throw new ArgumentNullException(nameof(statusBarMenuItem));
         _tabDisplaySizeMenuItems = new Dictionary<int, RadioMenuFlyoutItem>
         {
             [2] = tabDisplaySize2MenuItem ?? throw new ArgumentNullException(nameof(tabDisplaySize2MenuItem)),
@@ -349,11 +352,13 @@ internal sealed class MainWindowViewAdapter :
         }
     }
 
-    public void SetStatusBarVisible(bool visible) =>
+    public void SetStatusBarVisible(bool visible)
+    {
         _statusBarPanel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        _statusBarMenuItem.IsChecked = visible;
+    }
 
-    public void SetWordWrapLabel(bool enabled) =>
-        _wordWrapMenuItem.Text = enabled ? "Word Wrap ✓" : "Word Wrap";
+    public void SetWordWrapLabel(bool enabled) => _wordWrapMenuItem.IsChecked = enabled;
 
     public void SetTabDisplaySizeLabel(int size)
     {

@@ -19,6 +19,8 @@ internal sealed class MainWindowRuntime : IDisposable
     private readonly WinUiExternalToolDialog _externalToolDialog;
     private readonly Action _refreshWindowMenus;
     private readonly Action<string> _recordRecentFile;
+    private readonly Action<bool> _recordWordWrap;
+    private readonly Action<bool> _recordStatusBarVisible;
     private bool _disposed;
 
     public MainWindowRuntime(
@@ -27,12 +29,16 @@ internal sealed class MainWindowRuntime : IDisposable
         Func<string, Task> openFileInNewWindow,
         Action refreshWindowMenus,
         IFilePathActions filePathActions,
-        Action<string> recordRecentFile)
+        Action<string> recordRecentFile,
+        Action<bool> recordWordWrap,
+        Action<bool> recordStatusBarVisible)
     {
         _view = view ?? throw new ArgumentNullException(nameof(view));
         _refreshWindowMenus = refreshWindowMenus ?? throw new ArgumentNullException(nameof(refreshWindowMenus));
         _filePathActions = filePathActions ?? throw new ArgumentNullException(nameof(filePathActions));
         _recordRecentFile = recordRecentFile ?? throw new ArgumentNullException(nameof(recordRecentFile));
+        _recordWordWrap = recordWordWrap ?? throw new ArgumentNullException(nameof(recordWordWrap));
+        _recordStatusBarVisible = recordStatusBarVisible ?? throw new ArgumentNullException(nameof(recordStatusBarVisible));
         _session = new DocumentSession();
         _prompt = new WinUiUserPrompt(() => _view.XamlRoot);
         _dispatcher = new DispatcherQueueUiDispatcher(_view.DispatcherQueue);
@@ -177,7 +183,17 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public void SelectAll() => _editorCommands.SelectAll();
 
-    public void ToggleWordWrap() => _editorCommands.ToggleWordWrap();
+    public void ToggleWordWrap()
+    {
+        _recordWordWrap(_editorCommands.ToggleWordWrap());
+    }
+
+    public void ApplyViewState(AzunoteState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        _editorCommands.SetWordWrap(state.WordWrap);
+        _editorCommands.SetStatusBarVisible(state.StatusBarVisible);
+    }
 
     public void SetTabDisplaySize(int size)
     {
@@ -268,7 +284,10 @@ internal sealed class MainWindowRuntime : IDisposable
         }
     }
 
-    public void ToggleStatusBar() => _editorCommands.ToggleStatusBar();
+    public void ToggleStatusBar()
+    {
+        _recordStatusBarVisible(_editorCommands.ToggleStatusBar());
+    }
 
     public void ToggleAlwaysOnTop() => _view.ToggleAlwaysOnTop();
 

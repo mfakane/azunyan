@@ -14,6 +14,8 @@ internal sealed class ApplicationStateController : IDisposable
     private Task _saveQueue = Task.CompletedTask;
     private AzunoteState _current = new();
     private WindowLayoutState? _pendingWindowSize;
+    private bool? _pendingWordWrap;
+    private bool? _pendingStatusBarVisible;
     private bool _initialized;
     private bool _disposed;
 
@@ -189,6 +191,48 @@ internal sealed class ApplicationStateController : IDisposable
         }
     }
 
+    public void RecordWordWrap(bool enabled)
+    {
+        lock (_gate)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _current.WordWrap = enabled;
+            if (!_initialized)
+            {
+                _pendingWordWrap = enabled;
+            }
+            else
+            {
+                QueueSaveLocked();
+            }
+        }
+    }
+
+    public void RecordStatusBarVisible(bool visible)
+    {
+        lock (_gate)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _current.StatusBarVisible = visible;
+            if (!_initialized)
+            {
+                _pendingStatusBarVisible = visible;
+            }
+            else
+            {
+                QueueSaveLocked();
+            }
+        }
+    }
+
     public async Task FlushAsync()
     {
         Task initialization;
@@ -263,13 +307,27 @@ internal sealed class ApplicationStateController : IDisposable
                             .ToArray();
                     }
 
+                    if (_pendingWordWrap is { } pendingWordWrap)
+                    {
+                        loadedState.WordWrap = pendingWordWrap;
+                    }
+
+                    if (_pendingStatusBarVisible is { } pendingStatusBarVisible)
+                    {
+                        loadedState.StatusBarVisible = pendingStatusBarVisible;
+                    }
+
                     _current = AzunoteStateNormalization.Normalize(loadedState);
                 }
 
                 var hasPendingChanges = _pendingWindowSize is not null
-                    || _pendingRecentFiles.Count > 0;
+                    || _pendingRecentFiles.Count > 0
+                    || _pendingWordWrap is not null
+                    || _pendingStatusBarVisible is not null;
                 _pendingWindowSize = null;
                 _pendingRecentFiles.Clear();
+                _pendingWordWrap = null;
+                _pendingStatusBarVisible = null;
                 _initialized = true;
                 if (hasPendingChanges)
                 {
