@@ -46,6 +46,8 @@ public sealed class AzunoteSettings
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     WriteIndented = true)]
 [TomlSerializable(typeof(AzunoteSettings))]
+[TomlSerializable(typeof(AzunoteState))]
+[TomlSerializable(typeof(WindowLayoutState))]
 [TomlSerializable(typeof(ShellCommandSettings))]
 [TomlSerializable(typeof(ExternalToolSettings))]
 [TomlSerializable(typeof(ExternalToolLaunchSettings))]
