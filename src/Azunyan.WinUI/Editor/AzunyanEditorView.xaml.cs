@@ -47,10 +47,13 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private string[] _completionTriggerCharacters = Array.Empty<string>();
     private bool _disposed;
     private int _hoverPosition = -1;
+    private string _projectedAutomationStructureKey = string.Empty;
     private long _documentProviderGeneration;
     private long _viewportProviderGeneration;
     private long _positionProviderGeneration;
     private DocumentChangedEventArgs? _pendingProviderDocumentChange;
+    private DocumentChangedEventArgs? _pendingAutomationDocumentChange;
+    private AzunyanEditorViewAutomationPeer? _automationPeer;
 
     public AzunyanEditorView()
     {
@@ -73,6 +76,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         InputEditor.DocumentChanged += OnInputDocumentChanged;
         InputEditor.SelectionChanged += OnInputSelectionChanged;
         InputEditor.CompositionChanged += OnInputCompositionChanged;
+        InputEditor.GotFocus += OnInputFocusChanged;
+        InputEditor.LostFocus += OnInputFocusChanged;
         InputEditor.AddHandler(
             UIElement.KeyDownEvent,
             new KeyEventHandler(OnInputKeyDown),
@@ -350,7 +355,13 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
     }
 
-    public void SetText(string text) => InputEditor.SetText(text);
+    public void SetText(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        var oldText = Snapshot.Text;
+        InputEditor.SetText(text);
+        _automationPeer?.NotifyTextChanged(oldText, Snapshot.Text);
+    }
 
     public void SetDocumentSelection(TextSelection selection) => InputEditor.SetDocumentSelection(selection);
 
@@ -442,7 +453,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     public new bool Focus(FocusState value) => InputEditor.Focus(value);
 
     protected override AutomationPeer OnCreateAutomationPeer() =>
-        new AzunyanEditorViewAutomationPeer(this);
+        _automationPeer ??= new AzunyanEditorViewAutomationPeer(this);
 
     private static void OnRenderPropertyChanged(DependencyObject sender, DependencyPropertyChangedEventArgs args)
     {
@@ -516,6 +527,13 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         RenderViewport();
         if (!InputEditor.IsComposing)
         {
+            var automationChange = _pendingAutomationDocumentChange;
+            _pendingAutomationDocumentChange = null;
+            if (automationChange is not null)
+            {
+                _automationPeer?.NotifyDocumentChanged(automationChange);
+            }
+
             RequestProviderResults(
                 true,
                 true,
@@ -531,6 +549,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     {
         _defaultRenderer.TextRenderer.NotifyDocumentChanged(args);
         _pendingProviderDocumentChange = args;
+        _pendingAutomationDocumentChange = args;
         if (!InputEditor.IsComposing
             && !_applyingCompletion
             && InputEditor.FocusState != FocusState.Unfocused)
@@ -571,6 +590,13 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         RenderViewport();
         if (!InputEditor.IsComposing)
         {
+            var automationChange = _pendingAutomationDocumentChange;
+            _pendingAutomationDocumentChange = null;
+            if (automationChange is not null)
+            {
+                _automationPeer?.NotifyDocumentChanged(automationChange);
+            }
+
             RequestProviderResults(true, true, true);
         }
     }
@@ -586,6 +612,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private void OnInputSelectionChanged(object sender, RoutedEventArgs args)
     {
         RenderViewport();
+        _automationPeer?.NotifySelectionChanged();
         if (!InputEditor.IsComposing)
         {
             RequestProviderResults(false, false, true, requestCompletion: _completionRequested);
@@ -623,6 +650,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
     }
+
+    private void OnInputFocusChanged(object sender, RoutedEventArgs args) =>
+        _automationPeer?.NotifyFocusChanged();
 
     private void OnCompletionListKeyDown(object sender, KeyRoutedEventArgs args)
     {
@@ -871,10 +901,26 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     {
         if (!IsProjectedTextSurface)
         {
+            if (_projectedAutomationStructureKey.Length > 0)
+            {
+                _projectedAutomationStructureKey = string.Empty;
+                _automationPeer?.NotifyStructureChanged();
+            }
+
             return;
         }
 
-        foreach (var target in _defaultRenderer.TextRenderer.GetAutomationTargets())
+        var targets = _defaultRenderer.TextRenderer.GetAutomationTargets();
+        var structureKey = string.Join(
+            '\u001f',
+            targets.Select(target => $"{target.Kind}\u001f{target.Id}"));
+        var structureChanged = !string.Equals(
+            _projectedAutomationStructureKey,
+            structureKey,
+            StringComparison.Ordinal);
+        _projectedAutomationStructureKey = structureKey;
+
+        foreach (var target in targets)
         {
             var button = new ProjectedTextAutomationButton
             {
@@ -898,6 +944,11 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             Canvas.SetLeft(button, target.Bounds.X);
             Canvas.SetTop(button, target.Bounds.Y);
             RenderOverlay.Children.Add(button);
+        }
+
+        if (structureChanged)
+        {
+            _automationPeer?.NotifyStructureChanged();
         }
     }
 

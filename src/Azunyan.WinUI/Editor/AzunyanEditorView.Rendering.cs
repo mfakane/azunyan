@@ -127,5 +127,6 @@ public sealed partial class AzunyanEditorView
         UpdateProjectedScrollExtent(viewportHeight);
         UpdateCompletionPopup();
         UpdateTooltipPopup();
+        _automationPeer?.NotifyLayoutChanged();
     }
 }

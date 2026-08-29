@@ -1,3 +1,5 @@
+using Azunyan.Core;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Automation.Provider;
@@ -13,6 +15,7 @@ internal sealed partial class AzunyanEditorViewAutomationPeer : FrameworkElement
 {
     private readonly AzunyanEditorView _owner;
     private ProjectedTextAutomationProvider? _projectedTextProvider;
+    private bool _reportedKeyboardFocus;
 
     public AzunyanEditorViewAutomationPeer(AzunyanEditorView owner)
         : base(owner)
@@ -37,6 +40,82 @@ internal sealed partial class AzunyanEditorViewAutomationPeer : FrameworkElement
 
     internal IRawElementProviderSimple GetRawProvider() => ProviderFromPeer(this)!;
 
+    internal void NotifyDocumentChanged(DocumentChangedEventArgs args) =>
+        NotifyTextChanged(args.OldSnapshot.Text, args.NewSnapshot.Text);
+
+    internal void NotifyTextChanged(string oldText, string newText)
+    {
+        if (string.Equals(oldText, newText, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        if (ListenerExists(AutomationEvents.TextPatternOnTextChanged))
+        {
+            RaiseAutomationEvent(AutomationEvents.TextPatternOnTextChanged);
+        }
+
+        if (ListenerExists(AutomationEvents.PropertyChanged))
+        {
+            RaisePropertyChangedEvent(
+                ValuePatternIdentifiers.ValueProperty,
+                oldText,
+                newText);
+        }
+    }
+
+    internal void NotifySelectionChanged()
+    {
+        if (ListenerExists(AutomationEvents.TextPatternOnTextSelectionChanged))
+        {
+            RaiseAutomationEvent(
+                AutomationEvents.TextPatternOnTextSelectionChanged);
+        }
+    }
+
+    internal void NotifyLayoutChanged()
+    {
+        if (ListenerExists(AutomationEvents.LayoutInvalidated))
+        {
+            RaiseAutomationEvent(AutomationEvents.LayoutInvalidated);
+        }
+    }
+
+    internal void NotifyStructureChanged()
+    {
+        if (ListenerExists(AutomationEvents.StructureChanged))
+        {
+            RaiseStructureChangedEvent(
+                AutomationStructureChangeType.ChildrenInvalidated,
+                this);
+        }
+    }
+
+    internal void NotifyFocusChanged()
+    {
+        var hasKeyboardFocus = HasKeyboardFocusCore();
+        if (hasKeyboardFocus == _reportedKeyboardFocus)
+        {
+            return;
+        }
+
+        var oldValue = _reportedKeyboardFocus;
+        _reportedKeyboardFocus = hasKeyboardFocus;
+        if (ListenerExists(AutomationEvents.PropertyChanged))
+        {
+            RaisePropertyChangedEvent(
+                AutomationElementIdentifiers.HasKeyboardFocusProperty,
+                oldValue,
+                hasKeyboardFocus);
+        }
+
+        if (hasKeyboardFocus
+            && ListenerExists(AutomationEvents.AutomationFocusChanged))
+        {
+            RaiseAutomationEvent(AutomationEvents.AutomationFocusChanged);
+        }
+    }
+
     internal static IRawElementProviderSimple? GetRawProvider(AutomationPeer peer) =>
         peer switch
         {
@@ -47,6 +126,11 @@ internal sealed partial class AzunyanEditorViewAutomationPeer : FrameworkElement
 
     protected override AutomationControlType GetAutomationControlTypeCore() =>
         AutomationControlType.Edit;
+
+    protected override bool IsKeyboardFocusableCore() => true;
+
+    protected override bool HasKeyboardFocusCore() =>
+        _owner.InputHost.FocusState != FocusState.Unfocused;
 
     protected override string GetClassNameCore() => nameof(AzunyanEditorView);
 
