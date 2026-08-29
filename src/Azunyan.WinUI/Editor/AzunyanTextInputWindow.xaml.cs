@@ -41,7 +41,7 @@ public sealed partial class AzunyanTextInputWindow : UserControl
 
     public int WindowStart => _windowStart;
 
-    internal TextBox NativeTextBoxControl => NativeTextBox;
+    internal AzunyanNativeTextBox NativeTextBoxControl => NativeTextBox;
 
     public long Generation => _generation;
 
@@ -95,7 +95,6 @@ public sealed partial class AzunyanTextInputWindow : UserControl
             NativeTextBox.Text = text;
             NativeTextBox.SelectionStart = localSelection.Start;
             NativeTextBox.SelectionLength = localSelection.Length;
-            NativeTextBox.ClearUndoRedoHistory();
         }
         finally
         {

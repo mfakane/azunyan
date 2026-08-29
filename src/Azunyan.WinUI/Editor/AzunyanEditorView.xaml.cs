@@ -34,11 +34,17 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private TextRange? _compositionRange;
     private long _inputWindowGeneration;
     private bool _synchronizingInputWindow;
+    private bool _applyingDocumentCommand;
+    private bool _applyingInputChange;
+    private bool _inputWindowSynchronizationPending;
+    private bool _inputWindowSynchronizationScheduled;
+    private bool _nativeKeyDownPending;
     private bool _autoIndentOnEnter = true;
     private bool _suppressVerticalCaretNavigation;
     private int? _indentSize;
     private IndentationInputMode _indentationInputMode;
     private readonly Queue<Action> _pendingCompositionOperations = new();
+    private readonly Queue<(VirtualKey Key, Action Action)> _pendingKeyEdits = new();
     private AzunyanColorScheme _colorScheme;
     private readonly EditorProviderSet _providers = new();
     private readonly EditorProviderScheduler _providerScheduler;
@@ -90,10 +96,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         InputWindow.InputSelectionChanged += OnInputSelectionChanged;
         InputWindow.CompositionChanged += OnInputCompositionChanged;
         InputWindow.NativeFocusChanged += OnInputFocusChanged;
-        InputWindow.AddHandler(
-            UIElement.KeyDownEvent,
-            new KeyEventHandler(OnInputKeyDown),
-            true);
+        InputWindow.NativeTextBoxControl.BeforeKeyDown += OnInputKeyDown;
+        InputWindow.NativeTextBoxControl.AfterKeyUp += OnInputKeyUp;
         EditorPointerSurface.PointerPressed += OnInputPointerPressed;
         EditorPointerSurface.PointerMoved += OnInputPointerMoved;
         EditorPointerSurface.PointerExited += OnInputPointerExited;
@@ -119,6 +123,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         _disposed = true;
+        InputWindow.NativeTextBoxControl.BeforeKeyDown -= OnInputKeyDown;
+        InputWindow.NativeTextBoxControl.AfterKeyUp -= OnInputKeyUp;
         _providerScheduler.Dispose();
         if (_renderer is IDisposable renderer
             && !ReferenceEquals(_renderer, _defaultRenderer))
@@ -639,10 +645,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private static void OnIndentationInputModeChanged(DependencyObject sender, DependencyPropertyChangedEventArgs args) =>
         ((AzunyanEditorView)sender).ApplyIndentationInputMode();
 
-    private static void OnAcceptsReturnChanged(DependencyObject sender, DependencyPropertyChangedEventArgs args)
-    {
+    private static void OnAcceptsReturnChanged(DependencyObject sender, DependencyPropertyChangedEventArgs args) =>
         ((AzunyanEditorView)sender).InputWindow.NativeTextBoxControl.AcceptsReturn = (bool)args.NewValue;
-    }
 
     private void OnLoaded(object sender, RoutedEventArgs args)
     {
@@ -662,6 +666,17 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         UpdateTextSurfaceMode();
         RenderViewport();
         RequestProviderResults(true, true, true);
+        // The document workflow may request focus before the native sliding
+        // window has completed its first layout. Re-apply it on the next UI
+        // turn so real keyboard input reaches the inner TextBox, not only the
+        // projected editor automation peer.
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (!_disposed && IsLoaded)
+            {
+                InputWindow.Focus(FocusState.Programmatic);
+            }
+        });
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs args)
@@ -691,21 +706,48 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             return;
         }
 
-        if (args.CompositionRange is { } composition)
+        var oldSnapshot = Snapshot;
+        _applyingInputChange = true;
+        try
         {
-            _compositionRange = composition;
+            if (args.CompositionRange is { } composition)
+            {
+                _compositionRange = composition;
+            }
+
+            _document.Replace(args.Change.OldRange, args.Change.NewText);
+            if (_document.Selection != args.Selection)
+            {
+                _document.Selection = args.Selection;
+            }
+
+            if (_autoIndentOnEnter
+                && args.Change.NewText.Any(character => character is '\r' or '\n'))
+            {
+                var autoIndentedBreak = TextEditorCommands.GetNewLineWithAutoIndentation(
+                    oldSnapshot,
+                    args.Change.OldRange.Start);
+                if (TryGetLeadingLineEndingLength(
+                        autoIndentedBreak,
+                        out var generatedLineEndingLength)
+                    && autoIndentedBreak.Length > generatedLineEndingLength)
+                {
+                    var indentation = autoIndentedBreak[generatedLineEndingLength..];
+                    _document.Replace(
+                        TextRange.Empty(_document.Selection.CaretPosition),
+                        indentation);
+                }
+            }
+        }
+        finally
+        {
+            _applyingInputChange = false;
         }
 
-        _document.Replace(args.Change.OldRange, args.Change.NewText);
-        if (_document.Selection != args.Selection)
-        {
-            _document.Selection = args.Selection;
-        }
-
-        SyncInputWindow();
         var documentChange = _pendingProviderDocumentChange;
         _pendingProviderDocumentChange = null;
         RenderViewport();
+        _inputWindowSynchronizationPending = !IsInputWindowSynchronized();
         if (!IsComposing)
         {
             FlushPendingAutomationDocumentChange(render: false);
@@ -715,6 +757,11 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 true,
                 requestCompletion: _completionRequested,
                 documentChange: documentChange);
+        }
+
+        if (!_nativeKeyDownPending)
+        {
+            RequestInputWindowSynchronization();
         }
     }
 
@@ -802,6 +849,12 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     private void OnDocumentSelectionChanged(object? sender, EventArgs args)
     {
+        if (_applyingDocumentCommand || _applyingInputChange)
+        {
+            _automationPeer?.NotifySelectionChanged();
+            return;
+        }
+
         SyncInputWindow();
         RenderViewport();
         _automationPeer?.NotifySelectionChanged();
@@ -861,7 +914,43 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         var currentWindow = InputWindow.WindowRange;
-        var window = IsComposing
+        var window = CalculateInputWindow(currentWindow);
+        var text = Snapshot.GetText(window);
+        TextRange? compositionRange = _compositionRange is { } compositionInWindow
+            && window.Contains(compositionInWindow)
+                ? compositionInWindow
+                : null;
+        if (window == currentWindow
+            && string.Equals(InputWindow.WindowText, text, StringComparison.Ordinal)
+            && InputWindow.Selection == Document.Selection
+            && InputWindow.CompositionRange == compositionRange)
+        {
+            _inputWindowSynchronizationPending = false;
+            return;
+        }
+
+        var generation = checked(++_inputWindowGeneration);
+
+        _synchronizingInputWindow = true;
+        try
+        {
+            InputWindow.SetWindow(
+                generation,
+                window.Start,
+                text,
+                Document.Selection,
+                compositionRange);
+        }
+        finally
+        {
+            _synchronizingInputWindow = false;
+        }
+
+        _inputWindowSynchronizationPending = false;
+    }
+
+    private TextRange CalculateInputWindow(TextRange currentWindow) =>
+        IsComposing
             && currentWindow.Contains(Document.Selection.Range)
             && _compositionRange is { } composition
             && currentWindow.Contains(composition)
@@ -871,24 +960,46 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                     Document.Selection,
                     _compositionRange,
                     currentWindow);
-        var generation = checked(++_inputWindowGeneration);
 
-        _synchronizingInputWindow = true;
-        try
-        {
-            InputWindow.SetWindow(
-                generation,
-                window.Start,
+    private bool IsInputWindowSynchronized()
+    {
+        var currentWindow = InputWindow.WindowRange;
+        var window = CalculateInputWindow(currentWindow);
+        TextRange? compositionRange = _compositionRange is { } compositionInWindow
+            && window.Contains(compositionInWindow)
+                ? compositionInWindow
+                : null;
+        return window == currentWindow
+            && string.Equals(
+                InputWindow.WindowText,
                 Snapshot.GetText(window),
-                Document.Selection,
-                _compositionRange is { } compositionInWindow
-                    && window.Contains(compositionInWindow)
-                        ? compositionInWindow
-                        : null);
-        }
-        finally
+                StringComparison.Ordinal)
+            && InputWindow.Selection == Document.Selection
+            && InputWindow.CompositionRange == compositionRange;
+    }
+
+    private void RequestInputWindowSynchronization()
+    {
+        if (!_inputWindowSynchronizationPending
+            || _inputWindowSynchronizationScheduled
+            || IsComposing)
         {
-            _synchronizingInputWindow = false;
+            return;
+        }
+
+        _inputWindowSynchronizationScheduled = true;
+        if (!DispatcherQueue.TryEnqueue(() =>
+            {
+                _inputWindowSynchronizationScheduled = false;
+                if (!_disposed && !IsComposing)
+                {
+                    SyncInputWindow();
+                }
+            }))
+        {
+            _inputWindowSynchronizationScheduled = false;
+            throw new InvalidOperationException(
+                "The editor dispatcher is no longer available.");
         }
     }
 
@@ -932,6 +1043,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     private void OnInputKeyDown(object sender, KeyRoutedEventArgs args)
     {
+        _nativeKeyDownPending = true;
+
         if (IsCompletionPopupOpen)
         {
             switch (args.Key)
@@ -946,10 +1059,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                     return;
                 case VirtualKey.Enter:
                 case VirtualKey.Tab when !IsKeyDown(VirtualKey.Shift):
-                    if (TryAcceptSelectedCompletion())
-                    {
-                        args.Handled = true;
-                    }
+                    QueueKeyEdit(args.Key, () => TryAcceptSelectedCompletion());
+                    args.Handled = true;
                     return;
                 case VirtualKey.Escape:
                     HideCompletionPopup();
@@ -972,61 +1083,149 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         var extendSelection = IsKeyDown(VirtualKey.Shift);
         switch (args.Key)
         {
-            case VirtualKey.Enter
-                when _autoIndentOnEnter
-                && AcceptsReturn
-                && !IsComposing
-                && !control
-                && !menu:
-                TextEditorCommands.InsertNewLineWithAutoIndent(Document);
-                SyncInputWindow();
-                args.Handled = true;
-                break;
             case VirtualKey.Tab
                 when !IsComposing
                 && !control
                 && !menu:
-                TextEditorCommands.IndentSelection(
-                    Document,
-                    extendSelection,
-                    _indentSize,
-                    _indentationInputMode);
-                SyncInputWindow();
+                QueueKeyEdit(args.Key, () =>
+                {
+                    ApplyDocumentCommand(() =>
+                    {
+                        if (!IsComposing)
+                        {
+                            TextEditorCommands.IndentSelection(
+                                Document,
+                                extendSelection,
+                                _indentSize,
+                                _indentationInputMode);
+                        }
+                    });
+                });
                 args.Handled = true;
                 break;
             case VirtualKey.Z when control && !IsComposing:
                 if (extendSelection)
                 {
-                    RedoDocument();
+                    QueueKeyEdit(args.Key, () => _ = RedoDocument());
                 }
                 else
                 {
-                    UndoDocument();
+                    QueueKeyEdit(args.Key, () => _ = UndoDocument());
                 }
 
                 args.Handled = true;
                 break;
             case VirtualKey.Y when control && !IsComposing:
-                RedoDocument();
+                QueueKeyEdit(args.Key, () => _ = RedoDocument());
                 args.Handled = true;
                 break;
             case VirtualKey.Left when !IsComposing:
-                Document.MoveCaretByGrapheme(-1, extendSelection);
-                SyncInputWindow();
+                QueueKeyEdit(args.Key, () =>
+                {
+                    ApplyDocumentCommand(() =>
+                    {
+                        if (!IsComposing)
+                        {
+                            Document.MoveCaretByGrapheme(-1, extendSelection);
+                        }
+                    });
+                });
                 args.Handled = true;
                 break;
             case VirtualKey.Right when !IsComposing:
-                Document.MoveCaretByGrapheme(1, extendSelection);
-                SyncInputWindow();
+                QueueKeyEdit(args.Key, () =>
+                {
+                    ApplyDocumentCommand(() =>
+                    {
+                        if (!IsComposing)
+                        {
+                            Document.MoveCaretByGrapheme(1, extendSelection);
+                        }
+                    });
+                });
                 args.Handled = true;
                 break;
             case VirtualKey.Delete when !IsComposing:
-                Document.DeleteForward();
-                SyncInputWindow();
+                QueueKeyEdit(args.Key, () =>
+                {
+                    ApplyDocumentCommand(() =>
+                    {
+                        if (!IsComposing)
+                        {
+                            Document.DeleteForward();
+                        }
+                    });
+                });
                 args.Handled = true;
                 break;
         }
 
+    }
+
+    private void QueueKeyEdit(VirtualKey key, Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        _pendingKeyEdits.Enqueue((key, action));
+    }
+
+    private void OnInputKeyUp(object sender, KeyRoutedEventArgs args)
+    {
+        _nativeKeyDownPending = false;
+        var hasPendingEdit = _pendingKeyEdits.Count > 0
+            && _pendingKeyEdits.Peek().Key == args.Key;
+        if (!hasPendingEdit)
+        {
+            RequestInputWindowSynchronization();
+            return;
+        }
+
+        var pending = _pendingKeyEdits.Dequeue();
+        if (!DispatcherQueue.TryEnqueue(() =>
+            {
+                if (!_disposed)
+                {
+                    pending.Action();
+                }
+            }))
+        {
+            throw new InvalidOperationException(
+                "The editor dispatcher is no longer available.");
+        }
+    }
+
+    private static bool TryGetLeadingLineEndingLength(string text, out int length)
+    {
+        if (text.StartsWith("\r\n", StringComparison.Ordinal))
+        {
+            length = 2;
+            return true;
+        }
+
+        if (text.StartsWith('\n') || text.StartsWith('\r'))
+        {
+            length = 1;
+            return true;
+        }
+
+        length = 0;
+        return false;
+    }
+
+    private void ApplyDocumentCommand(Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        _applyingDocumentCommand = true;
+        try
+        {
+            action();
+        }
+        finally
+        {
+            _applyingDocumentCommand = false;
+        }
+
+        SyncInputWindow();
+        RenderViewport();
     }
 
     private void OnInputFocusChanged(object? sender, EventArgs args) =>
@@ -1134,6 +1333,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             SetDocumentSelection(TextSelection.Caret(anchor.Position.Offset));
         }
 
+        InputWindow.Focus(FocusState.Pointer);
         args.Handled = true;
     }
 
