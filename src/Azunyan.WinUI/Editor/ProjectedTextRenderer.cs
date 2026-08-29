@@ -404,6 +404,25 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         return true;
     }
 
+    public bool TryGetCaretRect(DocumentAnchor anchor, out Rect rect)
+    {
+        rect = default;
+        if (_renderFrame is not { } frame)
+        {
+            return false;
+        }
+
+        return TryGetCaretRect(
+            anchor,
+            frame.Context.ContentLeft,
+            frame.Context.ContentTop,
+            frame.Context.HorizontalOffset,
+            frame.Context.VerticalOffset,
+            frame.Context.CharacterWidth,
+            frame.Context.LineHeight,
+            out rect);
+    }
+
     public bool TryGetRangeRectangles(
         TextRange range,
         out IReadOnlyList<Rect> rectangles)
@@ -1620,6 +1639,9 @@ internal sealed class AzunyanEditorRenderer : IAzunyanEditorRenderer
             _gutterLayer,
             _textLayer,
             _overlayLayer));
+
+    public bool TryGetCaretRect(DocumentAnchor anchor, out Rect rect) =>
+        TextRenderer.TryGetCaretRect(anchor, out rect);
 
     public void Dispose() => TextRenderer.Dispose();
 }

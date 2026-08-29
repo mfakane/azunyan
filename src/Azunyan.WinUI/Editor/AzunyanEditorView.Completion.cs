@@ -44,14 +44,8 @@ public sealed partial class AzunyanEditorView
         _autoIndentOnEnter = false;
         _suppressVerticalCaretNavigation = true;
 
-        if (!_defaultRenderer.TextRenderer.TryGetCaretRect(
+        if (!TryGetRendererCaretRect(
                 DocumentAnchor.Before(frame.Selection.CaretPosition),
-                InputWindow.NativeTextBoxControl.Padding.Left,
-                InputWindow.NativeTextBoxControl.Padding.Top,
-                _scrollViewer?.HorizontalOffset ?? 0,
-                GetVerticalOffset(),
-                _characterWidth,
-                _lineHeight,
                 out var caretRect))
         {
             HideCompletionPopup();
@@ -124,14 +118,8 @@ public sealed partial class AzunyanEditorView
             return;
         }
 
-        if (!_defaultRenderer.TextRenderer.TryGetCaretRect(
+        if (!TryGetRendererCaretRect(
                 DocumentAnchor.Before(_hoverPosition),
-                InputWindow.NativeTextBoxControl.Padding.Left,
-                InputWindow.NativeTextBoxControl.Padding.Top,
-                _scrollViewer?.HorizontalOffset ?? 0,
-                GetVerticalOffset(),
-                _characterWidth,
-                _lineHeight,
                 out var anchorRect))
         {
             HideTooltipPopup();

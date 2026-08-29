@@ -183,4 +183,10 @@ internal interface ICanvasEditorRenderer
 public interface IAzunyanEditorRenderer
 {
     void Render(AzunyanEditorRenderFrame frame);
+
+    /// <summary>
+    /// Gets the rendered caret rectangle in the editor host's coordinate
+    /// space. The view uses this rectangle to place its native IME window.
+    /// </summary>
+    bool TryGetCaretRect(DocumentAnchor anchor, out Windows.Foundation.Rect rect);
 }

@@ -1,6 +1,7 @@
 using Azunyan.Core;
 using System.Globalization;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Windows.Foundation;
 
@@ -28,7 +29,7 @@ public sealed partial class AzunyanEditorView
                 verticalOffset,
                 out viewportAnchor,
                 out offsetWithinRow);
-        var horizontalOffset = _scrollViewer?.HorizontalOffset ?? 0;
+        var horizontalOffset = GetHorizontalOffset();
         var viewportWidth = Math.Max(1, ProjectedSurfaceHost.ActualWidth);
         var viewportHeight = Math.Max(1, ProjectedSurfaceHost.ActualHeight);
         var firstVisibleLine = Math.Clamp(
@@ -101,6 +102,13 @@ public sealed partial class AzunyanEditorView
             _collapsedFoldIds,
             currentFrame);
         _renderer?.Render(frame);
+        if (TryGetRendererCaretRect(
+                DocumentAnchor.Before(Document.Selection.CaretPosition),
+                out var caretRect))
+        {
+            InputWindow.SetCaretRect(caretRect);
+            DispatcherQueue.TryEnqueue(ReconcileInputWindowCaret);
+        }
         CreateProjectedAutomationChildren();
         if (preserveViewport
             && !_preservingViewport
@@ -128,5 +136,39 @@ public sealed partial class AzunyanEditorView
         UpdateCompletionPopup();
         UpdateTooltipPopup();
         _automationPeer?.NotifyLayoutChanged();
+    }
+
+    private void ReconcileInputWindowCaret()
+    {
+        if (!IsLoaded
+            || !TryGetRendererCaretRect(
+                DocumentAnchor.Before(Document.Selection.CaretPosition),
+                out var desiredRect))
+        {
+            return;
+        }
+
+        try
+        {
+            var actualRect = InputWindow.GetCaretRect(EditorHost);
+            var deltaX = desiredRect.X - actualRect.X;
+            var deltaY = desiredRect.Y - actualRect.Y;
+            if (Math.Abs(deltaX) <= 0.5 && Math.Abs(deltaY) <= 0.5)
+            {
+                return;
+            }
+
+            InputWindow.SetCaretRect(
+                new Rect(
+                    Canvas.GetLeft(InputWindow) + deltaX,
+                    Canvas.GetTop(InputWindow) + deltaY,
+                    desiredRect.Width,
+                    desiredRect.Height));
+        }
+        catch (InvalidOperationException)
+        {
+            // The native template may not have been laid out yet. The next
+            // render pass will retry using the current caret and window.
+        }
     }
 }

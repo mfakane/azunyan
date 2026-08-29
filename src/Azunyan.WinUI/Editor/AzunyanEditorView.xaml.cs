@@ -38,6 +38,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private bool _suppressVerticalCaretNavigation;
     private int? _indentSize;
     private IndentationInputMode _indentationInputMode;
+    private readonly Queue<Action> _pendingCompositionOperations = new();
     private AzunyanColorScheme _colorScheme;
     private readonly EditorProviderSet _providers = new();
     private readonly EditorProviderScheduler _providerScheduler;
@@ -356,6 +357,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         get => _renderer;
         set
         {
+            ArgumentNullException.ThrowIfNull(value);
             _renderer = value;
             UpdateTextSurfaceMode();
             RenderViewport();
@@ -365,6 +367,11 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     public void SetText(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
+        RunAfterComposition(() => SetTextCore(text));
+    }
+
+    private void SetTextCore(string text)
+    {
         var oldText = Snapshot.Text;
         _document.Changed -= OnInputDocumentChanged;
         _document.SelectionChanged -= OnDocumentSelectionChanged;
@@ -379,12 +386,15 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     public void SetDocumentSelection(TextSelection selection)
     {
-        _document.Selection = selection;
-        SyncInputWindow();
+        RunAfterComposition(() =>
+        {
+            _document.Selection = selection;
+            SyncInputWindow();
+        });
     }
 
     public void ReplaceDocumentRange(TextRange range, string replacement) =>
-        ReplaceDocumentRangeAndNotify(range, replacement);
+        RunAfterComposition(() => ReplaceDocumentRangeAndNotify(range, replacement));
 
     internal void SetAutomationValue(string value)
     {
@@ -456,6 +466,17 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     public bool UndoDocument()
     {
+        if (IsComposing)
+        {
+            RunAfterComposition(() => UndoDocumentCore());
+            return false;
+        }
+
+        return UndoDocumentCore();
+    }
+
+    private bool UndoDocumentCore()
+    {
         var result = _document.Undo();
         if (result)
         {
@@ -467,6 +488,17 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     public bool RedoDocument()
     {
+        if (IsComposing)
+        {
+            RunAfterComposition(() => RedoDocumentCore());
+            return false;
+        }
+
+        return RedoDocumentCore();
+    }
+
+    private bool RedoDocumentCore()
+    {
         var result = _document.Redo();
         if (result)
         {
@@ -477,6 +509,11 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     }
 
     public void CutSelectionToClipboard()
+    {
+        RunAfterComposition(CutSelectionToClipboardCore);
+    }
+
+    private void CutSelectionToClipboardCore()
     {
         SyncInputWindow();
         InputWindow.NativeTextBoxControl.CutSelectionToClipboard();
@@ -495,20 +532,29 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     public void PasteFromClipboard()
     {
-        SyncInputWindow();
-        InputWindow.NativeTextBoxControl.PasteFromClipboard();
+        RunAfterComposition(() =>
+        {
+            SyncInputWindow();
+            InputWindow.NativeTextBoxControl.PasteFromClipboard();
+        });
     }
 
     public void SelectAll()
     {
-        _document.Select(TextRange.FromBounds(0, Snapshot.Length));
-        SyncInputWindow();
+        RunAfterComposition(() =>
+        {
+            _document.Select(TextRange.FromBounds(0, Snapshot.Length));
+            SyncInputWindow();
+        });
     }
 
     public void Select(int start, int length)
     {
-        _document.Select(new TextRange(start, length));
-        SyncInputWindow();
+        RunAfterComposition(() =>
+        {
+            _document.Select(new TextRange(start, length));
+            SyncInputWindow();
+        });
     }
 
     public void RefreshProviders() => RequestProviderResults(true, true, true);
@@ -627,7 +673,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
         _providerScheduler.CancelAll();
         InvalidateProviderGenerations();
-        if (_scrollViewer is not null)
+        if (_scrollViewer is not null && !IsProjectedTextSurface)
         {
             _scrollViewer.ViewChanged -= OnViewportChanged;
             _scrollViewer = null;
@@ -729,6 +775,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         CompositionChanged?.Invoke(this, EventArgs.Empty);
         if (!args.IsComposing)
         {
+            DrainPendingCompositionOperations();
             FlushPendingAutomationDocumentChange(render: false);
 
             RequestProviderResults(true, true, true);
@@ -843,6 +890,44 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         {
             _synchronizingInputWindow = false;
         }
+    }
+
+    private void RunAfterComposition(Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        if (IsComposing)
+        {
+            _pendingCompositionOperations.Enqueue(action);
+            return;
+        }
+
+        action();
+    }
+
+    private void DrainPendingCompositionOperations()
+    {
+        if (IsComposing)
+        {
+            return;
+        }
+
+        while (_pendingCompositionOperations.Count > 0)
+        {
+            _pendingCompositionOperations.Dequeue().Invoke();
+        }
+    }
+
+    private bool TryGetRendererCaretRect(
+        DocumentAnchor anchor,
+        out Rect rect)
+    {
+        if (_renderer is null)
+        {
+            rect = default;
+            return false;
+        }
+
+        return _renderer.TryGetCaretRect(anchor, out rect);
     }
 
     private void OnInputKeyDown(object sender, KeyRoutedEventArgs args)
@@ -1017,7 +1102,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 point.Position.Y,
                 InputWindow.NativeTextBoxControl.Padding.Left,
                 InputWindow.NativeTextBoxControl.Padding.Top,
-                _scrollViewer?.HorizontalOffset ?? 0,
+                GetHorizontalOffset(),
                 GetVerticalOffset(),
                 _characterWidth,
                 out var anchor,
@@ -1088,7 +1173,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 point.Position.Y,
                 InputWindow.NativeTextBoxControl.Padding.Left,
                 InputWindow.NativeTextBoxControl.Padding.Top,
-                _scrollViewer?.HorizontalOffset ?? 0,
+                GetHorizontalOffset(),
                 GetVerticalOffset(),
                 _characterWidth,
                 out var anchor,
@@ -1119,7 +1204,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     private void OnViewportChanged(object? sender, ScrollViewerViewChangedEventArgs args)
     {
-        if (IsProjectedTextSurface && !_synchronizingProjectedScroll)
+        if (!IsProjectedTextSurface && !_synchronizingProjectedScroll)
         {
             _projectedVerticalOffset = _scrollViewer?.VerticalOffset ?? 0;
         }
@@ -1390,7 +1475,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 localPoint.Y,
                 InputWindow.NativeTextBoxControl.Padding.Left,
                 InputWindow.NativeTextBoxControl.Padding.Top,
-                _scrollViewer?.HorizontalOffset ?? 0,
+                GetHorizontalOffset(),
                 GetVerticalOffset(),
                 _characterWidth,
                 out var anchor,
@@ -1444,11 +1529,6 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         {
             _projectedVerticalOffset = targetOffset;
             ProjectedVerticalScrollBar.Value = targetOffset;
-            _scrollViewer?.ChangeView(
-                horizontalOffset: null,
-                verticalOffset: targetOffset,
-                zoomFactor: null,
-                disableAnimation: true);
         }
         finally
         {
@@ -1503,6 +1583,29 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     private void UpdateTextSurfaceMode()
     {
+        if (_renderer is not null && !IsProjectedTextSurface)
+        {
+            // A custom renderer owns the complete document surface too. Its
+            // caret contract is used for input placement, so native text is
+            // still restricted to the transparent IME window.
+            var customNativeTextBox = InputWindow.NativeTextBoxControl;
+            customNativeTextBox.Opacity = 0;
+            customNativeTextBox.Foreground = new SolidColorBrush(Colors.Transparent);
+            customNativeTextBox.SelectionHighlightColor = new SolidColorBrush(Colors.Transparent);
+            customNativeTextBox.SelectionHighlightColorWhenNotFocused = new SolidColorBrush(Colors.Transparent);
+            ScrollViewer.SetHorizontalScrollBarVisibility(customNativeTextBox, ScrollBarVisibility.Hidden);
+            ScrollViewer.SetVerticalScrollBarVisibility(customNativeTextBox, ScrollBarVisibility.Hidden);
+            GutterDrawingSurface.Visibility = Visibility.Collapsed;
+            TextDrawingSurface.Visibility = Visibility.Collapsed;
+            ProjectedVerticalScrollBar.Visibility = Visibility.Collapsed;
+            _projectedVerticalOffset = 0;
+            _completionRequested = false;
+            HideCompletionPopup();
+            _hoverPosition = -1;
+            HideTooltipPopup();
+            return;
+        }
+
         if (IsProjectedTextSurface)
         {
             // TextBox remains the native editing/IME host, but its template
@@ -1547,6 +1650,10 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         ? _projectedVerticalOffset
         : _scrollViewer?.VerticalOffset ?? 0;
 
+    private double GetHorizontalOffset() => IsProjectedTextSurface
+        ? 0
+        : _scrollViewer?.HorizontalOffset ?? 0;
+
     private void OnProjectedVerticalScrollChanged(
         object sender,
         RangeBaseValueChangedEventArgs args)
@@ -1557,19 +1664,6 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         _projectedVerticalOffset = args.NewValue;
-        _synchronizingProjectedScroll = true;
-        try
-        {
-            _scrollViewer?.ChangeView(
-                horizontalOffset: null,
-                verticalOffset: _projectedVerticalOffset,
-                zoomFactor: null,
-                disableAnimation: true);
-        }
-        finally
-        {
-            _synchronizingProjectedScroll = false;
-        }
 
         RenderViewport();
         RequestProviderResults(false, true, false);
@@ -1594,15 +1688,6 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             ProjectedVerticalScrollBar.SmallChange = Math.Max(1, _lineHeight);
             ProjectedVerticalScrollBar.Value = offset;
             _projectedVerticalOffset = offset;
-            if (_scrollViewer is { } scrollViewer
-                && Math.Abs(scrollViewer.VerticalOffset - offset) > 0.5)
-            {
-                scrollViewer.ChangeView(
-                    horizontalOffset: null,
-                    verticalOffset: offset,
-                    zoomFactor: null,
-                    disableAnimation: true);
-            }
         }
         finally
         {

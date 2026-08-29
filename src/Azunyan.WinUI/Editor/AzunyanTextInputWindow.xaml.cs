@@ -85,19 +85,13 @@ public sealed partial class AzunyanTextInputWindow : UserControl
         var localSelection = new TextSelection(
             selection.Anchor - windowStart,
             selection.Active - windowStart);
-        TextRange? localComposition = compositionRange is { } compositionValue
-            ? new TextRange(
-                compositionValue.Start - windowStart,
-                compositionValue.Length)
-            : null;
-
         _synchronizing = true;
         try
         {
             _windowStart = windowStart;
             _generation = generation;
             _synchronizedText = text;
-            _compositionRange = localComposition;
+            _compositionRange = compositionRange;
             NativeTextBox.Text = text;
             NativeTextBox.SelectionStart = localSelection.Start;
             NativeTextBox.SelectionLength = localSelection.Length;
