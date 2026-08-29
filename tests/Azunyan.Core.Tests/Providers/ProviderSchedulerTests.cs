@@ -6,6 +6,34 @@ namespace Azunyan.Core.Tests;
 public sealed class ProviderSchedulerTests
 {
     [Fact]
+    public void Provider_configuration_captures_one_consistent_set_of_references()
+    {
+        var first = new DelegateSyntaxProvider(_ =>
+            Task.FromResult<IEnumerable<SyntaxSpan>>(Array.Empty<SyntaxSpan>()));
+        var second = new DelegateSyntaxProvider(_ =>
+            Task.FromResult<IEnumerable<SyntaxSpan>>(Array.Empty<SyntaxSpan>()));
+        var providers = new EditorProviderSet { Syntax = first };
+
+        var configuration = providers.CreateSnapshot();
+        providers.Syntax = second;
+
+        Assert.Same(first, configuration.Syntax);
+        Assert.Same(second, providers.Syntax);
+    }
+
+    [Fact]
+    public void Completion_items_are_not_mutable_through_the_result()
+    {
+        var result = new CompletionResult(
+            TextRange.Empty(0),
+            new[] { new CompletionItem("word") });
+
+        var items = Assert.IsAssignableFrom<IList<CompletionItem>>(result.Items);
+
+        Assert.Throws<NotSupportedException>(() => items.Add(new CompletionItem("other")));
+    }
+
+    [Fact]
     public async Task Document_viewport_and_position_requests_have_independent_lifetimes()
     {
         var documentStarted = new TaskCompletionSource(

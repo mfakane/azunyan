@@ -9,9 +9,9 @@ public sealed class DocumentProviderResults
         IReadOnlyList<FoldRange> folds)
     {
         Snapshot = snapshot;
-        Syntax = syntax;
-        Decorations = decorations;
-        Folds = folds;
+        Syntax = Array.AsReadOnly(syntax.ToArray());
+        Decorations = Array.AsReadOnly(decorations.ToArray());
+        Folds = Array.AsReadOnly(folds.ToArray());
     }
 
     public TextSnapshot Snapshot { get; }
@@ -32,9 +32,9 @@ public sealed class ViewportProviderResults
         IReadOnlyList<BlockAdornment> blockAdornments)
     {
         Context = context;
-        Gutter = gutter;
-        Inlays = inlays;
-        BlockAdornments = blockAdornments;
+        Gutter = Array.AsReadOnly(gutter.ToArray());
+        Inlays = Array.AsReadOnly(inlays.ToArray());
+        BlockAdornments = Array.AsReadOnly(blockAdornments.ToArray());
     }
 
     public EditorProviderContext Context { get; }
@@ -91,10 +91,12 @@ public sealed class EditorProviderScheduler : IDisposable
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         var context = new EditorProviderContext(snapshot, selection.CaretPosition, selection);
+        var providers = _providers.CreateSnapshot();
         return RequestAsync(
             _document,
             context,
-            CollectDocumentAsync,
+            (requestId, providerContext, token) =>
+                CollectDocumentAsync(providers, requestId, providerContext, token),
             cancellationToken);
     }
 
@@ -110,10 +112,12 @@ public sealed class EditorProviderScheduler : IDisposable
             selection.CaretPosition,
             selection,
             visibleRange);
+        var providers = _providers.CreateSnapshot();
         return RequestAsync(
             _viewport,
             context,
-            CollectViewportAsync,
+            (requestId, providerContext, token) =>
+                CollectViewportAsync(providers, requestId, providerContext, token),
             cancellationToken);
     }
 
@@ -126,11 +130,17 @@ public sealed class EditorProviderScheduler : IDisposable
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         var context = new EditorProviderContext(snapshot, position, selection);
+        var providers = _providers.CreateSnapshot();
         return RequestAsync(
             _position,
             context,
             (requestId, providerContext, token) =>
-                CollectPositionAsync(requestId, providerContext, includeCompletion, token),
+                CollectPositionAsync(
+                    providers,
+                    requestId,
+                    providerContext,
+                    includeCompletion,
+                    token),
             cancellationToken);
     }
 
@@ -210,25 +220,26 @@ public sealed class EditorProviderScheduler : IDisposable
         }
     }
 
-    private async Task<DocumentProviderResults> CollectDocumentAsync(
+    private static async Task<DocumentProviderResults> CollectDocumentAsync(
+        EditorProviderConfiguration providers,
         long requestId,
         EditorProviderContext context,
         CancellationToken cancellationToken)
     {
-        var syntaxTask = _providers.Syntax is null
+        var syntaxTask = providers.Syntax is null
             ? Task.FromResult<IReadOnlyList<SyntaxSpan>>(Array.Empty<SyntaxSpan>())
             : InvokeListAsync(
-                () => _providers.Syntax.GetSyntaxAsync(context, cancellationToken),
+                () => providers.Syntax.GetSyntaxAsync(context, cancellationToken),
                 cancellationToken);
-        var decorationTask = _providers.Decorations is null
+        var decorationTask = providers.Decorations is null
             ? Task.FromResult<IReadOnlyList<TextDecoration>>(Array.Empty<TextDecoration>())
             : InvokeListAsync(
-                () => _providers.Decorations.GetDecorationsAsync(context, cancellationToken),
+                () => providers.Decorations.GetDecorationsAsync(context, cancellationToken),
                 cancellationToken);
-        var foldingTask = _providers.Folding is null
+        var foldingTask = providers.Folding is null
             ? Task.FromResult<IReadOnlyList<FoldRange>>(Array.Empty<FoldRange>())
             : InvokeListAsync(
-                () => _providers.Folding.GetFoldsAsync(context, cancellationToken),
+                () => providers.Folding.GetFoldsAsync(context, cancellationToken),
                 cancellationToken);
 
         await Task.WhenAll(syntaxTask, decorationTask, foldingTask).ConfigureAwait(false);
@@ -239,25 +250,26 @@ public sealed class EditorProviderScheduler : IDisposable
             foldingTask.Result.Where(item => IsValidRange(item.Range, context.Snapshot)).ToArray());
     }
 
-    private async Task<ViewportProviderResults> CollectViewportAsync(
+    private static async Task<ViewportProviderResults> CollectViewportAsync(
+        EditorProviderConfiguration providers,
         long requestId,
         EditorProviderContext context,
         CancellationToken cancellationToken)
     {
-        var gutterTask = _providers.Gutter is null
+        var gutterTask = providers.Gutter is null
             ? Task.FromResult<IReadOnlyList<GutterItem>>(Array.Empty<GutterItem>())
             : InvokeListAsync(
-                () => _providers.Gutter.GetGutterItemsAsync(context, cancellationToken),
+                () => providers.Gutter.GetGutterItemsAsync(context, cancellationToken),
                 cancellationToken);
-        var inlayTask = _providers.Inlay is null
+        var inlayTask = providers.Inlay is null
             ? Task.FromResult<IReadOnlyList<InlineAdornment>>(Array.Empty<InlineAdornment>())
             : InvokeListAsync(
-                () => _providers.Inlay.GetInlaysAsync(context, cancellationToken),
+                () => providers.Inlay.GetInlaysAsync(context, cancellationToken),
                 cancellationToken);
-        var blockTask = _providers.BlockAdornment is null
+        var blockTask = providers.BlockAdornment is null
             ? Task.FromResult<IReadOnlyList<BlockAdornment>>(Array.Empty<BlockAdornment>())
             : InvokeListAsync(
-                () => _providers.BlockAdornment.GetBlockAdornmentsAsync(context, cancellationToken),
+                () => providers.BlockAdornment.GetBlockAdornmentsAsync(context, cancellationToken),
                 cancellationToken);
 
         await Task.WhenAll(gutterTask, inlayTask, blockTask).ConfigureAwait(false);
@@ -269,21 +281,22 @@ public sealed class EditorProviderScheduler : IDisposable
             blockTask.Result.Where(item => ContainsAnchor(visibleRange, item.Anchor)).ToArray());
     }
 
-    private async Task<PositionProviderResults> CollectPositionAsync(
+    private static async Task<PositionProviderResults> CollectPositionAsync(
+        EditorProviderConfiguration providers,
         long requestId,
         EditorProviderContext context,
         bool includeCompletion,
         CancellationToken cancellationToken)
     {
-        var tooltipTask = _providers.Tooltip is null
+        var tooltipTask = providers.Tooltip is null
             ? Task.FromResult<TooltipData?>(null)
             : InvokeOptionalAsync(
-                () => _providers.Tooltip.GetTooltipAsync(context, cancellationToken),
+                () => providers.Tooltip.GetTooltipAsync(context, cancellationToken),
                 cancellationToken);
-        var completionTask = !includeCompletion || _providers.Completion is null
+        var completionTask = !includeCompletion || providers.Completion is null
             ? Task.FromResult<CompletionResult?>(null)
             : InvokeOptionalAsync(
-                () => _providers.Completion.GetCompletionsAsync(context, cancellationToken),
+                () => providers.Completion.GetCompletionsAsync(context, cancellationToken),
                 cancellationToken);
 
         await Task.WhenAll(tooltipTask, completionTask).ConfigureAwait(false);

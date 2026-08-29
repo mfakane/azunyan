@@ -86,7 +86,7 @@ public sealed record AdornmentContent
         ArgumentNullException.ThrowIfNull(text);
         Text = text;
         IconKey = iconKey;
-        Actions = actions ?? Array.Empty<AdornmentAction>();
+        Actions = Array.AsReadOnly((actions ?? Array.Empty<AdornmentAction>()).ToArray());
     }
 
     public string Text { get; }

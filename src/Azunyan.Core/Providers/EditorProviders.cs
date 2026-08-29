@@ -154,7 +154,7 @@ public sealed class CompletionResult
     {
         ArgumentNullException.ThrowIfNull(items);
         ReplacementRange = replacementRange;
-        Items = items;
+        Items = Array.AsReadOnly(items.ToArray());
     }
 
     public TextRange ReplacementRange { get; }
@@ -269,6 +269,64 @@ public sealed class EditorProviderSet
     public IInlayProvider? Inlay { get; set; }
 
     public IBlockAdornmentProvider? BlockAdornment { get; set; }
+
+    /// <summary>
+    /// Captures the current provider references for one request. The mutable
+    /// set remains convenient for hosts, while a scheduler can use this
+    /// snapshot to keep one request on one consistent configuration.
+    /// </summary>
+    public EditorProviderConfiguration CreateSnapshot() =>
+        new(
+            Syntax,
+            Decorations,
+            Tooltip,
+            Completion,
+            Gutter,
+            Folding,
+            Inlay,
+            BlockAdornment);
+}
+
+/// <summary>
+/// Immutable provider references used by one scheduler request.
+/// </summary>
+public sealed class EditorProviderConfiguration
+{
+    internal EditorProviderConfiguration(
+        ISyntaxProvider? syntax,
+        IDecorationProvider? decorations,
+        ITooltipProvider? tooltip,
+        ICompletionProvider? completion,
+        IGutterProvider? gutter,
+        IFoldingProvider? folding,
+        IInlayProvider? inlay,
+        IBlockAdornmentProvider? blockAdornment)
+    {
+        Syntax = syntax;
+        Decorations = decorations;
+        Tooltip = tooltip;
+        Completion = completion;
+        Gutter = gutter;
+        Folding = folding;
+        Inlay = inlay;
+        BlockAdornment = blockAdornment;
+    }
+
+    public ISyntaxProvider? Syntax { get; }
+
+    public IDecorationProvider? Decorations { get; }
+
+    public ITooltipProvider? Tooltip { get; }
+
+    public ICompletionProvider? Completion { get; }
+
+    public IGutterProvider? Gutter { get; }
+
+    public IFoldingProvider? Folding { get; }
+
+    public IInlayProvider? Inlay { get; }
+
+    public IBlockAdornmentProvider? BlockAdornment { get; }
 }
 
 /// <summary>
@@ -287,11 +345,11 @@ public sealed class EditorProviderResults
     {
         RequestId = requestId;
         Context = context;
-        Syntax = syntax;
-        Decorations = decorations;
+        Syntax = Array.AsReadOnly(syntax.ToArray());
+        Decorations = Array.AsReadOnly(decorations.ToArray());
         Tooltip = tooltip;
         Completions = completions;
-        Gutter = gutter;
+        Gutter = Array.AsReadOnly(gutter.ToArray());
     }
 
     public long RequestId { get; }
@@ -353,9 +411,10 @@ public sealed class EditorProviderCoordinator : IDisposable
         ArgumentNullException.ThrowIfNull(snapshot);
         var requestSelection = selection ?? TextSelection.Caret(position);
         var context = new EditorProviderContext(snapshot, position, requestSelection);
+        var providers = _providers.CreateSnapshot();
         var request = BeginRequest(cancellationToken);
         var work = Task.Run(
-            () => CollectAsync(request.Id, context, request.Token),
+            () => CollectAsync(providers, request.Id, context, request.Token),
             request.Token);
 
         try
@@ -435,16 +494,17 @@ public sealed class EditorProviderCoordinator : IDisposable
         }
     }
 
-    private async Task<EditorProviderResults> CollectAsync(
+    private static async Task<EditorProviderResults> CollectAsync(
+        EditorProviderConfiguration providers,
         long requestId,
         EditorProviderContext context,
         CancellationToken cancellationToken)
     {
-        var syntaxTask = GetSyntaxAsync(context, cancellationToken);
-        var decorationTask = GetDecorationsAsync(context, cancellationToken);
-        var tooltipTask = GetTooltipAsync(context, cancellationToken);
-        var completionTask = GetCompletionsAsync(context, cancellationToken);
-        var gutterTask = GetGutterAsync(context, cancellationToken);
+        var syntaxTask = GetSyntaxAsync(providers, context, cancellationToken);
+        var decorationTask = GetDecorationsAsync(providers, context, cancellationToken);
+        var tooltipTask = GetTooltipAsync(providers, context, cancellationToken);
+        var completionTask = GetCompletionsAsync(providers, context, cancellationToken);
+        var gutterTask = GetGutterAsync(providers, context, cancellationToken);
 
         await Task.WhenAll(syntaxTask, decorationTask, tooltipTask, completionTask, gutterTask)
             .ConfigureAwait(false);
@@ -481,40 +541,45 @@ public sealed class EditorProviderCoordinator : IDisposable
     private static bool IsValidRange(TextRange range, TextSnapshot snapshot) =>
         range.Start <= snapshot.Length && range.End <= snapshot.Length;
 
-    private Task<IReadOnlyList<SyntaxSpan>> GetSyntaxAsync(
+    private static Task<IReadOnlyList<SyntaxSpan>> GetSyntaxAsync(
+        EditorProviderConfiguration providers,
         EditorProviderContext context,
         CancellationToken cancellationToken) =>
-        _providers.Syntax is null
+        providers.Syntax is null
             ? Task.FromResult<IReadOnlyList<SyntaxSpan>>(Array.Empty<SyntaxSpan>())
-            : _providers.Syntax.GetSyntaxAsync(context, cancellationToken).AsTask();
+            : providers.Syntax.GetSyntaxAsync(context, cancellationToken).AsTask();
 
-    private Task<IReadOnlyList<TextDecoration>> GetDecorationsAsync(
+    private static Task<IReadOnlyList<TextDecoration>> GetDecorationsAsync(
+        EditorProviderConfiguration providers,
         EditorProviderContext context,
         CancellationToken cancellationToken) =>
-        _providers.Decorations is null
+        providers.Decorations is null
             ? Task.FromResult<IReadOnlyList<TextDecoration>>(Array.Empty<TextDecoration>())
-            : _providers.Decorations.GetDecorationsAsync(context, cancellationToken).AsTask();
+            : providers.Decorations.GetDecorationsAsync(context, cancellationToken).AsTask();
 
-    private Task<TooltipData?> GetTooltipAsync(
+    private static Task<TooltipData?> GetTooltipAsync(
+        EditorProviderConfiguration providers,
         EditorProviderContext context,
         CancellationToken cancellationToken) =>
-        _providers.Tooltip is null
+        providers.Tooltip is null
             ? Task.FromResult<TooltipData?>(null)
-            : _providers.Tooltip.GetTooltipAsync(context, cancellationToken).AsTask();
+            : providers.Tooltip.GetTooltipAsync(context, cancellationToken).AsTask();
 
-    private Task<CompletionResult?> GetCompletionsAsync(
+    private static Task<CompletionResult?> GetCompletionsAsync(
+        EditorProviderConfiguration providers,
         EditorProviderContext context,
         CancellationToken cancellationToken) =>
-        _providers.Completion is null
+        providers.Completion is null
             ? Task.FromResult<CompletionResult?>(null)
-            : _providers.Completion.GetCompletionsAsync(context, cancellationToken).AsTask();
+            : providers.Completion.GetCompletionsAsync(context, cancellationToken).AsTask();
 
-    private Task<IReadOnlyList<GutterItem>> GetGutterAsync(
+    private static Task<IReadOnlyList<GutterItem>> GetGutterAsync(
+        EditorProviderConfiguration providers,
         EditorProviderContext context,
         CancellationToken cancellationToken) =>
-        _providers.Gutter is null
+        providers.Gutter is null
             ? Task.FromResult<IReadOnlyList<GutterItem>>(Array.Empty<GutterItem>())
-            : _providers.Gutter.GetGutterItemsAsync(context, cancellationToken).AsTask();
+            : providers.Gutter.GetGutterItemsAsync(context, cancellationToken).AsTask();
 
     private void CompleteRequest(RequestState request)
     {
