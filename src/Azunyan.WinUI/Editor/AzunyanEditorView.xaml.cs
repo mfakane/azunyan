@@ -367,7 +367,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     public void SetDocumentSelection(TextSelection selection) => InputEditor.SetDocumentSelection(selection);
 
     public void ReplaceDocumentRange(TextRange range, string replacement) =>
-        InputEditor.ReplaceDocumentRange(range, replacement);
+        ReplaceDocumentRangeAndNotify(range, replacement);
 
     internal void SetAutomationValue(string value)
     {
@@ -583,12 +583,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         RenderViewport();
         if (!InputEditor.IsComposing)
         {
-            var automationChange = _pendingAutomationDocumentChange;
-            _pendingAutomationDocumentChange = null;
-            if (automationChange is not null)
-            {
-                _automationPeer?.NotifyDocumentChanged(automationChange);
-            }
+            FlushPendingAutomationDocumentChange(render: false);
 
             RequestProviderResults(
                 true,
@@ -606,6 +601,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         _defaultRenderer.TextRenderer.NotifyDocumentChanged(args);
         _pendingProviderDocumentChange = args;
         _pendingAutomationDocumentChange = args;
+        DispatcherQueue.TryEnqueue(FlushPendingAutomationDocumentChange);
         if (!InputEditor.IsComposing
             && !_applyingCompletion
             && InputEditor.FocusState != FocusState.Unfocused)
@@ -646,12 +642,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         RenderViewport();
         if (!InputEditor.IsComposing)
         {
-            var automationChange = _pendingAutomationDocumentChange;
-            _pendingAutomationDocumentChange = null;
-            if (automationChange is not null)
-            {
-                _automationPeer?.NotifyDocumentChanged(automationChange);
-            }
+            FlushPendingAutomationDocumentChange(render: false);
 
             RequestProviderResults(true, true, true);
         }
@@ -673,6 +664,47 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         {
             RequestProviderResults(false, false, true, requestCompletion: _completionRequested);
         }
+    }
+
+    private void FlushPendingAutomationDocumentChange() =>
+        FlushPendingAutomationDocumentChange(render: true);
+
+    private void FlushPendingAutomationDocumentChange(bool render)
+    {
+        if (InputEditor.IsComposing)
+        {
+            return;
+        }
+
+        var automationChange = _pendingAutomationDocumentChange;
+        _pendingAutomationDocumentChange = null;
+        if (automationChange is null)
+        {
+            return;
+        }
+
+        if (render)
+        {
+            RenderViewport();
+        }
+
+        _automationPeer?.NotifyDocumentChanged(automationChange);
+    }
+
+    private void ReplaceDocumentRangeAndNotify(
+        TextRange range,
+        string replacement)
+    {
+        var oldText = Snapshot.Text;
+        InputEditor.ReplaceDocumentRange(range, replacement);
+        if (string.Equals(oldText, Snapshot.Text, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _pendingAutomationDocumentChange = null;
+        RenderViewport();
+        _automationPeer?.NotifyTextChanged(oldText, Snapshot.Text);
     }
 
     private void OnInputKeyDown(object sender, KeyRoutedEventArgs args)
