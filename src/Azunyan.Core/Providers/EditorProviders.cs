@@ -231,12 +231,24 @@ public interface ISyntaxProvider
 }
 
 /// <summary>
+/// Optional richer syntax contract. The scheduler uses this contract when a
+/// provider needs to preserve candidates or provider-owned state between
+/// snapshots.
+/// </summary>
+public interface ISyntaxAnalysisProvider : ISyntaxProvider
+{
+    ValueTask<SyntaxAnalysis> GetSyntaxAnalysisAsync(
+        EditorProviderContext context,
+        CancellationToken cancellationToken = default);
+}
+
+/// <summary>
 /// Optional incremental syntax contract. Implementations can use the previous
 /// snapshot and the coarse document change to avoid rescanning unrelated text.
 /// Providers that do not implement this interface continue to receive the
 /// full snapshot through <see cref="ISyntaxProvider"/>.
 /// </summary>
-public interface IIncrementalSyntaxProvider : ISyntaxProvider
+public interface IIncrementalSyntaxProvider : ISyntaxAnalysisProvider
 {
     ValueTask<SyntaxAnalysis> GetSyntaxAsync(
         EditorProviderContext context,

@@ -7,7 +7,7 @@ namespace Azunyan.Syntax;
 /// At each source position, the first source with a candidate wins and consumes
 /// its complete range.
 /// </summary>
-public sealed class CompositeSyntaxProvider : ISyntaxProvider
+public sealed class CompositeSyntaxProvider : IIncrementalSyntaxProvider
 {
     private readonly IReadOnlyList<ISyntaxProvider> _sources;
 
@@ -25,19 +25,115 @@ public sealed class CompositeSyntaxProvider : ISyntaxProvider
 
     public async ValueTask<IReadOnlyList<SyntaxSpan>> GetSyntaxAsync(
         EditorProviderContext context,
+        CancellationToken cancellationToken = default) =>
+        (await GetSyntaxAnalysisAsync(context, cancellationToken).ConfigureAwait(false)).Spans;
+
+    public async ValueTask<SyntaxAnalysis> GetSyntaxAnalysisAsync(
+        EditorProviderContext context,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
-        var tasks = _sources.Select(source => InvokeAsync(source, context, cancellationToken)).ToArray();
+        var tasks = _sources
+            .Select(source => InvokeAsync(source, context, cancellationToken))
+            .ToArray();
         var sourceResults = await Task.WhenAll(tasks).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
+        return Combine(sourceResults, context.Snapshot, cancellationToken);
+    }
 
+    public async ValueTask<SyntaxAnalysis> GetSyntaxAsync(
+        EditorProviderContext context,
+        TextSnapshot previousSnapshot,
+        TextChange change,
+        SyntaxAnalysis previousAnalysis,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(previousSnapshot);
+        ArgumentNullException.ThrowIfNull(previousAnalysis);
+        if (previousAnalysis.State is not CompositeSyntaxState state
+            || state.Sources.Count != _sources.Count
+            || change.OldRange.End > previousSnapshot.Length
+            || change.NewRange.End > context.Snapshot.Length)
+        {
+            return await GetSyntaxAnalysisAsync(context, cancellationToken).ConfigureAwait(false);
+        }
+
+        var tasks = _sources
+            .Select((source, index) => InvokeIncrementalAsync(
+                source,
+                state.Sources[index],
+                context,
+                previousSnapshot,
+                change,
+                cancellationToken))
+            .ToArray();
+        var sourceResults = await Task.WhenAll(tasks).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return Combine(sourceResults, context.Snapshot, cancellationToken);
+    }
+
+    private static async Task<SyntaxAnalysis> InvokeAsync(
+        ISyntaxProvider source,
+        EditorProviderContext context,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return source is ISyntaxAnalysisProvider analysisProvider
+                ? await analysisProvider.GetSyntaxAnalysisAsync(context, cancellationToken).ConfigureAwait(false)
+                : new(await source.GetSyntaxAsync(context, cancellationToken).ConfigureAwait(false));
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            return SyntaxAnalysis.Empty;
+        }
+    }
+
+    private static async Task<SyntaxAnalysis> InvokeIncrementalAsync(
+        ISyntaxProvider source,
+        SyntaxAnalysis previous,
+        EditorProviderContext context,
+        TextSnapshot previousSnapshot,
+        TextChange change,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return source is IIncrementalSyntaxProvider incremental
+                ? await incremental.GetSyntaxAsync(
+                    context,
+                    previousSnapshot,
+                    change,
+                    previous,
+                    cancellationToken).ConfigureAwait(false)
+                : await InvokeAsync(source, context, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            return SyntaxAnalysis.Empty;
+        }
+    }
+
+    private static SyntaxAnalysis Combine(
+        IReadOnlyList<SyntaxAnalysis> sourceResults,
+        TextSnapshot snapshot,
+        CancellationToken cancellationToken)
+    {
         var normalized = sourceResults
-            .Select(items => items
+            .Select(result => result.Candidates
                 .Select((span, order) => (Span: span, Order: order))
                 .Where(item => !item.Span.Range.IsEmpty
-                    && item.Span.Range.Start <= context.Snapshot.Length
-                    && item.Span.Range.End <= context.Snapshot.Length)
+                    && item.Span.Range.Start <= snapshot.Length
+                    && item.Span.Range.End <= snapshot.Length)
                 .OrderBy(item => item.Span.Range.Start)
                 .ThenBy(item => item.Order)
                 .ToArray())
@@ -46,10 +142,10 @@ public sealed class CompositeSyntaxProvider : ISyntaxProvider
         var result = new List<SyntaxSpan>();
         var position = 0;
 
-        while (position < context.Snapshot.Length)
+        while (position < snapshot.Length)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var nextStart = context.Snapshot.Length;
+            var nextStart = snapshot.Length;
             SyntaxSpan? winner = null;
             for (var sourceIndex = 0; sourceIndex < normalized.Length; sourceIndex++)
             {
@@ -88,33 +184,12 @@ public sealed class CompositeSyntaxProvider : ISyntaxProvider
             }
         }
 
-        return result;
+        return new SyntaxAnalysis(
+            result,
+            normalized.SelectMany(items => items.Select(item => item.Span)).ToArray(),
+            new CompositeSyntaxState(sourceResults));
     }
 
-    private static async Task<IReadOnlyList<SyntaxSpan>> InvokeAsync(
-        ISyntaxProvider source,
-        EditorProviderContext context,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            var spans = source switch
-            {
-                DelimitedSyntaxRule delimited =>
-                    await delimited.GetCandidatesAsync(context, cancellationToken).ConfigureAwait(false),
-                LineRemainderSyntaxRule line =>
-                    await line.GetCandidatesAsync(context, cancellationToken).ConfigureAwait(false),
-                _ => await source.GetSyntaxAsync(context, cancellationToken).ConfigureAwait(false)
-            };
-            return spans ?? [];
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception)
-        {
-            return [];
-        }
-    }
+    private sealed record CompositeSyntaxState(
+        IReadOnlyList<SyntaxAnalysis> Sources) : SyntaxProviderState;
 }

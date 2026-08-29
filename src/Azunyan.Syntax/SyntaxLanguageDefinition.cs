@@ -3,7 +3,7 @@ using Azunyan.Core;
 namespace Azunyan.Syntax;
 
 /// <summary>An immutable, application-selectable syntax definition.</summary>
-public sealed class SyntaxLanguageDefinition : ISyntaxProvider
+public sealed class SyntaxLanguageDefinition : ISyntaxAnalysisProvider, IIncrementalSyntaxProvider
 {
     private readonly CompositeSyntaxProvider _provider;
 
@@ -97,6 +97,24 @@ public sealed class SyntaxLanguageDefinition : ISyntaxProvider
         EditorProviderContext context,
         CancellationToken cancellationToken = default) =>
         _provider.GetSyntaxAsync(context, cancellationToken);
+
+    public ValueTask<SyntaxAnalysis> GetSyntaxAnalysisAsync(
+        EditorProviderContext context,
+        CancellationToken cancellationToken = default) =>
+        _provider.GetSyntaxAnalysisAsync(context, cancellationToken);
+
+    public ValueTask<SyntaxAnalysis> GetSyntaxAsync(
+        EditorProviderContext context,
+        TextSnapshot previousSnapshot,
+        TextChange change,
+        SyntaxAnalysis previousAnalysis,
+        CancellationToken cancellationToken = default) =>
+        _provider.GetSyntaxAsync(
+            context,
+            previousSnapshot,
+            change,
+            previousAnalysis,
+            cancellationToken);
 
     private static string NormalizePattern(string pattern)
     {

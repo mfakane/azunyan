@@ -5,7 +5,7 @@ using Azunyan.Core;
 namespace Azunyan.Syntax;
 
 /// <summary>Highlights text between literal opening and closing tokens.</summary>
-public sealed class DelimitedSyntaxRule : ISyntaxProvider
+public sealed class DelimitedSyntaxRule : IIncrementalSyntaxProvider
 {
     public DelimitedSyntaxRule(
         string openingToken,
@@ -55,34 +55,115 @@ public sealed class DelimitedSyntaxRule : ISyntaxProvider
     public ValueTask<IReadOnlyList<SyntaxSpan>> GetSyntaxAsync(
         EditorProviderContext context,
         CancellationToken cancellationToken = default) =>
-        GetSyntaxAsync(context, includeOverlappingCandidates: false, cancellationToken);
+        GetSyntaxAsync(context, includeOverlappingCandidates: false, window: null, cancellationToken);
+
+    public async ValueTask<SyntaxAnalysis> GetSyntaxAnalysisAsync(
+        EditorProviderContext context,
+        CancellationToken cancellationToken = default)
+    {
+        var spans = await GetSyntaxAsync(
+            context,
+            includeOverlappingCandidates: false,
+            window: null,
+            cancellationToken).ConfigureAwait(false);
+        var candidates = await GetSyntaxAsync(
+            context,
+            includeOverlappingCandidates: true,
+            window: null,
+            cancellationToken).ConfigureAwait(false);
+        return new SyntaxAnalysis(spans, candidates);
+    }
+
+    public async ValueTask<SyntaxAnalysis> GetSyntaxAsync(
+        EditorProviderContext context,
+        TextSnapshot previousSnapshot,
+        TextChange change,
+        SyntaxAnalysis previousAnalysis,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(previousSnapshot);
+        ArgumentNullException.ThrowIfNull(previousAnalysis);
+        if (change.OldRange.End > previousSnapshot.Length
+            || change.NewRange.End > context.Snapshot.Length)
+        {
+            return await GetSyntaxAnalysisAsync(context, cancellationToken).ConfigureAwait(false);
+        }
+
+        var previousWindow = IncrementalSyntax.Expand(
+            change.OldRange,
+            OpeningToken.Length,
+            ClosingToken.Length,
+            previousSnapshot.Length);
+        previousWindow = IncrementalSyntax.ExpandToPreviousSpan(
+            previousAnalysis.Candidates,
+            change.OldRange,
+            previousWindow,
+            previousSnapshot.Length);
+        var currentWindow = IncrementalSyntax.MapAfterChange(
+            previousWindow,
+            change,
+            context.Snapshot.Length);
+        currentWindow = IncrementalSyntax.Expand(
+            currentWindow,
+            OpeningToken.Length,
+            ClosingToken.Length,
+            context.Snapshot.Length);
+
+        var spans = await GetSyntaxAsync(
+            context,
+            includeOverlappingCandidates: false,
+            window: currentWindow,
+            cancellationToken).ConfigureAwait(false);
+        var candidates = await GetSyntaxAsync(
+            context,
+            includeOverlappingCandidates: true,
+            window: currentWindow,
+            cancellationToken).ConfigureAwait(false);
+        if (currentWindow.End < context.Snapshot.Length
+            && (spans.Any(span => span.Range.End >= currentWindow.End)
+                || candidates.Any(span => span.Range.End >= currentWindow.End)))
+        {
+            return await GetSyntaxAnalysisAsync(context, cancellationToken).ConfigureAwait(false);
+        }
+
+        return IncrementalSyntax.Merge(
+            previousAnalysis,
+            change,
+            previousWindow,
+            currentWindow,
+            spans,
+            candidates);
+    }
 
     internal ValueTask<IReadOnlyList<SyntaxSpan>> GetCandidatesAsync(
         EditorProviderContext context,
         CancellationToken cancellationToken) =>
-        GetSyntaxAsync(context, includeOverlappingCandidates: true, cancellationToken);
+        GetSyntaxAsync(context, includeOverlappingCandidates: true, window: null, cancellationToken);
 
     private ValueTask<IReadOnlyList<SyntaxSpan>> GetSyntaxAsync(
         EditorProviderContext context,
         bool includeOverlappingCandidates,
+        TextRange? window,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
         var text = context.Snapshot.Text;
         var spans = new List<SyntaxSpan>();
-        var searchPosition = 0;
+        var scanRange = window ?? TextRange.FromBounds(0, text.Length);
+        var searchPosition = scanRange.Start;
 
-        while (searchPosition < text.Length)
+        while (searchPosition < scanRange.End)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var start = text.IndexOf(OpeningToken, searchPosition, Comparison);
-            if (start < 0)
+            if (start < 0 || start >= scanRange.End)
             {
                 break;
             }
 
             var position = start + OpeningToken.Length;
-            while (position < text.Length)
+            while (position < scanRange.End)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!AllowLineBreaks && text[position] is '\r' or '\n')
@@ -131,7 +212,7 @@ public sealed class DelimitedSyntaxRule : ISyntaxProvider
 }
 
 /// <summary>Highlights from a literal token to, but not including, the line ending.</summary>
-public sealed class LineRemainderSyntaxRule : ISyntaxProvider
+public sealed class LineRemainderSyntaxRule : IIncrementalSyntaxProvider
 {
     public LineRemainderSyntaxRule(
         string token,
@@ -158,27 +239,90 @@ public sealed class LineRemainderSyntaxRule : ISyntaxProvider
     public ValueTask<IReadOnlyList<SyntaxSpan>> GetSyntaxAsync(
         EditorProviderContext context,
         CancellationToken cancellationToken = default) =>
-        GetSyntaxAsync(context, includeOverlappingCandidates: false, cancellationToken);
+        GetSyntaxAsync(context, includeOverlappingCandidates: false, window: null, cancellationToken);
+
+    public async ValueTask<SyntaxAnalysis> GetSyntaxAnalysisAsync(
+        EditorProviderContext context,
+        CancellationToken cancellationToken = default)
+    {
+        var spans = await GetSyntaxAsync(
+            context,
+            includeOverlappingCandidates: false,
+            window: null,
+            cancellationToken).ConfigureAwait(false);
+        var candidates = await GetSyntaxAsync(
+            context,
+            includeOverlappingCandidates: true,
+            window: null,
+            cancellationToken).ConfigureAwait(false);
+        return new SyntaxAnalysis(spans, candidates);
+    }
+
+    public async ValueTask<SyntaxAnalysis> GetSyntaxAsync(
+        EditorProviderContext context,
+        TextSnapshot previousSnapshot,
+        TextChange change,
+        SyntaxAnalysis previousAnalysis,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(previousSnapshot);
+        ArgumentNullException.ThrowIfNull(previousAnalysis);
+        if (change.OldRange.End > previousSnapshot.Length
+            || change.NewRange.End > context.Snapshot.Length)
+        {
+            return await GetSyntaxAnalysisAsync(context, cancellationToken).ConfigureAwait(false);
+        }
+
+        var previousWindow = IncrementalSyntax.ExpandToLine(
+            previousSnapshot,
+            change.OldRange);
+        var currentWindow = IncrementalSyntax.ExpandToLine(
+            context.Snapshot,
+            IncrementalSyntax.MapAfterChange(
+                previousWindow,
+                change,
+                context.Snapshot.Length));
+        var spans = await GetSyntaxAsync(
+            context,
+            includeOverlappingCandidates: false,
+            window: currentWindow,
+            cancellationToken).ConfigureAwait(false);
+        var candidates = await GetSyntaxAsync(
+            context,
+            includeOverlappingCandidates: true,
+            window: currentWindow,
+            cancellationToken).ConfigureAwait(false);
+        return IncrementalSyntax.Merge(
+            previousAnalysis,
+            change,
+            previousWindow,
+            currentWindow,
+            spans,
+            candidates);
+    }
 
     internal ValueTask<IReadOnlyList<SyntaxSpan>> GetCandidatesAsync(
         EditorProviderContext context,
         CancellationToken cancellationToken) =>
-        GetSyntaxAsync(context, includeOverlappingCandidates: true, cancellationToken);
+        GetSyntaxAsync(context, includeOverlappingCandidates: true, window: null, cancellationToken);
 
     private ValueTask<IReadOnlyList<SyntaxSpan>> GetSyntaxAsync(
         EditorProviderContext context,
         bool includeOverlappingCandidates,
+        TextRange? window,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
         var text = context.Snapshot.Text;
         var spans = new List<SyntaxSpan>();
-        var position = 0;
-        while (position < text.Length)
+        var scanRange = window ?? TextRange.FromBounds(0, text.Length);
+        var position = scanRange.Start;
+        while (position < scanRange.End)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var start = text.IndexOf(Token, position, Comparison);
-            if (start < 0)
+            if (start < 0 || start >= scanRange.End)
             {
                 break;
             }
@@ -190,7 +334,7 @@ public sealed class LineRemainderSyntaxRule : ISyntaxProvider
             }
 
             var end = start + Token.Length;
-            while (end < text.Length && text[end] is not '\r' and not '\n')
+            while (end < scanRange.End && text[end] is not '\r' and not '\n')
             {
                 end++;
             }
@@ -206,7 +350,7 @@ public sealed class LineRemainderSyntaxRule : ISyntaxProvider
 }
 
 /// <summary>Highlights identifier-like words from a fixed vocabulary.</summary>
-public sealed class KeywordSyntaxRule : ISyntaxProvider
+public sealed class KeywordSyntaxRule : IIncrementalSyntaxProvider
 {
     private readonly HashSet<string> _keywords;
     private readonly Func<char, bool> _isIdentifierPart;
@@ -265,6 +409,90 @@ public sealed class KeywordSyntaxRule : ISyntaxProvider
         return ValueTask.FromResult<IReadOnlyList<SyntaxSpan>>(spans);
     }
 
+    public async ValueTask<SyntaxAnalysis> GetSyntaxAnalysisAsync(
+        EditorProviderContext context,
+        CancellationToken cancellationToken = default)
+    {
+        var spans = await GetSyntaxAsync(
+            context,
+            window: null,
+            cancellationToken).ConfigureAwait(false);
+        return new SyntaxAnalysis(spans);
+    }
+
+    public async ValueTask<SyntaxAnalysis> GetSyntaxAsync(
+        EditorProviderContext context,
+        TextSnapshot previousSnapshot,
+        TextChange change,
+        SyntaxAnalysis previousAnalysis,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(previousSnapshot);
+        ArgumentNullException.ThrowIfNull(previousAnalysis);
+        if (change.OldRange.End > previousSnapshot.Length
+            || change.NewRange.End > context.Snapshot.Length)
+        {
+            return await GetSyntaxAnalysisAsync(context, cancellationToken).ConfigureAwait(false);
+        }
+
+        var previousWindow = IncrementalSyntax.ExpandToIdentifier(
+            previousSnapshot,
+            change.OldRange,
+            _isIdentifierPart);
+        var currentWindow = IncrementalSyntax.ExpandToIdentifier(
+            context.Snapshot,
+            IncrementalSyntax.MapAfterChange(
+                previousWindow,
+                change,
+                context.Snapshot.Length),
+            _isIdentifierPart);
+        var spans = await GetSyntaxAsync(
+            context,
+            currentWindow,
+            cancellationToken).ConfigureAwait(false);
+        return IncrementalSyntax.Merge(
+            previousAnalysis,
+            change,
+            previousWindow,
+            currentWindow,
+            spans);
+    }
+
+    private ValueTask<IReadOnlyList<SyntaxSpan>> GetSyntaxAsync(
+        EditorProviderContext context,
+        TextRange? window,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        var text = context.Snapshot.Text;
+        var spans = new List<SyntaxSpan>();
+        var scanRange = window ?? TextRange.FromBounds(0, text.Length);
+        var position = scanRange.Start;
+        while (position < scanRange.End)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!_isIdentifierPart(text[position]))
+            {
+                position++;
+                continue;
+            }
+
+            var start = position++;
+            while (position < scanRange.End && _isIdentifierPart(text[position]))
+            {
+                position++;
+            }
+
+            if (_keywords.Contains(text[start..position]))
+            {
+                spans.Add(new SyntaxSpan(TextRange.FromBounds(start, position), Classification));
+            }
+        }
+
+        return ValueTask.FromResult<IReadOnlyList<SyntaxSpan>>(spans);
+    }
+
     private static bool IsDefaultIdentifierPart(char value)
     {
         if (char.IsLetterOrDigit(value) || char.IsSurrogate(value))
@@ -280,7 +508,7 @@ public sealed class KeywordSyntaxRule : ISyntaxProvider
 }
 
 /// <summary>Highlights every occurrence of a literal token.</summary>
-public sealed class LiteralSyntaxRule : ISyntaxProvider
+public sealed class LiteralSyntaxRule : IIncrementalSyntaxProvider
 {
     public LiteralSyntaxRule(
         string token,
@@ -303,16 +531,71 @@ public sealed class LiteralSyntaxRule : ISyntaxProvider
     public ValueTask<IReadOnlyList<SyntaxSpan>> GetSyntaxAsync(
         EditorProviderContext context,
         CancellationToken cancellationToken = default)
+        => GetSyntaxAsync(context, window: null, cancellationToken);
+
+    public async ValueTask<SyntaxAnalysis> GetSyntaxAnalysisAsync(
+        EditorProviderContext context,
+        CancellationToken cancellationToken = default)
+    {
+        var spans = await GetSyntaxAsync(context, window: null, cancellationToken)
+            .ConfigureAwait(false);
+        return new SyntaxAnalysis(spans);
+    }
+
+    public async ValueTask<SyntaxAnalysis> GetSyntaxAsync(
+        EditorProviderContext context,
+        TextSnapshot previousSnapshot,
+        TextChange change,
+        SyntaxAnalysis previousAnalysis,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(previousSnapshot);
+        ArgumentNullException.ThrowIfNull(previousAnalysis);
+        if (change.OldRange.End > previousSnapshot.Length
+            || change.NewRange.End > context.Snapshot.Length)
+        {
+            return await GetSyntaxAnalysisAsync(context, cancellationToken).ConfigureAwait(false);
+        }
+
+        var previousWindow = IncrementalSyntax.Expand(
+            change.OldRange,
+            Token.Length,
+            Token.Length,
+            previousSnapshot.Length);
+        var currentWindow = IncrementalSyntax.Expand(
+            IncrementalSyntax.MapAfterChange(
+                previousWindow,
+                change,
+                context.Snapshot.Length),
+            Token.Length,
+            Token.Length,
+            context.Snapshot.Length);
+        var spans = await GetSyntaxAsync(context, currentWindow, cancellationToken)
+            .ConfigureAwait(false);
+        return IncrementalSyntax.Merge(
+            previousAnalysis,
+            change,
+            previousWindow,
+            currentWindow,
+            spans);
+    }
+
+    private ValueTask<IReadOnlyList<SyntaxSpan>> GetSyntaxAsync(
+        EditorProviderContext context,
+        TextRange? window,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
         var text = context.Snapshot.Text;
         var spans = new List<SyntaxSpan>();
-        var position = 0;
-        while (position <= text.Length - Token.Length)
+        var scanRange = window ?? TextRange.FromBounds(0, text.Length);
+        var position = scanRange.Start;
+        while (position <= scanRange.End - Token.Length)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var start = text.IndexOf(Token, position, Comparison);
-            if (start < 0)
+            if (start < 0 || start > scanRange.End - Token.Length)
             {
                 break;
             }
@@ -326,7 +609,7 @@ public sealed class LiteralSyntaxRule : ISyntaxProvider
 }
 
 /// <summary>Highlights non-empty matches of a regular expression.</summary>
-public sealed class RegexSyntaxRule : ISyntaxProvider
+public sealed class RegexSyntaxRule : IIncrementalSyntaxProvider
 {
     private readonly Regex _regex;
 
@@ -367,5 +650,25 @@ public sealed class RegexSyntaxRule : ISyntaxProvider
         }
 
         return ValueTask.FromResult<IReadOnlyList<SyntaxSpan>>(spans);
+    }
+
+    public async ValueTask<SyntaxAnalysis> GetSyntaxAnalysisAsync(
+        EditorProviderContext context,
+        CancellationToken cancellationToken = default)
+    {
+        var spans = await GetSyntaxAsync(context, cancellationToken).ConfigureAwait(false);
+        return new SyntaxAnalysis(spans);
+    }
+
+    public ValueTask<SyntaxAnalysis> GetSyntaxAsync(
+        EditorProviderContext context,
+        TextSnapshot previousSnapshot,
+        TextChange change,
+        SyntaxAnalysis previousAnalysis,
+        CancellationToken cancellationToken = default)
+    {
+        // An arbitrary regular expression may depend on text far outside the
+        // edit, so retain correctness by falling back to a complete scan.
+        return GetSyntaxAnalysisAsync(context, cancellationToken);
     }
 }

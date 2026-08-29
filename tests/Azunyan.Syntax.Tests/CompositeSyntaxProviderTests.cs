@@ -85,6 +85,36 @@ public sealed class CompositeSyntaxProviderTests
             await GetAsync(provider, "value", cancellation.Token));
     }
 
+    [Fact]
+    public async Task Incremental_analysis_keeps_composite_candidates_and_matches_full_result()
+    {
+        var provider = new CompositeSyntaxProvider(
+        [
+            new LineRemainderSyntaxRule("//", "comment"),
+            new DelimitedSyntaxRule("\"", "\"", "string", allowLineBreaks: false, escapePrefix: "\\"),
+            new KeywordSyntaxRule(["var"])
+        ]);
+        var previous = new TextSnapshot("var s = \"old\"; // note");
+        var current = new TextSnapshot("var s = \"new\"; // note");
+        var previousAnalysis = await provider.GetSyntaxAnalysisAsync(
+            new EditorProviderContext(previous, 0, TextSelection.Caret(0)));
+
+        var incremental = await provider.GetSyntaxAsync(
+            new EditorProviderContext(current, 0, TextSelection.Caret(0)),
+            previous,
+            new TextChange(
+                new TextRange(previous.Text.IndexOf("old", StringComparison.Ordinal), 3),
+                "old",
+                "new"),
+            previousAnalysis);
+        var full = await provider.GetSyntaxAnalysisAsync(
+            new EditorProviderContext(current, 0, TextSelection.Caret(0)));
+
+        Assert.NotNull(incremental.State);
+        Assert.Equal(full.Spans, incremental.Spans);
+        Assert.Equal(full.Candidates, incremental.Candidates);
+    }
+
     private static async Task<IReadOnlyList<SyntaxSpan>> GetAsync(
         CompositeSyntaxProvider provider,
         string text,

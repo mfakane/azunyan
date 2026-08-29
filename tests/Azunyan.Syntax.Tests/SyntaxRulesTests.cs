@@ -73,6 +73,48 @@ public sealed class SyntaxRulesTests
             await GetAsync(rule, "text"));
     }
 
+    [Fact]
+    public async Task Incremental_keyword_analysis_matches_a_full_analysis()
+    {
+        var rule = new KeywordSyntaxRule(["TODO", "DONE"]);
+        var previous = new TextSnapshot("TODO old\nDONE");
+        var current = new TextSnapshot("TODO new\nDONE");
+        var previousAnalysis = await rule.GetSyntaxAnalysisAsync(
+            new EditorProviderContext(previous, 0, TextSelection.Caret(0)));
+
+        var incremental = await rule.GetSyntaxAsync(
+            new EditorProviderContext(current, 0, TextSelection.Caret(0)),
+            previous,
+            new TextChange(new TextRange(5, 3), "old", "new"),
+            previousAnalysis);
+        var full = await rule.GetSyntaxAnalysisAsync(
+            new EditorProviderContext(current, 0, TextSelection.Caret(0)));
+
+        Assert.Equal(full.Spans, incremental.Spans);
+        Assert.Equal(full.Candidates, incremental.Candidates);
+    }
+
+    [Fact]
+    public async Task Incremental_delimited_analysis_rebases_unaffected_ranges()
+    {
+        var rule = new DelimitedSyntaxRule("/*", "*/", "comment");
+        var previous = new TextSnapshot("/* first */\ntext\n/* old */");
+        var current = new TextSnapshot("/* first */\ntext\n/* new */");
+        var previousAnalysis = await rule.GetSyntaxAnalysisAsync(
+            new EditorProviderContext(previous, 0, TextSelection.Caret(0)));
+
+        var incremental = await rule.GetSyntaxAsync(
+            new EditorProviderContext(current, 0, TextSelection.Caret(0)),
+            previous,
+            new TextChange(new TextRange(previous.Text.IndexOf("old", StringComparison.Ordinal), 3), "old", "new"),
+            previousAnalysis);
+        var full = await rule.GetSyntaxAnalysisAsync(
+            new EditorProviderContext(current, 0, TextSelection.Caret(0)));
+
+        Assert.Equal(full.Spans, incremental.Spans);
+        Assert.Equal(full.Candidates, incremental.Candidates);
+    }
+
     private static async Task<IReadOnlyList<SyntaxSpan>> GetAsync(ISyntaxProvider provider, string text)
     {
         var snapshot = new TextSnapshot(text);

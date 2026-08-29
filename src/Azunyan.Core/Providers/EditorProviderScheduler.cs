@@ -324,9 +324,16 @@ public sealed class EditorProviderScheduler : IDisposable
         EditorProviderContext context,
         CancellationToken cancellationToken) =>
         InvokeAnalysisAsync(
-            async () => new SyntaxAnalysis(
-                await provider.GetSyntaxAsync(context, cancellationToken).ConfigureAwait(false)),
+            () => provider is ISyntaxAnalysisProvider analysisProvider
+                ? analysisProvider.GetSyntaxAnalysisAsync(context, cancellationToken)
+                : WrapSyntaxAsync(provider, context, cancellationToken),
             cancellationToken);
+
+    private static async ValueTask<SyntaxAnalysis> WrapSyntaxAsync(
+        ISyntaxProvider provider,
+        EditorProviderContext context,
+        CancellationToken cancellationToken) =>
+        new(await provider.GetSyntaxAsync(context, cancellationToken).ConfigureAwait(false));
 
     private static async Task<SyntaxAnalysis> InvokeAnalysisAsync(
         Func<ValueTask<SyntaxAnalysis>> invoke,

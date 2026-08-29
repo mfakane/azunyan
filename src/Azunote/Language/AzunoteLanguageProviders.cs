@@ -13,7 +13,7 @@ public static class AzunoteLanguageDefinition
 /// TOML syntax used by Azunote's configuration language mode. Configuration
 /// semantics are supplied separately by the schema-backed completion provider.
 /// </summary>
-public sealed class AzunoteSyntaxProvider : ISyntaxProvider
+public sealed class AzunoteSyntaxProvider : IIncrementalSyntaxProvider
 {
     private static readonly SyntaxLanguageDefinition Provider = BuiltInSyntaxLanguages.Toml;
 
@@ -23,6 +23,24 @@ public sealed class AzunoteSyntaxProvider : ISyntaxProvider
     {
         return Provider.GetSyntaxAsync(context, cancellationToken);
     }
+
+    public ValueTask<SyntaxAnalysis> GetSyntaxAnalysisAsync(
+        EditorProviderContext context,
+        CancellationToken cancellationToken = default) =>
+        Provider.GetSyntaxAnalysisAsync(context, cancellationToken);
+
+    public ValueTask<SyntaxAnalysis> GetSyntaxAsync(
+        EditorProviderContext context,
+        TextSnapshot previousSnapshot,
+        TextChange change,
+        SyntaxAnalysis previousAnalysis,
+        CancellationToken cancellationToken = default) =>
+        Provider.GetSyntaxAsync(
+            context,
+            previousSnapshot,
+            change,
+            previousAnalysis,
+            cancellationToken);
 }
 
 /// <summary>Compatibility name for the schema-backed configuration provider.</summary>
