@@ -6,6 +6,7 @@ using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.UI;
 using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Windows.Foundation;
 using Windows.UI;
 using Windows.UI.Text;
@@ -17,7 +18,7 @@ namespace Azunyan.WinUI;
 /// rows may be unwrapped lines or continuation segments produced by the
 /// framework-independent layout layer.
 /// </summary>
-internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
+internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
 {
     private readonly CanvasControl _gutterSurface;
     private readonly CanvasControl _textSurface;
@@ -1511,11 +1512,21 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
 
 internal sealed class AzunyanEditorRenderer : IAzunyanEditorRenderer
 {
+    private readonly Canvas _gutterLayer;
+    private readonly Canvas _textLayer;
+    private readonly Canvas _overlayLayer;
+
     public AzunyanEditorRenderer(
         CanvasControl gutterSurface,
-        CanvasControl textSurface)
+        CanvasControl textSurface,
+        Canvas gutterLayer,
+        Canvas textLayer,
+        Canvas overlayLayer)
     {
         TextRenderer = new ProjectedTextRenderer(gutterSurface, textSurface);
+        _gutterLayer = gutterLayer ?? throw new ArgumentNullException(nameof(gutterLayer));
+        _textLayer = textLayer ?? throw new ArgumentNullException(nameof(textLayer));
+        _overlayLayer = overlayLayer ?? throw new ArgumentNullException(nameof(overlayLayer));
     }
 
     public ProjectedTextRenderer TextRenderer { get; }
@@ -1526,7 +1537,12 @@ internal sealed class AzunyanEditorRenderer : IAzunyanEditorRenderer
         remove => TextRenderer.LayoutInvalidated -= value;
     }
 
-    public void Render(AzunyanEditorRenderContext context) => TextRenderer.Render(context);
+    public void Render(AzunyanEditorRenderFrame frame) =>
+        TextRenderer.Render(new AzunyanEditorRenderContext(
+            frame,
+            _gutterLayer,
+            _textLayer,
+            _overlayLayer));
 
     public void Dispose() => TextRenderer.Dispose();
 }

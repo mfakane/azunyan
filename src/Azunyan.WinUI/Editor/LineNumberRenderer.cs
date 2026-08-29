@@ -5,7 +5,7 @@ using Microsoft.UI.Xaml.Media;
 
 namespace Azunyan.WinUI;
 
-internal sealed class LineNumberRenderer : IAzunyanEditorRenderer
+internal sealed class LineNumberRenderer : ICanvasEditorRenderer
 {
     public void Render(AzunyanEditorRenderContext context)
     {

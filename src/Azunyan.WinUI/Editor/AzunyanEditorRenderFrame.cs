@@ -1,24 +1,21 @@
 using Azunyan.Core;
 using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 
 namespace Azunyan.WinUI;
 
 /// <summary>
-/// Internal WinUI adapter that combines an immutable render frame with the
-/// control surfaces used by the built-in renderer.
+/// Immutable viewport information passed to an editor renderer. This public
+/// boundary contains document, layout, and provider data only; WinUI control
+/// surfaces remain an implementation detail of the built-in renderer.
 /// </summary>
-internal sealed class AzunyanEditorRenderContext
+public sealed class AzunyanEditorRenderFrame
 {
-    internal AzunyanEditorRenderContext(
+    internal AzunyanEditorRenderFrame(
         TextSnapshot snapshot,
         TextSelection selection,
         TextRange? compositionRange,
         AzunyanColorScheme colorScheme,
-        Canvas gutterLayer,
-        Canvas textLayer,
-        Canvas overlayLayer,
         double lineHeight,
         double characterWidth,
         double verticalOffset,
@@ -38,13 +35,10 @@ internal sealed class AzunyanEditorRenderContext
         IReadOnlySet<string> collapsedFoldIds,
         EditorProviderFrame? providerFrame)
     {
-        Snapshot = snapshot;
+        Snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
         Selection = selection;
         CompositionRange = compositionRange;
         ColorScheme = colorScheme ?? throw new ArgumentNullException(nameof(colorScheme));
-        GutterLayer = gutterLayer;
-        TextLayer = textLayer;
-        OverlayLayer = overlayLayer;
         LineHeight = lineHeight;
         CharacterWidth = characterWidth;
         VerticalOffset = verticalOffset;
@@ -54,50 +48,16 @@ internal sealed class AzunyanEditorRenderContext
         ViewportHeight = viewportHeight;
         FirstVisibleLine = firstVisibleLine;
         LastVisibleLine = lastVisibleLine;
-        FontFamily = fontFamily;
+        FontFamily = fontFamily ?? throw new ArgumentNullException(nameof(fontFamily));
         FontSize = fontSize;
         ContentLeft = contentLeft;
         ContentTop = contentTop;
         ShowLineNumbers = showLineNumbers;
         TextWrapping = textWrapping;
         TabDisplaySize = tabDisplaySize;
-        CollapsedFoldIds = collapsedFoldIds;
+        CollapsedFoldIds = collapsedFoldIds ?? throw new ArgumentNullException(nameof(collapsedFoldIds));
         ProviderFrame = providerFrame;
         ProviderResults = providerFrame?.ToLegacyResults();
-    }
-
-    internal AzunyanEditorRenderContext(
-        AzunyanEditorRenderFrame frame,
-        Canvas gutterLayer,
-        Canvas textLayer,
-        Canvas overlayLayer)
-        : this(
-            frame.Snapshot,
-            frame.Selection,
-            frame.CompositionRange,
-            frame.ColorScheme,
-            gutterLayer,
-            textLayer,
-            overlayLayer,
-            frame.LineHeight,
-            frame.CharacterWidth,
-            frame.VerticalOffset,
-            frame.HorizontalOffset,
-            frame.GutterWidth,
-            frame.ViewportWidth,
-            frame.ViewportHeight,
-            frame.FirstVisibleLine,
-            frame.LastVisibleLine,
-            frame.FontFamily,
-            frame.FontSize,
-            frame.ContentLeft,
-            frame.ContentTop,
-            frame.ShowLineNumbers,
-            frame.TextWrapping,
-            frame.TabDisplaySize,
-            frame.CollapsedFoldIds,
-            frame.ProviderFrame)
-    {
     }
 
     public TextSnapshot Snapshot { get; }
@@ -112,12 +72,6 @@ internal sealed class AzunyanEditorRenderContext
     public TextRange? CompositionRange { get; }
 
     public AzunyanColorScheme ColorScheme { get; }
-
-    public Canvas GutterLayer { get; }
-
-    public Canvas TextLayer { get; }
-
-    public Canvas OverlayLayer { get; }
 
     public double LineHeight { get; }
 
@@ -153,10 +107,6 @@ internal sealed class AzunyanEditorRenderContext
 
     public IReadOnlySet<string> CollapsedFoldIds { get; }
 
-    /// <summary>
-    /// The immutable provider channels used to build this render pass. A
-    /// channel may be absent while its independent request is still running.
-    /// </summary>
     public EditorProviderFrame? ProviderFrame { get; }
 
     public DocumentProviderResults? DocumentResults => ProviderFrame?.Document;
@@ -165,22 +115,7 @@ internal sealed class AzunyanEditorRenderContext
 
     public PositionProviderResults? PositionResults => ProviderFrame?.Position;
 
-    /// <summary>
-    /// The newest provider results for this viewport request. A renderer may
-    /// use the syntax, decoration, gutter, tooltip, or completion data as
-    /// appropriate for its own visual layer.
-    /// </summary>
     public EditorProviderResults? ProviderResults { get; }
 
     public TextRange GetLineRange(int line) => Snapshot.Lines.GetLineRange(line);
-}
-
-internal interface ICanvasEditorRenderer
-{
-    void Render(AzunyanEditorRenderContext context);
-}
-
-public interface IAzunyanEditorRenderer
-{
-    void Render(AzunyanEditorRenderFrame frame);
 }

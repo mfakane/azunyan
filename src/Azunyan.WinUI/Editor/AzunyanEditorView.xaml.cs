@@ -58,7 +58,10 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         _colorScheme = AzunyanColorScheme.Default;
         _defaultRenderer = new AzunyanEditorRenderer(
             GutterDrawingSurface,
-            TextDrawingSurface);
+            TextDrawingSurface,
+            GutterCanvas,
+            TextRenderLayer,
+            RenderOverlay);
         _defaultRenderer.LayoutInvalidated += OnRendererLayoutInvalidated;
         _providerScheduler = new EditorProviderScheduler(_providers);
         _renderer = _defaultRenderer;
@@ -858,14 +861,11 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         TextRenderLayer.Children.Clear();
         RenderOverlay.Children.Clear();
 
-        var context = new AzunyanEditorRenderContext(
+        var frame = new AzunyanEditorRenderFrame(
             InputEditor.Snapshot,
             InputEditor.Document.Selection,
             InputEditor.CompositionRange,
             _colorScheme,
-            GutterCanvas,
-            TextRenderLayer,
-            RenderOverlay,
             _lineHeight,
             _characterWidth,
             verticalOffset,
@@ -884,7 +884,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             TabDisplaySize,
             _collapsedFoldIds,
             currentFrame);
-        _renderer?.Render(context);
+        _renderer?.Render(frame);
         CreateProjectedAutomationChildren();
         if (preserveViewport
             && !_preservingViewport
