@@ -106,6 +106,53 @@ public sealed class LayoutTests
     }
 
     [Fact]
+    public void Incremental_visual_rows_rebase_wrapped_suffix_and_blocks()
+    {
+        var document = new Document("aa\nbbbb\ncc\n");
+        var oldSnapshot = document.Snapshot;
+        var oldProjection = TextProjectionBuilder.Build(oldSnapshot);
+        var oldBlock = new BlockAdornment(
+            "lens",
+            DocumentAnchor.Before(8),
+            12,
+            "codelens",
+            new AdornmentContent("details"));
+        var previous = VisualRowMapBuilder.Build(
+            oldProjection,
+            new[] { oldBlock },
+            wrapColumns: 2);
+
+        var change = document.Insert(4, "X");
+        var currentProjection = TextProjectionBuilder.BuildIncremental(
+            oldSnapshot,
+            document.Snapshot,
+            oldProjection,
+            change);
+        var currentBlock = new BlockAdornment(
+            "lens",
+            DocumentAnchor.Before(9),
+            12,
+            "codelens",
+            new AdornmentContent("details"));
+        var incremental = VisualRowMapBuilder.BuildIncremental(
+            oldProjection,
+            currentProjection,
+            previous,
+            new[] { currentBlock },
+            wrapColumns: 2,
+            change: change);
+        var expected = VisualRowMapBuilder.Build(
+            currentProjection,
+            new[] { currentBlock },
+            wrapColumns: 2);
+
+        Assert.Equal(
+            expected.Rows.Select(DescribeRow),
+            incremental.Rows.Select(DescribeRow));
+        Assert.Same(previous.Rows[0], incremental.Rows[0]);
+    }
+
+    [Fact]
     public void Visible_layouts_reuse_cached_unwrapped_line_layouts()
     {
         var snapshot = new TextSnapshot("abcdef");
@@ -169,6 +216,49 @@ public sealed class LayoutTests
         Assert.Equal(
             new[] { (0, 0, 3), (0, 3, 3), (1, 0, 2), (1, 2, 1) },
             rows.Rows.Select(row => (row.LogicalLine, row.TextStartColumn, row.TextLength)));
+    }
+
+    [Fact]
+    public void Incremental_visual_rows_rebases_measured_wrap_breaks_by_source_line()
+    {
+        var document = new Document("aa\nabcdef\nxyz\n");
+        var oldSnapshot = document.Snapshot;
+        var oldProjection = TextProjectionBuilder.Build(oldSnapshot);
+        var oldBreaks = new Dictionary<int, IReadOnlyList<int>>
+        {
+            [1] = new[] { 2, 5 },
+            [2] = new[] { 1 }
+        };
+        var previous = VisualRowMapBuilder.Build(
+            oldProjection,
+            wrapColumns: 99,
+            wrappedLineBreaksByVisualLine: oldBreaks);
+
+        var change = document.Insert(1, "Z");
+        var currentProjection = TextProjectionBuilder.BuildIncremental(
+            oldSnapshot,
+            document.Snapshot,
+            oldProjection,
+            change);
+        var currentBreaks = new Dictionary<int, IReadOnlyList<int>>
+        {
+            [1] = new[] { 2, 5 },
+            [2] = new[] { 1 }
+        };
+        var incremental = VisualRowMapBuilder.BuildIncremental(
+            oldProjection,
+            currentProjection,
+            previous,
+            wrapColumns: 99,
+            wrappedLineBreaksByVisualLine: currentBreaks,
+            change: change);
+        var expected = VisualRowMapBuilder.Build(
+            currentProjection,
+            wrapColumns: 99,
+            wrappedLineBreaksByVisualLine: currentBreaks);
+
+        Assert.Equal(expected.Rows.Select(DescribeRow), incremental.Rows.Select(DescribeRow));
+        Assert.Equal(7, incremental.Rows.Count);
     }
 
     [Fact]
@@ -377,4 +467,8 @@ public sealed class LayoutTests
         Assert.Single(layouts);
         Assert.Equal(0, layouts[0].Top);
     }
+
+    private static (VisualRowKind Kind, int LogicalLine, int Start, int Length, string? BlockId)
+        DescribeRow(VisualRow row) =>
+        (row.Kind, row.LogicalLine, row.TextStartColumn, row.TextLength, row.BlockAdornment?.Id);
 }

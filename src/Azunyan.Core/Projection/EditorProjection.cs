@@ -418,6 +418,12 @@ public sealed class ProjectedLine
 /// A snapshot-bound, unwrapped projection. It maps document anchors through
 /// folded ranges and inline adornments without changing document offsets.
 /// </summary>
+internal readonly record struct ProjectionChangeWindow(
+    int OldStartLine,
+    int OldEndLine,
+    int NewStartLine,
+    int NewEndLine);
+
 public sealed class TextProjection
 {
     private readonly int[] _logicalToVisual;
@@ -432,7 +438,8 @@ public sealed class TextProjection
         IReadOnlyList<FoldRange> folds,
         IReadOnlyList<InlineAdornment> inlays,
         int[]? logicalToVisual,
-        bool isPlain)
+        bool isPlain,
+        ProjectionChangeWindow? changeWindow = null)
     {
         Snapshot = snapshot;
         Lines = lines;
@@ -442,6 +449,7 @@ public sealed class TextProjection
         _foldStarts = _folds.Select(fold => fold.Range.Start).ToArray();
         _logicalToVisual = logicalToVisual ?? Array.Empty<int>();
         IsPlain = isPlain;
+        ChangeWindow = changeWindow;
     }
 
     public TextSnapshot Snapshot { get; }
@@ -453,6 +461,8 @@ public sealed class TextProjection
     internal IReadOnlyList<FoldRange> Folds => _folds;
 
     internal IReadOnlyList<InlineAdornment> Inlays => _inlays;
+
+    internal ProjectionChangeWindow? ChangeWindow { get; }
 
     internal int GetVisualLineForLogicalLine(int logicalLine) =>
         IsPlain ? logicalLine : _logicalToVisual[logicalLine];
@@ -732,7 +742,12 @@ public sealed class TextProjectionBuilder
             normalizedFolds,
             normalizedInlays,
             logicalToVisual,
-            isPlain: normalizedFolds.Count == 0 && normalizedInlays.Length == 0);
+            isPlain: normalizedFolds.Count == 0 && normalizedInlays.Length == 0,
+            changeWindow: new ProjectionChangeWindow(
+                oldWindow.StartLine,
+                oldWindow.EndLine,
+                newWindow.StartLine,
+                newWindow.EndLine));
     }
 
     private static void CopyPrefixVisualLines(
@@ -978,7 +993,12 @@ public sealed class TextProjectionBuilder
             Array.Empty<FoldRange>(),
             Array.Empty<InlineAdornment>(),
             logicalToVisual: null,
-            isPlain: true);
+            isPlain: true,
+            changeWindow: new ProjectionChangeWindow(
+                oldWindow.StartLine,
+                oldWindow.EndLine,
+                newWindow.StartLine,
+                newWindow.EndLine));
     }
 
     private static ProjectedLine CreatePlainLine(int logicalLine, TextRange sourceRange) =>
