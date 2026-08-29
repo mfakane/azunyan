@@ -410,23 +410,31 @@ public sealed class TextProjection
     private readonly int[] _logicalToVisual;
     private readonly FoldRange[] _folds;
     private readonly int[] _foldStarts;
+    private readonly ProjectedLineTable _lineTable;
 
     internal TextProjection(
         TextSnapshot snapshot,
-        IReadOnlyList<ProjectedLine> lines,
+        ProjectedLineTable lines,
         IReadOnlyList<FoldRange> folds,
-        int[] logicalToVisual)
+        int[]? logicalToVisual,
+        bool isPlain)
     {
         Snapshot = snapshot;
         Lines = lines;
+        _lineTable = lines;
         _folds = folds.ToArray();
         _foldStarts = _folds.Select(fold => fold.Range.Start).ToArray();
-        _logicalToVisual = logicalToVisual;
+        _logicalToVisual = logicalToVisual ?? Array.Empty<int>();
+        IsPlain = isPlain;
     }
 
     public TextSnapshot Snapshot { get; }
 
     public IReadOnlyList<ProjectedLine> Lines { get; }
+
+    internal ProjectedLineTable LineTable => _lineTable;
+
+    internal bool IsPlain { get; }
 
     public int VisualLineCount => Lines.Count;
 
@@ -436,7 +444,9 @@ public sealed class TextProjection
         var offset = anchor.Position.Offset;
         var containingFold = FindContainingFold(offset, anchor.Affinity);
         var logicalLine = Snapshot.Lines.GetLine(containingFold?.Range.Start ?? offset);
-        var visualLine = _logicalToVisual[logicalLine];
+        var visualLine = IsPlain
+            ? logicalLine
+            : _logicalToVisual[logicalLine];
         if (visualLine < 0)
         {
             throw new InvalidOperationException("The projection has no visible line for the requested position.");
@@ -460,7 +470,7 @@ public sealed class TextProjection
             return false;
         }
 
-        visualLine = _logicalToVisual[logicalLine];
+        visualLine = IsPlain ? logicalLine : _logicalToVisual[logicalLine];
         return visualLine >= 0;
     }
 
@@ -543,13 +553,19 @@ public sealed class TextProjectionBuilder
         var normalizedFolds = NormalizeFolds(snapshot, folds ?? Array.Empty<FoldRange>());
         var normalizedInlays = NormalizeInlays(snapshot, inlays ?? Array.Empty<InlineAdornment>());
         var lines = new List<ProjectedLine>();
-        var logicalToVisual = Enumerable.Repeat(-1, snapshot.Lines.LineCount).ToArray();
 
         if (normalizedFolds.Count == 0 && normalizedInlays.Length == 0)
         {
-            BuildPlainProjection(snapshot, lines, logicalToVisual);
-            return new TextProjection(snapshot, lines, normalizedFolds, logicalToVisual);
+            BuildPlainProjection(snapshot, lines);
+            return new TextProjection(
+                snapshot,
+                ProjectedLineTable.FromLines(lines),
+                normalizedFolds,
+                logicalToVisual: null,
+                isPlain: true);
         }
+
+        var logicalToVisual = Enumerable.Repeat(-1, snapshot.Lines.LineCount).ToArray();
 
         for (var logicalLine = 0; logicalLine < snapshot.Lines.LineCount; logicalLine++)
         {
@@ -564,7 +580,12 @@ public sealed class TextProjectionBuilder
             lines.Add(new ProjectedLine(logicalLine, sourceRange, inlines));
         }
 
-        return new TextProjection(snapshot, lines, normalizedFolds, logicalToVisual);
+        return new TextProjection(
+            snapshot,
+            ProjectedLineTable.FromLines(lines),
+            normalizedFolds,
+            logicalToVisual,
+            isPlain: false);
     }
 
     /// <summary>
@@ -583,7 +604,7 @@ public sealed class TextProjectionBuilder
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(previous);
         if (!ReferenceEquals(oldSnapshot, previous.Snapshot)
-            || !IsPlain(previous)
+            || !previous.IsPlain
             || change.OldRange.End > oldSnapshot.Length
             || change.NewRange.End > snapshot.Length)
         {
@@ -592,60 +613,49 @@ public sealed class TextProjectionBuilder
 
         var oldLines = previous.Snapshot.Lines;
         var newLines = snapshot.Lines;
-        var lines = new List<ProjectedLine>(newLines.LineCount);
-        var logicalToVisual = Enumerable.Repeat(-1, newLines.LineCount).ToArray();
         var delta = change.NewText.Length - change.OldRange.Length;
 
-        for (var logicalLine = 0; logicalLine < newLines.LineCount; logicalLine++)
-        {
-            var sourceRange = newLines.GetLineRange(logicalLine);
-            ProjectedLine line;
-            if (sourceRange.End < change.OldRange.Start
-                && logicalLine < previous.Lines.Count
-                && previous.Lines[logicalLine].SourceRange == sourceRange)
-            {
-                line = previous.Lines[logicalLine];
-            }
-            else if (sourceRange.Start >= change.NewRange.End)
-            {
-                var oldStart = sourceRange.Start - delta;
-                if (oldStart >= 0
-                    && oldStart <= previous.Snapshot.Length
-                    && oldLines.GetLineStart(oldLines.GetLine(oldStart)) == oldStart)
-                {
-                    var oldLineIndex = oldLines.GetLine(oldStart);
-                    var oldRange = oldLines.GetLineRange(oldLineIndex);
-                    if (oldRange.End + delta == sourceRange.End
-                        && oldLineIndex < previous.Lines.Count)
-                    {
-                        line = previous.Lines[oldLineIndex].Rebase(
-                            logicalLine,
-                            sourceRange);
-                    }
-                    else
-                    {
-                        line = CreatePlainLine(logicalLine, sourceRange);
-                    }
-                }
-                else
-                {
-                    line = CreatePlainLine(logicalLine, sourceRange);
-                }
-            }
-            else
-            {
-                line = CreatePlainLine(logicalLine, sourceRange);
-            }
+        var oldWindow = GetLineWindow(oldSnapshot, change.OldRange);
+        var oldWindowStart = oldLines.GetLineStart(oldWindow.StartLine);
+        var oldWindowEnd = oldWindow.EndLine == oldLines.LineCount
+            ? oldSnapshot.Length
+            : oldLines.GetLineStart(oldWindow.EndLine);
+        var mappedStart = Math.Clamp(
+            MapPosition(oldWindowStart, change, delta),
+            0,
+            snapshot.Length);
+        var mappedEnd = Math.Clamp(
+            MapPosition(oldWindowEnd, change, delta),
+            mappedStart,
+            snapshot.Length);
+        var mappedWindow = TextRange.FromBounds(mappedStart, mappedEnd);
+        var newWindow = GetLineWindow(snapshot, mappedWindow);
+        var chunks = new List<ProjectedLineChunk>();
+        previous.LineTable.AddRange(chunks, 0, oldWindow.StartLine);
 
-            logicalToVisual[logicalLine] = lines.Count;
-            lines.Add(line);
+        var changedLines = new List<ProjectedLine>(newWindow.EndLine - newWindow.StartLine);
+        for (var logicalLine = newWindow.StartLine; logicalLine < newWindow.EndLine; logicalLine++)
+        {
+            changedLines.Add(CreatePlainLine(logicalLine, newLines.GetLineRange(logicalLine)));
         }
+
+        ProjectedLineTable.FromLines(changedLines).AddRange(
+            chunks,
+            0,
+            changedLines.Count);
+        previous.LineTable.AddRange(
+            chunks,
+            oldWindow.EndLine,
+            oldLines.LineCount - oldWindow.EndLine,
+            newWindow.EndLine - oldWindow.EndLine,
+            delta);
 
         return new TextProjection(
             snapshot,
-            lines,
+            ProjectedLineTable.FromChunks(chunks),
             Array.Empty<FoldRange>(),
-            logicalToVisual);
+            logicalToVisual: null,
+            isPlain: true);
     }
 
     private static ProjectedLine CreatePlainLine(int logicalLine, TextRange sourceRange) =>
@@ -654,18 +664,13 @@ public sealed class TextProjectionBuilder
             sourceRange,
             new ProjectionInline[] { new ProjectedText(sourceRange) });
 
-    private static bool IsPlain(TextProjection projection) =>
-        projection.Lines.All(line => line.Inlines.All(inline => inline is ProjectedText));
-
     private static void BuildPlainProjection(
         TextSnapshot snapshot,
-        List<ProjectedLine> lines,
-        int[] logicalToVisual)
+        List<ProjectedLine> lines)
     {
         for (var logicalLine = 0; logicalLine < snapshot.Lines.LineCount; logicalLine++)
         {
             var sourceRange = snapshot.Lines.GetLineRange(logicalLine);
-            logicalToVisual[logicalLine] = lines.Count;
             lines.Add(new ProjectedLine(
                 logicalLine,
                 sourceRange,
@@ -763,6 +768,26 @@ public sealed class TextProjectionBuilder
             result.Add(new ProjectedText(TextRange.FromBounds(cursor, end)));
         }
     }
+
+    private static (int StartLine, int EndLine) GetLineWindow(
+        TextSnapshot snapshot,
+        TextRange range)
+    {
+        var firstLine = snapshot.Lines.GetLine(range.Start);
+        var lastPosition = range.IsEmpty
+            ? range.Start
+            : Math.Min(snapshot.Length, range.End - 1);
+        var endLine = snapshot.Lines.GetLine(lastPosition) + 1;
+        endLine = Math.Min(snapshot.Lines.LineCount, endLine + 1);
+        return (firstLine, endLine);
+    }
+
+    private static int MapPosition(int position, TextChange change, int delta) =>
+        position <= change.OldRange.Start
+            ? position
+            : position >= change.OldRange.End
+                ? checked(position + delta)
+                : change.NewRange.Start;
 
     private static int LowerBoundInlay(
         IReadOnlyList<InlineAdornment> inlays,
