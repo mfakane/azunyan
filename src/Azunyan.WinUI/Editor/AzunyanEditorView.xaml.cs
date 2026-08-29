@@ -99,6 +99,13 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
         _disposed = true;
         _providerScheduler.Dispose();
+        if (_renderer is IDisposable renderer
+            && !ReferenceEquals(_renderer, _defaultRenderer))
+        {
+            renderer.Dispose();
+        }
+
+        _defaultRenderer.Dispose();
     }
 
     public static readonly DependencyProperty ShowLineNumbersProperty =

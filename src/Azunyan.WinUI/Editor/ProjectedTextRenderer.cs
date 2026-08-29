@@ -21,11 +21,13 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
 {
     private readonly CanvasControl _gutterSurface;
     private readonly CanvasControl _textSurface;
-    private readonly Dictionary<int, DirectWriteTextLayout> _gutterLayouts = new();
-    private readonly Dictionary<int, DirectWriteTextLayout> _textLayouts = new();
+    private readonly Dictionary<VisualRow, GutterLayoutEntry> _gutterLayouts = new();
+    private readonly Dictionary<VisualRow, DirectWriteTextLayout> _textLayouts = new();
     private ProjectedTextLayoutState? _cachedLayout;
     private ProjectedTextRenderFrame? _renderFrame;
     private DocumentChangedEventArgs? _pendingDocumentChange;
+    private TextLayoutCacheKey? _textLayoutCacheKey;
+    private bool _disposed;
 
     public ProjectedTextRenderer(CanvasControl gutterSurface, CanvasControl textSurface)
     {
@@ -43,8 +45,33 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
 
     public void NotifyDocumentChanged(DocumentChangedEventArgs change)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         ArgumentNullException.ThrowIfNull(change);
         _pendingDocumentChange = change;
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _gutterSurface.CreateResources -= OnCreateResources;
+        _gutterSurface.Draw -= OnGutterDraw;
+        _textSurface.CreateResources -= OnCreateResources;
+        _textSurface.Draw -= OnDraw;
+        ClearTextLayouts();
+        _textLayoutCacheKey = null;
+        _cachedLayout = null;
+        _renderFrame = null;
+        _pendingDocumentChange = null;
+        LayoutInvalidated = null;
     }
 
     public bool TryGetVisibleDocumentRange(out TextRange range)
@@ -475,7 +502,10 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
 
     private float GetCaretX(int rowIndex, int localStop, double characterWidth)
     {
-        if (_textLayouts.TryGetValue(rowIndex, out var directWriteLayout))
+        if (_renderFrame is { } frame
+            && rowIndex >= 0
+            && rowIndex < frame.Layouts.Count
+            && _textLayouts.TryGetValue(frame.Layouts[rowIndex].Row, out var directWriteLayout))
         {
             return directWriteLayout.GetCaretPosition(localStop).X;
         }
@@ -489,31 +519,18 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
         int localStop,
         double characterWidth)
     {
-        var directWriteLayout = GetTextLayoutForGlobalRow(rowIndex, row);
+        var directWriteLayout = GetTextLayoutForGlobalRow(row);
         return directWriteLayout is not null
             ? directWriteLayout.GetCaretPosition(localStop).X
             : localStop * (float)characterWidth;
     }
 
     private DirectWriteTextLayout? GetTextLayoutForGlobalRow(
-        int rowIndex,
         VisualRow row)
     {
-        if (_renderFrame is not { } frame)
-        {
-            return null;
-        }
-
-        for (var index = 0; index < frame.Layouts.Count; index++)
-        {
-            if (ReferenceEquals(frame.Layouts[index].Row, row)
-                && _textLayouts.TryGetValue(index, out var layout))
-            {
-                return layout;
-            }
-        }
-
-        return null;
+        return _textLayouts.TryGetValue(row, out var layout)
+            ? layout
+            : null;
     }
 
     private UnwrappedLineLayout? GetLineLayoutForGlobalRow(
@@ -654,7 +671,7 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
         double x,
         double characterWidth)
     {
-        var directWriteLayout = GetTextLayoutForGlobalRow(rowIndex, row);
+        var directWriteLayout = GetTextLayoutForGlobalRow(row);
         if (directWriteLayout is null)
         {
             return Math.Clamp(
@@ -681,6 +698,11 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
 
     public void Render(AzunyanEditorRenderContext context)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         var wrapWidth = GetWrapWidth(context);
         var wrapColumns = GetWrapColumns(context);
         var layoutState = GetLayoutState(context, wrapColumns, wrapWidth);
@@ -698,8 +720,9 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
             metrics,
             new MonospaceLineLayoutEngine());
 
-        ClearTextLayouts();
+        EnsureTextLayoutCache(context);
         _renderFrame = new ProjectedTextRenderFrame(context, layouts);
+        PruneLayoutCaches(layouts);
         if (_pendingDocumentChange is { } change
             && ReferenceEquals(change.NewSnapshot, context.Snapshot))
         {
@@ -711,7 +734,13 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
 
     private void OnCreateResources(CanvasControl sender, CanvasCreateResourcesEventArgs args)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         ClearTextLayouts();
+        _textLayoutCacheKey = null;
         if (_renderFrame?.Context.TextWrapping == TextWrapping.Wrap)
         {
             LayoutInvalidated?.Invoke(this, EventArgs.Empty);
@@ -727,11 +756,49 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
 
         foreach (var gutterLayout in _gutterLayouts.Values)
         {
-            gutterLayout.Dispose();
+            gutterLayout.Layout.Dispose();
         }
 
         _gutterLayouts.Clear();
         _textLayouts.Clear();
+    }
+
+    private void EnsureTextLayoutCache(AzunyanEditorRenderContext context)
+    {
+        var key = new TextLayoutCacheKey(
+            context.Snapshot,
+            context.DocumentResults?.Syntax,
+            context.ColorScheme,
+            context.FontFamily.Source,
+            context.FontSize,
+            context.CharacterWidth,
+            context.LineHeight,
+            context.GutterWidth,
+            context.TabDisplaySize,
+            context.TextWrapping);
+        if (_textLayoutCacheKey is null || !_textLayoutCacheKey.Matches(key))
+        {
+            ClearTextLayouts();
+            _textLayoutCacheKey = key;
+        }
+    }
+
+    private void PruneLayoutCaches(IReadOnlyList<ViewportRowLayout> layouts)
+    {
+        var rows = layouts
+            .Select(layout => layout.Row)
+            .ToHashSet();
+        foreach (var row in _textLayouts.Keys.Where(row => !rows.Contains(row)).ToArray())
+        {
+            _textLayouts[row].Dispose();
+            _textLayouts.Remove(row);
+        }
+
+        foreach (var row in _gutterLayouts.Keys.Where(row => !rows.Contains(row)).ToArray())
+        {
+            _gutterLayouts[row].Layout.Dispose();
+            _gutterLayouts.Remove(row);
+        }
     }
 
     private void OnGutterDraw(CanvasControl sender, CanvasDrawEventArgs args)
@@ -759,9 +826,11 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
                 continue;
             }
 
-            if (!_gutterLayouts.TryGetValue(index, out var gutterLayout))
+            if (!_gutterLayouts.TryGetValue(row, out var gutterLayout)
+                || !string.Equals(gutterLayout.Text, text, StringComparison.Ordinal))
             {
-                gutterLayout = DirectWriteTextLayout.Create(
+                gutterLayout?.Layout.Dispose();
+                var layout = DirectWriteTextLayout.Create(
                     args.DrawingSession,
                     new[] { new DirectWriteTextRun(text, colors.GutterForeground) },
                     frame.Context.FontFamily.Source,
@@ -770,15 +839,16 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
                     (float)frame.Context.LineHeight,
                     (float)frame.Context.LineHeight,
                     Math.Min((float)frame.Context.LineHeight * 0.8f, (float)frame.Context.LineHeight));
-                _gutterLayouts.Add(index, gutterLayout);
+                gutterLayout = new GutterLayoutEntry(text, layout);
+                _gutterLayouts[row] = gutterLayout;
             }
 
             var top = frame.Context.ContentTop
                 + rowLayout.Top
                 - frame.Context.VerticalOffset;
-            gutterLayout.Draw(
+            gutterLayout.Layout.Draw(
                 args.DrawingSession,
-                (float)(frame.Context.GutterWidth - 8 - gutterLayout.Width),
+                (float)(frame.Context.GutterWidth - 8 - gutterLayout.Layout.Width),
                 (float)top,
                 colors.GutterForeground);
         }
@@ -817,7 +887,7 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
                 - frame.Context.VerticalOffset;
             if (rowLayout.TextLayout is { } layout)
             {
-                DrawTextRow(args.DrawingSession, frame.Context, layout, top, index);
+                DrawTextRow(args.DrawingSession, frame.Context, layout, top, rowLayout.Row);
             }
             else if (rowLayout.Row.BlockAdornment is { } block)
             {
@@ -1002,9 +1072,9 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
         AzunyanEditorRenderContext context,
         UnwrappedLineLayout line,
         double top,
-        int rowIndex)
+        VisualRow row)
     {
-        if (!_textLayouts.TryGetValue(rowIndex, out var textLayout))
+        if (!_textLayouts.TryGetValue(row, out var textLayout))
         {
             var runs = line.Runs
                 .Select(run => new DirectWriteTextRun(
@@ -1022,7 +1092,7 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
                 (float)context.LineHeight,
                 Math.Min((float)context.LineHeight * 0.8f, (float)context.LineHeight),
                 (float)(context.CharacterWidth * context.TabDisplaySize));
-            _textLayouts.Add(rowIndex, textLayout);
+            _textLayouts.Add(row, textLayout);
         }
 
         DrawSelection(drawingSession, context, line, textLayout, top);
@@ -1352,6 +1422,78 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
         && caretStop >= row.TextStartColumn
         && (caretStop < row.TextEndColumn
             || caretStop == row.TextEndColumn && caretStop == row.TextLine.VisualLength);
+
+    private sealed class GutterLayoutEntry
+    {
+        public GutterLayoutEntry(string text, DirectWriteTextLayout layout)
+        {
+            Text = text;
+            Layout = layout;
+        }
+
+        public string Text { get; }
+
+        public DirectWriteTextLayout Layout { get; }
+    }
+
+    private sealed class TextLayoutCacheKey
+    {
+        public TextLayoutCacheKey(
+            TextSnapshot snapshot,
+            IReadOnlyList<SyntaxSpan>? syntax,
+            AzunyanColorScheme colorScheme,
+            string fontFamily,
+            double fontSize,
+            double characterWidth,
+            double lineHeight,
+            double gutterWidth,
+            int tabDisplaySize,
+            TextWrapping textWrapping)
+        {
+            Snapshot = snapshot;
+            Syntax = syntax;
+            ColorScheme = colorScheme;
+            FontFamily = fontFamily;
+            FontSize = fontSize;
+            CharacterWidth = characterWidth;
+            LineHeight = lineHeight;
+            GutterWidth = gutterWidth;
+            TabDisplaySize = tabDisplaySize;
+            TextWrapping = textWrapping;
+        }
+
+        public TextSnapshot Snapshot { get; }
+
+        public IReadOnlyList<SyntaxSpan>? Syntax { get; }
+
+        public AzunyanColorScheme ColorScheme { get; }
+
+        public string FontFamily { get; }
+
+        public double FontSize { get; }
+
+        public double CharacterWidth { get; }
+
+        public double LineHeight { get; }
+
+        public double GutterWidth { get; }
+
+        public int TabDisplaySize { get; }
+
+        public TextWrapping TextWrapping { get; }
+
+        public bool Matches(TextLayoutCacheKey other) =>
+            ReferenceEquals(Snapshot, other.Snapshot)
+            && ReferenceEquals(Syntax, other.Syntax)
+            && Equals(ColorScheme, other.ColorScheme)
+            && string.Equals(FontFamily, other.FontFamily, StringComparison.Ordinal)
+            && FontSize == other.FontSize
+            && CharacterWidth == other.CharacterWidth
+            && LineHeight == other.LineHeight
+            && GutterWidth == other.GutterWidth
+            && TabDisplaySize == other.TabDisplaySize
+            && TextWrapping == other.TextWrapping;
+    }
 }
 
 internal sealed class AzunyanEditorRenderer : IAzunyanEditorRenderer
@@ -1372,4 +1514,6 @@ internal sealed class AzunyanEditorRenderer : IAzunyanEditorRenderer
     }
 
     public void Render(AzunyanEditorRenderContext context) => TextRenderer.Render(context);
+
+    public void Dispose() => TextRenderer.Dispose();
 }
