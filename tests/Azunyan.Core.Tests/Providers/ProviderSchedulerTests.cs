@@ -273,6 +273,11 @@ public sealed class ProviderSchedulerTests
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
+        public ValueTask<SyntaxAnalysis> GetSyntaxAnalysisAsync(
+            EditorProviderContext context,
+            CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(SyntaxAnalysis.Empty);
+
         public async ValueTask<SyntaxAnalysis> GetSyntaxAsync(
             EditorProviderContext context,
             TextSnapshot previousSnapshot,

@@ -778,7 +778,7 @@ public sealed class TextProjectionBuilder
             ? range.Start
             : Math.Min(snapshot.Length, range.End - 1);
         var endLine = snapshot.Lines.GetLine(lastPosition) + 1;
-        endLine = Math.Min(snapshot.Lines.LineCount, endLine + 1);
+        endLine = Math.Min(snapshot.Lines.LineCount, endLine);
         return (firstLine, endLine);
     }
 
