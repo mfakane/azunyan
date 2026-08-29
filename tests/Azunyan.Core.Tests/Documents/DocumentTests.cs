@@ -70,6 +70,19 @@ public sealed class DocumentTests
     }
 
     [Fact]
+    public void Line_index_handles_crlf_split_across_persistent_text_pieces()
+    {
+        var document = new Document("a\r");
+        document.Insert(2, "\n");
+
+        var lines = document.Snapshot.Lines;
+
+        Assert.Equal(2, lines.LineCount);
+        Assert.Equal(new TextRange(0, 1), lines.GetLineRange(0));
+        Assert.Equal(new TextRange(3, 0), lines.GetLineRange(1));
+    }
+
+    [Fact]
     public void Search_supports_non_overlapping_and_overlapping_matches()
     {
         var snapshot = new TextSnapshot("ababa");

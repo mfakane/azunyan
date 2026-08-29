@@ -15,30 +15,53 @@ public sealed class LineIndex
         _snapshot = snapshot;
         var starts = new List<int> { 0 };
         var ends = new List<int>();
-        var text = snapshot.Text;
-
-        var index = 0;
-        while (index < text.Length)
+        var position = 0;
+        var pendingCarriageReturn = -1;
+        snapshot.Tree.VisitPieces(piece =>
         {
-            var newlineLength = text[index] switch
+            foreach (var character in piece.Span)
             {
-                '\r' when index + 1 < text.Length && text[index + 1] == '\n' => 2,
-                '\r' or '\n' => 1,
-                _ => 0
-            };
+                if (pendingCarriageReturn >= 0)
+                {
+                    if (character == '\n')
+                    {
+                        position++;
+                        ends.Add(pendingCarriageReturn);
+                        starts.Add(position);
+                        pendingCarriageReturn = -1;
+                        continue;
+                    }
 
-            if (newlineLength == 0)
-            {
-                index++;
-                continue;
+                    ends.Add(pendingCarriageReturn);
+                    starts.Add(position);
+                    pendingCarriageReturn = -1;
+                }
+
+                switch (character)
+                {
+                    case '\r':
+                        pendingCarriageReturn = position;
+                        position++;
+                        break;
+                    case '\n':
+                        ends.Add(position);
+                        position++;
+                        starts.Add(position);
+                        break;
+                    default:
+                        position++;
+                        break;
+                }
             }
+        });
 
-            ends.Add(index);
-            index += newlineLength;
-            starts.Add(index);
+        if (pendingCarriageReturn >= 0)
+        {
+            ends.Add(pendingCarriageReturn);
+            starts.Add(position);
         }
 
-        ends.Add(text.Length);
+        ends.Add(snapshot.Length);
         _starts = starts.ToArray();
         _ends = ends.ToArray();
     }

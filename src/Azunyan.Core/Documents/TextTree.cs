@@ -113,6 +113,26 @@ internal sealed class TextTree
         return builder.ToString();
     }
 
+    internal void VisitPieces(Action<ReadOnlyMemory<char>> visitor)
+    {
+        ArgumentNullException.ThrowIfNull(visitor);
+        VisitPieces(_root, visitor);
+    }
+
+    private static void VisitPieces(
+        Node? node,
+        Action<ReadOnlyMemory<char>> visitor)
+    {
+        if (node is null)
+        {
+            return;
+        }
+
+        VisitPieces(node.Left, visitor);
+        visitor(node.Piece.Memory);
+        VisitPieces(node.Right, visitor);
+    }
+
     private void ValidatePosition(int position)
     {
         if (position < 0 || position > Length)
@@ -281,6 +301,8 @@ internal sealed class TextTree
         public int Length { get; }
 
         public char this[int offset] => Source[Start + offset];
+
+        public ReadOnlyMemory<char> Memory => Source.AsMemory(Start, Length);
 
         public TextPiece Slice(int start, int length) => new(Source, Start + start, length);
 
