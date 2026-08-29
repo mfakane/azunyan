@@ -180,8 +180,15 @@ public sealed partial class AzunyanTextInputWindow : UserControl
                 _compositionRange));
     }
 
-    private void OnSelectionChanged(object sender, RoutedEventArgs args) =>
+    private void OnSelectionChanged(object sender, RoutedEventArgs args)
+    {
+        if (_synchronizing)
+        {
+            return;
+        }
+
         RaiseSelectionChanged();
+    }
 
     private void OnTextCompositionStarted(
         TextBox sender,

@@ -64,6 +64,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private string[] _completionTriggerCharacters = Array.Empty<string>();
     private bool _disposed;
     private int _hoverPosition = -1;
+    private int? _pointerSelectionAnchor;
+    private uint? _selectionPointerId;
     private string _projectedAutomationStructureKey = string.Empty;
     private long _documentProviderGeneration;
     private long _viewportProviderGeneration;
@@ -99,6 +101,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         InputWindow.NativeTextBoxControl.BeforeKeyDown += OnInputKeyDown;
         InputWindow.NativeTextBoxControl.AfterKeyUp += OnInputKeyUp;
         EditorPointerSurface.PointerPressed += OnInputPointerPressed;
+        EditorPointerSurface.PointerReleased += OnInputPointerReleased;
         EditorPointerSurface.PointerMoved += OnInputPointerMoved;
         EditorPointerSurface.PointerExited += OnInputPointerExited;
         CompletionList.ItemClick += OnCompletionItemClick;
@@ -125,6 +128,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         _disposed = true;
         InputWindow.NativeTextBoxControl.BeforeKeyDown -= OnInputKeyDown;
         InputWindow.NativeTextBoxControl.AfterKeyUp -= OnInputKeyUp;
+        EditorPointerSurface.PointerReleased -= OnInputPointerReleased;
+        StopPointerSelection();
         _providerScheduler.Dispose();
         if (_renderer is IDisposable renderer
             && !ReferenceEquals(_renderer, _defaultRenderer))
@@ -1296,6 +1301,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             return;
         }
 
+        StopPointerSelection();
+
         if (!_defaultRenderer.TextRenderer.TryHitTest(
                 point.Position.X,
                 point.Position.Y,
@@ -1330,11 +1337,38 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
         else
         {
+            _pointerSelectionAnchor = anchor.Position.Offset;
+            _selectionPointerId = point.PointerId;
+            EditorPointerSurface.CapturePointer(args.Pointer);
             SetDocumentSelection(TextSelection.Caret(anchor.Position.Offset));
         }
 
         InputWindow.Focus(FocusState.Pointer);
         args.Handled = true;
+    }
+
+    private void OnInputPointerReleased(object sender, PointerRoutedEventArgs args)
+    {
+        if (_selectionPointerId is not uint selectionPointerId)
+        {
+            return;
+        }
+
+        var point = args.GetCurrentPoint(EditorPointerSurface);
+        if (point.PointerId != selectionPointerId)
+        {
+            return;
+        }
+
+        StopPointerSelection();
+        args.Handled = true;
+    }
+
+    private void StopPointerSelection()
+    {
+        _pointerSelectionAnchor = null;
+        _selectionPointerId = null;
+        EditorPointerSurface.ReleasePointerCaptures();
     }
 
     private bool TryGetAdornment(
@@ -1368,6 +1402,37 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         var point = args.GetCurrentPoint(EditorPointerSurface);
+        if (_selectionPointerId is uint selectionPointerId
+            && point.PointerId == selectionPointerId
+            && _pointerSelectionAnchor is int selectionAnchor)
+        {
+            if (point.PointerDeviceType == Microsoft.UI.Input.PointerDeviceType.Mouse
+                && !point.Properties.IsLeftButtonPressed)
+            {
+                StopPointerSelection();
+                return;
+            }
+
+            if (_defaultRenderer.TextRenderer.TryHitTest(
+                    point.Position.X,
+                    point.Position.Y,
+                    InputWindow.NativeTextBoxControl.Padding.Left,
+                    InputWindow.NativeTextBoxControl.Padding.Top,
+                    GetHorizontalOffset(),
+                    GetVerticalOffset(),
+                    _characterWidth,
+                    out var dragAnchor,
+                    out _))
+            {
+                SetDocumentSelection(new TextSelection(
+                    selectionAnchor,
+                    dragAnchor.Position.Offset));
+            }
+
+            args.Handled = true;
+            return;
+        }
+
         if (!_defaultRenderer.TextRenderer.TryHitTest(
                 point.Position.X,
                 point.Position.Y,

@@ -635,11 +635,13 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             return false;
         }
 
-        var documentY = y + verticalOffset - contentTop;
-        if (documentY < 0 || documentY > layout.Heights.TotalHeight)
-        {
-            return false;
-        }
+        // Treat the empty area above or below the document as the nearest
+        // document edge. This lets pointer selection start and continue from
+        // outside the range of realized text rows.
+        var documentY = Math.Clamp(
+            y + verticalOffset - contentTop,
+            0,
+            layout.Heights.TotalHeight);
 
         var rowIndex = layout.Heights.FindLine(documentY);
         var row = layout.Rows.Rows[rowIndex];
