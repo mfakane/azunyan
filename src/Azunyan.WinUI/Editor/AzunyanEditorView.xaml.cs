@@ -1532,6 +1532,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
         var frame = GetCurrentFrame();
         var completions = frame?.Position?.Completions;
+        StopCompletionSessionIfEmpty(frame, completions);
         if (frame is null
             || completions is null
             || completions.Items.Count == 0
@@ -1820,6 +1821,26 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         CompletionDetailsBorder.Visibility = Visibility.Collapsed;
         CompletionDetailsTitle.Text = string.Empty;
         CompletionDetailsContent.Text = string.Empty;
+    }
+
+    private void StopCompletionSessionIfEmpty(
+        EditorProviderFrame? frame,
+        CompletionResult? completions)
+    {
+        if (!_completionRequested
+            || frame?.Position is not { } position
+            || position.Context.Position != frame.Selection.CaretPosition)
+        {
+            return;
+        }
+
+        if (completions is null
+            || completions.Items.Count == 0
+            || !HasUsefulCompletion(completions))
+        {
+            _completionRequested = false;
+            _explicitCompletionRequested = false;
+        }
     }
 
     private void HideTooltipPopup()
