@@ -188,6 +188,19 @@ public sealed partial class AzunyanEditorView
 
     private void PublishProviderFrame(EditorProviderFrame frame)
     {
+        // Provider channels complete independently. A partial result must not
+        // erase channels that were already computed for this snapshot (most
+        // importantly syntax when only the caret changed).
+        if (GetCurrentFrame() is { } currentFrame)
+        {
+            frame = new EditorProviderFrame(
+                frame.Snapshot,
+                frame.Selection,
+                frame.Document ?? currentFrame.Document,
+                frame.Viewport ?? currentFrame.Viewport,
+                frame.Position ?? currentFrame.Position);
+        }
+
         _providerFrame = frame;
         RenderViewport();
         ProviderFrameChanged?.Invoke(this, new EditorProviderFrameEventArgs(frame));

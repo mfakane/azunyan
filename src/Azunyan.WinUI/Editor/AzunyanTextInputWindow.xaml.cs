@@ -17,6 +17,7 @@ public sealed partial class AzunyanTextInputWindow : UserControl
 {
     private bool _synchronizing;
     private string _synchronizedText = string.Empty;
+    private string _synchronizedNativeText = string.Empty;
     private TextRange? _compositionRange;
     private int _windowStart;
     private long _generation;
@@ -85,16 +86,20 @@ public sealed partial class AzunyanTextInputWindow : UserControl
         var localSelection = new TextSelection(
             selection.Anchor - windowStart,
             selection.Active - windowStart);
+        var nativeText = ToNativeText(text);
         _synchronizing = true;
         try
         {
             _windowStart = windowStart;
             _generation = generation;
             _synchronizedText = text;
+            _synchronizedNativeText = nativeText;
             _compositionRange = compositionRange;
-            NativeTextBox.Text = text;
-            NativeTextBox.SelectionStart = localSelection.Start;
-            NativeTextBox.SelectionLength = localSelection.Length;
+            NativeTextBox.Text = nativeText;
+            var nativeSelectionStart = ToNativeOffset(text, localSelection.Start);
+            NativeTextBox.SelectionStart = nativeSelectionStart;
+            NativeTextBox.SelectionLength =
+                ToNativeOffset(text, localSelection.End) - nativeSelectionStart;
         }
         finally
         {
@@ -157,20 +162,27 @@ public sealed partial class AzunyanTextInputWindow : UserControl
         }
 
         var currentText = NativeTextBox.Text;
-        if (string.Equals(_synchronizedText, currentText, StringComparison.Ordinal))
+        if (string.Equals(_synchronizedNativeText, currentText, StringComparison.Ordinal))
         {
             RaiseSelectionChanged();
             return;
         }
 
-        var (localRange, insertedText) = FindReplacement(_synchronizedText, currentText);
+        var (localNativeRange, insertedNativeText) = FindReplacement(
+            _synchronizedNativeText,
+            currentText);
+        var localStart = ToDocumentOffset(_synchronizedText, localNativeRange.Start);
+        var localEnd = ToDocumentOffset(_synchronizedText, localNativeRange.End);
+        var localRange = TextRange.FromBounds(localStart, localEnd);
+        var insertedText = FromNativeText(insertedNativeText, _synchronizedText);
         var change = new TextChange(
             new TextRange(_windowStart + localRange.Start, localRange.Length),
             localRange.Length == 0
                 ? string.Empty
                 : _synchronizedText.Substring(localRange.Start, localRange.Length),
             insertedText);
-        _synchronizedText = currentText;
+        _synchronizedText = ReplaceText(_synchronizedText, localRange, insertedText);
+        _synchronizedNativeText = currentText;
         InputChanged?.Invoke(
             this,
             new AzunyanTextInputChangedEventArgs(
@@ -215,9 +227,16 @@ public sealed partial class AzunyanTextInputWindow : UserControl
 
     private void SetComposition(int start, int length)
     {
-        var safeStart = Math.Clamp(start, 0, NativeTextBox.Text.Length);
-        var safeLength = Math.Clamp(length, 0, NativeTextBox.Text.Length - safeStart);
-        _compositionRange = new TextRange(_windowStart + safeStart, safeLength);
+        var safeStart = Math.Clamp(start, 0, _synchronizedNativeText.Length);
+        var safeEnd = Math.Clamp(
+            safeStart + length,
+            safeStart,
+            _synchronizedNativeText.Length);
+        var documentStart = ToDocumentOffset(_synchronizedText, safeStart);
+        var documentEnd = ToDocumentOffset(_synchronizedText, safeEnd);
+        _compositionRange = new TextRange(
+            _windowStart + documentStart,
+            documentEnd - documentStart);
         CompositionChanged?.Invoke(
             this,
             new AzunyanTextInputCompositionChangedEventArgs(
@@ -235,29 +254,172 @@ public sealed partial class AzunyanTextInputWindow : UserControl
 
     private TextSelection ToDocumentSelection()
     {
-        var start = Math.Clamp(NativeTextBox.SelectionStart, 0, _synchronizedText.Length);
-        var length = Math.Clamp(
-            NativeTextBox.SelectionLength,
+        var nativeStart = Math.Clamp(
+            NativeTextBox.SelectionStart,
             0,
-            _synchronizedText.Length - start);
-        return new TextSelection(_windowStart + start, _windowStart + start + length);
+            _synchronizedNativeText.Length);
+        var nativeEnd = Math.Clamp(
+            nativeStart + NativeTextBox.SelectionLength,
+            nativeStart,
+            _synchronizedNativeText.Length);
+        var start = ToDocumentOffset(_synchronizedText, nativeStart);
+        var end = ToDocumentOffset(_synchronizedText, nativeEnd);
+        return new TextSelection(_windowStart + start, _windowStart + end);
     }
 
     private Rect GetNativeCaretRect()
     {
-        if (_synchronizedText.Length == 0)
+        if (_synchronizedNativeText.Length == 0)
         {
             return new Rect(0, 0, 1, Math.Max(1, NativeTextBox.ActualHeight));
         }
 
-        var index = Math.Clamp(NativeTextBox.SelectionStart, 0, _synchronizedText.Length);
-        if (index == _synchronizedText.Length)
+        var index = Math.Clamp(
+            NativeTextBox.SelectionStart,
+            0,
+            _synchronizedNativeText.Length);
+        if (index == _synchronizedNativeText.Length)
         {
             return NativeTextBox.GetRectFromCharacterIndex(index - 1, trailingEdge: true);
         }
 
         return NativeTextBox.GetRectFromCharacterIndex(index, trailingEdge: false);
     }
+
+    private static string ToNativeText(string text)
+    {
+        if (text.IndexOf('\r') < 0 && text.IndexOf('\n') < 0)
+        {
+            return text;
+        }
+
+        var nativeText = new System.Text.StringBuilder(text.Length);
+        for (var index = 0; index < text.Length; index++)
+        {
+            if (text[index] == '\r')
+            {
+                if (index + 1 < text.Length && text[index + 1] == '\n')
+                {
+                    index++;
+                }
+
+                nativeText.Append('\r');
+            }
+            else if (text[index] == '\n')
+            {
+                nativeText.Append('\r');
+            }
+            else
+            {
+                nativeText.Append(text[index]);
+            }
+        }
+
+        return nativeText.ToString();
+    }
+
+    private static string FromNativeText(string text, string referenceText)
+    {
+        var lineEnding = GetPreferredLineEnding(referenceText);
+        if (text.IndexOf('\r') < 0)
+        {
+            return text;
+        }
+
+        var documentText = new System.Text.StringBuilder(text.Length);
+        for (var index = 0; index < text.Length; index++)
+        {
+            if (text[index] == '\r')
+            {
+                if (index + 1 < text.Length && text[index + 1] == '\n')
+                {
+                    index++;
+                }
+
+                documentText.Append(lineEnding);
+            }
+            else
+            {
+                documentText.Append(text[index]);
+            }
+        }
+
+        return documentText.ToString();
+    }
+
+    private static string GetPreferredLineEnding(string text)
+    {
+        for (var index = 0; index < text.Length; index++)
+        {
+            if (text[index] == '\r')
+            {
+                return index + 1 < text.Length && text[index + 1] == '\n'
+                    ? "\r\n"
+                    : "\r";
+            }
+
+            if (text[index] == '\n')
+            {
+                return "\n";
+            }
+        }
+
+        return Environment.NewLine;
+    }
+
+    private static int ToNativeOffset(string text, int documentOffset)
+    {
+        var safeOffset = Math.Clamp(documentOffset, 0, text.Length);
+        var documentIndex = 0;
+        var nativeOffset = 0;
+        while (documentIndex < safeOffset)
+        {
+            if (text[documentIndex] == '\r'
+                && documentIndex + 1 < text.Length
+                && text[documentIndex + 1] == '\n')
+            {
+                documentIndex += 2;
+            }
+            else
+            {
+                documentIndex++;
+            }
+
+            nativeOffset++;
+        }
+
+        return nativeOffset;
+    }
+
+    private static int ToDocumentOffset(string text, int nativeOffset)
+    {
+        var safeOffset = Math.Clamp(
+            nativeOffset,
+            0,
+            ToNativeOffset(text, text.Length));
+        var documentIndex = 0;
+        var currentNativeOffset = 0;
+        while (documentIndex < text.Length && currentNativeOffset < safeOffset)
+        {
+            if (text[documentIndex] == '\r'
+                && documentIndex + 1 < text.Length
+                && text[documentIndex + 1] == '\n')
+            {
+                documentIndex += 2;
+            }
+            else
+            {
+                documentIndex++;
+            }
+
+            currentNativeOffset++;
+        }
+
+        return documentIndex;
+    }
+
+    private static string ReplaceText(string text, TextRange range, string replacement) =>
+        text[..range.Start] + replacement + text[range.End..];
 
     private static void ValidateDocumentRange(
         TextRange range,

@@ -1219,6 +1219,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private void ApplyDocumentCommand(Action action)
     {
         ArgumentNullException.ThrowIfNull(action);
+        var previousSnapshot = Snapshot;
         _applyingDocumentCommand = true;
         try
         {
@@ -1231,6 +1232,27 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
         SyncInputWindow();
         RenderViewport();
+        if (ReferenceEquals(previousSnapshot, Snapshot))
+        {
+            // SelectionChanged is intentionally suppressed while the command
+            // mutates the document model. Keep position-scoped results and
+            // the provider frame selection in sync after the command ends.
+            RequestProviderResults(
+                false,
+                false,
+                true,
+                requestCompletion: _completionRequested);
+            return;
+        }
+
+        var documentChange = _pendingProviderDocumentChange;
+        _pendingProviderDocumentChange = null;
+        RequestProviderResults(
+            true,
+            true,
+            true,
+            requestCompletion: _completionRequested,
+            documentChange: documentChange);
     }
 
     private void OnInputFocusChanged(object? sender, EventArgs args) =>
