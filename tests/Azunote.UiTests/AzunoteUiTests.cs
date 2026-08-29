@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Windows.Automation;
+using System.Windows.Automation.Text;
 using Xunit;
 using Xunit.Sdk;
 
@@ -71,6 +72,89 @@ public sealed class AzunoteUiTests : IClassFixture<AzunoteUiFixture>
     }
 
     [AzunoteUiFact]
+    public void Projected_editor_exposes_read_write_value_and_empty_range_geometry()
+    {
+        var editor = _fixture.Editor;
+        var valuePattern = AzunoteUiFixture.WaitForValuePattern(editor);
+        var textPattern = AzunoteUiFixture.WaitForTextPattern(editor);
+        var original = valuePattern.Current.Value;
+        var replacement = original + "\nUIA value update";
+
+        try
+        {
+            valuePattern.SetValue(replacement);
+
+            var updatedTextPattern = AzunoteUiFixture.WaitForTextPattern(editor);
+            var updatedText = AzunoteUiFixture.WaitForDocumentText(
+                updatedTextPattern,
+                text => string.Equals(text, replacement, StringComparison.Ordinal));
+            Assert.Equal(replacement, updatedText);
+
+            var updatedValuePattern = AzunoteUiFixture.WaitForValuePattern(
+                editor,
+                value => string.Equals(value, replacement, StringComparison.Ordinal));
+            Assert.Equal(replacement, updatedValuePattern.Current.Value);
+
+            var emptyRange = textPattern.DocumentRange.Clone();
+            emptyRange.MoveEndpointByRange(
+                TextPatternRangeEndpoint.End,
+                emptyRange,
+                TextPatternRangeEndpoint.Start);
+            Assert.NotEmpty(emptyRange.GetBoundingRectangles());
+        }
+        finally
+        {
+            AzunoteUiFixture.WaitForValuePattern(editor).SetValue(original);
+        }
+    }
+
+    [AzunoteUiFact]
+    public void Projected_editor_does_not_expose_native_edit_control_as_duplicate()
+    {
+        var editor = _fixture.Editor;
+        Assert.Equal(ControlType.Edit, editor.Current.ControlType);
+
+        var nestedEditors = editor.FindAll(
+            TreeScope.Descendants,
+            new PropertyCondition(
+                AutomationElement.ControlTypeProperty,
+                ControlType.Edit));
+        Assert.Empty(nestedEditors);
+    }
+
+    [AzunoteUiFact]
+    public void Projected_range_remains_bound_to_old_snapshot_after_value_update()
+    {
+        var editor = _fixture.Editor;
+        var textPattern = AzunoteUiFixture.WaitForTextPattern(editor);
+        var valuePattern = AzunoteUiFixture.WaitForValuePattern(editor);
+        var oldRange = textPattern.DocumentRange.FindText("日本語", false, false);
+        Assert.NotNull(oldRange);
+
+        var original = valuePattern.Current.Value;
+        var replacement = original.Replace(
+            "日本語",
+            "置換後の日本語",
+            StringComparison.Ordinal);
+
+        try
+        {
+            valuePattern.SetValue(replacement);
+            var updatedTextPattern = AzunoteUiFixture.WaitForTextPattern(editor);
+            AzunoteUiFixture.WaitForDocumentText(
+                updatedTextPattern,
+                text => string.Equals(text, replacement, StringComparison.Ordinal));
+
+            Assert.Equal("日本語", oldRange!.GetText(-1));
+            Assert.Empty(oldRange.GetBoundingRectangles());
+        }
+        finally
+        {
+            AzunoteUiFixture.WaitForValuePattern(editor).SetValue(original);
+        }
+    }
+
+    [AzunoteUiFact]
     public void New_file_creates_a_window_and_window_menu_lists_all_instances()
     {
         var originalWindow = _fixture.Window;
@@ -128,6 +212,36 @@ public sealed class AzunoteUiFixture : IDisposable
                     ? textPattern
                     : null,
             "The projected editor did not expose TextPattern.");
+    }
+
+    public static ValuePattern WaitForValuePattern(
+        AutomationElement editor,
+        Func<string, bool>? predicate = null)
+    {
+        predicate ??= _ => true;
+        return WaitFor(
+            () =>
+            {
+                if (!editor.TryGetCurrentPattern(
+                        ValuePattern.Pattern,
+                        out var pattern)
+                    || pattern is not ValuePattern valuePattern)
+                {
+                    return null;
+                }
+
+                try
+                {
+                    return predicate(valuePattern.Current.Value)
+                        ? valuePattern
+                        : null;
+                }
+                catch (ElementNotAvailableException)
+                {
+                    return null;
+                }
+            },
+            "The projected editor did not expose the expected ValuePattern value.");
     }
 
     public static string WaitForDocumentText(

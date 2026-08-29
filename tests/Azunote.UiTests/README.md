@@ -20,7 +20,14 @@ dotnet test tests/Azunote.UiTests/Azunote.UiTests.csproj -c Debug --no-build
 If the executable is in a non-default location, set `AZUNOTE_EXE` to its full path.
 The fixture starts only the process it owns and closes it after the test class finishes.
 
-The current tests verify that the projected editor exposes UI Automation text and visible
-range geometry, and that a projected text range can find and select document text.
+The current tests verify that the projected editor exposes TextPattern and a read/write
+ValuePattern, reports geometry for empty caret ranges, keeps ranges bound to the snapshot
+from which they were created, and does not expose the native IME host as a duplicate Edit
+control. They also cover visible range geometry and finding/selecting document text.
+
+The remaining accessibility acceptance is manual: focus the editor with Narrator or NVDA,
+read through Japanese, emoji, combining-mark, Arabic, and Hebrew lines, move by character,
+word, and line, select text, and edit through the value/text actions. Confirm that focus,
+selection, text-change, layout, and interactive-child announcements remain coherent.
 Actual IME composition, DPI changes, GPU antialiasing, and theme changes remain manual
 acceptance cases because they depend on the active Windows desktop, IME, monitor, and GPU.

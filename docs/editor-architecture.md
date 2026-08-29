@@ -394,12 +394,21 @@ contracts.
 
 ## 10. Accessibility
 
-The custom surface supplies an AutomationPeer implementing the applicable text
-patterns. Automation ranges are document ranges, not visual-line indices.
+When the projected surface is active, the outer editor peer is the single owner
+of the `Text`, `Text2`, and `Value` patterns. The native `TextBox` remains the
+input/IME host and is exposed only in the raw tree, so clients do not see a
+second `Edit` control in the normal control tree. When a custom renderer is not
+active, the outer peer delegates to the native peer as a compatibility fallback.
+
+Automation ranges are immutable-snapshot document ranges, not visual-line
+indices. XAML and renderer access is marshalled to the editor owner thread;
+text reads remain safe against later document changes.
 
 The peer must provide:
 
 - document text and selection;
+- a read/write `ValuePattern` whose writes use the normal document replacement
+  path;
 - caret range;
 - visible ranges;
 - range bounding rectangles from current layout data;
@@ -407,10 +416,14 @@ The peer must provide:
 - scrolling a range into view;
 - child providers for realized interactive adornments.
 
-Fold placeholders and inlays expose names through annotations or realized
-children, while copied text remains document text. Accessibility support is a
-release requirement for replacing the native visible TextBox, not deferred
-polish.
+Empty ranges expose the current caret rectangle, while stale ranges become
+read-only snapshot values and no longer mutate the current editor. Character
+units follow text-element boundaries and word units use Unicode letter, number,
+and combining-mark categories. Fold placeholders and inlays expose names
+through realized children, while copied text remains document text. Document,
+selection, focus, layout, and child-structure changes raise corresponding UI
+Automation notifications. Accessibility support is a release requirement for
+replacing the native visible TextBox, not deferred polish.
 
 ## 11. Threading and ownership
 
@@ -520,7 +533,8 @@ input/accessibility replacement remain next gates.
 
 - harden continuation visual rows and wrapped hit testing with additional real
   font-metric cases;
-- complete UI Automation text patterns;
+- complete UI Automation text patterns and validate the projected peer with
+  automated UIA tests plus Narrator/NVDA manual passes;
 - run IME, BiDi, grapheme, DPI, theme, and performance matrices;
 - remove the native visible-text fallback only after all gates pass.
 
@@ -540,6 +554,11 @@ The following parts are explicitly transitional:
 - the native TextBox remaining visible as the input/IME proxy;
 - line coordinates inferred from one measured character and a ScrollViewer
   offset.
+
+The native TextBox is currently intentionally retained as the input/IME host;
+its raw-tree presence is an implementation detail rather than a second
+accessible editor. The projected peer owns the user-facing text/value contract
+while this migration is in progress.
 
 Azunote's application shell also installs a failure boundary around the WinUI
 dispatcher, AppDomain, and unobserved-task paths. Managed UI failures are
