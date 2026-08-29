@@ -62,7 +62,8 @@ public sealed class ViewportLayoutEngine
         double overscan,
         IReadOnlyList<SyntaxSpan> syntax,
         LayoutMetrics metrics,
-        IUnwrappedLineLayoutEngine lineEngine)
+        IUnwrappedLineLayoutEngine lineEngine,
+        IDictionary<ProjectedLine, UnwrappedLineLayout>? lineLayoutCache = null)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(rowMap);
@@ -99,7 +100,13 @@ public sealed class ViewportLayoutEngine
             var row = rowMap.Rows[visualRow];
             var textLayout = row.TextLine is null
                 ? null
-                : LayoutTextRow(snapshot, row, syntax, metrics, lineEngine);
+                : LayoutTextRow(
+                    snapshot,
+                    row,
+                    syntax,
+                    metrics,
+                    lineEngine,
+                    lineLayoutCache);
             result.Add(new ViewportRowLayout(
                 row,
                 heights.GetOffset(visualRow),
@@ -115,11 +122,19 @@ public sealed class ViewportLayoutEngine
         VisualRow row,
         IReadOnlyList<SyntaxSpan> syntax,
         LayoutMetrics metrics,
-        IUnwrappedLineLayoutEngine lineEngine)
+        IUnwrappedLineLayoutEngine lineEngine,
+        IDictionary<ProjectedLine, UnwrappedLineLayout>? lineLayoutCache)
     {
-        var full = lineEngine.Layout(snapshot, row.TextLine!, syntax, metrics);
+        var textLine = row.TextLine!;
+        if (lineLayoutCache is null
+            || !lineLayoutCache.TryGetValue(textLine, out var full))
+        {
+            full = lineEngine.Layout(snapshot, textLine, syntax, metrics);
+            lineLayoutCache?.Add(textLine, full);
+        }
+
         return row.TextStartColumn == 0
-            && row.TextLength == row.TextLine!.VisualLength
+            && row.TextLength == textLine.VisualLength
             ? full
             : full.Slice(row.TextStartColumn, row.TextLength);
     }

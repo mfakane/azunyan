@@ -106,6 +106,40 @@ public sealed class LayoutTests
     }
 
     [Fact]
+    public void Visible_layouts_reuse_cached_unwrapped_line_layouts()
+    {
+        var snapshot = new TextSnapshot("abcdef");
+        var projection = TextProjectionBuilder.Build(snapshot);
+        var rows = VisualRowMapBuilder.Build(projection);
+        var heights = new VisualLineHeightIndex(new[] { 18d });
+        var cache = new Dictionary<ProjectedLine, UnwrappedLineLayout>();
+        var metrics = new LayoutMetrics(8, 18, 14);
+
+        var first = ViewportLayoutEngine.LayoutVisibleRows(
+            snapshot,
+            rows,
+            heights,
+            new LayoutViewport(0, 18),
+            overscan: 0,
+            Array.Empty<SyntaxSpan>(),
+            metrics,
+            new MonospaceLineLayoutEngine(),
+            cache);
+        var second = ViewportLayoutEngine.LayoutVisibleRows(
+            snapshot,
+            rows,
+            heights,
+            new LayoutViewport(0, 18),
+            overscan: 0,
+            Array.Empty<SyntaxSpan>(),
+            metrics,
+            new MonospaceLineLayoutEngine(),
+            cache);
+
+        Assert.Same(first[0].TextLayout, second[0].TextLayout);
+    }
+
+    [Fact]
     public void Measured_wrap_breaks_override_the_fixed_column_fallback()
     {
         var snapshot = new TextSnapshot("abcdef");

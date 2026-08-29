@@ -21,6 +21,7 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
 {
     private readonly CanvasControl _gutterSurface;
     private readonly CanvasControl _textSurface;
+    private readonly Dictionary<ProjectedLine, UnwrappedLineLayout> _lineLayouts = new();
     private readonly Dictionary<VisualRow, GutterLayoutEntry> _gutterLayouts = new();
     private readonly Dictionary<VisualRow, DirectWriteTextLayout> _textLayouts = new();
     private ProjectedTextLayoutState? _cachedLayout;
@@ -68,6 +69,7 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
         _textSurface.Draw -= OnDraw;
         ClearTextLayouts();
         _textLayoutCacheKey = null;
+        _lineLayouts.Clear();
         _cachedLayout = null;
         _renderFrame = null;
         _pendingDocumentChange = null;
@@ -715,7 +717,8 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
             overscan: context.LineHeight,
             context.DocumentResults?.Syntax ?? Array.Empty<SyntaxSpan>(),
             metrics,
-            new MonospaceLineLayoutEngine());
+            new MonospaceLineLayoutEngine(),
+            _lineLayouts);
 
         EnsureTextLayoutCache(context);
         _renderFrame = new ProjectedTextRenderFrame(context, layouts);
@@ -776,6 +779,7 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
         if (_textLayoutCacheKey is null || !_textLayoutCacheKey.Matches(key))
         {
             ClearTextLayouts();
+            _lineLayouts.Clear();
             _textLayoutCacheKey = key;
         }
     }
@@ -785,6 +789,16 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
         var rows = layouts
             .Select(layout => layout.Row)
             .ToHashSet();
+        var textLines = layouts
+            .Select(layout => layout.Row.TextLine)
+            .Where(line => line is not null)
+            .Cast<ProjectedLine>()
+            .ToHashSet();
+        foreach (var line in _lineLayouts.Keys.Where(line => !textLines.Contains(line)).ToArray())
+        {
+            _lineLayouts.Remove(line);
+        }
+
         foreach (var row in _textLayouts.Keys.Where(row => !rows.Contains(row)).ToArray())
         {
             _textLayouts[row].Dispose();
