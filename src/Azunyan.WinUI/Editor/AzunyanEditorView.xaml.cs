@@ -47,6 +47,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private string[] _completionTriggerCharacters = Array.Empty<string>();
     private bool _disposed;
     private int _hoverPosition = -1;
+    private long _documentProviderGeneration;
+    private long _viewportProviderGeneration;
+    private long _positionProviderGeneration;
 
     public AzunyanEditorView()
     {
@@ -472,6 +475,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         _providerScheduler.CancelAll();
+        InvalidateProviderGenerations();
         if (_scrollViewer is not null)
         {
             _scrollViewer.ViewChanged -= OnViewportChanged;
@@ -1052,23 +1056,28 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
         if (requestDocument)
         {
+            var generation = NextProviderGeneration(ref _documentProviderGeneration);
             _providerFrame = new EditorProviderFrame(snapshot, selection);
             RenderViewport();
             _ = ApplyDocumentProviderResultAsync(
-                _providerScheduler.RequestDocumentAsync(snapshot, selection));
+                _providerScheduler.RequestDocumentAsync(snapshot, selection),
+                generation);
         }
 
         if (requestViewport)
         {
+            var generation = NextProviderGeneration(ref _viewportProviderGeneration);
             _ = ApplyViewportProviderResultAsync(
                 _providerScheduler.RequestViewportAsync(
                     snapshot,
                     GetVisibleDocumentRange(),
-                    selection));
+                    selection),
+                generation);
         }
 
         if (requestPosition)
         {
+            var generation = NextProviderGeneration(ref _positionProviderGeneration);
             _providerFrame = new EditorProviderFrame(
                 snapshot,
                 selection,
@@ -1080,11 +1089,14 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                     snapshot,
                     selection.CaretPosition,
                     selection,
-                    includeCompletion: requestCompletion));
+                    includeCompletion: requestCompletion),
+                generation);
         }
     }
 
-    private async Task ApplyDocumentProviderResultAsync(Task<DocumentProviderResults?> request)
+    private async Task ApplyDocumentProviderResultAsync(
+        Task<DocumentProviderResults?> request,
+        long generation)
     {
         DocumentProviderResults? result;
         try
@@ -1103,7 +1115,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
         DispatcherQueue.TryEnqueue(() =>
         {
-            if (!IsLoaded || !ReferenceEquals(result.Snapshot, InputEditor.Snapshot))
+            if (!IsLoaded
+                || generation != _documentProviderGeneration
+                || !ReferenceEquals(result.Snapshot, InputEditor.Snapshot))
             {
                 return;
             }
@@ -1118,7 +1132,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         });
     }
 
-    private async Task ApplyViewportProviderResultAsync(Task<ViewportProviderResults?> request)
+    private async Task ApplyViewportProviderResultAsync(
+        Task<ViewportProviderResults?> request,
+        long generation)
     {
         ViewportProviderResults? result;
         try
@@ -1137,7 +1153,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
         DispatcherQueue.TryEnqueue(() =>
         {
-            if (!IsLoaded || !ReferenceEquals(result.Context.Snapshot, InputEditor.Snapshot))
+            if (!IsLoaded
+                || generation != _viewportProviderGeneration
+                || !ReferenceEquals(result.Context.Snapshot, InputEditor.Snapshot))
             {
                 return;
             }
@@ -1152,7 +1170,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         });
     }
 
-    private async Task ApplyPositionProviderResultAsync(Task<PositionProviderResults?> request)
+    private async Task ApplyPositionProviderResultAsync(
+        Task<PositionProviderResults?> request,
+        long generation)
     {
         PositionProviderResults? result;
         try
@@ -1171,7 +1191,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
         DispatcherQueue.TryEnqueue(() =>
         {
-            if (!IsLoaded || !ReferenceEquals(result.Context.Snapshot, InputEditor.Snapshot))
+            if (!IsLoaded
+                || generation != _positionProviderGeneration
+                || !ReferenceEquals(result.Context.Snapshot, InputEditor.Snapshot))
             {
                 return;
             }
@@ -1195,6 +1217,16 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             this,
             new EditorProviderResultsEventArgs(frame.ToLegacyResults()));
     }
+
+    private void InvalidateProviderGenerations()
+    {
+        NextProviderGeneration(ref _documentProviderGeneration);
+        NextProviderGeneration(ref _viewportProviderGeneration);
+        NextProviderGeneration(ref _positionProviderGeneration);
+    }
+
+    private static long NextProviderGeneration(ref long generation) =>
+        generation = checked(generation + 1);
 
     private EditorProviderFrame? GetCurrentFrame() =>
         _providerFrame is { } frame
@@ -1605,12 +1637,14 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             return;
         }
 
+        var generation = NextProviderGeneration(ref _positionProviderGeneration);
         _ = ApplyPositionProviderResultAsync(
             _providerScheduler.RequestPositionAsync(
                 InputEditor.Snapshot,
                 position,
                 InputEditor.Document.Selection,
-                includeCompletion: false));
+                includeCompletion: false),
+            generation);
     }
 
     private void UpdateTooltipPopup()
