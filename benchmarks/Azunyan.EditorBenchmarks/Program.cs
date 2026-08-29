@@ -34,6 +34,52 @@ var incrementalProjection = TextProjectionBuilder.BuildIncremental(
     change);
 var equivalent = AreEquivalent(current, fullProjection, incrementalProjection);
 
+var foldStart = text.IndexOf("line-075000", StringComparison.Ordinal);
+var inlayPosition = text.IndexOf("line-090000", StringComparison.Ordinal) + 5;
+var folds = new[] { new FoldRange("stable-fold", new TextRange(foldStart, 8), "...") };
+var inlays = new[]
+{
+    new InlineAdornment(
+        "stable-inlay",
+        DocumentAnchor.Before(inlayPosition),
+        "type-hint",
+        new AdornmentContent(" : int"))
+};
+var currentFolds = new[] { new FoldRange("stable-fold", new TextRange(foldStart + 8, 8), "...") };
+var currentInlays = new[]
+{
+    new InlineAdornment(
+        "stable-inlay",
+        DocumentAnchor.Before(inlayPosition + 8),
+        "type-hint",
+        new AdornmentContent(" : int"))
+};
+var previousDecorated = TextProjectionBuilder.Build(oldSnapshot, folds, inlays);
+var fullDecorated = Measure(
+    iterations,
+    () => TextProjectionBuilder.Build(current, currentFolds, currentInlays));
+var incrementalDecorated = Measure(
+    iterations,
+    () => TextProjectionBuilder.BuildIncremental(
+        oldSnapshot,
+        current,
+        previousDecorated,
+        change,
+        currentFolds,
+        currentInlays));
+var fullDecoratedProjection = TextProjectionBuilder.Build(current, currentFolds, currentInlays);
+var incrementalDecoratedProjection = TextProjectionBuilder.BuildIncremental(
+    oldSnapshot,
+    current,
+    previousDecorated,
+    change,
+    currentFolds,
+    currentInlays);
+var decoratedEquivalent = AreEquivalent(
+    current,
+    fullDecoratedProjection,
+    incrementalDecoratedProjection);
+
 Console.WriteLine($"scenario=100k-lines-middle-insert");
 Console.WriteLine($"full_mean_ms={full.Elapsed.TotalMilliseconds / iterations:F3}");
 Console.WriteLine($"incremental_mean_ms={incremental.Elapsed.TotalMilliseconds / iterations:F3}");
@@ -41,8 +87,14 @@ Console.WriteLine($"full_mean_allocated_bytes={full.AllocatedBytes / iterations}
 Console.WriteLine($"incremental_mean_allocated_bytes={incremental.AllocatedBytes / iterations}");
 Console.WriteLine($"visual_lines={incrementalProjection.VisualLineCount}");
 Console.WriteLine($"equivalent={equivalent}");
+Console.WriteLine($"decorated_full_mean_ms={fullDecorated.Elapsed.TotalMilliseconds / iterations:F3}");
+Console.WriteLine($"decorated_incremental_mean_ms={incrementalDecorated.Elapsed.TotalMilliseconds / iterations:F3}");
+Console.WriteLine($"decorated_full_mean_allocated_bytes={fullDecorated.AllocatedBytes / iterations}");
+Console.WriteLine($"decorated_incremental_mean_allocated_bytes={incrementalDecorated.AllocatedBytes / iterations}");
+Console.WriteLine($"decorated_visual_lines={incrementalDecoratedProjection.VisualLineCount}");
+Console.WriteLine($"decorated_equivalent={decoratedEquivalent}");
 
-if (verify && !equivalent)
+if (verify && (!equivalent || !decoratedEquivalent))
 {
     throw new InvalidOperationException("Incremental projection differs from a full projection.");
 }
@@ -88,12 +140,16 @@ static bool AreEquivalent(
         return false;
     }
 
-    foreach (var line in new[] { 0, expected.VisualLineCount / 2, expected.VisualLineCount - 1 })
+    for (var line = 0; line < expected.VisualLineCount; line++)
     {
-        if (line < 0 || line >= expected.VisualLineCount
+        if (expected.Lines[line].LogicalLine != actual.Lines[line].LogicalLine
             || expected.Lines[line].SourceRange != actual.Lines[line].SourceRange
+            || expected.Lines[line].VisualLength != actual.Lines[line].VisualLength
             || snapshot.GetText(expected.Lines[line].SourceRange)
-                != snapshot.GetText(actual.Lines[line].SourceRange))
+                != snapshot.GetText(actual.Lines[line].SourceRange)
+            || expected.Lines[line].Inlines.Count != actual.Lines[line].Inlines.Count
+            || expected.Lines[line].Inlines.Zip(actual.Lines[line].Inlines)
+                .Any(pair => pair.First.GetType() != pair.Second.GetType()))
         {
             return false;
         }

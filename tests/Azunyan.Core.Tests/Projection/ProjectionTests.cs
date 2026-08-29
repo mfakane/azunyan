@@ -114,6 +114,132 @@ public sealed class ProjectionTests
     }
 
     [Fact]
+    public void Incremental_projection_matches_full_projection_across_seeded_random_edits()
+    {
+        var document = new Document(string.Join('\n', Enumerable.Range(0, 24).Select(index => $"line-{index:D2}")));
+        var previous = TextProjectionBuilder.Build(document.Snapshot);
+        var random = new Random(20260829);
+        var history = new List<string>();
+
+        for (var iteration = 0; iteration < 80; iteration++)
+        {
+            var oldSnapshot = document.Snapshot;
+            var start = random.Next(oldSnapshot.Length + 1);
+            var maxLength = Math.Min(5, oldSnapshot.Length - start);
+            var length = random.Next(maxLength + 1);
+            var inserted = new[] { "", "x", "YZ", "\n", "q\nrs" }[random.Next(5)];
+            var operation = $"iteration={iteration}, range={start}:{length}, old={oldSnapshot.GetText(new TextRange(start, length))}, inserted={inserted.Replace("\n", "\\n", StringComparison.Ordinal)}";
+            history.Add(operation);
+            var change = document.Replace(new TextRange(start, length), inserted);
+
+            var incremental = TextProjectionBuilder.BuildIncremental(
+                oldSnapshot,
+                document.Snapshot,
+                previous,
+                change);
+            var expected = TextProjectionBuilder.Build(document.Snapshot);
+
+            Assert.True(
+                expected.VisualLineCount == incremental.VisualLineCount,
+                $"{string.Join("; ", history)}, expected={expected.VisualLineCount}, actual={incremental.VisualLineCount}");
+            AssertProjectionEquivalent(expected, incremental, document.Snapshot);
+            previous = incremental;
+        }
+    }
+
+    [Fact]
+    public void Incremental_decorated_projection_matches_full_projection_when_adornments_change()
+    {
+        var document = new Document("aa\nbb\ncc\ndd\nee\n");
+        var oldSnapshot = document.Snapshot;
+        var oldFolds = new[] { new FoldRange("body", new TextRange(3, 2), "...") };
+        var oldInlays = new[]
+        {
+            new InlineAdornment(
+                "hint",
+                DocumentAnchor.Before(1),
+                "type",
+                new AdornmentContent(": int"))
+        };
+        var previous = TextProjectionBuilder.Build(oldSnapshot, oldFolds, oldInlays);
+
+        var change = document.Insert(0, "X");
+        var currentFolds = new[] { new FoldRange("body", new TextRange(4, 3), "[fold]") };
+        var currentInlays = new[]
+        {
+            new InlineAdornment(
+                "hint",
+                DocumentAnchor.After(2),
+                "type-hint",
+                new AdornmentContent(" : long"))
+        };
+        var incremental = TextProjectionBuilder.BuildIncremental(
+            oldSnapshot,
+            document.Snapshot,
+            previous,
+            change,
+            currentFolds,
+            currentInlays);
+        var expected = TextProjectionBuilder.Build(
+            document.Snapshot,
+            currentFolds,
+            currentInlays);
+
+        AssertProjectionEquivalent(expected, incremental, document.Snapshot);
+    }
+
+    [Fact]
+    public void Incremental_visual_rows_match_full_rows_across_seeded_random_edits()
+    {
+        var document = new Document(string.Join('\n', Enumerable.Range(0, 24).Select(index => $"line-{index:D2}")));
+        var previousProjection = TextProjectionBuilder.Build(document.Snapshot);
+        var previousRows = VisualRowMapBuilder.Build(previousProjection, wrapColumns: 3);
+        var random = new Random(20260830);
+        var history = new List<string>();
+
+        for (var iteration = 0; iteration < 80; iteration++)
+        {
+            var oldSnapshot = document.Snapshot;
+            var start = random.Next(oldSnapshot.Length + 1);
+            var maxLength = Math.Min(5, oldSnapshot.Length - start);
+            var length = random.Next(maxLength + 1);
+            var inserted = new[] { "", "x", "YZ", "\n", "q\nrs" }[random.Next(5)];
+            history.Add(
+                $"iteration={iteration}, range={start}:{length}, oldLine={oldSnapshot.Lines.GetLine(start)}, old={oldSnapshot.GetText(new TextRange(start, length))}, inserted={inserted.Replace("\n", "\\n", StringComparison.Ordinal)}");
+            var change = document.Replace(new TextRange(start, length), inserted);
+
+            var projection = TextProjectionBuilder.BuildIncremental(
+                oldSnapshot,
+                document.Snapshot,
+                previousProjection,
+                change);
+            var fullProjection = TextProjectionBuilder.Build(document.Snapshot);
+            Assert.True(
+                fullProjection.VisualLineCount == projection.VisualLineCount,
+                $"{string.Join("; ", history)}, expected={fullProjection.VisualLineCount}, actual={projection.VisualLineCount}");
+            AssertProjectionEquivalent(
+                fullProjection,
+                projection,
+                document.Snapshot);
+            var incremental = VisualRowMapBuilder.BuildIncremental(
+                previousProjection,
+                projection,
+                previousRows,
+                wrapColumns: 3,
+                change: change);
+            var expected = VisualRowMapBuilder.Build(projection, wrapColumns: 3);
+
+            var expectedRows = expected.Rows.Select(DescribeRow).ToArray();
+            var actualRows = incremental.Rows.Select(DescribeRow).ToArray();
+            Assert.True(
+                expectedRows.SequenceEqual(actualRows),
+                $"{string.Join("; ", history)}, rowWindow={incremental.ChangeWindow}, expected={string.Join(",", expectedRows)}, actual={string.Join(",", actualRows)}");
+            previousProjection = projection;
+            previousRows = incremental;
+        }
+    }
+
+    [Fact]
     public void Folded_ranges_hide_middle_lines_and_map_hidden_positions_to_placeholder()
     {
         var snapshot = new TextSnapshot("a\nb\nc");
@@ -271,4 +397,9 @@ public sealed class ProjectionTests
             $"inlay:{inlay.Id}:{inlay.Anchor}:{inlay.Kind}:{inlay.Content.Text}",
         _ => throw new ArgumentOutOfRangeException(nameof(inline))
     };
+
+    private static string DescribeRow(VisualRow row) =>
+        row.Kind == VisualRowKind.Text
+            ? $"text:{row.LogicalLine}:{row.TextStartColumn}:{row.TextLength}"
+            : $"block:{row.BlockAdornment!.Id}:{row.LogicalLine}";
 }

@@ -735,7 +735,7 @@ public sealed class VisualRowMapBuilder
 
 public sealed class VisualRowMap
 {
-    private readonly Lazy<Dictionary<ProjectedLine, int[]>> _textRowsByLine;
+    private readonly Lazy<Dictionary<int, int[]>> _textRowsByLine;
     private readonly Lazy<Dictionary<DocumentAnchor, int[]>> _blockRowsByAnchor;
     private readonly bool _isPlain;
 
@@ -797,10 +797,10 @@ public sealed class VisualRowMap
         WrapBreaks = wrapBreaks;
         ChangeWindow = changeWindow;
         _isPlain = isPlain;
-        _textRowsByLine = new Lazy<Dictionary<ProjectedLine, int[]>>(
+        _textRowsByLine = new Lazy<Dictionary<int, int[]>>(
             () => rows
                 .Where(row => row.TextLine is not null)
-                .GroupBy(row => row.TextLine!)
+                .GroupBy(row => row.TextLine!.LogicalLine)
                 .ToDictionary(group => group.Key, group => group
                     .Select(row => row.VisualRowIndex)
                     .ToArray()));
@@ -857,7 +857,7 @@ public sealed class VisualRowMap
     public IReadOnlyList<int> GetTextRowIndices(ProjectedLine line) =>
         _isPlain && ProjectionLineMatches(line, out var plainRow)
             ? new[] { plainRow }
-            : _textRowsByLine.Value.TryGetValue(line, out var rows)
+            : _textRowsByLine.Value.TryGetValue(line.LogicalLine, out var rows)
             ? rows
             : Array.Empty<int>();
 

@@ -680,8 +680,16 @@ public sealed class TextProjectionBuilder
         AddChangedFoldRanges(previous.Folds, normalizedFolds, change, oldImpact, newImpact);
         AddChangedInlayRanges(previous.Inlays, normalizedInlays, change, oldImpact, newImpact);
 
-        var oldWindow = GetLineWindow(oldSnapshot, CombineRanges(oldImpact));
+        var oldWindow = GetLineWindow(
+            oldSnapshot,
+            CombineRanges(oldImpact),
+            EndsAfterLineBreak(oldSnapshot, change.OldRange));
         var newWindow = GetLineWindow(snapshot, CombineRanges(newImpact));
+        newWindow = IncludeTrailingLineIfNeeded(
+            oldWindow,
+            oldSnapshot.Lines,
+            snapshot,
+            newWindow);
         var oldLines = previous.Snapshot.Lines;
         var newLines = snapshot.Lines;
         var delta = change.NewText.Length - change.OldRange.Length;
@@ -962,7 +970,10 @@ public sealed class TextProjectionBuilder
         var oldLines = previous.Snapshot.Lines;
         var newLines = snapshot.Lines;
         var delta = change.NewText.Length - change.OldRange.Length;
-        var oldWindow = GetLineWindow(oldSnapshot, change.OldRange);
+        var oldWindow = GetLineWindow(
+            oldSnapshot,
+            change.OldRange,
+            EndsAfterLineBreak(oldSnapshot, change.OldRange));
         var oldWindowStart = oldLines.GetLineStart(oldWindow.StartLine);
         var oldWindowEnd = oldWindow.EndLine == oldLines.LineCount
             ? oldSnapshot.Length
@@ -970,6 +981,7 @@ public sealed class TextProjectionBuilder
         var mappedStart = Math.Clamp(MapPosition(oldWindowStart, change, delta), 0, snapshot.Length);
         var mappedEnd = Math.Clamp(MapPosition(oldWindowEnd, change, delta), mappedStart, snapshot.Length);
         var newWindow = GetLineWindow(snapshot, TextRange.FromBounds(mappedStart, mappedEnd));
+        newWindow = IncludeTrailingLineIfNeeded(oldWindow, oldLines, snapshot, newWindow);
         var chunks = new List<ProjectedLineChunk>();
         previous.LineTable.AddRange(chunks, 0, oldWindow.StartLine);
 
@@ -1114,15 +1126,43 @@ public sealed class TextProjectionBuilder
 
     private static (int StartLine, int EndLine) GetLineWindow(
         TextSnapshot snapshot,
-        TextRange range)
+        TextRange range,
+        bool includeEndLine = false)
     {
         var firstLine = snapshot.Lines.GetLine(range.Start);
         var lastPosition = range.IsEmpty
             ? range.Start
             : Math.Min(snapshot.Length, range.End - 1);
         var endLine = snapshot.Lines.GetLine(lastPosition) + 1;
+        if (includeEndLine && !range.IsEmpty)
+        {
+            endLine = Math.Max(endLine, snapshot.Lines.GetLine(range.End) + 1);
+        }
+
         endLine = Math.Min(snapshot.Lines.LineCount, endLine);
         return (firstLine, endLine);
+    }
+
+    private static bool EndsAfterLineBreak(TextSnapshot snapshot, TextRange range) =>
+        range.End > range.Start
+        && range.End <= snapshot.Length
+        && snapshot.GetText(new TextRange(range.End - 1, 1)) == "\n";
+
+    private static (int StartLine, int EndLine) IncludeTrailingLineIfNeeded(
+        (int StartLine, int EndLine) oldWindow,
+        LineIndex oldLines,
+        TextSnapshot snapshot,
+        (int StartLine, int EndLine) newWindow)
+    {
+        if (oldWindow.EndLine == oldLines.LineCount
+            && snapshot.Length > 0
+            && (snapshot[snapshot.Length - 1] == '\n'
+                || snapshot[snapshot.Length - 1] == '\r'))
+        {
+            return (newWindow.StartLine, snapshot.Lines.LineCount);
+        }
+
+        return newWindow;
     }
 
     private static int MapPosition(int position, TextChange change, int delta) =>
