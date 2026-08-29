@@ -408,7 +408,8 @@ public sealed class ProjectedLine
 public sealed class TextProjection
 {
     private readonly int[] _logicalToVisual;
-    private readonly IReadOnlyList<FoldRange> _folds;
+    private readonly FoldRange[] _folds;
+    private readonly int[] _foldStarts;
 
     internal TextProjection(
         TextSnapshot snapshot,
@@ -418,7 +419,8 @@ public sealed class TextProjection
     {
         Snapshot = snapshot;
         Lines = lines;
-        _folds = folds;
+        _folds = folds.ToArray();
+        _foldStarts = _folds.Select(fold => fold.Range.Start).ToArray();
         _logicalToVisual = logicalToVisual;
     }
 
@@ -447,7 +449,7 @@ public sealed class TextProjection
     {
         ValidateDocumentAnchor(anchor);
         var offset = anchor.Position.Offset;
-        return _folds.Any(fold => offset > fold.Range.Start && offset < fold.Range.End);
+        return FindContainingFold(offset, AnchorAffinity.After) is not null;
     }
 
     public bool TryGetVisualLine(int logicalLine, out int visualLine)
@@ -474,20 +476,51 @@ public sealed class TextProjection
 
     private FoldRange? FindContainingFold(int offset, AnchorAffinity affinity)
     {
-        foreach (var fold in _folds)
+        var firstAtOrAfter = LowerBound(_foldStarts, offset);
+        if (firstAtOrAfter < _folds.Length
+            && _foldStarts[firstAtOrAfter] == offset)
         {
-            if (offset > fold.Range.Start && offset < fold.Range.End)
+            if (affinity == AnchorAffinity.Before
+                && firstAtOrAfter > 0
+                && _folds[firstAtOrAfter - 1].Range.End == offset)
             {
-                return fold;
+                return _folds[firstAtOrAfter - 1];
             }
 
-            if (offset == fold.Range.End && affinity == AnchorAffinity.Before)
+            return null;
+        }
+
+        var candidate = firstAtOrAfter - 1;
+        if (candidate < 0)
+        {
+            return null;
+        }
+
+        var fold = _folds[candidate];
+        return offset < fold.Range.End
+            || offset == fold.Range.End && affinity == AnchorAffinity.Before
+            ? fold
+            : null;
+    }
+
+    private static int LowerBound(int[] values, int value)
+    {
+        var low = 0;
+        var high = values.Length;
+        while (low < high)
+        {
+            var middle = low + ((high - low) / 2);
+            if (values[middle] < value)
             {
-                return fold;
+                low = middle + 1;
+            }
+            else
+            {
+                high = middle;
             }
         }
 
-        return null;
+        return low;
     }
 
     private void ValidateDocumentAnchor(DocumentAnchor anchor)
@@ -642,11 +675,15 @@ public sealed class TextProjectionBuilder
 
     private static List<ProjectionInline>? BuildLineInlines(
         TextRange line,
-        IReadOnlyList<FoldRange> folds,
+        List<FoldRange> folds,
         IReadOnlyList<InlineAdornment> inlays)
     {
-        var coveringFold = folds.FirstOrDefault(fold =>
-            fold.Range.Start < line.Start && fold.Range.End > line.Start);
+        var firstFold = LowerBoundFold(folds, line.Start);
+        var coveringFold = firstFold > 0
+            && folds[firstFold - 1].Range.Start < line.Start
+            && folds[firstFold - 1].Range.End > line.Start
+            ? folds[firstFold - 1]
+            : null;
         var cursor = coveringFold?.Range.End ?? line.Start;
         if (cursor > line.End)
         {
@@ -654,8 +691,14 @@ public sealed class TextProjectionBuilder
         }
 
         var result = new List<ProjectionInline>();
-        foreach (var fold in folds)
+        for (var foldIndex = firstFold; foldIndex < folds.Count; foldIndex++)
         {
+            var fold = folds[foldIndex];
+            if (fold.Range.Start > line.End)
+            {
+                break;
+            }
+
             if (fold.Range.Start < cursor || fold.Range.Start > line.End)
             {
                 continue;
@@ -696,12 +739,14 @@ public sealed class TextProjectionBuilder
         }
 
         var cursor = start;
-        foreach (var inlay in inlays)
+        var firstInlay = LowerBoundInlay(inlays, start);
+        for (var inlayIndex = firstInlay; inlayIndex < inlays.Count; inlayIndex++)
         {
+            var inlay = inlays[inlayIndex];
             var position = inlay.Anchor.Position.Offset;
-            if (position < start || position > end || (position == end && !includeEnd))
+            if (position > end || position == end && !includeEnd)
             {
-                continue;
+                break;
             }
 
             if (position > cursor)
@@ -719,6 +764,50 @@ public sealed class TextProjectionBuilder
         }
     }
 
+    private static int LowerBoundInlay(
+        IReadOnlyList<InlineAdornment> inlays,
+        int position)
+    {
+        var low = 0;
+        var high = inlays.Count;
+        while (low < high)
+        {
+            var middle = low + ((high - low) / 2);
+            if (inlays[middle].Anchor.Position.Offset < position)
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                high = middle;
+            }
+        }
+
+        return low;
+    }
+
+    private static int LowerBoundFold(
+        List<FoldRange> folds,
+        int position)
+    {
+        var low = 0;
+        var high = folds.Count;
+        while (low < high)
+        {
+            var middle = low + ((high - low) / 2);
+            if (folds[middle].Range.Start < position)
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                high = middle;
+            }
+        }
+
+        return low;
+    }
+
     private static List<FoldRange> NormalizeFolds(
         TextSnapshot snapshot,
         IEnumerable<FoldRange> candidates)
@@ -731,7 +820,8 @@ public sealed class TextProjectionBuilder
             .ThenByDescending(fold => fold.Range.End)
             .ThenBy(fold => fold.Id, StringComparer.Ordinal))
         {
-            if (!ids.Add(fold.Id) || accepted.Any(existing => Overlaps(existing.Range, fold.Range)))
+            if (!ids.Add(fold.Id)
+                || accepted.Count > 0 && Overlaps(accepted[^1].Range, fold.Range))
             {
                 continue;
             }

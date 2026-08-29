@@ -229,13 +229,38 @@ public sealed class VisualRowMapBuilder
 
 public sealed class VisualRowMap
 {
+    private readonly Dictionary<ProjectedLine, int[]> _textRowsByLine;
+    private readonly Dictionary<DocumentAnchor, int[]> _blockRowsByAnchor;
+
     internal VisualRowMap(TextProjection projection, IReadOnlyList<VisualRow> rows)
     {
         Projection = projection;
         Rows = rows;
+        _textRowsByLine = rows
+            .Where(row => row.TextLine is not null)
+            .GroupBy(row => row.TextLine!)
+            .ToDictionary(group => group.Key, group => group
+                .Select(row => row.VisualRowIndex)
+                .ToArray());
+        _blockRowsByAnchor = rows
+            .Where(row => row.BlockAdornment is not null)
+            .GroupBy(row => row.BlockAdornment!.Anchor)
+            .ToDictionary(group => group.Key, group => group
+                .Select(row => row.VisualRowIndex)
+                .ToArray());
     }
 
     public TextProjection Projection { get; }
 
     public IReadOnlyList<VisualRow> Rows { get; }
+
+    public IReadOnlyList<int> GetTextRowIndices(ProjectedLine line) =>
+        _textRowsByLine.TryGetValue(line, out var rows)
+            ? rows
+            : Array.Empty<int>();
+
+    public IReadOnlyList<int> GetBlockRowIndices(DocumentAnchor anchor) =>
+        _blockRowsByAnchor.TryGetValue(anchor, out var rows)
+            ? rows
+            : Array.Empty<int>();
 }

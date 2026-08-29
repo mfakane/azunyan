@@ -124,6 +124,26 @@ public sealed class ProjectionTests
     }
 
     [Fact]
+    public void Adjacent_folds_preserve_end_and_start_affinity()
+    {
+        var snapshot = new TextSnapshot("abcdefgh");
+        var projection = TextProjectionBuilder.Build(
+            snapshot,
+            folds: new[]
+            {
+                new FoldRange("first", new TextRange(1, 2)),
+                new FoldRange("second", new TextRange(3, 2))
+            });
+
+        Assert.Equal(
+            new VisualPosition(0, 2),
+            projection.MapDocumentPosition(DocumentAnchor.Before(3)));
+        Assert.Equal(
+            new VisualPosition(0, 3),
+            projection.MapDocumentPosition(DocumentAnchor.After(3)));
+    }
+
+    [Fact]
     public void Visual_line_height_index_supports_prefix_lookup_and_local_updates()
     {
         var index = new VisualLineHeightIndex(new[] { 10d, 20d, 15d });

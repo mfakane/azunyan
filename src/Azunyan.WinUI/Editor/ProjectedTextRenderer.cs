@@ -310,11 +310,10 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
             return false;
         }
 
-        for (var index = 0; index < layout.Rows.Rows.Count; index++)
+        foreach (var index in layout.Rows.GetBlockRowIndices(anchor))
         {
             var row = layout.Rows.Rows[index];
-            if (row.BlockAdornment is { } block
-                && block.Anchor == anchor)
+            if (row.BlockAdornment is not null)
             {
                 verticalOffset = layout.Heights.GetOffset(index) + offsetWithinRow;
                 return true;
@@ -323,11 +322,10 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
 
         var position = layout.Rows.Projection.MapDocumentPosition(anchor);
         var textLine = layout.Rows.Projection.Lines[position.VisualLine];
-        for (var index = 0; index < layout.Rows.Rows.Count; index++)
+        foreach (var index in layout.Rows.GetTextRowIndices(textLine))
         {
             var row = layout.Rows.Rows[index];
-            if (ReferenceEquals(row.TextLine, textLine)
-                && ContainsCaret(row, position.CaretStop))
+            if (ContainsCaret(row, position.CaretStop))
             {
                 verticalOffset = layout.Heights.GetOffset(index) + offsetWithinRow;
                 return true;
@@ -371,11 +369,10 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
         var position = projection.MapDocumentPosition(anchor);
         var projectedLine = projection.Lines[position.VisualLine];
         var rowIndex = -1;
-        for (var index = 0; index < layout.Rows.Rows.Count; index++)
+        foreach (var index in layout.Rows.GetTextRowIndices(projectedLine))
         {
             var row = layout.Rows.Rows[index];
-            if (ReferenceEquals(row.TextLine, projectedLine)
-                && ContainsCaret(row, position.CaretStop))
+            if (ContainsCaret(row, position.CaretStop))
             {
                 rowIndex = index;
                 break;
