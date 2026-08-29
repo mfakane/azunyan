@@ -50,6 +50,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private long _documentProviderGeneration;
     private long _viewportProviderGeneration;
     private long _positionProviderGeneration;
+    private DocumentChangedEventArgs? _pendingProviderDocumentChange;
 
     public AzunyanEditorView()
     {
@@ -494,10 +495,17 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     private void OnInputTextChanged(object sender, TextChangedEventArgs args)
     {
+        var documentChange = _pendingProviderDocumentChange;
+        _pendingProviderDocumentChange = null;
         RenderViewport();
         if (!InputEditor.IsComposing)
         {
-            RequestProviderResults(true, true, true, requestCompletion: _completionRequested);
+            RequestProviderResults(
+                true,
+                true,
+                true,
+                requestCompletion: _completionRequested,
+                documentChange: documentChange);
         }
     }
 
@@ -506,6 +514,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         DocumentChangedEventArgs args)
     {
         _defaultRenderer.TextRenderer.NotifyDocumentChanged(args);
+        _pendingProviderDocumentChange = args;
         if (!InputEditor.IsComposing
             && !_applyingCompletion
             && InputEditor.FocusState != FocusState.Unfocused)
@@ -539,6 +548,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     private void OnInputCompositionChanged(object? sender, EventArgs args)
     {
+        _pendingProviderDocumentChange = null;
         _completionRequested = false;
         _explicitCompletionRequested = false;
         HideCompletionPopup();
@@ -1050,7 +1060,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         bool requestDocument,
         bool requestViewport,
         bool requestPosition,
-        bool requestCompletion = false)
+        bool requestCompletion = false,
+        DocumentChangedEventArgs? documentChange = null)
     {
         if (_disposed || !IsLoaded)
         {
@@ -1066,8 +1077,18 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             var generation = NextProviderGeneration(ref _documentProviderGeneration);
             _providerFrame = new EditorProviderFrame(snapshot, selection);
             RenderViewport();
+            var canUseDocumentChange = documentChange is { }
+                && ReferenceEquals(documentChange.NewSnapshot, snapshot);
             _ = ApplyDocumentProviderResultAsync(
-                _providerScheduler.RequestDocumentAsync(snapshot, selection),
+                _providerScheduler.RequestDocumentAsync(
+                    snapshot,
+                    selection,
+                    previousSnapshot: canUseDocumentChange
+                        ? documentChange!.OldSnapshot
+                        : null,
+                    change: canUseDocumentChange
+                        ? documentChange!.Change
+                        : null),
                 generation);
         }
 

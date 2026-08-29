@@ -210,6 +210,35 @@ public sealed class ProviderSchedulerTests
         Assert.Equal(0, calls);
     }
 
+    [Fact]
+    public async Task Incremental_syntax_provider_receives_the_previous_snapshot_and_change()
+    {
+        var previous = new TextSnapshot("old");
+        var current = new TextSnapshot("new");
+        var providers = new EditorProviderSet
+        {
+            Syntax = new DelegateIncrementalSyntaxProvider((context, oldSnapshot, change) =>
+            {
+                Assert.Same(current, context.Snapshot);
+                Assert.Same(previous, oldSnapshot);
+                Assert.Equal(new TextRange(0, 3), change.OldRange);
+                Assert.Equal("new", change.NewText);
+                return Task.FromResult<IEnumerable<SyntaxSpan>>(
+                    new[] { new SyntaxSpan(new TextRange(0, 3), "incremental") });
+            })
+        };
+        using var scheduler = new EditorProviderScheduler(providers);
+
+        var result = await scheduler.RequestDocumentAsync(
+            current,
+            TextSelection.Caret(3),
+            previousSnapshot: previous,
+            change: new TextChange(new TextRange(0, 3), "old", "new"));
+
+        Assert.NotNull(result);
+        Assert.Equal("incremental", Assert.Single(result!.Syntax).Classification);
+    }
+
     private sealed class DelegateSyntaxProvider : ISyntaxProvider
     {
         private readonly Func<EditorProviderContext, Task<IEnumerable<SyntaxSpan>>> _handler;
@@ -221,6 +250,31 @@ public sealed class ProviderSchedulerTests
             EditorProviderContext context,
             CancellationToken cancellationToken = default) =>
             (await _handler(context)).ToArray();
+    }
+
+    private sealed class DelegateIncrementalSyntaxProvider : IIncrementalSyntaxProvider
+    {
+        private readonly Func<
+            EditorProviderContext,
+            TextSnapshot,
+            TextChange,
+            Task<IEnumerable<SyntaxSpan>>> _handler;
+
+        public DelegateIncrementalSyntaxProvider(
+            Func<EditorProviderContext, TextSnapshot, TextChange, Task<IEnumerable<SyntaxSpan>>> handler) =>
+            _handler = handler;
+
+        public ValueTask<IReadOnlyList<SyntaxSpan>> GetSyntaxAsync(
+            EditorProviderContext context,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public async ValueTask<IReadOnlyList<SyntaxSpan>> GetSyntaxAsync(
+            EditorProviderContext context,
+            TextSnapshot previousSnapshot,
+            TextChange change,
+            CancellationToken cancellationToken = default) =>
+            (await _handler(context, previousSnapshot, change)).ToArray();
     }
 
     private sealed class DelegateInlayProvider : IInlayProvider

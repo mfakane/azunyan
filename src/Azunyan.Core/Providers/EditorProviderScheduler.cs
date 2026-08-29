@@ -87,6 +87,19 @@ public sealed class EditorProviderScheduler : IDisposable
     public Task<DocumentProviderResults?> RequestDocumentAsync(
         TextSnapshot snapshot,
         TextSelection selection,
+        CancellationToken cancellationToken = default) =>
+        RequestDocumentAsync(
+            snapshot,
+            selection,
+            previousSnapshot: null,
+            change: null,
+            cancellationToken: cancellationToken);
+
+    public Task<DocumentProviderResults?> RequestDocumentAsync(
+        TextSnapshot snapshot,
+        TextSelection selection,
+        TextSnapshot? previousSnapshot,
+        TextChange? change,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
@@ -96,7 +109,13 @@ public sealed class EditorProviderScheduler : IDisposable
             _document,
             context,
             (requestId, providerContext, token) =>
-                CollectDocumentAsync(providers, requestId, providerContext, token),
+                CollectDocumentAsync(
+                    providers,
+                    previousSnapshot,
+                    change,
+                    requestId,
+                    providerContext,
+                    token),
             cancellationToken);
     }
 
@@ -222,15 +241,18 @@ public sealed class EditorProviderScheduler : IDisposable
 
     private static async Task<DocumentProviderResults> CollectDocumentAsync(
         EditorProviderConfiguration providers,
+        TextSnapshot? previousSnapshot,
+        TextChange? change,
         long requestId,
         EditorProviderContext context,
         CancellationToken cancellationToken)
     {
-        var syntaxTask = providers.Syntax is null
-            ? Task.FromResult<IReadOnlyList<SyntaxSpan>>(Array.Empty<SyntaxSpan>())
-            : InvokeListAsync(
-                () => providers.Syntax.GetSyntaxAsync(context, cancellationToken),
-                cancellationToken);
+        var syntaxTask = GetSyntaxAsync(
+            providers.Syntax,
+            previousSnapshot,
+            change,
+            context,
+            cancellationToken);
         var decorationTask = providers.Decorations is null
             ? Task.FromResult<IReadOnlyList<TextDecoration>>(Array.Empty<TextDecoration>())
             : InvokeListAsync(
@@ -248,6 +270,38 @@ public sealed class EditorProviderScheduler : IDisposable
             syntaxTask.Result.Where(item => IsValidRange(item.Range, context.Snapshot)).ToArray(),
             decorationTask.Result.Where(item => IsValidRange(item.Range, context.Snapshot)).ToArray(),
             foldingTask.Result.Where(item => IsValidRange(item.Range, context.Snapshot)).ToArray());
+    }
+
+    private static Task<IReadOnlyList<SyntaxSpan>> GetSyntaxAsync(
+        ISyntaxProvider? provider,
+        TextSnapshot? previousSnapshot,
+        TextChange? change,
+        EditorProviderContext context,
+        CancellationToken cancellationToken)
+    {
+        if (provider is null)
+        {
+            return Task.FromResult<IReadOnlyList<SyntaxSpan>>(Array.Empty<SyntaxSpan>());
+        }
+
+        if (provider is IIncrementalSyntaxProvider incremental
+            && previousSnapshot is not null
+            && change is { } documentChange
+            && documentChange.OldRange.End <= previousSnapshot.Length
+            && documentChange.NewRange.End <= context.Snapshot.Length)
+        {
+            return InvokeListAsync(
+                () => incremental.GetSyntaxAsync(
+                    context,
+                    previousSnapshot,
+                    documentChange,
+                    cancellationToken),
+                cancellationToken);
+        }
+
+        return InvokeListAsync(
+            () => provider.GetSyntaxAsync(context, cancellationToken),
+            cancellationToken);
     }
 
     private static async Task<ViewportProviderResults> CollectViewportAsync(
