@@ -251,6 +251,10 @@ internal sealed class MainWindowViewAdapter :
         _editor.Providers.Completion = configuration.Completion;
         _editor.Providers.Tooltip = null;
         _editor.Providers.Folding = null;
+        _editor.Providers.Decorations = null;
+        _editor.Providers.Gutter = null;
+        _editor.Providers.Inlay = null;
+        _editor.Providers.BlockAdornment = null;
     }
 
     public void RefreshProviders() => _editor.RefreshProviders();
