@@ -7,5 +7,6 @@
   <Project Path="tests/Azunyan.Syntax.Tests/Azunyan.Syntax.Tests.csproj" />
   <Project Path="tests/Azunote.Tests/Azunote.Tests.csproj" />
   <Project Path="tests/Azunote.UiTests/Azunote.UiTests.csproj" />
+  <Project Path="benchmarks/Azunyan.EditorBenchmarks/Azunyan.EditorBenchmarks.csproj" />
   <Project Path="src/Azunote/Azunote.csproj" />
 </Solution>
