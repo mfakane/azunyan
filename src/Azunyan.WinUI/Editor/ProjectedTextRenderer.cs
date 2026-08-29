@@ -1049,9 +1049,11 @@ internal sealed class ProjectedTextRenderer : IAzunyanEditorRenderer
             context.TabDisplaySize,
             measuredBreaks,
             rows,
-            new VisualLineHeightIndex(rows.Rows.Select(row => row.BlockAdornment is { } block
-                ? Math.Max(1, block.DesiredHeight)
-                : context.LineHeight)));
+            rows.HasUniformTextHeights
+                ? VisualLineHeightIndex.CreateUniform(rows.Rows.Count, context.LineHeight)
+                : new VisualLineHeightIndex(rows.Rows.Select(row => row.BlockAdornment is { } block
+                    ? Math.Max(1, block.DesiredHeight)
+                    : context.LineHeight)));
         return _cachedLayout;
     }
 

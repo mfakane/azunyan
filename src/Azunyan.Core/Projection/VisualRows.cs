@@ -109,8 +109,17 @@ public sealed class VisualRowMapBuilder
                 nameof(wrappedLineBreaksByVisualLine));
         }
 
-        var blocks = NormalizeBlocks(projection, blockAdornments ?? Array.Empty<BlockAdornment>());
-        var blocksByVisualLine = blocks
+        var blocks = blockAdornments?.ToArray() ?? Array.Empty<BlockAdornment>();
+        if (blocks.Length == 0
+            && wrapColumns == 0
+            && wrappedLineBreaks is null
+            && wrappedLineBreaksByVisualLine is null)
+        {
+            return VisualRowMap.CreatePlain(projection);
+        }
+
+        var normalizedBlocks = NormalizeBlocks(projection, blocks);
+        var blocksByVisualLine = normalizedBlocks
             .GroupBy(block => projection.MapDocumentPosition(block.Anchor).VisualLine)
             .ToDictionary(group => group.Key, group => group.ToArray());
         var rows = new List<VisualRow>();
@@ -231,31 +240,52 @@ public sealed class VisualRowMap
 {
     private readonly Dictionary<ProjectedLine, int[]> _textRowsByLine;
     private readonly Dictionary<DocumentAnchor, int[]> _blockRowsByAnchor;
+    private readonly bool _isPlain;
 
     internal VisualRowMap(TextProjection projection, IReadOnlyList<VisualRow> rows)
+        : this(projection, rows, isPlain: false)
+    {
+    }
+
+    private VisualRowMap(
+        TextProjection projection,
+        IReadOnlyList<VisualRow> rows,
+        bool isPlain)
     {
         Projection = projection;
         Rows = rows;
-        _textRowsByLine = rows
-            .Where(row => row.TextLine is not null)
-            .GroupBy(row => row.TextLine!)
-            .ToDictionary(group => group.Key, group => group
-                .Select(row => row.VisualRowIndex)
-                .ToArray());
-        _blockRowsByAnchor = rows
-            .Where(row => row.BlockAdornment is not null)
-            .GroupBy(row => row.BlockAdornment!.Anchor)
-            .ToDictionary(group => group.Key, group => group
-                .Select(row => row.VisualRowIndex)
-                .ToArray());
+        _isPlain = isPlain;
+        _textRowsByLine = isPlain
+            ? new Dictionary<ProjectedLine, int[]>()
+            : rows
+                .Where(row => row.TextLine is not null)
+                .GroupBy(row => row.TextLine!)
+                .ToDictionary(group => group.Key, group => group
+                    .Select(row => row.VisualRowIndex)
+                    .ToArray());
+        _blockRowsByAnchor = isPlain
+            ? new Dictionary<DocumentAnchor, int[]>()
+            : rows
+                .Where(row => row.BlockAdornment is not null)
+                .GroupBy(row => row.BlockAdornment!.Anchor)
+                .ToDictionary(group => group.Key, group => group
+                    .Select(row => row.VisualRowIndex)
+                    .ToArray());
     }
 
     public TextProjection Projection { get; }
 
     public IReadOnlyList<VisualRow> Rows { get; }
 
+    public bool HasUniformTextHeights => _isPlain;
+
+    internal static VisualRowMap CreatePlain(TextProjection projection) =>
+        new(projection, new PlainVisualRowList(projection), isPlain: true);
+
     public IReadOnlyList<int> GetTextRowIndices(ProjectedLine line) =>
-        _textRowsByLine.TryGetValue(line, out var rows)
+        _isPlain && ProjectionLineMatches(line, out var plainRow)
+            ? new[] { plainRow }
+            : _textRowsByLine.TryGetValue(line, out var rows)
             ? rows
             : Array.Empty<int>();
 
@@ -263,4 +293,12 @@ public sealed class VisualRowMap
         _blockRowsByAnchor.TryGetValue(anchor, out var rows)
             ? rows
             : Array.Empty<int>();
+
+    private bool ProjectionLineMatches(ProjectedLine line, out int visualRow)
+    {
+        visualRow = line.LogicalLine;
+        return visualRow >= 0
+            && visualRow < Projection.Lines.Count
+            && ReferenceEquals(Projection.Lines[visualRow], line);
+    }
 }

@@ -164,4 +164,30 @@ public sealed class ProjectionTests
         Assert.Equal(40, index.GetOffset(2));
         Assert.Equal(2, index.FindLine(54.99));
     }
+
+    [Fact]
+    public void Visual_line_height_index_splices_rows_without_changing_lookup_semantics()
+    {
+        var index = VisualLineHeightIndex.CreateUniform(3, 10);
+
+        index.Splice(1, 1, new[] { 20d, 30d });
+
+        Assert.Equal(4, index.Count);
+        Assert.Equal(new[] { 10d, 20d, 30d, 10d },
+            Enumerable.Range(0, index.Count).Select(index.GetHeight).ToArray());
+        Assert.Equal(30, index.GetOffset(2));
+        Assert.Equal(2, index.FindLine(31));
+    }
+
+    [Fact]
+    public void Plain_visual_rows_are_realized_on_demand()
+    {
+        var projection = TextProjectionBuilder.Build(new TextSnapshot("a\nb\nc"));
+        var rows = VisualRowMapBuilder.Build(projection);
+
+        Assert.Equal(3, rows.Rows.Count);
+        Assert.Equal(0, rows.Rows[0].VisualRowIndex);
+        Assert.Equal(2, rows.Rows[2].VisualRowIndex);
+        Assert.Equal(new[] { 1 }, rows.GetTextRowIndices(projection.Lines[1]));
+    }
 }
