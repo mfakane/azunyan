@@ -650,11 +650,15 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             return true;
         }
 
-        var xInText = (x + horizontalOffset - contentLeft) / characterWidth;
+        // DirectWrite reports caret positions in pixels, so keep the pointer
+        // position in the same coordinate space while choosing a caret stop.
+        // The fixed-width fallback performs the conversion using
+        // characterWidth below.
+        var xInTextPixels = x + horizontalOffset - contentLeft;
         var localColumn = GetNearestCaretStop(
             rowIndex,
             row,
-            xInText,
+            xInTextPixels,
             characterWidth);
         var visualColumn = row.TextStartColumn + localColumn;
         anchor = GetLineLayoutForGlobalRow(rowIndex, row)
