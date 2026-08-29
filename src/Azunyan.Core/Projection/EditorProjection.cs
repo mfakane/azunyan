@@ -312,6 +312,19 @@ public sealed class ProjectedLine
                     TextRange.FromBounds(
                         text.Source.Start + offsetDelta,
                         text.Source.End + offsetDelta)),
+                FoldPlaceholder fold => new FoldPlaceholder(
+                    TextRange.FromBounds(
+                        fold.HiddenSource.Start + offsetDelta,
+                        fold.HiddenSource.End + offsetDelta),
+                    fold.DisplayText,
+                    fold.FoldId),
+                InlineAdornment adornment => new InlineAdornment(
+                    adornment.Id,
+                    new DocumentAnchor(
+                        new DocumentPosition(adornment.Anchor.Position.Offset + offsetDelta),
+                        adornment.Anchor.Affinity),
+                    adornment.Kind,
+                    adornment.Content),
                 _ => inline
             })
             .ToArray();
@@ -409,6 +422,7 @@ public sealed class TextProjection
 {
     private readonly int[] _logicalToVisual;
     private readonly FoldRange[] _folds;
+    private readonly InlineAdornment[] _inlays;
     private readonly int[] _foldStarts;
     private readonly ProjectedLineTable _lineTable;
 
@@ -416,6 +430,7 @@ public sealed class TextProjection
         TextSnapshot snapshot,
         ProjectedLineTable lines,
         IReadOnlyList<FoldRange> folds,
+        IReadOnlyList<InlineAdornment> inlays,
         int[]? logicalToVisual,
         bool isPlain)
     {
@@ -423,6 +438,7 @@ public sealed class TextProjection
         Lines = lines;
         _lineTable = lines;
         _folds = folds.ToArray();
+        _inlays = inlays.ToArray();
         _foldStarts = _folds.Select(fold => fold.Range.Start).ToArray();
         _logicalToVisual = logicalToVisual ?? Array.Empty<int>();
         IsPlain = isPlain;
@@ -433,6 +449,13 @@ public sealed class TextProjection
     public IReadOnlyList<ProjectedLine> Lines { get; }
 
     internal ProjectedLineTable LineTable => _lineTable;
+
+    internal IReadOnlyList<FoldRange> Folds => _folds;
+
+    internal IReadOnlyList<InlineAdornment> Inlays => _inlays;
+
+    internal int GetVisualLineForLogicalLine(int logicalLine) =>
+        IsPlain ? logicalLine : _logicalToVisual[logicalLine];
 
     internal bool IsPlain { get; }
 
@@ -464,13 +487,13 @@ public sealed class TextProjection
 
     public bool TryGetVisualLine(int logicalLine, out int visualLine)
     {
-        if (logicalLine < 0 || logicalLine >= _logicalToVisual.Length)
+        if (logicalLine < 0 || logicalLine >= Snapshot.Lines.LineCount)
         {
             visualLine = -1;
             return false;
         }
 
-        visualLine = IsPlain ? logicalLine : _logicalToVisual[logicalLine];
+        visualLine = GetVisualLineForLogicalLine(logicalLine);
         return visualLine >= 0;
     }
 
@@ -561,6 +584,7 @@ public sealed class TextProjectionBuilder
                 snapshot,
                 ProjectedLineTable.FromLines(lines),
                 normalizedFolds,
+                normalizedInlays,
                 logicalToVisual: null,
                 isPlain: true);
         }
@@ -584,59 +608,91 @@ public sealed class TextProjectionBuilder
             snapshot,
             ProjectedLineTable.FromLines(lines),
             normalizedFolds,
+            normalizedInlays,
             logicalToVisual,
             isPlain: false);
     }
 
     /// <summary>
-    /// Rebuilds a plain projection after one document replacement while
-    /// reusing unaffected line projections. Fold and inlay projections are
-    /// intentionally delegated to <see cref="Build"/> because their anchors
-    /// can change across a wider provider result than the text edit itself.
+    /// Rebuilds a projection after one document replacement while reusing
+    /// unaffected line projections. The four-argument overload is the plain
+    /// projection convenience API.
     /// </summary>
     public static TextProjection BuildIncremental(
         TextSnapshot oldSnapshot,
         TextSnapshot snapshot,
         TextProjection previous,
         TextChange change)
+        => BuildIncremental(
+            oldSnapshot,
+            snapshot,
+            previous,
+            change,
+            folds: null,
+            inlays: null);
+
+    /// <summary>
+    /// Incrementally rebuilds the projection and its fold/inlay metadata.
+    /// Only lines affected by the document edit or by an adornment change are
+    /// materialized; suffix lines are rebased lazily through their chunks.
+    /// </summary>
+    public static TextProjection BuildIncremental(
+        TextSnapshot oldSnapshot,
+        TextSnapshot snapshot,
+        TextProjection previous,
+        TextChange change,
+        IEnumerable<FoldRange>? folds,
+        IEnumerable<InlineAdornment>? inlays)
     {
         ArgumentNullException.ThrowIfNull(oldSnapshot);
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(previous);
         if (!ReferenceEquals(oldSnapshot, previous.Snapshot)
-            || !previous.IsPlain
             || change.OldRange.End > oldSnapshot.Length
             || change.NewRange.End > snapshot.Length)
         {
-            return Build(snapshot);
+            return Build(snapshot, folds, inlays);
         }
 
+        var normalizedFolds = NormalizeFolds(snapshot, folds ?? Array.Empty<FoldRange>());
+        var normalizedInlays = NormalizeInlays(snapshot, inlays ?? Array.Empty<InlineAdornment>());
+        if (previous.IsPlain
+            && previous.Folds.Count == 0
+            && previous.Inlays.Count == 0
+            && normalizedFolds.Count == 0
+            && normalizedInlays.Length == 0)
+        {
+            return BuildPlainIncremental(oldSnapshot, snapshot, previous, change);
+        }
+
+        var oldImpact = new List<TextRange> { change.OldRange };
+        var newImpact = new List<TextRange> { change.NewRange };
+        AddChangedFoldRanges(previous.Folds, normalizedFolds, change, oldImpact, newImpact);
+        AddChangedInlayRanges(previous.Inlays, normalizedInlays, change, oldImpact, newImpact);
+
+        var oldWindow = GetLineWindow(oldSnapshot, CombineRanges(oldImpact));
+        var newWindow = GetLineWindow(snapshot, CombineRanges(newImpact));
         var oldLines = previous.Snapshot.Lines;
         var newLines = snapshot.Lines;
         var delta = change.NewText.Length - change.OldRange.Length;
-
-        var oldWindow = GetLineWindow(oldSnapshot, change.OldRange);
-        var oldWindowStart = oldLines.GetLineStart(oldWindow.StartLine);
-        var oldWindowEnd = oldWindow.EndLine == oldLines.LineCount
-            ? oldSnapshot.Length
-            : oldLines.GetLineStart(oldWindow.EndLine);
-        var mappedStart = Math.Clamp(
-            MapPosition(oldWindowStart, change, delta),
-            0,
-            snapshot.Length);
-        var mappedEnd = Math.Clamp(
-            MapPosition(oldWindowEnd, change, delta),
-            mappedStart,
-            snapshot.Length);
-        var mappedWindow = TextRange.FromBounds(mappedStart, mappedEnd);
-        var newWindow = GetLineWindow(snapshot, mappedWindow);
         var chunks = new List<ProjectedLineChunk>();
         previous.LineTable.AddRange(chunks, 0, oldWindow.StartLine);
 
         var changedLines = new List<ProjectedLine>(newWindow.EndLine - newWindow.StartLine);
+        var logicalToVisual = Enumerable.Repeat(-1, newLines.LineCount).ToArray();
+        CopyPrefixVisualLines(previous, logicalToVisual, oldWindow.StartLine);
+        var prefixVisualCount = CountVisibleLines(previous, oldWindow.StartLine);
         for (var logicalLine = newWindow.StartLine; logicalLine < newWindow.EndLine; logicalLine++)
         {
-            changedLines.Add(CreatePlainLine(logicalLine, newLines.GetLineRange(logicalLine)));
+            var sourceRange = newLines.GetLineRange(logicalLine);
+            var line = BuildLineInlines(sourceRange, normalizedFolds, normalizedInlays);
+            if (line is null)
+            {
+                continue;
+            }
+
+            logicalToVisual[logicalLine] = prefixVisualCount + changedLines.Count;
+            changedLines.Add(new ProjectedLine(logicalLine, sourceRange, line));
         }
 
         ProjectedLineTable.FromLines(changedLines).AddRange(
@@ -650,10 +706,277 @@ public sealed class TextProjectionBuilder
             newWindow.EndLine - oldWindow.EndLine,
             delta);
 
+        var oldChangedVisualCount = CountVisibleLines(
+            previous,
+            oldWindow.StartLine,
+            oldWindow.EndLine);
+        var visualDelta = changedLines.Count - oldChangedVisualCount;
+        var logicalDelta = newWindow.EndLine - oldWindow.EndLine;
+        for (var logicalLine = newWindow.EndLine; logicalLine < newLines.LineCount; logicalLine++)
+        {
+            var oldLogicalLine = logicalLine - logicalDelta;
+            if (oldLogicalLine < 0 || oldLogicalLine >= oldLines.LineCount)
+            {
+                continue;
+            }
+
+            var oldVisualLine = previous.GetVisualLineForLogicalLine(oldLogicalLine);
+            logicalToVisual[logicalLine] = oldVisualLine < 0
+                ? -1
+                : oldVisualLine + visualDelta;
+        }
+
+        return new TextProjection(
+            snapshot,
+            ProjectedLineTable.FromChunks(chunks),
+            normalizedFolds,
+            normalizedInlays,
+            logicalToVisual,
+            isPlain: normalizedFolds.Count == 0 && normalizedInlays.Length == 0);
+    }
+
+    private static void CopyPrefixVisualLines(
+        TextProjection previous,
+        int[] destination,
+        int count)
+    {
+        for (var logicalLine = 0; logicalLine < count; logicalLine++)
+        {
+            destination[logicalLine] = previous.GetVisualLineForLogicalLine(logicalLine);
+        }
+    }
+
+    private static int CountVisibleLines(TextProjection projection, int endLine) =>
+        CountVisibleLines(projection, 0, endLine);
+
+    private static int CountVisibleLines(
+        TextProjection projection,
+        int startLine,
+        int endLine)
+    {
+        var count = 0;
+        for (var logicalLine = startLine; logicalLine < endLine; logicalLine++)
+        {
+            if (projection.GetVisualLineForLogicalLine(logicalLine) >= 0)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private static void AddChangedFoldRanges(
+        IReadOnlyList<FoldRange> previous,
+        List<FoldRange> current,
+        TextChange change,
+        List<TextRange> oldImpact,
+        List<TextRange> newImpact)
+    {
+        var matched = new bool[current.Count];
+        var delta = change.NewText.Length - change.OldRange.Length;
+        foreach (var oldFold in previous)
+        {
+            var currentIndex = FindFold(current, oldFold.Id, matched);
+            var mappedRange = MapRange(oldFold.Range, change, delta);
+            var changed = currentIndex < 0
+                || !FoldMatches(oldFold, current[currentIndex], mappedRange)
+                || Touches(oldFold.Range, change.OldRange);
+            if (!changed)
+            {
+                matched[currentIndex] = true;
+                continue;
+            }
+
+            oldImpact.Add(oldFold.Range);
+            newImpact.Add(currentIndex >= 0 ? current[currentIndex].Range : mappedRange);
+            if (currentIndex >= 0)
+            {
+                matched[currentIndex] = true;
+            }
+        }
+
+        for (var index = 0; index < current.Count; index++)
+        {
+            if (!matched[index])
+            {
+                newImpact.Add(current[index].Range);
+            }
+        }
+    }
+
+    private static void AddChangedInlayRanges(
+        IReadOnlyList<InlineAdornment> previous,
+        InlineAdornment[] current,
+        TextChange change,
+        List<TextRange> oldImpact,
+        List<TextRange> newImpact)
+    {
+        var matched = new bool[current.Length];
+        var delta = change.NewText.Length - change.OldRange.Length;
+        foreach (var oldInlay in previous)
+        {
+            var currentIndex = FindInlay(current, oldInlay, change, delta, matched);
+            var mappedPosition = MapPosition(oldInlay.Anchor.Position.Offset, change, delta);
+            var changed = currentIndex < 0
+                || !InlayMatches(oldInlay, current[currentIndex], mappedPosition)
+                || Touches(TextRange.Empty(oldInlay.Anchor.Position.Offset), change.OldRange);
+            if (!changed)
+            {
+                matched[currentIndex] = true;
+                continue;
+            }
+
+            oldImpact.Add(TextRange.Empty(oldInlay.Anchor.Position.Offset));
+            newImpact.Add(currentIndex >= 0
+                ? TextRange.Empty(current[currentIndex].Anchor.Position.Offset)
+                : TextRange.Empty(mappedPosition));
+            if (currentIndex >= 0)
+            {
+                matched[currentIndex] = true;
+            }
+        }
+
+        for (var index = 0; index < current.Length; index++)
+        {
+            if (!matched[index])
+            {
+                newImpact.Add(TextRange.Empty(current[index].Anchor.Position.Offset));
+            }
+        }
+    }
+
+    private static int FindFold(
+        List<FoldRange> folds,
+        string id,
+        bool[] matched)
+    {
+        for (var index = 0; index < folds.Count; index++)
+        {
+            if (!matched[index]
+                && string.Equals(folds[index].Id, id, StringComparison.Ordinal))
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    private static int FindInlay(
+        InlineAdornment[] inlays,
+        InlineAdornment previous,
+        TextChange change,
+        int delta,
+        bool[] matched)
+    {
+        var mappedPosition = MapPosition(previous.Anchor.Position.Offset, change, delta);
+        for (var index = 0; index < inlays.Length; index++)
+        {
+            if (!matched[index]
+                && string.Equals(inlays[index].Id, previous.Id, StringComparison.Ordinal)
+                && InlayMatches(previous, inlays[index], mappedPosition))
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    private static bool FoldMatches(
+        FoldRange previous,
+        FoldRange current,
+        TextRange mappedRange) =>
+        string.Equals(previous.Id, current.Id, StringComparison.Ordinal)
+        && previous.Placeholder == current.Placeholder
+        && current.Range == mappedRange;
+
+    private static bool InlayMatches(
+        InlineAdornment previous,
+        InlineAdornment current,
+        int mappedPosition) =>
+        current.Anchor.Position.Offset == mappedPosition
+        && current.Anchor.Affinity == previous.Anchor.Affinity
+        && current.Kind == previous.Kind
+        && ContentMatches(previous.Content, current.Content);
+
+    private static bool ContentMatches(AdornmentContent previous, AdornmentContent current)
+    {
+        if (previous.Text != current.Text
+            || previous.IconKey != current.IconKey
+            || previous.Actions.Count != current.Actions.Count)
+        {
+            return false;
+        }
+
+        return previous.Actions.Zip(current.Actions).All(pair =>
+            pair.First.Id == pair.Second.Id
+            && pair.First.Label == pair.Second.Label
+            && pair.First.CommandId == pair.Second.CommandId);
+    }
+
+    private static bool Touches(TextRange left, TextRange right) =>
+        left.Start <= right.End && right.Start <= left.End;
+
+    private static TextRange MapRange(TextRange range, TextChange change, int delta)
+    {
+        var start = MapPosition(range.Start, change, delta);
+        var end = MapPosition(range.End, change, delta);
+        return TextRange.FromBounds(start, end);
+    }
+
+    private static TextRange CombineRanges(List<TextRange> ranges)
+    {
+        if (ranges.Count == 0)
+        {
+            return TextRange.Empty(0);
+        }
+
+        var start = ranges.Min(range => range.Start);
+        var end = ranges.Max(range => range.End);
+        return TextRange.FromBounds(start, end);
+    }
+
+    private static TextProjection BuildPlainIncremental(
+        TextSnapshot oldSnapshot,
+        TextSnapshot snapshot,
+        TextProjection previous,
+        TextChange change)
+    {
+        var oldLines = previous.Snapshot.Lines;
+        var newLines = snapshot.Lines;
+        var delta = change.NewText.Length - change.OldRange.Length;
+        var oldWindow = GetLineWindow(oldSnapshot, change.OldRange);
+        var oldWindowStart = oldLines.GetLineStart(oldWindow.StartLine);
+        var oldWindowEnd = oldWindow.EndLine == oldLines.LineCount
+            ? oldSnapshot.Length
+            : oldLines.GetLineStart(oldWindow.EndLine);
+        var mappedStart = Math.Clamp(MapPosition(oldWindowStart, change, delta), 0, snapshot.Length);
+        var mappedEnd = Math.Clamp(MapPosition(oldWindowEnd, change, delta), mappedStart, snapshot.Length);
+        var newWindow = GetLineWindow(snapshot, TextRange.FromBounds(mappedStart, mappedEnd));
+        var chunks = new List<ProjectedLineChunk>();
+        previous.LineTable.AddRange(chunks, 0, oldWindow.StartLine);
+
+        var changedLines = new List<ProjectedLine>(newWindow.EndLine - newWindow.StartLine);
+        for (var logicalLine = newWindow.StartLine; logicalLine < newWindow.EndLine; logicalLine++)
+        {
+            changedLines.Add(CreatePlainLine(logicalLine, newLines.GetLineRange(logicalLine)));
+        }
+
+        ProjectedLineTable.FromLines(changedLines).AddRange(chunks, 0, changedLines.Count);
+        previous.LineTable.AddRange(
+            chunks,
+            oldWindow.EndLine,
+            oldLines.LineCount - oldWindow.EndLine,
+            newWindow.EndLine - oldWindow.EndLine,
+            delta);
+
         return new TextProjection(
             snapshot,
             ProjectedLineTable.FromChunks(chunks),
             Array.Empty<FoldRange>(),
+            Array.Empty<InlineAdornment>(),
             logicalToVisual: null,
             isPlain: true);
     }

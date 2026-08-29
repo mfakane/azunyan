@@ -75,6 +75,45 @@ public sealed class ProjectionTests
     }
 
     [Fact]
+    public void Incremental_decorated_projection_rebases_unaffected_folds_and_inlays()
+    {
+        var document = new Document("zz\naa\nbb\ncc\ndd\nee\n");
+        var oldSnapshot = document.Snapshot;
+        var oldFold = new FoldRange("body", new TextRange(9, 5), "...");
+        var oldInlay = new InlineAdornment(
+            "type",
+            DocumentAnchor.Before(15),
+            "hint",
+            new AdornmentContent(" : str"));
+        var previous = TextProjectionBuilder.Build(
+            oldSnapshot,
+            folds: new[] { oldFold },
+            inlays: new[] { oldInlay });
+
+        var change = document.Insert(4, "X");
+        var currentFold = new FoldRange("body", new TextRange(10, 5), "...");
+        var currentInlay = new InlineAdornment(
+            "type",
+            DocumentAnchor.Before(16),
+            "hint",
+            new AdornmentContent(" : str"));
+        var incremental = TextProjectionBuilder.BuildIncremental(
+            oldSnapshot,
+            document.Snapshot,
+            previous,
+            change,
+            folds: new[] { currentFold },
+            inlays: new[] { currentInlay });
+        var expected = TextProjectionBuilder.Build(
+            document.Snapshot,
+            folds: new[] { currentFold },
+            inlays: new[] { currentInlay });
+
+        AssertProjectionEquivalent(expected, incremental, document.Snapshot);
+        Assert.Same(previous.Lines[0], incremental.Lines[0]);
+    }
+
+    [Fact]
     public void Folded_ranges_hide_middle_lines_and_map_hidden_positions_to_placeholder()
     {
         var snapshot = new TextSnapshot("a\nb\nc");
@@ -190,4 +229,46 @@ public sealed class ProjectionTests
         Assert.Equal(2, rows.Rows[2].VisualRowIndex);
         Assert.Equal(new[] { 1 }, rows.GetTextRowIndices(projection.Lines[1]));
     }
+
+    private static void AssertProjectionEquivalent(
+        TextProjection expected,
+        TextProjection actual,
+        TextSnapshot snapshot)
+    {
+        Assert.Equal(expected.VisualLineCount, actual.VisualLineCount);
+        for (var lineIndex = 0; lineIndex < expected.VisualLineCount; lineIndex++)
+        {
+            var expectedLine = expected.Lines[lineIndex];
+            var actualLine = actual.Lines[lineIndex];
+            Assert.Equal(expectedLine.LogicalLine, actualLine.LogicalLine);
+            Assert.Equal(expectedLine.SourceRange, actualLine.SourceRange);
+            Assert.Equal(expectedLine.VisualLength, actualLine.VisualLength);
+            Assert.Equal(expectedLine.Inlines.Count, actualLine.Inlines.Count);
+            for (var inlineIndex = 0; inlineIndex < expectedLine.Inlines.Count; inlineIndex++)
+            {
+                Assert.Equal(
+                    DescribeInline(expectedLine.Inlines[inlineIndex]),
+                    DescribeInline(actualLine.Inlines[inlineIndex]));
+            }
+        }
+
+        for (var offset = 0; offset <= snapshot.Length; offset++)
+        {
+            foreach (var affinity in new[] { AnchorAffinity.Before, AnchorAffinity.After })
+            {
+                var anchor = new DocumentAnchor(new DocumentPosition(offset), affinity);
+                Assert.Equal(expected.MapDocumentPosition(anchor), actual.MapDocumentPosition(anchor));
+                Assert.Equal(expected.IsHidden(anchor), actual.IsHidden(anchor));
+            }
+        }
+    }
+
+    private static string DescribeInline(ProjectionInline inline) => inline switch
+    {
+        ProjectedText text => $"text:{text.Source}",
+        FoldPlaceholder fold => $"fold:{fold.FoldId}:{fold.HiddenSource}:{fold.DisplayText}",
+        InlineAdornment inlay =>
+            $"inlay:{inlay.Id}:{inlay.Anchor}:{inlay.Kind}:{inlay.Content.Text}",
+        _ => throw new ArgumentOutOfRangeException(nameof(inline))
+    };
 }
