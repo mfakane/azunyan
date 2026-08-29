@@ -12,7 +12,7 @@ public sealed partial class AzunyanEditorView
     {
         if (!IsLoaded
             || !IsProjectedTextSurface
-            || InputEditor.IsComposing
+            || IsComposing
             || !_completionRequested)
         {
             HideCompletionPopup();
@@ -25,8 +25,8 @@ public sealed partial class AzunyanEditorView
         if (frame is null
             || completions is null
             || completions.Items.Count == 0
-            || completions.ReplacementRange.Start > InputEditor.Snapshot.Length
-            || completions.ReplacementRange.End > InputEditor.Snapshot.Length
+            || completions.ReplacementRange.Start > Snapshot.Length
+            || completions.ReplacementRange.End > Snapshot.Length
             || frame.Position!.Context.Position != frame.Selection.CaretPosition
             || frame.Selection.CaretPosition < completions.ReplacementRange.Start
             || frame.Selection.CaretPosition > completions.ReplacementRange.End)
@@ -41,13 +41,13 @@ public sealed partial class AzunyanEditorView
             return;
         }
 
-        InputEditor.AutoIndentOnEnter = false;
-        InputEditor.SuppressVerticalCaretNavigation = true;
+        _autoIndentOnEnter = false;
+        _suppressVerticalCaretNavigation = true;
 
         if (!_defaultRenderer.TextRenderer.TryGetCaretRect(
                 DocumentAnchor.Before(frame.Selection.CaretPosition),
-                InputEditor.Padding.Left,
-                InputEditor.Padding.Top,
+                InputWindow.NativeTextBoxControl.Padding.Left,
+                InputWindow.NativeTextBoxControl.Padding.Top,
                 _scrollViewer?.HorizontalOffset ?? 0,
                 GetVerticalOffset(),
                 _characterWidth,
@@ -97,9 +97,9 @@ public sealed partial class AzunyanEditorView
         var generation = NextProviderGeneration(ref _positionProviderGeneration);
         _ = ApplyPositionProviderResultAsync(
             _providerScheduler.RequestPositionAsync(
-                InputEditor.Snapshot,
+            Snapshot,
                 position,
-                InputEditor.Document.Selection,
+            Document.Selection,
                 includeCompletion: false),
             generation);
     }
@@ -117,8 +117,8 @@ public sealed partial class AzunyanEditorView
         if (frame is null
             || tooltip is null
             || frame.Position!.Context.Position != _hoverPosition
-            || tooltip.Range.Start > InputEditor.Snapshot.Length
-            || tooltip.Range.End > InputEditor.Snapshot.Length)
+            || tooltip.Range.Start > Snapshot.Length
+            || tooltip.Range.End > Snapshot.Length)
         {
             HideTooltipPopup();
             return;
@@ -126,8 +126,8 @@ public sealed partial class AzunyanEditorView
 
         if (!_defaultRenderer.TextRenderer.TryGetCaretRect(
                 DocumentAnchor.Before(_hoverPosition),
-                InputEditor.Padding.Left,
-                InputEditor.Padding.Top,
+                InputWindow.NativeTextBoxControl.Padding.Left,
+                InputWindow.NativeTextBoxControl.Padding.Top,
                 _scrollViewer?.HorizontalOffset ?? 0,
                 GetVerticalOffset(),
                 _characterWidth,
@@ -234,8 +234,8 @@ public sealed partial class AzunyanEditorView
             || frame.Position!.Context.Position != frame.Selection.CaretPosition
             || frame.Selection.CaretPosition < range.Start
             || frame.Selection.CaretPosition > range.End
-            || range.Start > InputEditor.Snapshot.Length
-            || range.End > InputEditor.Snapshot.Length
+            || range.Start > Snapshot.Length
+            || range.End > Snapshot.Length
             || (!_explicitCompletionRequested && !HasUsefulCompletion(completions)))
         {
             HideCompletionPopup();
@@ -250,14 +250,14 @@ public sealed partial class AzunyanEditorView
         _applyingCompletion = true;
         try
         {
-            InputEditor.ReplaceDocumentRange(range, item.InsertText);
+            ReplaceDocumentRange(range, item.InsertText);
         }
         finally
         {
             _applyingCompletion = false;
         }
 
-        InputEditor.Focus(FocusState.Programmatic);
+        Focus(FocusState.Programmatic);
         return true;
     }
 
@@ -280,8 +280,8 @@ public sealed partial class AzunyanEditorView
 
     private string GetCompletionPrefix()
     {
-        var position = InputEditor.Document.Selection.CaretPosition;
-        var text = InputEditor.Snapshot.Text;
+        var position = Document.Selection.CaretPosition;
+        var text = Snapshot.Text;
         var start = position;
         while (start > 0 && IsIdentifierPart(text[start - 1]))
         {
@@ -302,8 +302,8 @@ public sealed partial class AzunyanEditorView
 
     private void HideCompletionPopup()
     {
-        InputEditor.AutoIndentOnEnter = true;
-        InputEditor.SuppressVerticalCaretNavigation = false;
+        _autoIndentOnEnter = true;
+        _suppressVerticalCaretNavigation = false;
         CompletionPopup.IsOpen = false;
         CompletionList.Items.Clear();
         _displayedCompletionItems = null;

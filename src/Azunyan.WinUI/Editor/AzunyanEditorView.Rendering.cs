@@ -17,14 +17,14 @@ public sealed partial class AzunyanEditorView
 
         UpdateTextMetrics();
 
-        var lineIndex = InputEditor.Snapshot.Lines;
+        var lineIndex = Snapshot.Lines;
         var lineCount = lineIndex.LineCount;
         var verticalOffset = GetVerticalOffset();
         var viewportAnchor = DocumentAnchor.Before(0);
         var offsetWithinRow = 0d;
         var preserveViewport = IsProjectedTextSurface
             && _defaultRenderer.TextRenderer.TryGetViewportAnchor(
-                InputEditor.Snapshot,
+                Snapshot,
                 verticalOffset,
                 out viewportAnchor,
                 out offsetWithinRow);
@@ -78,9 +78,9 @@ public sealed partial class AzunyanEditorView
         RenderOverlay.Children.Clear();
 
         var frame = new AzunyanEditorRenderFrame(
-            InputEditor.Snapshot,
-            InputEditor.Document.Selection,
-            InputEditor.CompositionRange,
+            Snapshot,
+            Document.Selection,
+            CompositionRange,
             _colorScheme,
             _lineHeight,
             _characterWidth,
@@ -91,10 +91,10 @@ public sealed partial class AzunyanEditorView
             viewportHeight,
             firstVisibleLine,
             lastVisibleLine,
-            InputEditor.FontFamily,
-            InputEditor.FontSize,
-            InputEditor.Padding.Left,
-            InputEditor.Padding.Top,
+            InputWindow.NativeTextBoxControl.FontFamily,
+            InputWindow.NativeTextBoxControl.FontSize,
+            InputWindow.NativeTextBoxControl.Padding.Left,
+            InputWindow.NativeTextBoxControl.Padding.Top,
             showLogicalLineNumbers,
             TextWrapping,
             TabDisplaySize,

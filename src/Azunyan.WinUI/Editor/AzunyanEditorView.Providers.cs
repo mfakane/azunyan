@@ -16,8 +16,8 @@ public sealed partial class AzunyanEditorView
             return;
         }
 
-        var snapshot = InputEditor.Snapshot;
-        var selection = InputEditor.Document.Selection;
+        var snapshot = Snapshot;
+        var selection = Document.Selection;
         var currentFrame = GetCurrentFrame();
 
         if (requestDocument)
@@ -95,7 +95,7 @@ public sealed partial class AzunyanEditorView
         {
             if (!IsLoaded
                 || generation != _documentProviderGeneration
-                || !ReferenceEquals(result.Snapshot, InputEditor.Snapshot))
+                || !ReferenceEquals(result.Snapshot, Snapshot))
             {
                 return;
             }
@@ -103,7 +103,7 @@ public sealed partial class AzunyanEditorView
             var currentFrame = GetCurrentFrame();
             PublishProviderFrame(new EditorProviderFrame(
                 result.Snapshot,
-                InputEditor.Document.Selection,
+                Document.Selection,
                 result,
                 currentFrame?.Viewport,
                 currentFrame?.Position));
@@ -133,7 +133,7 @@ public sealed partial class AzunyanEditorView
         {
             if (!IsLoaded
                 || generation != _viewportProviderGeneration
-                || !ReferenceEquals(result.Context.Snapshot, InputEditor.Snapshot))
+                || !ReferenceEquals(result.Context.Snapshot, Snapshot))
             {
                 return;
             }
@@ -141,7 +141,7 @@ public sealed partial class AzunyanEditorView
             var currentFrame = GetCurrentFrame();
             PublishProviderFrame(new EditorProviderFrame(
                 result.Context.Snapshot,
-                InputEditor.Document.Selection,
+                Document.Selection,
                 currentFrame?.Document,
                 result,
                 currentFrame?.Position));
@@ -171,7 +171,7 @@ public sealed partial class AzunyanEditorView
         {
             if (!IsLoaded
                 || generation != _positionProviderGeneration
-                || !ReferenceEquals(result.Context.Snapshot, InputEditor.Snapshot))
+                || !ReferenceEquals(result.Context.Snapshot, Snapshot))
             {
                 return;
             }
@@ -179,7 +179,7 @@ public sealed partial class AzunyanEditorView
             var currentFrame = GetCurrentFrame();
             PublishProviderFrame(new EditorProviderFrame(
                 result.Context.Snapshot,
-                InputEditor.Document.Selection,
+                Document.Selection,
                 currentFrame?.Document,
                 currentFrame?.Viewport,
                 result));
@@ -208,7 +208,7 @@ public sealed partial class AzunyanEditorView
 
     private EditorProviderFrame? GetCurrentFrame() =>
         _providerFrame is { } frame
-        && ReferenceEquals(frame.Snapshot, InputEditor.Snapshot)
+        && ReferenceEquals(frame.Snapshot, Snapshot)
             ? frame
             : null;
 }
