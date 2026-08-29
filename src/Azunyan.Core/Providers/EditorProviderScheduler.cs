@@ -4,17 +4,20 @@ public sealed class DocumentProviderResults
 {
     internal DocumentProviderResults(
         TextSnapshot snapshot,
-        IReadOnlyList<SyntaxSpan> syntax,
+        SyntaxAnalysis syntax,
         IReadOnlyList<TextDecoration> decorations,
         IReadOnlyList<FoldRange> folds)
     {
         Snapshot = snapshot;
-        Syntax = Array.AsReadOnly(syntax.ToArray());
+        SyntaxAnalysis = syntax;
+        Syntax = syntax.Spans;
         Decorations = Array.AsReadOnly(decorations.ToArray());
         Folds = Array.AsReadOnly(folds.ToArray());
     }
 
     public TextSnapshot Snapshot { get; }
+
+    public SyntaxAnalysis SyntaxAnalysis { get; }
 
     public IReadOnlyList<SyntaxSpan> Syntax { get; }
 
@@ -98,7 +101,7 @@ public sealed class EditorProviderScheduler : IDisposable
     public Task<DocumentProviderResults?> RequestDocumentAsync(
         TextSnapshot snapshot,
         TextSelection selection,
-        TextSnapshot? previousSnapshot,
+        DocumentProviderResults? previousResults,
         TextChange? change,
         CancellationToken cancellationToken = default)
     {
@@ -111,13 +114,26 @@ public sealed class EditorProviderScheduler : IDisposable
             (requestId, providerContext, token) =>
                 CollectDocumentAsync(
                     providers,
-                    previousSnapshot,
+                    previousResults,
                     change,
                     requestId,
                     providerContext,
                     token),
             cancellationToken);
     }
+
+    public Task<DocumentProviderResults?> RequestDocumentAsync(
+        TextSnapshot snapshot,
+        TextSelection selection,
+        TextSnapshot? previousSnapshot,
+        TextChange? change,
+        CancellationToken cancellationToken = default)
+        => RequestDocumentAsync(
+            snapshot,
+            selection,
+            previousResults: null,
+            change: null,
+            cancellationToken: cancellationToken);
 
     public Task<ViewportProviderResults?> RequestViewportAsync(
         TextSnapshot snapshot,
@@ -241,7 +257,7 @@ public sealed class EditorProviderScheduler : IDisposable
 
     private static async Task<DocumentProviderResults> CollectDocumentAsync(
         EditorProviderConfiguration providers,
-        TextSnapshot? previousSnapshot,
+        DocumentProviderResults? previousResults,
         TextChange? change,
         long requestId,
         EditorProviderContext context,
@@ -249,7 +265,7 @@ public sealed class EditorProviderScheduler : IDisposable
     {
         var syntaxTask = GetSyntaxAsync(
             providers.Syntax,
-            previousSnapshot,
+            previousResults,
             change,
             context,
             cancellationToken);
@@ -267,42 +283,76 @@ public sealed class EditorProviderScheduler : IDisposable
         await Task.WhenAll(syntaxTask, decorationTask, foldingTask).ConfigureAwait(false);
         return new DocumentProviderResults(
             context.Snapshot,
-            syntaxTask.Result.Where(item => IsValidRange(item.Range, context.Snapshot)).ToArray(),
+            FilterSyntax(syntaxTask.Result, context.Snapshot),
             decorationTask.Result.Where(item => IsValidRange(item.Range, context.Snapshot)).ToArray(),
             foldingTask.Result.Where(item => IsValidRange(item.Range, context.Snapshot)).ToArray());
     }
 
-    private static Task<IReadOnlyList<SyntaxSpan>> GetSyntaxAsync(
+    private static Task<SyntaxAnalysis> GetSyntaxAsync(
         ISyntaxProvider? provider,
-        TextSnapshot? previousSnapshot,
+        DocumentProviderResults? previousResults,
         TextChange? change,
         EditorProviderContext context,
         CancellationToken cancellationToken)
     {
         if (provider is null)
         {
-            return Task.FromResult<IReadOnlyList<SyntaxSpan>>(Array.Empty<SyntaxSpan>());
+            return Task.FromResult(SyntaxAnalysis.Empty);
         }
 
         if (provider is IIncrementalSyntaxProvider incremental
-            && previousSnapshot is not null
+            && previousResults is not null
             && change is { } documentChange
-            && documentChange.OldRange.End <= previousSnapshot.Length
+            && documentChange.OldRange.End <= previousResults.Snapshot.Length
             && documentChange.NewRange.End <= context.Snapshot.Length)
         {
-            return InvokeListAsync(
+            return InvokeAnalysisAsync(
                 () => incremental.GetSyntaxAsync(
                     context,
-                    previousSnapshot,
+                    previousResults.Snapshot,
                     documentChange,
+                    previousResults.SyntaxAnalysis,
                     cancellationToken),
                 cancellationToken);
         }
 
-        return InvokeListAsync(
-            () => provider.GetSyntaxAsync(context, cancellationToken),
-            cancellationToken);
+        return InvokeSyntaxAsync(provider, context, cancellationToken);
     }
+
+    private static Task<SyntaxAnalysis> InvokeSyntaxAsync(
+        ISyntaxProvider provider,
+        EditorProviderContext context,
+        CancellationToken cancellationToken) =>
+        InvokeAnalysisAsync(
+            async () => new SyntaxAnalysis(
+                await provider.GetSyntaxAsync(context, cancellationToken).ConfigureAwait(false)),
+            cancellationToken);
+
+    private static async Task<SyntaxAnalysis> InvokeAnalysisAsync(
+        Func<ValueTask<SyntaxAnalysis>> invoke,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await invoke().ConfigureAwait(false) ?? SyntaxAnalysis.Empty;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            return SyntaxAnalysis.Empty;
+        }
+    }
+
+    private static SyntaxAnalysis FilterSyntax(
+        SyntaxAnalysis analysis,
+        TextSnapshot snapshot) =>
+        new(
+            analysis.Spans.Where(item => IsValidRange(item.Range, snapshot)).ToArray(),
+            analysis.Candidates.Where(item => IsValidRange(item.Range, snapshot)).ToArray(),
+            analysis.State);
 
     private static async Task<ViewportProviderResults> CollectViewportAsync(
         EditorProviderConfiguration providers,

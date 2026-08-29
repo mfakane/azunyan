@@ -229,10 +229,14 @@ public sealed class ProviderSchedulerTests
         };
         using var scheduler = new EditorProviderScheduler(providers);
 
+        var previousResult = await scheduler.RequestDocumentAsync(
+            previous,
+            TextSelection.Caret(3));
+
         var result = await scheduler.RequestDocumentAsync(
             current,
             TextSelection.Caret(3),
-            previousSnapshot: previous,
+            previousResults: previousResult,
             change: new TextChange(new TextRange(0, 3), "old", "new"));
 
         Assert.NotNull(result);
@@ -269,12 +273,13 @@ public sealed class ProviderSchedulerTests
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
-        public async ValueTask<IReadOnlyList<SyntaxSpan>> GetSyntaxAsync(
+        public async ValueTask<SyntaxAnalysis> GetSyntaxAsync(
             EditorProviderContext context,
             TextSnapshot previousSnapshot,
             TextChange change,
+            SyntaxAnalysis previousAnalysis,
             CancellationToken cancellationToken = default) =>
-            (await _handler(context, previousSnapshot, change)).ToArray();
+            new((await _handler(context, previousSnapshot, change)).ToArray());
     }
 
     private sealed class DelegateInlayProvider : IInlayProvider

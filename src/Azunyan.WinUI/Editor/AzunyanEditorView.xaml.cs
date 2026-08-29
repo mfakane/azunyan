@@ -1083,9 +1083,11 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 _providerScheduler.RequestDocumentAsync(
                     snapshot,
                     selection,
-                    previousSnapshot: canUseDocumentChange
-                        ? documentChange!.OldSnapshot
-                        : null,
+                    previousResults: canUseDocumentChange
+                        && currentFrame?.Document is { } previousResults
+                        && ReferenceEquals(previousResults.Snapshot, documentChange!.OldSnapshot)
+                            ? previousResults
+                            : null,
                     change: canUseDocumentChange
                         ? documentChange!.Change
                         : null),

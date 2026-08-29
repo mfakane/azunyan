@@ -69,6 +69,38 @@ public readonly record struct SyntaxSpan
 }
 
 /// <summary>
+/// A complete syntax result for one snapshot. <see cref="Spans"/> is the
+/// result consumed by the renderer. <see cref="Candidates"/> retains the
+/// source candidates needed by composite providers when they incrementally
+/// recompute their result.
+/// </summary>
+public sealed class SyntaxAnalysis
+{
+    public SyntaxAnalysis(
+        IReadOnlyList<SyntaxSpan>? spans = null,
+        IReadOnlyList<SyntaxSpan>? candidates = null,
+        SyntaxProviderState? state = null)
+    {
+        Spans = Array.AsReadOnly((spans ?? Array.Empty<SyntaxSpan>()).ToArray());
+        Candidates = Array.AsReadOnly((candidates ?? Spans).ToArray());
+        State = state;
+    }
+
+    public IReadOnlyList<SyntaxSpan> Spans { get; }
+
+    public IReadOnlyList<SyntaxSpan> Candidates { get; }
+
+    public SyntaxProviderState? State { get; }
+
+    public static SyntaxAnalysis Empty { get; } = new();
+}
+
+/// <summary>
+/// Provider-owned state carried from one complete syntax analysis to the next.
+/// </summary>
+public abstract record SyntaxProviderState;
+
+/// <summary>
 /// A range decoration returned by a decoration provider. Rendering remains a
 /// consumer concern; <see cref="Kind"/> lets each consumer map a decoration
 /// to its own brush, underline, diagnostic, or other visual treatment.
@@ -206,10 +238,11 @@ public interface ISyntaxProvider
 /// </summary>
 public interface IIncrementalSyntaxProvider : ISyntaxProvider
 {
-    ValueTask<IReadOnlyList<SyntaxSpan>> GetSyntaxAsync(
+    ValueTask<SyntaxAnalysis> GetSyntaxAsync(
         EditorProviderContext context,
         TextSnapshot previousSnapshot,
         TextChange change,
+        SyntaxAnalysis previousAnalysis,
         CancellationToken cancellationToken = default);
 }
 
