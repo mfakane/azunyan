@@ -40,6 +40,9 @@ internal sealed class ChunkedHeightIndex
         return new ChunkedHeightIndex(chunks.ToArray());
     }
 
+    public ChunkedHeightIndex Clone() =>
+        new(_chunks.Select(chunk => chunk.Clone()).ToArray());
+
     public double GetHeight(int line)
     {
         var (chunk, local) = Locate(line);
@@ -280,5 +283,7 @@ internal sealed class ChunkedHeightIndex
             Array.Copy(Values, start, values, 0, count);
             return new HeightChunk(values);
         }
+
+        public HeightChunk Clone() => new((double[])Values.Clone());
     }
 }

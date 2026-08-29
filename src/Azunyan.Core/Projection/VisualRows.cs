@@ -6,6 +6,12 @@ public enum VisualRowKind
     BlockAdornment
 }
 
+public readonly record struct VisualRowChangeWindow(
+    int OldStart,
+    int OldEnd,
+    int NewStart,
+    int NewEnd);
+
 /// <summary>
 /// One row in the projected document. Text rows reference a projected logical
 /// line; block rows occupy vertical space without changing document text.
@@ -168,6 +174,12 @@ public sealed class VisualRowMapBuilder
             projection,
             wrappedLineBreaks: null,
             wrappedLineBreaksByVisualLine);
+        CarryForwardWrapBreaks(
+            previousProjection,
+            projection,
+            previous.WrapBreaks,
+            wrapBreaks,
+            changeWindow);
         var blocks = NormalizeBlocks(
             projection,
             blockAdornments?.ToArray() ?? Array.Empty<BlockAdornment>());
@@ -248,7 +260,16 @@ public sealed class VisualRowMapBuilder
             oldRowWindow.Start,
             oldRowWindow.End,
             changeWindow.NewEndLine - changeWindow.OldEndLine);
-        return new VisualRowMap(projection, rows, blocks, wrapBreaks);
+        return new VisualRowMap(
+            projection,
+            rows,
+            blocks,
+            wrapBreaks,
+            new VisualRowChangeWindow(
+                oldRowWindow.Start,
+                oldRowWindow.End,
+                newRowStart,
+                newRowEnd));
     }
 
     private static (int Start, int End) GetVisualWindow(
@@ -389,7 +410,7 @@ public sealed class VisualRowMapBuilder
         return result;
     }
 
-    private static WrapBreakKey CreateWrapBreakKey(ProjectedLine line) =>
+    internal static WrapBreakKey CreateWrapBreakKey(ProjectedLine line) =>
         new(line.LogicalLine, line.SourceRange.Start, line.SourceRange.End);
 
     private static void ExpandForWrapBreakChanges(
@@ -452,6 +473,35 @@ public sealed class VisualRowMapBuilder
                 ExpandWindow(ref oldWindow, oldVisualLine);
                 ExpandWindow(ref newWindow, newVisualLine);
             }
+        }
+    }
+
+    private static void CarryForwardWrapBreaks(
+        TextProjection previousProjection,
+        TextProjection projection,
+        IReadOnlyDictionary<WrapBreakKey, IReadOnlyList<int>> previous,
+        Dictionary<WrapBreakKey, IReadOnlyList<int>> current,
+        ProjectionChangeWindow changeWindow)
+    {
+        var logicalDelta = changeWindow.NewEndLine - changeWindow.OldEndLine;
+        foreach (var pair in previous)
+        {
+            if (pair.Key.LogicalLine >= changeWindow.OldStartLine
+                && pair.Key.LogicalLine < changeWindow.OldEndLine)
+            {
+                continue;
+            }
+
+            var newLogicalLine = pair.Key.LogicalLine >= changeWindow.OldEndLine
+                ? checked(pair.Key.LogicalLine + logicalDelta)
+                : pair.Key.LogicalLine;
+            if (!projection.TryGetVisualLine(newLogicalLine, out var newVisualLine))
+            {
+                continue;
+            }
+
+            var newKey = CreateWrapBreakKey(projection.Lines[newVisualLine]);
+            current.TryAdd(newKey, pair.Value);
         }
     }
 
@@ -695,6 +745,7 @@ public sealed class VisualRowMap
             rows,
             Array.Empty<BlockAdornment>(),
             new Dictionary<WrapBreakKey, IReadOnlyList<int>>(),
+            changeWindow: null,
             isPlain: false)
     {
     }
@@ -708,6 +759,7 @@ public sealed class VisualRowMap
             rows,
             blockAdornments,
             new Dictionary<WrapBreakKey, IReadOnlyList<int>>(),
+            changeWindow: null,
             isPlain: false)
     {
     }
@@ -717,7 +769,17 @@ public sealed class VisualRowMap
         IReadOnlyList<VisualRow> rows,
         IReadOnlyList<BlockAdornment> blockAdornments,
         IReadOnlyDictionary<WrapBreakKey, IReadOnlyList<int>> wrapBreaks)
-        : this(projection, rows, blockAdornments, wrapBreaks, isPlain: false)
+        : this(projection, rows, blockAdornments, wrapBreaks, changeWindow: null, isPlain: false)
+    {
+    }
+
+    internal VisualRowMap(
+        TextProjection projection,
+        IReadOnlyList<VisualRow> rows,
+        IReadOnlyList<BlockAdornment> blockAdornments,
+        IReadOnlyDictionary<WrapBreakKey, IReadOnlyList<int>> wrapBreaks,
+        VisualRowChangeWindow changeWindow)
+        : this(projection, rows, blockAdornments, wrapBreaks, changeWindow, isPlain: false)
     {
     }
 
@@ -726,12 +788,14 @@ public sealed class VisualRowMap
         IReadOnlyList<VisualRow> rows,
         IReadOnlyList<BlockAdornment> blockAdornments,
         IReadOnlyDictionary<WrapBreakKey, IReadOnlyList<int>> wrapBreaks,
+        VisualRowChangeWindow? changeWindow,
         bool isPlain)
     {
         Projection = projection;
         Rows = rows;
         BlockAdornments = blockAdornments.ToArray();
         WrapBreaks = wrapBreaks;
+        ChangeWindow = changeWindow;
         _isPlain = isPlain;
         _textRowsByLine = new Lazy<Dictionary<ProjectedLine, int[]>>(
             () => rows
@@ -757,6 +821,28 @@ public sealed class VisualRowMap
 
     internal IReadOnlyDictionary<WrapBreakKey, IReadOnlyList<int>> WrapBreaks { get; }
 
+    public VisualRowChangeWindow? ChangeWindow { get; }
+
+    public IReadOnlyDictionary<int, IReadOnlyList<int>> GetWrapBreaksByVisualLine()
+    {
+        var result = new Dictionary<int, IReadOnlyList<int>>();
+        foreach (var pair in WrapBreaks)
+        {
+            if (!Projection.TryGetVisualLine(pair.Key.LogicalLine, out var visualLine))
+            {
+                continue;
+            }
+
+            var line = Projection.Lines[visualLine];
+            if (VisualRowMapBuilder.CreateWrapBreakKey(line) == pair.Key)
+            {
+                result[visualLine] = pair.Value;
+            }
+        }
+
+        return result;
+    }
+
     public bool HasUniformTextHeights => _isPlain;
 
     internal static VisualRowMap CreatePlain(TextProjection projection) =>
@@ -765,6 +851,7 @@ public sealed class VisualRowMap
             new PlainVisualRowList(projection),
             Array.Empty<BlockAdornment>(),
             new Dictionary<WrapBreakKey, IReadOnlyList<int>>(),
+            changeWindow: null,
             isPlain: true);
 
     public IReadOnlyList<int> GetTextRowIndices(ProjectedLine line) =>

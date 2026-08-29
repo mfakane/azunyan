@@ -919,6 +919,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         var collapsedFoldIds = context.CollapsedFoldIds
             .OrderBy(id => id, StringComparer.Ordinal)
             .ToArray();
+        var cachedLayout = _cachedLayout;
         if (_cachedLayout is { } cached
             && cached.Matches(
                 context.Snapshot,
@@ -938,7 +939,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             }
 
             var measuredBreaks = MeasureVisibleWrapBreaks(context, cached, wrapWidth);
-            return measuredBreaks.Count == cached.WrapBreaks.Count
+            return WrapBreaksEqual(measuredBreaks, cached.WrapBreaks)
                 ? cached
                 : BuildLayoutState(
                     context,
@@ -949,7 +950,8 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
                     wrapColumns,
                     wrapWidth,
                     cached.Rows.Projection,
-                    measuredBreaks);
+                    measuredBreaks,
+                    cached);
         }
 
         var folds = documentFolds is null
@@ -959,8 +961,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
                 .ToArray();
         var projection = TryBuildIncrementalProjection(
             context,
-            cached: _cachedLayout,
-            collapsedFoldIds,
+            cached: cachedLayout,
             inlays,
             folds);
         var layout = BuildLayoutState(
@@ -972,7 +973,8 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             wrapColumns,
             wrapWidth,
             projection,
-            new Dictionary<int, IReadOnlyList<int>>());
+            new Dictionary<int, IReadOnlyList<int>>(),
+            cachedLayout);
         if (context.TextWrapping != TextWrapping.Wrap
             || !_textSurface.ReadyToDraw)
         {
@@ -980,7 +982,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         }
 
         var measured = MeasureVisibleWrapBreaks(context, layout, wrapWidth);
-        return measured.Count == 0
+        return WrapBreaksEqual(measured, layout.WrapBreaks)
             ? layout
             : BuildLayoutState(
                 context,
@@ -991,13 +993,13 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
                 wrapColumns,
                 wrapWidth,
                 projection,
-                measured);
+                measured,
+                cachedLayout);
     }
 
     private TextProjection TryBuildIncrementalProjection(
         AzunyanEditorRenderContext context,
         ProjectedTextLayoutState? cached,
-        string[] collapsedFoldIds,
         IReadOnlyList<InlineAdornment>? inlays,
         FoldRange[] folds)
     {
@@ -1005,15 +1007,15 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             && _pendingDocumentChange is { } change
             && ReferenceEquals(change.OldSnapshot, cached.Snapshot)
             && ReferenceEquals(change.NewSnapshot, context.Snapshot)
-            && collapsedFoldIds.Length == 0
-            && folds.Length == 0
-            && (inlays is null || inlays.Count == 0))
+            )
         {
             return TextProjectionBuilder.BuildIncremental(
                 change.OldSnapshot,
                 context.Snapshot,
                 cached.Rows.Projection,
-                change.Change);
+                change.Change,
+                folds,
+                inlays ?? Array.Empty<InlineAdornment>());
         }
 
         return TextProjectionBuilder.Build(
@@ -1031,14 +1033,32 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         int wrapColumns,
         double wrapWidth,
         TextProjection projection,
-        IReadOnlyDictionary<int, IReadOnlyList<int>> measuredBreaks)
+        IReadOnlyDictionary<int, IReadOnlyList<int>> measuredBreaks,
+        ProjectedTextLayoutState? previousLayout)
     {
-        var rows = VisualRowMapBuilder.Build(
-            projection,
-            blocks ?? Array.Empty<BlockAdornment>(),
-            wrapColumns,
-            wrappedLineBreaksByVisualLine: measuredBreaks);
-        _cachedLayout = new ProjectedTextLayoutState(
+        var currentBlocks = blocks ?? Array.Empty<BlockAdornment>();
+        var pendingChange = _pendingDocumentChange;
+        var canBuildIncrementally = previousLayout is not null
+            && !ReferenceEquals(previousLayout.Snapshot, context.Snapshot)
+            && pendingChange is { } change
+            && ReferenceEquals(change.OldSnapshot, previousLayout.Snapshot)
+            && ReferenceEquals(change.NewSnapshot, context.Snapshot);
+        var rows = canBuildIncrementally
+            ? VisualRowMapBuilder.BuildIncremental(
+                previousLayout!.Rows.Projection,
+                projection,
+                previousLayout.Rows,
+                currentBlocks,
+                wrapColumns,
+                measuredBreaks,
+                pendingChange!.Change)
+            : VisualRowMapBuilder.Build(
+                projection,
+                currentBlocks,
+                wrapColumns,
+                wrappedLineBreaksByVisualLine: measuredBreaks);
+        var heights = BuildHeightIndex(context, rows, previousLayout);
+        var layout = new ProjectedTextLayoutState(
             context.Snapshot,
             context.LineHeight,
             documentFolds,
@@ -1048,15 +1068,59 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             wrapColumns,
             wrapWidth,
             context.TabDisplaySize,
-            measuredBreaks,
+            rows.GetWrapBreaksByVisualLine(),
             rows,
-            rows.HasUniformTextHeights
-                ? VisualLineHeightIndex.CreateUniform(rows.Rows.Count, context.LineHeight)
-                : new VisualLineHeightIndex(rows.Rows.Select(row => row.BlockAdornment is { } block
-                    ? Math.Max(1, block.DesiredHeight)
-                    : context.LineHeight)));
-        return _cachedLayout;
+            heights);
+        _cachedLayout = layout;
+        return layout;
     }
+
+    private static VisualLineHeightIndex BuildHeightIndex(
+        AzunyanEditorRenderContext context,
+        VisualRowMap rows,
+        ProjectedTextLayoutState? previousLayout)
+    {
+        if (previousLayout is not null
+            && rows.ChangeWindow is { } changeWindow
+            && changeWindow.OldStart >= 0
+            && changeWindow.OldEnd >= changeWindow.OldStart
+            && changeWindow.NewStart >= 0
+            && changeWindow.NewEnd >= changeWindow.NewStart
+            && changeWindow.OldEnd <= previousLayout.Heights.Count
+            && changeWindow.NewEnd <= rows.Rows.Count
+            && previousLayout.Heights.Count
+                - (changeWindow.OldEnd - changeWindow.OldStart)
+                + (changeWindow.NewEnd - changeWindow.NewStart)
+                == rows.Rows.Count)
+        {
+            var heights = previousLayout.Heights.Clone();
+            heights.Splice(
+                changeWindow.OldStart,
+                changeWindow.OldEnd - changeWindow.OldStart,
+                rows.Rows
+                    .Skip(changeWindow.NewStart)
+                    .Take(changeWindow.NewEnd - changeWindow.NewStart)
+                    .Select(row => GetRowHeight(row, context.LineHeight)));
+            return heights;
+        }
+
+        return rows.HasUniformTextHeights
+            ? VisualLineHeightIndex.CreateUniform(rows.Rows.Count, context.LineHeight)
+            : new VisualLineHeightIndex(rows.Rows.Select(row => GetRowHeight(row, context.LineHeight)));
+    }
+
+    private static double GetRowHeight(VisualRow row, double lineHeight) =>
+        row.BlockAdornment is { } block
+            ? Math.Max(1, block.DesiredHeight)
+            : lineHeight;
+
+    private static bool WrapBreaksEqual(
+        Dictionary<int, IReadOnlyList<int>> previous,
+        IReadOnlyDictionary<int, IReadOnlyList<int>> current) =>
+        previous.Count == current.Count
+        && previous.All(pair =>
+            current.TryGetValue(pair.Key, out var currentBreaks)
+            && pair.Value.SequenceEqual(currentBreaks));
 
     private static void DrawBlock(
         CanvasDrawingSession drawingSession,

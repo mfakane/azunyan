@@ -20,6 +20,8 @@ public sealed class VisualLineHeightIndex
     public static VisualLineHeightIndex CreateUniform(int count, double height) =>
         new(ChunkedHeightIndex.CreateUniform(count, height));
 
+    public VisualLineHeightIndex Clone() => new(_index.Clone());
+
     public int Count => _index.Count;
 
     public double TotalHeight => _index.TotalHeight;
