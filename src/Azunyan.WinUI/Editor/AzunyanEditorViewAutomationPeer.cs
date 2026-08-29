@@ -7,7 +7,7 @@ namespace Azunyan.WinUI;
 /// <summary>
 /// Keeps the outer editor in the UI Automation tree. The native TextBox peer
 /// remains the compatibility implementation for custom renderers, while the
-/// projected surface exposes snapshot-bound text ranges and geometry.
+/// projected surface exposes snapshot-bound text, value, ranges, and geometry.
 /// </summary>
 internal sealed partial class AzunyanEditorViewAutomationPeer : FrameworkElementAutomationPeer
 {
@@ -23,7 +23,9 @@ internal sealed partial class AzunyanEditorViewAutomationPeer : FrameworkElement
     protected override object? GetPatternCore(PatternInterface patternInterface)
     {
         if (_owner.IsProjectedTextSurfaceActive
-            && patternInterface is PatternInterface.Text or PatternInterface.Text2)
+            && patternInterface is PatternInterface.Text
+                or PatternInterface.Text2
+                or PatternInterface.Value)
         {
             return _projectedTextProvider ??= new ProjectedTextAutomationProvider(_owner);
         }

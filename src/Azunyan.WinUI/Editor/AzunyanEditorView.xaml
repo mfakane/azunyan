@@ -38,6 +38,7 @@
                 VerticalAlignment="Stretch"
                 HorizontalContentAlignment="Left"
                 VerticalContentAlignment="Top"
+                AutomationProperties.AccessibilityView="Raw"
                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
                 ScrollViewer.VerticalScrollBarVisibility="Auto"
                 TextWrapping="NoWrap" />

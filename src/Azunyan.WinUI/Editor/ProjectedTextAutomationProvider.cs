@@ -20,11 +20,15 @@ internal sealed record ProjectedTextAutomationTarget(
     Rect Bounds);
 
 /// <summary>
-/// UI Automation text provider for the projected surface. The native
-/// TextBox remains the input/IME host, but automation clients see the same
-/// immutable document ranges and projected geometry that the renderer uses.
+/// UI Automation provider for the projected surface. The native TextBox
+/// remains the input/IME host, but automation clients see the same immutable
+/// document text, editable value, ranges, and projected geometry that the
+/// renderer uses.
 /// </summary>
-internal sealed partial class ProjectedTextAutomationProvider : ITextProvider, ITextProvider2
+internal sealed partial class ProjectedTextAutomationProvider :
+    ITextProvider,
+    ITextProvider2,
+    IValueProvider
 {
     private readonly AzunyanEditorView _owner;
 
@@ -38,6 +42,16 @@ internal sealed partial class ProjectedTextAutomationProvider : ITextProvider, I
 
     public SupportedTextSelection SupportedTextSelection =>
         SupportedTextSelection.Single;
+
+    public bool IsReadOnly => false;
+
+    public string Value => _owner.Snapshot.Text;
+
+    public void SetValue(string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        _owner.SetAutomationValue(value);
+    }
 
     public ITextRangeProvider[] GetSelection() =>
         new[] { CreateRange(_owner.AutomationSelection.Range) };

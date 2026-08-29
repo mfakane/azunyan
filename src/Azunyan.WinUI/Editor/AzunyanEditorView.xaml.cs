@@ -357,6 +357,19 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     public void ReplaceDocumentRange(TextRange range, string replacement) =>
         InputEditor.ReplaceDocumentRange(range, replacement);
 
+    internal void SetAutomationValue(string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        if (string.Equals(value, Snapshot.Text, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        ReplaceDocumentRange(
+            TextRange.FromBounds(0, Snapshot.Length),
+            value);
+    }
+
     public bool UndoDocument() => InputEditor.UndoDocument();
 
     public bool RedoDocument() => InputEditor.RedoDocument();
