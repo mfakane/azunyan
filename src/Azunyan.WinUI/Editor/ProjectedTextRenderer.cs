@@ -421,6 +421,19 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
 
         if (range.IsEmpty)
         {
+            if (TryGetCaretRect(
+                DocumentAnchor.Before(range.Start),
+                frame.Context.ContentLeft,
+                frame.Context.ContentTop,
+                frame.Context.HorizontalOffset,
+                frame.Context.VerticalOffset,
+                frame.Context.CharacterWidth,
+                frame.Context.LineHeight,
+                out var caretRect))
+            {
+                rectangles = new[] { caretRect };
+            }
+
             return true;
         }
 

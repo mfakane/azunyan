@@ -1,5 +1,6 @@
 using Azunyan.Core;
 using System.Globalization;
+using System.Runtime.ExceptionServices;
 using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI;
 using Microsoft.UI.Input;
@@ -379,6 +380,61 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         ReplaceDocumentRange(
             TextRange.FromBounds(0, Snapshot.Length),
             value);
+    }
+
+    internal void InvokeOnEditorThread(Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        InvokeOnEditorThread<object?>(() =>
+        {
+            action();
+            return null;
+        });
+    }
+
+    internal T InvokeOnEditorThread<T>(Func<T> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        if (DispatcherQueue.HasThreadAccess)
+        {
+            return action();
+        }
+
+        T result = default!;
+        Exception? exception = null;
+        using var completed = new ManualResetEventSlim();
+        if (!DispatcherQueue.TryEnqueue(() =>
+            {
+                try
+                {
+                    result = action();
+                }
+                catch (Exception error)
+                {
+                    exception = error;
+                }
+                finally
+                {
+                    completed.Set();
+                }
+            }))
+        {
+            throw new InvalidOperationException(
+                "The editor dispatcher is no longer available.");
+        }
+
+        if (!completed.Wait(TimeSpan.FromSeconds(5)))
+        {
+            throw new TimeoutException(
+                "The editor dispatcher did not process the automation request.");
+        }
+
+        if (exception is not null)
+        {
+            ExceptionDispatchInfo.Capture(exception).Throw();
+        }
+
+        return result;
     }
 
     public bool UndoDocument() => InputEditor.UndoDocument();

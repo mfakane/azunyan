@@ -37,51 +37,62 @@ internal sealed partial class ProjectedTextAutomationProvider :
         _owner = owner;
     }
 
-    public ITextRangeProvider DocumentRange => CreateRange(
-        TextRange.FromBounds(0, _owner.Snapshot.Length));
+    public ITextRangeProvider DocumentRange =>
+        _owner.InvokeOnEditorThread(() =>
+            CreateRange(TextRange.FromBounds(0, _owner.Snapshot.Length)));
 
     public SupportedTextSelection SupportedTextSelection =>
         SupportedTextSelection.Single;
 
     public bool IsReadOnly => false;
 
-    public string Value => _owner.Snapshot.Text;
+    public string Value => _owner.InvokeOnEditorThread(
+        () => _owner.Snapshot.Text);
 
     public void SetValue(string value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        _owner.SetAutomationValue(value);
+        _owner.InvokeOnEditorThread(() => _owner.SetAutomationValue(value));
     }
 
     public ITextRangeProvider[] GetSelection() =>
-        new[] { CreateRange(_owner.AutomationSelection.Range) };
+        _owner.InvokeOnEditorThread(() =>
+            new[] { CreateRange(_owner.AutomationSelection.Range) });
 
     public ITextRangeProvider[] GetVisibleRanges() =>
-        _owner.TryGetProjectedVisibleDocumentRange(out var range)
-            ? new[] { CreateRange(range) }
-            : new[] { DocumentRange };
+        _owner.InvokeOnEditorThread(() =>
+            _owner.TryGetProjectedVisibleDocumentRange(out var range)
+                ? new[] { CreateRange(range) }
+                : new[] { CreateRange(TextRange.FromBounds(0, _owner.Snapshot.Length)) });
 
     public ITextRangeProvider RangeFromChild(IRawElementProviderSimple childElement) =>
-        _owner.TryGetProjectedAutomationChildRange(childElement, out var range)
-            ? CreateRange(range)
-            : DocumentRange;
+        _owner.InvokeOnEditorThread(() =>
+            _owner.TryGetProjectedAutomationChildRange(childElement, out var range)
+                ? CreateRange(range)
+                : CreateRange(TextRange.FromBounds(0, _owner.Snapshot.Length)));
 
     public ITextRangeProvider RangeFromPoint(Point screenLocation) =>
-        _owner.TryGetProjectedRangeFromPoint(screenLocation, out var range)
-            ? CreateRange(range)
-            : DocumentRange;
+        _owner.InvokeOnEditorThread(() =>
+            _owner.TryGetProjectedRangeFromPoint(screenLocation, out var range)
+                ? CreateRange(range)
+                : CreateRange(TextRange.FromBounds(0, _owner.Snapshot.Length)));
 
     public ITextRangeProvider GetCaretRange(out bool isActive)
     {
-        isActive = _owner.InputHost.FocusState != FocusState.Unfocused;
-        return CreateRange(TextRange.Empty(_owner.AutomationSelection.CaretPosition));
+        var result = _owner.InvokeOnEditorThread(() =>
+            (
+                IsActive: _owner.InputHost.FocusState != FocusState.Unfocused,
+                Range: CreateRange(TextRange.Empty(_owner.AutomationSelection.CaretPosition))
+            ));
+        isActive = result.IsActive;
+        return result.Range;
     }
 
     public ITextRangeProvider RangeFromAnnotation(
         IRawElementProviderSimple annotationElement) => DocumentRange;
 
     internal ProjectedTextRangeProvider CreateRange(TextRange range) =>
-        new(_owner, range);
+        new(_owner, _owner.Snapshot, range);
 }
 
 internal sealed partial class ProjectedTextAutomationButton : Button
@@ -112,10 +123,13 @@ internal sealed partial class ProjectedTextRangeProvider : ITextRangeProvider
     private int _start;
     private int _end;
 
-    public ProjectedTextRangeProvider(AzunyanEditorView owner, TextRange range)
+    public ProjectedTextRangeProvider(
+        AzunyanEditorView owner,
+        TextSnapshot snapshot,
+        TextRange range)
     {
         _owner = owner;
-        _snapshot = owner.Snapshot;
+        _snapshot = snapshot;
         _start = Math.Clamp(range.Start, 0, _snapshot.Length);
         _end = Math.Clamp(range.End, _start, _snapshot.Length);
     }
@@ -125,7 +139,7 @@ internal sealed partial class ProjectedTextRangeProvider : ITextRangeProvider
     private bool IsCurrent => ReferenceEquals(_snapshot, _owner.Snapshot);
 
     public ITextRangeProvider Clone() =>
-        new ProjectedTextRangeProvider(_owner, CurrentRange);
+        new ProjectedTextRangeProvider(_owner, _snapshot, CurrentRange);
 
     public bool Compare(ITextRangeProvider range)
     {
@@ -151,7 +165,7 @@ internal sealed partial class ProjectedTextRangeProvider : ITextRangeProvider
 
     public void ExpandToEnclosingUnit(TextUnit unit)
     {
-        var units = GetUnitRanges(unit);
+        var units = GetUnitRanges(unit).ToList();
         if (units.Count == 0)
         {
             _start = _end = 0;
@@ -206,6 +220,7 @@ internal sealed partial class ProjectedTextRangeProvider : ITextRangeProvider
             ? null
             : new ProjectedTextRangeProvider(
                 _owner,
+                _snapshot,
                 TextRange.FromBounds(_start + index, _start + index + text.Length));
     }
 
@@ -213,15 +228,18 @@ internal sealed partial class ProjectedTextRangeProvider : ITextRangeProvider
 
     public void GetBoundingRectangles(out double[] returnValue)
     {
-        if (!IsCurrent
-            || !_owner.TryGetProjectedRangeRectangles(
-                CurrentRange,
-                out var rectangles)
-            || rectangles.Count == 0)
+        var rectangles = _owner.InvokeOnEditorThread(() =>
         {
-            returnValue = Array.Empty<double>();
-            return;
-        }
+            if (!IsCurrent
+                || !_owner.TryGetProjectedRangeRectangles(
+                    CurrentRange,
+                    out var currentRectangles))
+            {
+                return Array.Empty<Rect>();
+            }
+
+            return currentRectangles.ToArray();
+        });
 
         returnValue = rectangles
             .SelectMany(rect => new[]
@@ -235,16 +253,20 @@ internal sealed partial class ProjectedTextRangeProvider : ITextRangeProvider
     }
 
     public IRawElementProviderSimple[] GetChildren() =>
-        IsCurrent
-            ? _owner.GetProjectedAutomationChildren(CurrentRange).ToArray()
-            : Array.Empty<IRawElementProviderSimple>();
+        _owner.InvokeOnEditorThread(() =>
+            IsCurrent
+                ? _owner.GetProjectedAutomationChildren(CurrentRange).ToArray()
+                : Array.Empty<IRawElementProviderSimple>());
 
     public IRawElementProviderSimple GetEnclosingElement()
     {
-        var peer = FrameworkElementAutomationPeer.CreatePeerForElement(_owner);
-        return peer is AzunyanEditorViewAutomationPeer editorPeer
-            ? editorPeer.GetRawProvider()
-            : null!;
+        return _owner.InvokeOnEditorThread(() =>
+        {
+            var peer = FrameworkElementAutomationPeer.CreatePeerForElement(_owner);
+            return peer is AzunyanEditorViewAutomationPeer editorPeer
+                ? editorPeer.GetRawProvider()
+                : null!;
+        });
     }
 
     public string GetText(int maxLength)
@@ -267,7 +289,7 @@ internal sealed partial class ProjectedTextRangeProvider : ITextRangeProvider
             return 0;
         }
 
-        var units = GetUnitRanges(unit);
+        var units = GetUnitRanges(unit).ToList();
         if (units.Count == 0)
         {
             return 0;
@@ -359,26 +381,35 @@ internal sealed partial class ProjectedTextRangeProvider : ITextRangeProvider
 
     public void RemoveFromSelection()
     {
-        if (IsCurrent)
+        _owner.InvokeOnEditorThread(() =>
         {
-            _owner.SetDocumentSelection(TextSelection.Caret(_start));
-        }
+            if (IsCurrent)
+            {
+                _owner.SetDocumentSelection(TextSelection.Caret(_start));
+            }
+        });
     }
 
     public void ScrollIntoView(bool alignToTop)
     {
-        if (IsCurrent)
+        _owner.InvokeOnEditorThread(() =>
         {
-            _owner.ScrollProjectedRangeIntoView(CurrentRange, alignToTop);
-        }
+            if (IsCurrent)
+            {
+                _owner.ScrollProjectedRangeIntoView(CurrentRange, alignToTop);
+            }
+        });
     }
 
     public void Select()
     {
-        if (IsCurrent)
+        _owner.InvokeOnEditorThread(() =>
         {
-            _owner.SetDocumentSelection(new TextSelection(_start, _end));
-        }
+            if (IsCurrent)
+            {
+                _owner.SetDocumentSelection(new TextSelection(_start, _end));
+            }
+        });
     }
 
     public void AddToSelection() => Select();
@@ -399,35 +430,44 @@ internal sealed partial class ProjectedTextRangeProvider : ITextRangeProvider
         }
     }
 
-    private List<TextRange> GetUnitRanges(TextUnit unit)
+    private IEnumerable<TextRange> GetUnitRanges(TextUnit unit)
     {
         switch (unit)
         {
             case TextUnit.Document:
             case TextUnit.Page:
-                return new List<TextRange>
-                {
-                    TextRange.FromBounds(0, _snapshot.Length)
-                };
+                yield return TextRange.FromBounds(0, _snapshot.Length);
+                yield break;
             case TextUnit.Line:
             case TextUnit.Paragraph:
             case TextUnit.Format:
-                return Enumerable
-                    .Range(0, _snapshot.Lines.LineCount)
-                    .Select(line => _snapshot.Lines.GetLineRange(line))
-                    .ToList();
+                for (var line = 0; line < _snapshot.Lines.LineCount; line++)
+                {
+                    yield return _snapshot.Lines.GetLineRange(line);
+                }
+
+                yield break;
             case TextUnit.Character:
-                return GetCharacterRanges();
+                foreach (var range in GetCharacterRanges())
+                {
+                    yield return range;
+                }
+
+                yield break;
             case TextUnit.Word:
-                return GetWordRanges();
+                foreach (var range in GetWordRanges())
+                {
+                    yield return range;
+                }
+
+                yield break;
             default:
-                return new List<TextRange>();
+                yield break;
         }
     }
 
-    private List<TextRange> GetCharacterRanges()
+    private IEnumerable<TextRange> GetCharacterRanges()
     {
-        var result = new List<TextRange>();
         var position = 0;
         while (position < _snapshot.Length)
         {
@@ -437,36 +477,63 @@ internal sealed partial class ProjectedTextRangeProvider : ITextRangeProvider
                 next = position + 1;
             }
 
-            result.Add(TextRange.FromBounds(position, Math.Min(next, _snapshot.Length)));
+            yield return TextRange.FromBounds(
+                position,
+                Math.Min(next, _snapshot.Length));
             position = next;
         }
-
-        return result;
     }
 
-    private List<TextRange> GetWordRanges()
+    private IEnumerable<TextRange> GetWordRanges()
     {
-        var result = new List<TextRange>();
         var text = _snapshot.Text;
         var position = 0;
         while (position < text.Length)
         {
-            var word = IsWordCharacter(text[position]);
-            var end = position + 1;
-            while (end < text.Length && IsWordCharacter(text[end]) == word)
+            var word = IsWordTextElement(text, position);
+            var end = _snapshot.GetNextTextElementPosition(position);
+            if (end <= position)
             {
-                end++;
+                end = position + 1;
             }
 
-            result.Add(TextRange.FromBounds(position, end));
+            while (end < text.Length)
+            {
+                var next = _snapshot.GetNextTextElementPosition(end);
+                if (next <= end || IsWordTextElement(text, end) != word)
+                {
+                    break;
+                }
+
+                end = next;
+            }
+
+            yield return TextRange.FromBounds(position, Math.Min(end, text.Length));
             position = end;
         }
-
-        return result;
     }
 
-    private static bool IsWordCharacter(char value) =>
-        char.IsLetterOrDigit(value) || value == '_';
+    private static bool IsWordTextElement(string text, int position)
+    {
+        if (text[position] == '_')
+        {
+            return true;
+        }
+
+        var category = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(
+            text,
+            position);
+        return category is
+            System.Globalization.UnicodeCategory.UppercaseLetter or
+            System.Globalization.UnicodeCategory.LowercaseLetter or
+            System.Globalization.UnicodeCategory.TitlecaseLetter or
+            System.Globalization.UnicodeCategory.ModifierLetter or
+            System.Globalization.UnicodeCategory.OtherLetter or
+            System.Globalization.UnicodeCategory.DecimalDigitNumber or
+            System.Globalization.UnicodeCategory.NonSpacingMark or
+            System.Globalization.UnicodeCategory.SpacingCombiningMark or
+            System.Globalization.UnicodeCategory.EnclosingMark;
+    }
 
     private static int FindUnitContaining(
         List<TextRange> units,
