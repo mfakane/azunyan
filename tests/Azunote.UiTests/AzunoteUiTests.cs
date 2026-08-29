@@ -123,6 +123,33 @@ public sealed class AzunoteUiTests : IClassFixture<AzunoteUiFixture>
     }
 
     [AzunoteUiFact]
+    public void Projected_editor_keeps_long_document_text_in_the_document_owner()
+    {
+        var editor = _fixture.Editor;
+        var valuePattern = AzunoteUiFixture.WaitForValuePattern(editor);
+        var original = valuePattern.Current.Value;
+        var replacement = string.Concat(
+            new string('a', 3000),
+            "日本語😀",
+            new string('b', 3000));
+
+        try
+        {
+            valuePattern.SetValue(replacement);
+
+            var updatedTextPattern = AzunoteUiFixture.WaitForTextPattern(editor);
+            var updatedText = AzunoteUiFixture.WaitForDocumentText(
+                updatedTextPattern,
+                text => string.Equals(text, replacement, StringComparison.Ordinal));
+            Assert.Equal(replacement, updatedText);
+        }
+        finally
+        {
+            AzunoteUiFixture.WaitForValuePattern(editor).SetValue(original);
+        }
+    }
+
+    [AzunoteUiFact]
     public void Projected_range_remains_bound_to_old_snapshot_after_value_update()
     {
         var editor = _fixture.Editor;

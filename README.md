@@ -188,29 +188,23 @@ opens a new window when the current window already contains a file or unsaved
 text. Window provides creation-order cycling with Ctrl+Tab/Ctrl+Shift+Tab,
 restoring or minimizing all windows, and per-window always-on-top control.
 
-The editor surface is `AzunyanEditorControl`, a `TextBox`-derived control that
-keeps Windows' native text-service integration. This provides Japanese IME
-composition, candidate-window placement, scrolling, selection rendering, and
-the standard Edit UI Automation patterns. Its mirrored `Azunyan.Core.Document`
-uses UTF-16 offsets at the WinUI boundary but exposes scalar and extended
-grapheme-cluster movement/deletion so surrogate pairs, combining sequences,
-and joined emoji are not split by editor commands.
+`AzunyanEditorView` owns the `Azunyan.Core.Document` and the full-document
+rendering contract. `AzunyanTextInputWindow` is a separate, transparent native
+WinUI `TextBox` host for IME and text-service events. It keeps a configurable
+sliding window (2048 UTF-16 code units before and after the active selection by
+default), aligns its edges to text-element boundaries, and publishes changes
+in document coordinates with a generation and window origin. It never owns the
+document, projection, or drawing.
 
-`AzunyanEditorView` is the reusable host for future editor rendering. It keeps
-the native editor as the IME/input host and exposes independent gutter, text,
-and overlay layers through `IAzunyanEditorRenderer`. In NoWrap mode, the
-default renderer realizes only visible lines from the snapshot projection and
-draws syntax, selection, and caret through the projected text layer; native
-glyphs and selection highlight are hidden. Word-wrap mode uses DirectWrite's
-measured line metrics to create continuation rows in the same projected
-surface, including wrapped selection, caret geometry, and pointer hit testing.
-The gutter is drawn through the same measured text backend, so line numbers
-follow visual-row scrolling without per-line XAML elements. In projected mode the
-vertical scrollbar uses the visual-row height index; the native TextBox keeps
-its internal scroll state only as an input/IME synchronization aid. Position
-completion results and provider tooltips are shown in projected-mode popups
-anchored to the same caret geometry; arrow keys, Enter/Tab, Escape, and
-the host application's completion command is supported.
+In NoWrap mode, the default renderer realizes only visible lines from the
+snapshot projection and draws syntax, selection, and caret through the
+projected text layer; native glyphs and selection highlight are hidden.
+Word-wrap mode uses DirectWrite's measured line metrics to create continuation
+rows in the same projected surface, including wrapped selection, caret geometry,
+and pointer hit testing. `IAzunyanEditorRenderer.TryGetCaretRect` supplies the
+renderer caret in `EditorHost` coordinates; the view places the input window
+there and reconciles it with the native caret rectangle for IME candidate
+placement. Completion results and provider tooltips use the same caret geometry.
 
 Provider APIs live in `Azunyan.Core`. `ISyntaxProvider`,
 `IDecorationProvider`, `ITooltipProvider`, `ICompletionProvider`, and

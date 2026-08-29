@@ -10,10 +10,10 @@ split into document/viewport/position channels with stale-result,
 cancellation, and provider-error isolation, and Azunote has a projected-text
 renderer for visible lines. Visual rows model block adornment heights, inline
 inlay identity, and fold-hidden blocks. Tooltip and completion popups are
-anchored through the same projected caret geometry. The native TextBox remains
-a deliberate transitional IME and accessibility host; the current wrapped
-surface is a bounded DirectWrite/Win2D milestone. Final input ownership,
-accessibility, and large-document performance gates remain.
+anchored through the same projected caret geometry. The native TextBox is now
+limited to `AzunyanTextInputWindow`, a bounded IME context window; it is not a
+second visible document renderer. Final input ownership, accessibility, and
+large-document performance gates remain.
 
 This document defines the target architecture for Azunyan as a practical code
 editor engine. Azunote remains a lightweight example application that enables
@@ -372,33 +372,40 @@ dispatcher-bound objects.
 
 ## 9. Input and IME
 
-Input is isolated behind `ITextInputBridge`. Rendering does not depend on which
-input bridge is active.
+Input is isolated in `AzunyanTextInputWindow`. Rendering does not depend on
+the amount of document text currently exposed to the native control.
 
-The first WinUI implementation may use a native text control as a small IME
-proxy. It owns neither the document nor visible text. The bridge:
+`AzunyanTextInputWindow` contains one native `TextBox` and is treated as a
+sliding window over the document. It owns neither the document nor visible
+text. The window:
 
 - translates committed text into document replacement commands;
 - publishes composition updates as transient projection state;
-- receives the rendered caret rectangle for candidate-window placement;
-- synchronizes selection and surrounding text needed by the platform;
+- receives the rendered caret rectangle in `EditorHost` coordinates for
+  candidate-window placement;
+- synchronizes only the surrounding UTF-16 context needed by the platform;
+- includes selection and composition even when they extend beyond context;
+- aligns window edges to text-element boundaries and uses generation IDs to
+  reject stale native events;
 - never requires the renderer to duplicate native glyphs.
 
-Composition state has a snapshot/document anchor and is invalidated or remapped
-explicitly when an external edit occurs. Normal editor commands cannot split a
-composition or grapheme cluster.
+The default context is 2048 UTF-16 code units on each side, with a 512-unit
+hysteresis before recentering. While composition is active the window remains
+fixed. External document mutations are deferred until `TextCompositionEnded`,
+and then applied through the same document command path. Normal editor commands
+cannot split a composition or grapheme cluster.
 
-The bridge can later be replaced by a lower-level Windows text-services
-implementation without changing projection, layout, provider, or rendering
-contracts.
+The native implementation can later be replaced by a lower-level Windows
+text-services implementation without changing projection, layout, provider, or
+rendering contracts.
 
 ## 10. Accessibility
 
-When the projected surface is active, the outer editor peer is the single owner
-of the `Text`, `Text2`, and `Value` patterns. The native `TextBox` remains the
-input/IME host and is exposed only in the raw tree, so clients do not see a
-second `Edit` control in the normal control tree. When a custom renderer is not
-active, the outer peer delegates to the native peer as a compatibility fallback.
+The outer editor peer is the single owner of the `Text`, `Text2`, and `Value`
+patterns. The native `TextBox` inside `AzunyanTextInputWindow` is exposed only
+in the raw tree, so clients do not see a second `Edit` control in the normal
+control tree. Custom renderers receive the same full-document contract and the
+same required caret API; the input window is never a visible-text fallback.
 
 Automation ranges are immutable-snapshot document ranges, not visual-line
 indices. XAML and renderer access is marshalled to the editor owner thread;
@@ -422,8 +429,8 @@ units follow text-element boundaries and word units use Unicode letter, number,
 and combining-mark categories. Fold placeholders and inlays expose names
 through realized children, while copied text remains document text. Document,
 selection, focus, layout, and child-structure changes raise corresponding UI
-Automation notifications. Accessibility support is a release requirement for
-replacing the native visible TextBox, not deferred polish.
+Automation notifications. The projected peer remains the user-facing editor
+while the native control stays raw-only as an IME input window.
 
 ## 11. Threading and ownership
 
@@ -493,16 +500,15 @@ rapid edits while providers return out of order.
 
 - draw visible unwrapped lines, selection, and caret through one text layout;
 - synchronize gutter and scrolling from the visual line map;
-- introduce the native IME proxy;
-- retain a runtime fallback to the native TextBox until IME and accessibility
-  acceptance tests pass.
+- introduce the sliding native IME input window;
+- publish renderer-owned caret geometry for input-window placement.
 
 Azunote now has the first bounded viewport version of this phase using cached
 DirectWrite text layouts for visible rows and a paired gutter surface.
 Selection, caret, syntax colors, fold placeholders, inlay styling, and line
 numbers are drawn through the same measured text backend rather than through
-per-line XAML text controls. The native TextBox remains the input/IME host
-until the acceptance gates below pass.
+per-line XAML text controls. The native TextBox is limited to the sliding
+input window and is not a second document renderer.
 
 ### Phase D: provider channels and syntax
 
@@ -536,7 +542,8 @@ input/accessibility replacement remain next gates.
 - complete UI Automation text patterns and validate the projected peer with
   automated UIA tests plus Narrator/NVDA manual passes;
 - run IME, BiDi, grapheme, DPI, theme, and performance matrices;
-- remove the native visible-text fallback only after all gates pass.
+- validate the sliding-window IME path with Japanese IME, DPI, monitor, and
+  screen-reader acceptance matrices.
 
 ## 15. Effect on the current provider API
 
@@ -550,15 +557,13 @@ The following current work remains useful:
 The following parts are explicitly transitional:
 
 - one aggregate request that runs every provider for every caret change;
-- `IAzunyanEditorRenderer` receiving mutable XAML Canvas layers;
-- the native TextBox remaining visible as the input/IME proxy;
 - line coordinates inferred from one measured character and a ScrollViewer
   offset.
 
-The native TextBox is currently intentionally retained as the input/IME host;
-its raw-tree presence is an implementation detail rather than a second
-accessible editor. The projected peer owns the user-facing text/value contract
-while this migration is in progress.
+`IAzunyanEditorRenderer` now receives an immutable full-document frame and must
+publish `TryGetCaretRect(DocumentAnchor, out Rect)` in `EditorHost` coordinates.
+`AzunyanTextInputWindow` consumes that contract while keeping its native text
+context bounded and independent from document rendering.
 
 Azunote's application shell also installs a failure boundary around the WinUI
 dispatcher, AppDomain, and unobserved-task paths. Managed UI failures are
@@ -575,12 +580,13 @@ architecture above:
 - Win2D is the selected DirectWrite/Direct2D backend for the current WinUI
   surface; direct COM interop remains an optimization option if profiling
   requires it;
-- native TextBox proxy versus a lower-level Windows text-services bridge;
+- the native TextBox input window versus a lower-level Windows text-services
+  bridge;
 - exact augmented-tree/chunk structure for lazy visual-line heights;
 - whether interactive adornments use pooled XAML controls or composition
   visuals with explicit accessibility peers.
 
-The custom surface cannot replace the native visible editor by default until
-the chosen prototypes pass Japanese IME composition/candidate placement,
-screen-reader text navigation, mixed-script shaping, and the performance
-envelope in this document.
+The current custom surface already uses the native control only as its IME
+input window. Lower-level text-services migration remains optional until a
+prototype demonstrates a measurable benefit for Japanese IME composition,
+candidate placement, mixed-script shaping, or performance.

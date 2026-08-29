@@ -270,7 +270,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     public IReadOnlySet<string> CollapsedFoldIds => _collapsedFoldIds;
 
-    internal AzunyanTextInputWindow InputHost => InputWindow;
+    internal TextBox InputHost => InputWindow.NativeTextBoxControl;
 
     public string Text
     {

@@ -22,8 +22,9 @@ The fixture starts only the process it owns and closes it after the test class f
 
 The current tests verify that the projected editor exposes TextPattern and a read/write
 ValuePattern, reports geometry for empty caret ranges, keeps ranges bound to the snapshot
-from which they were created, and does not expose the native IME host as a duplicate Edit
-control. They also cover visible range geometry and finding/selecting document text.
+from which they were created, and does not expose the native IME input window as a
+duplicate Edit control. They also cover visible range geometry, finding/selecting
+document text, and long document values that require the input window to slide.
 
 The remaining accessibility acceptance is manual: focus the editor with Narrator or NVDA,
 read through Japanese, emoji, combining-mark, Arabic, and Hebrew lines, move by character,
