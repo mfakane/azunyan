@@ -12,6 +12,7 @@ using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Automation.Provider;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
 using Windows.System;
 using Windows.UI.Core;
@@ -64,7 +65,10 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private string[] _completionTriggerCharacters = Array.Empty<string>();
     private bool _disposed;
     private int _hoverPosition = -1;
+    private TextBlockSelection? _blockSelection;
     private int? _pointerSelectionAnchor;
+    private TextBlockPosition? _pointerBlockSelectionAnchor;
+    private bool _pointerSelectingBlock;
     private uint? _selectionPointerId;
     private string _projectedAutomationStructureKey = string.Empty;
     private long _documentProviderGeneration;
@@ -303,9 +307,32 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     public string SelectedText
     {
-        get => Snapshot.GetText(Document.Selection.Range);
-        set => ReplaceDocumentRange(Document.Selection.Range, value);
+        get => _blockSelection is { } block
+            ? TextBlockSelectionOperations.GetSelectedText(
+                Snapshot,
+                block,
+                TabDisplaySize,
+                TextBlockSelectionOperations.GetPreferredLineEnding(Snapshot))
+            : Snapshot.GetText(Document.Selection.Range);
+        set
+        {
+            if (_blockSelection is { } block)
+            {
+                RunAfterComposition(() =>
+                {
+                    ApplyDocumentCommand(() => ApplyBlockReplacement(
+                        block,
+                        new[] { value },
+                        repeatSingleLine: true));
+                });
+                return;
+            }
+
+            ReplaceDocumentRange(Document.Selection.Range, value);
+        }
     }
+
+    public TextBlockSelection? RectangularSelection => _blockSelection;
 
     public bool ShowLineNumbers
     {
@@ -387,6 +414,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         _document.Changed -= OnInputDocumentChanged;
         _document.SelectionChanged -= OnDocumentSelectionChanged;
         _compositionRange = null;
+        _blockSelection = null;
         _document = new Document(text);
         _document.Changed += OnInputDocumentChanged;
         _document.SelectionChanged += OnDocumentSelectionChanged;
@@ -399,8 +427,14 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     {
         RunAfterComposition(() =>
         {
+            var hadBlockSelection = _blockSelection is not null;
+            _blockSelection = null;
             _document.Selection = selection;
             SyncInputWindow();
+            if (hadBlockSelection)
+            {
+                RenderViewport();
+            }
         });
     }
 
@@ -488,10 +522,16 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     private bool UndoDocumentCore()
     {
+        var hadBlockSelection = _blockSelection is not null;
+        _blockSelection = null;
         var result = _document.Undo();
         if (result)
         {
             SyncInputWindow();
+        }
+        else if (hadBlockSelection)
+        {
+            RenderViewport();
         }
 
         return result;
@@ -510,10 +550,16 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     private bool RedoDocumentCore()
     {
+        var hadBlockSelection = _blockSelection is not null;
+        _blockSelection = null;
         var result = _document.Redo();
         if (result)
         {
             SyncInputWindow();
+        }
+        else if (hadBlockSelection)
+        {
+            RenderViewport();
         }
 
         return result;
@@ -526,6 +572,16 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     private void CutSelectionToClipboardCore()
     {
+        if (_blockSelection is { } blockSelection)
+        {
+            SetClipboardText(GetBlockSelectionText(blockSelection));
+            ApplyDocumentCommand(() => ApplyBlockReplacement(
+                blockSelection,
+                new[] { string.Empty },
+                repeatSingleLine: true));
+            return;
+        }
+
         SyncInputWindow();
         InputWindow.NativeTextBoxControl.CutSelectionToClipboard();
         if (Document.Selection.Length > 0)
@@ -537,12 +593,24 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     public void CopySelectionToClipboard()
     {
+        if (_blockSelection is { } blockSelection)
+        {
+            SetClipboardText(GetBlockSelectionText(blockSelection));
+            return;
+        }
+
         SyncInputWindow();
         InputWindow.NativeTextBoxControl.CopySelectionToClipboard();
     }
 
     public void PasteFromClipboard()
     {
+        if (_blockSelection is not null)
+        {
+            RunAfterComposition(() => _ = PasteBlockFromClipboardAsync());
+            return;
+        }
+
         RunAfterComposition(() =>
         {
             SyncInputWindow();
@@ -554,8 +622,14 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     {
         RunAfterComposition(() =>
         {
+            var hadBlockSelection = _blockSelection is not null;
+            _blockSelection = null;
             _document.Select(TextRange.FromBounds(0, Snapshot.Length));
             SyncInputWindow();
+            if (hadBlockSelection)
+            {
+                RenderViewport();
+            }
         });
     }
 
@@ -563,8 +637,14 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     {
         RunAfterComposition(() =>
         {
+            var hadBlockSelection = _blockSelection is not null;
+            _blockSelection = null;
             _document.Select(new TextRange(start, length));
             SyncInputWindow();
+            if (hadBlockSelection)
+            {
+                RenderViewport();
+            }
         });
     }
 
@@ -636,6 +716,12 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private static void OnTextWrappingChanged(DependencyObject sender, DependencyPropertyChangedEventArgs args)
     {
         var view = (AzunyanEditorView)sender;
+        if ((TextWrapping)args.NewValue != TextWrapping.NoWrap)
+        {
+            view._blockSelection = null;
+            view.StopPointerSelection();
+        }
+
         view.InputWindow.NativeTextBoxControl.TextWrapping = (TextWrapping)args.NewValue;
         view.UpdateTextSurfaceMode();
         view.RenderViewport();
@@ -715,32 +801,43 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         _applyingInputChange = true;
         try
         {
-            if (args.CompositionRange is { } composition)
+            if (_blockSelection is { } blockSelection)
             {
-                _compositionRange = composition;
+                var inputLines = SplitBlockInput(args.Change.NewText);
+                ApplyBlockReplacement(
+                    blockSelection,
+                    inputLines,
+                    repeatSingleLine: inputLines.Length == 1);
             }
-
-            _document.Replace(args.Change.OldRange, args.Change.NewText);
-            if (_document.Selection != args.Selection)
+            else
             {
-                _document.Selection = args.Selection;
-            }
-
-            if (_autoIndentOnEnter
-                && args.Change.NewText.Any(character => character is '\r' or '\n'))
-            {
-                var autoIndentedBreak = TextEditorCommands.GetNewLineWithAutoIndentation(
-                    oldSnapshot,
-                    args.Change.OldRange.Start);
-                if (TryGetLeadingLineEndingLength(
-                        autoIndentedBreak,
-                        out var generatedLineEndingLength)
-                    && autoIndentedBreak.Length > generatedLineEndingLength)
+                if (args.CompositionRange is { } composition)
                 {
-                    var indentation = autoIndentedBreak[generatedLineEndingLength..];
-                    _document.Replace(
-                        TextRange.Empty(_document.Selection.CaretPosition),
-                        indentation);
+                    _compositionRange = composition;
+                }
+
+                _document.Replace(args.Change.OldRange, args.Change.NewText);
+                if (_document.Selection != args.Selection)
+                {
+                    _document.Selection = args.Selection;
+                }
+
+                if (_autoIndentOnEnter
+                    && args.Change.NewText.Any(character => character is '\r' or '\n'))
+                {
+                    var autoIndentedBreak = TextEditorCommands.GetNewLineWithAutoIndentation(
+                        oldSnapshot,
+                        args.Change.OldRange.Start);
+                    if (TryGetLeadingLineEndingLength(
+                            autoIndentedBreak,
+                            out var generatedLineEndingLength)
+                        && autoIndentedBreak.Length > generatedLineEndingLength)
+                    {
+                        var indentation = autoIndentedBreak[generatedLineEndingLength..];
+                        _document.Replace(
+                            TextRange.Empty(_document.Selection.CaretPosition),
+                            indentation);
+                    }
                 }
             }
         }
@@ -768,6 +865,83 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         {
             RequestInputWindowSynchronization();
         }
+    }
+
+    private void ApplyBlockReplacement(
+        TextBlockSelection selection,
+        IReadOnlyList<string> replacementLines,
+        bool repeatSingleLine)
+    {
+        var edit = TextBlockSelectionOperations.CreateReplacement(
+            Snapshot,
+            selection,
+            TabDisplaySize,
+            replacementLines,
+            repeatSingleLine,
+            TextBlockSelectionOperations.GetPreferredLineEnding(Snapshot));
+        _blockSelection = null;
+        if (edit is not { } blockEdit)
+        {
+            return;
+        }
+
+        var currentText = Snapshot.Text;
+        var replacedText = currentText[..blockEdit.Range.Start]
+            + blockEdit.Replacement
+            + currentText[blockEdit.Range.End..];
+        var replacedSnapshot = new TextSnapshot(replacedText);
+        var caretPosition = TextBlockSelectionOperations.GetCaretPosition(
+            replacedSnapshot,
+            selection.Active,
+            TabDisplaySize);
+        _document.Replace(
+            blockEdit.Range,
+            blockEdit.Replacement,
+            TextSelection.Caret(caretPosition));
+    }
+
+    private string GetBlockSelectionText(TextBlockSelection selection) =>
+        TextBlockSelectionOperations.GetSelectedText(
+            Snapshot,
+            selection,
+            TabDisplaySize,
+            TextBlockSelectionOperations.GetPreferredLineEnding(Snapshot));
+
+    private static void SetClipboardText(string text)
+    {
+        var dataPackage = new DataPackage();
+        dataPackage.SetText(text);
+        Clipboard.SetContent(dataPackage);
+    }
+
+    private async Task PasteBlockFromClipboardAsync()
+    {
+        var content = Clipboard.GetContent();
+        if (!content.Contains(StandardDataFormats.Text))
+        {
+            return;
+        }
+
+        var text = await content.GetTextAsync();
+        if (_disposed || _blockSelection is not { } selection)
+        {
+            return;
+        }
+
+        var lines = SplitBlockInput(text);
+        ApplyDocumentCommand(() => ApplyBlockReplacement(
+            selection,
+            lines,
+            repeatSingleLine: lines.Length == 1));
+    }
+
+    private static string[] SplitBlockInput(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        return text
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n')
+            .Split('\n', StringSplitOptions.None);
     }
 
     private void OnInputDocumentChanged(
@@ -848,7 +1022,13 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     {
         if (args.Generation == _inputWindowGeneration)
         {
+            var hadBlockSelection = _blockSelection is not null;
+            _blockSelection = null;
             _document.Selection = args.Selection;
+            if (hadBlockSelection)
+            {
+                RenderViewport();
+            }
         }
     }
 
@@ -898,11 +1078,18 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         TextRange range,
         string replacement)
     {
+        var hadBlockSelection = _blockSelection is not null;
+        _blockSelection = null;
         var oldText = Snapshot.Text;
         _document.Replace(range, replacement);
         SyncInputWindow();
         if (string.Equals(oldText, Snapshot.Text, StringComparison.Ordinal))
         {
+            if (hadBlockSelection)
+            {
+                RenderViewport();
+            }
+
             return;
         }
 
@@ -1124,12 +1311,28 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 QueueKeyEdit(args.Key, () => _ = RedoDocument());
                 args.Handled = true;
                 break;
+            case VirtualKey.C when control && _blockSelection is not null && !IsComposing:
+                QueueKeyEdit(args.Key, CopySelectionToClipboard);
+                args.Handled = true;
+                break;
+            case VirtualKey.X when control && _blockSelection is not null && !IsComposing:
+                QueueKeyEdit(args.Key, CutSelectionToClipboard);
+                args.Handled = true;
+                break;
+            case VirtualKey.V when control && _blockSelection is not null && !IsComposing:
+                QueueKeyEdit(args.Key, PasteFromClipboard);
+                args.Handled = true;
+                break;
             case VirtualKey.Left when !IsComposing:
                 QueueKeyEdit(args.Key, () =>
                 {
                     ApplyDocumentCommand(() =>
                     {
-                        if (!IsComposing)
+                        if (_blockSelection is not null)
+                        {
+                            _blockSelection = null;
+                        }
+                        else if (!IsComposing)
                         {
                             Document.MoveCaretByGrapheme(-1, extendSelection);
                         }
@@ -1142,9 +1345,29 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 {
                     ApplyDocumentCommand(() =>
                     {
-                        if (!IsComposing)
+                        if (_blockSelection is not null)
+                        {
+                            _blockSelection = null;
+                        }
+                        else if (!IsComposing)
                         {
                             Document.MoveCaretByGrapheme(1, extendSelection);
+                        }
+                    });
+                });
+                args.Handled = true;
+                break;
+            case VirtualKey.Back when _blockSelection is not null && !IsComposing:
+                QueueKeyEdit(args.Key, () =>
+                {
+                    ApplyDocumentCommand(() =>
+                    {
+                        if (_blockSelection is { } blockSelection)
+                        {
+                            ApplyBlockReplacement(
+                                blockSelection,
+                                new[] { string.Empty },
+                                repeatSingleLine: true);
                         }
                     });
                 });
@@ -1155,7 +1378,14 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 {
                     ApplyDocumentCommand(() =>
                     {
-                        if (!IsComposing)
+                        if (_blockSelection is { } blockSelection)
+                        {
+                            ApplyBlockReplacement(
+                                blockSelection,
+                                new[] { string.Empty },
+                                repeatSingleLine: true);
+                        }
+                        else if (!IsComposing)
                         {
                             Document.DeleteForward();
                         }
@@ -1335,7 +1565,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 _characterWidth,
                 out var anchor,
                 out var foldId,
-                out var adornmentId))
+                out var adornmentId,
+                out var blockPosition))
         {
             return;
         }
@@ -1359,10 +1590,27 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
         else
         {
-            _pointerSelectionAnchor = anchor.Position.Offset;
+            var isBlockSelection = TextWrapping == TextWrapping.NoWrap
+                && IsKeyDown(VirtualKey.Menu);
+            if (isBlockSelection)
+            {
+                _pointerBlockSelectionAnchor = blockPosition;
+                _pointerSelectingBlock = true;
+                _blockSelection = new TextBlockSelection(
+                    blockPosition,
+                    blockPosition);
+            }
+            else
+            {
+                _blockSelection = null;
+                _pointerSelectionAnchor = anchor.Position.Offset;
+            }
+
             _selectionPointerId = point.PointerId;
             EditorPointerSurface.CapturePointer(args.Pointer);
-            SetDocumentSelection(TextSelection.Caret(anchor.Position.Offset));
+            _document.Selection = TextSelection.Caret(anchor.Position.Offset);
+            SyncInputWindow();
+            RenderViewport();
         }
 
         InputWindow.Focus(FocusState.Pointer);
@@ -1389,8 +1637,29 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private void StopPointerSelection()
     {
         _pointerSelectionAnchor = null;
+        _pointerBlockSelectionAnchor = null;
+        _pointerSelectingBlock = false;
         _selectionPointerId = null;
         EditorPointerSurface.ReleasePointerCaptures();
+    }
+
+    private void UpdateBlockSelection(
+        TextBlockSelection selection,
+        int activeOffset)
+    {
+        var changed = _blockSelection != selection;
+        _blockSelection = selection;
+        var caret = TextSelection.Caret(activeOffset);
+        if (_document.Selection != caret)
+        {
+            _document.Selection = caret;
+        }
+
+        if (changed)
+        {
+            SyncInputWindow();
+            RenderViewport();
+        }
     }
 
     private bool TryGetAdornment(
@@ -1426,6 +1695,42 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         var point = args.GetCurrentPoint(EditorPointerSurface);
         if (_selectionPointerId is uint selectionPointerId
             && point.PointerId == selectionPointerId
+            && _pointerSelectingBlock
+            && _pointerBlockSelectionAnchor is { } blockSelectionAnchor)
+        {
+            if (point.PointerDeviceType == Microsoft.UI.Input.PointerDeviceType.Mouse
+                && !point.Properties.IsLeftButtonPressed)
+            {
+                StopPointerSelection();
+                return;
+            }
+
+            if (_defaultRenderer.TextRenderer.TryHitTest(
+                    point.Position.X,
+                    point.Position.Y,
+                    InputWindow.NativeTextBoxControl.Padding.Left,
+                    InputWindow.NativeTextBoxControl.Padding.Top,
+                    GetHorizontalOffset(),
+                    GetVerticalOffset(),
+                    _characterWidth,
+                    out var dragAnchor,
+                    out _,
+                    out _,
+                    out var dragBlockPosition))
+            {
+                UpdateBlockSelection(
+                    new TextBlockSelection(
+                        blockSelectionAnchor,
+                        dragBlockPosition),
+                    dragAnchor.Position.Offset);
+            }
+
+            args.Handled = true;
+            return;
+        }
+
+        if (_selectionPointerId is uint normalSelectionPointerId
+            && point.PointerId == normalSelectionPointerId
             && _pointerSelectionAnchor is int selectionAnchor)
         {
             if (point.PointerDeviceType == Microsoft.UI.Input.PointerDeviceType.Mouse

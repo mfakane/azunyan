@@ -14,6 +14,7 @@ public sealed class AzunyanEditorRenderFrame
     internal AzunyanEditorRenderFrame(
         TextSnapshot snapshot,
         TextSelection selection,
+        TextBlockSelection? blockSelection,
         TextRange? compositionRange,
         AzunyanColorScheme colorScheme,
         double lineHeight,
@@ -37,6 +38,7 @@ public sealed class AzunyanEditorRenderFrame
     {
         Snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
         Selection = selection;
+        BlockSelection = blockSelection;
         CompositionRange = compositionRange;
         ColorScheme = colorScheme ?? throw new ArgumentNullException(nameof(colorScheme));
         LineHeight = lineHeight;
@@ -63,6 +65,13 @@ public sealed class AzunyanEditorRenderFrame
     public TextSnapshot Snapshot { get; }
 
     public TextSelection Selection { get; }
+
+    /// <summary>
+    /// The optional display-column selection owned by the projected editor.
+    /// The regular <see cref="Selection"/> remains the native IME caret or
+    /// linear selection for compatibility with existing renderers.
+    /// </summary>
+    public TextBlockSelection? BlockSelection { get; }
 
     /// <summary>
     /// The transient UTF-16 range currently owned by the native IME text

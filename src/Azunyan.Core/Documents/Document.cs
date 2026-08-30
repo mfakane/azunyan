@@ -136,6 +136,11 @@ public sealed class Document
 
     public TextChange Replace(TextRange range, string text) => ApplyEdit(range, text);
 
+    public TextChange Replace(
+        TextRange range,
+        string text,
+        TextSelection selection) => ApplyEdit(range, text, selection);
+
     public TextChange Replace(int start, int length, string text) => Replace(new TextRange(start, length), text);
 
     public TextChange Replace(string text) => ApplyEdit(_selection.Range, text);
@@ -213,7 +218,10 @@ public sealed class Document
         _redo.Clear();
     }
 
-    private TextChange ApplyEdit(TextRange range, string newText)
+    private TextChange ApplyEdit(
+        TextRange range,
+        string newText,
+        TextSelection? requestedSelection = null)
     {
         ValidateRange(range);
         ArgumentNullException.ThrowIfNull(newText);
@@ -222,7 +230,10 @@ public sealed class Document
         var change = new TextChange(range, oldText, newText);
         var oldSnapshot = _snapshot;
         var oldSelection = _selection;
-        var newSelection = TextSelection.Caret(checked(range.Start + newText.Length));
+        var newSelection = requestedSelection
+            ?? TextSelection.Caret(checked(range.Start + newText.Length));
+        var newLength = checked(Length - range.Length + newText.Length);
+        ValidateSelection(newSelection, newLength);
 
         if (string.Equals(oldText, newText, StringComparison.Ordinal))
         {
@@ -294,7 +305,12 @@ public sealed class Document
 
     private void ValidateSelection(TextSelection selection)
     {
-        if (selection.Start > Length || selection.End > Length)
+        ValidateSelection(selection, Length);
+    }
+
+    private static void ValidateSelection(TextSelection selection, int length)
+    {
+        if (selection.Start > length || selection.End > length)
         {
             throw new ArgumentOutOfRangeException(nameof(selection));
         }

@@ -81,6 +81,7 @@ public sealed partial class AzunyanEditorView
         var frame = new AzunyanEditorRenderFrame(
             Snapshot,
             Document.Selection,
+            _blockSelection,
             CompositionRange,
             _colorScheme,
             _lineHeight,

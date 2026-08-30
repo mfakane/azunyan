@@ -604,6 +604,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             characterWidth,
             out anchor,
             out foldId,
+            out _,
             out _);
 
     public bool TryHitTest(
@@ -616,11 +617,36 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         double characterWidth,
         out DocumentAnchor anchor,
         out string? foldId,
-        out string? adornmentId)
+        out string? adornmentId) => TryHitTest(
+            x,
+            y,
+            contentLeft,
+            contentTop,
+            horizontalOffset,
+            verticalOffset,
+            characterWidth,
+            out anchor,
+            out foldId,
+            out adornmentId,
+            out _);
+
+    public bool TryHitTest(
+        double x,
+        double y,
+        double contentLeft,
+        double contentTop,
+        double horizontalOffset,
+        double verticalOffset,
+        double characterWidth,
+        out DocumentAnchor anchor,
+        out string? foldId,
+        out string? adornmentId,
+        out TextBlockPosition blockPosition)
     {
         anchor = DocumentAnchor.Before(0);
         foldId = null;
         adornmentId = null;
+        blockPosition = new TextBlockPosition(0, 0);
         if (_cachedLayout is not { } layout
             || !double.IsFinite(x)
             || !double.IsFinite(y)
@@ -648,6 +674,9 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         if (row.TextLine is not { } textLine)
         {
             anchor = row.BlockAdornment!.Anchor;
+            blockPosition = new TextBlockPosition(
+                layout.Snapshot.Lines.GetLine(anchor.Position.Offset),
+                0);
             adornmentId = row.BlockAdornment.Id;
             return true;
         }
@@ -657,6 +686,9 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         // The fixed-width fallback performs the conversion using
         // characterWidth below.
         var xInTextPixels = x + horizontalOffset - contentLeft;
+        blockPosition = new TextBlockPosition(
+            textLine.LogicalLine,
+            GetDisplayColumn(xInTextPixels, characterWidth));
         var localColumn = GetNearestCaretStop(
             rowIndex,
             row,
@@ -701,6 +733,19 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         }
 
         return true;
+    }
+
+    private static int GetDisplayColumn(double x, double characterWidth)
+    {
+        if (x <= 0)
+        {
+            return 0;
+        }
+
+        var column = x / characterWidth;
+        return column >= int.MaxValue
+            ? int.MaxValue
+            : Math.Max(0, (int)Math.Round(column, MidpointRounding.AwayFromZero));
     }
 
     private int GetNearestCaretStop(
@@ -1275,9 +1320,63 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         DirectWriteTextLayout textLayout,
         double top)
     {
+        if (context.BlockSelection is { } blockSelection)
+        {
+            if (context.TextWrapping == TextWrapping.NoWrap)
+            {
+                var logicalLine = layout.SourceLine.LogicalLine;
+                if (logicalLine < blockSelection.TopLine
+                    || logicalLine > blockSelection.BottomLine)
+                {
+                    return;
+                }
+
+                var blockRange = TextBlockSelectionOperations.GetLineRange(
+                    context.Snapshot,
+                    logicalLine,
+                    blockSelection.LeftColumn,
+                    blockSelection.RightColumn,
+                    context.TabDisplaySize);
+                DrawSelectionRange(
+                    drawingSession,
+                    context,
+                    layout,
+                    textLayout,
+                    top,
+                    blockRange);
+            }
+
+            return;
+        }
+
         var range = layout.SourceLine.SourceRange;
         var start = Math.Max(range.Start, context.Selection.Start);
         var end = Math.Min(range.End, context.Selection.End);
+        if (end <= start)
+        {
+            return;
+        }
+
+        DrawSelectionRange(
+            drawingSession,
+            context,
+            layout,
+            textLayout,
+            top,
+            TextRange.FromBounds(start, end));
+    }
+
+    private static void DrawSelectionRange(
+        CanvasDrawingSession drawingSession,
+        AzunyanEditorRenderContext context,
+        UnwrappedLineLayout layout,
+        DirectWriteTextLayout textLayout,
+        double top,
+        TextRange range)
+    {
+        var sourceRange = layout.SourceLine.SourceRange;
+        var start = Math.Max(sourceRange.Start, range.Start);
+        var end = Math.Min(sourceRange.End, range.End);
         if (end <= start)
         {
             return;
