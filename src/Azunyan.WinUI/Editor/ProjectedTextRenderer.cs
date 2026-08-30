@@ -1350,20 +1350,39 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         }
 
         var range = layout.SourceLine.SourceRange;
-        var start = Math.Max(range.Start, context.Selection.Start);
-        var end = Math.Min(range.End, context.Selection.End);
-        if (end <= start)
+        if (context.CaretSet is { } caretSet)
         {
+            foreach (var caret in caretSet)
+            {
+                var start = Math.Max(range.Start, caret.Selection.Start);
+                var end = Math.Min(range.End, caret.Selection.End);
+                if (end > start)
+                {
+                    DrawSelectionRange(
+                        drawingSession,
+                        context,
+                        layout,
+                        textLayout,
+                        top,
+                        TextRange.FromBounds(start, end));
+                }
+            }
+
             return;
         }
 
-        DrawSelectionRange(
-            drawingSession,
-            context,
-            layout,
-            textLayout,
-            top,
-            TextRange.FromBounds(start, end));
+        var selectionStart = Math.Max(range.Start, context.Selection.Start);
+        var selectionEnd = Math.Min(range.End, context.Selection.End);
+        if (selectionEnd > selectionStart)
+        {
+            DrawSelectionRange(
+                drawingSession,
+                context,
+                layout,
+                textLayout,
+                top,
+                TextRange.FromBounds(selectionStart, selectionEnd));
+        }
     }
 
     private static void DrawSelectionRange(
@@ -1415,7 +1434,39 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         DirectWriteTextLayout textLayout,
         double top)
     {
-        var position = context.Selection.CaretPosition;
+        if (context.CaretSet is { } caretSet)
+        {
+            foreach (var caret in caretSet)
+            {
+                DrawCaretAt(
+                    drawingSession,
+                    context,
+                    layout,
+                    textLayout,
+                    top,
+                    caret.CaretPosition);
+            }
+
+            return;
+        }
+
+        DrawCaretAt(
+            drawingSession,
+            context,
+            layout,
+            textLayout,
+            top,
+            context.Selection.CaretPosition);
+    }
+
+    private static void DrawCaretAt(
+        CanvasDrawingSession drawingSession,
+        AzunyanEditorRenderContext context,
+        UnwrappedLineLayout layout,
+        DirectWriteTextLayout textLayout,
+        double top,
+        int position)
+    {
         var range = layout.SourceLine.SourceRange;
         if (position < range.Start || position > range.End)
         {

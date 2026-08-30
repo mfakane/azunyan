@@ -12,7 +12,7 @@ public sealed class Document
     private readonly List<EditRecord> _redo = new();
     private TextTree _tree;
     private TextSnapshot _snapshot;
-    private TextSelection _selection;
+    private TextCaretSet _caretSet;
 
     public Document(string text = "", int undoLimit = 1000)
     {
@@ -22,7 +22,9 @@ public sealed class Document
         _undoLimit = undoLimit;
         _tree = new TextTree(text);
         _snapshot = new TextSnapshot(_tree);
-        _selection = TextSelection.Caret(0);
+        _caretSet = new TextCaretSet(new[] {
+            new TextCaretState(TextSelection.Caret(0), 0)
+        });
     }
 
     public TextSnapshot Snapshot => _snapshot;
@@ -33,27 +35,29 @@ public sealed class Document
 
     public int Length => _snapshot.Length;
 
+    /// <summary>
+    /// The primary selection. Assigning it intentionally collapses a
+    /// multi-caret document back to one caret, preserving the old API contract.
+    /// </summary>
     public TextSelection Selection
     {
-        get => _selection;
+        get => _caretSet.Primary.Selection;
         set
         {
             ValidateSelection(value);
-            if (_selection == value)
-            {
-                return;
-            }
-
-            _selection = value;
-            SelectionChanged?.Invoke(this, EventArgs.Empty);
+            SetCaretSetCore(new TextCaretSet(new[] {
+                new TextCaretState(value, GetDisplayColumn(value.CaretPosition))
+            }));
         }
     }
 
-    public TextCaret Caret => new(_selection.CaretPosition);
+    public TextCaretSet CaretSet => _caretSet;
+
+    public TextCaret Caret => new(Selection.CaretPosition);
 
     public int CaretPosition
     {
-        get => _selection.CaretPosition;
+        get => Selection.CaretPosition;
         set => SetCaret(value);
     }
 
@@ -65,15 +69,23 @@ public sealed class Document
 
     public event EventHandler? SelectionChanged;
 
-    public void SetSelection(TextSelection selection)
+    public event EventHandler? CaretSetChanged;
+
+    public void SetCaretSet(TextCaretSet caretSet)
     {
-        Selection = selection;
+        ArgumentNullException.ThrowIfNull(caretSet);
+        foreach (var caret in caretSet)
+        {
+            ValidateSelection(caret.Selection);
+        }
+
+        SetCaretSetCore(caretSet);
     }
 
-    public void SetSelection(int anchor, int active)
-    {
+    public void SetSelection(TextSelection selection) => Selection = selection;
+
+    public void SetSelection(int anchor, int active) =>
         SetSelection(new TextSelection(anchor, active));
-    }
 
     public void Select(TextRange range)
     {
@@ -85,7 +97,7 @@ public sealed class Document
     {
         ValidatePosition(position);
         SetSelection(extendSelection
-            ? new TextSelection(_selection.Anchor, position)
+            ? new TextSelection(Selection.Anchor, position)
             : TextSelection.Caret(position));
     }
 
@@ -103,20 +115,14 @@ public sealed class Document
 
     public TextChange DeleteForwardByScalar() => TextEditorCommands.DeleteForwardByScalar(this);
 
-    public void CollapseSelectionToStart() => SetCaret(_selection.Start);
+    public void CollapseSelectionToStart() => SetCaret(Selection.Start);
 
-    public void CollapseSelectionToEnd() => SetCaret(_selection.End);
+    public void CollapseSelectionToEnd() => SetCaret(Selection.End);
 
     public void SetCaret(int position)
     {
         ValidatePosition(position);
-        if (_selection == TextSelection.Caret(position))
-        {
-            return;
-        }
-
-        _selection = TextSelection.Caret(position);
-        SelectionChanged?.Invoke(this, EventArgs.Empty);
+        Selection = TextSelection.Caret(position);
     }
 
     public TextChange Insert(int position, string text)
@@ -126,24 +132,29 @@ public sealed class Document
         return ApplyEdit(TextRange.Empty(position), text);
     }
 
-    public TextChange Insert(string text) => ApplyEdit(_selection.Range, text);
+    public TextChange Insert(string text) => ApplyEdit(Selection.Range, text);
 
     public TextChange Delete(TextRange range) => ApplyEdit(range, string.Empty);
 
     public TextChange Delete(int start, int length) => Delete(new TextRange(start, length));
 
-    public TextChange DeleteSelection() => Delete(_selection.Range);
+    public TextChange DeleteSelection() => Delete(Selection.Range);
 
     public TextChange Replace(TextRange range, string text) => ApplyEdit(range, text);
 
     public TextChange Replace(
         TextRange range,
         string text,
-        TextSelection selection) => ApplyEdit(range, text, selection);
+        TextSelection selection) => ApplyEdit(range, text, requestedSelection: selection);
+
+    public TextChange Replace(
+        TextRange range,
+        string text,
+        TextCaretSet caretSet) => ApplyEdit(range, text, caretSet: caretSet);
 
     public TextChange Replace(int start, int length, string text) => Replace(new TextRange(start, length), text);
 
-    public TextChange Replace(string text) => ApplyEdit(_selection.Range, text);
+    public TextChange Replace(string text) => ApplyEdit(Selection.Range, text);
 
     public bool Undo()
     {
@@ -156,26 +167,22 @@ public sealed class Document
         _redo.Add(record);
 
         var oldSnapshot = _snapshot;
-        var oldSelection = _selection;
+        var oldSelection = Selection;
+        var oldCaretSet = _caretSet;
         _tree = record.OldTree;
         _snapshot = new TextSnapshot(_tree);
-        _selection = record.OldSelection;
+        _caretSet = record.OldCaretSet;
 
-        var inverse = record.Change.Inverse();
         Changed?.Invoke(
             this,
             new DocumentChangedEventArgs(
                 oldSnapshot,
                 _snapshot,
-                inverse,
+                record.Change.Inverse(),
                 oldSelection,
-                _selection,
+                Selection,
                 DocumentChangeKind.Undo));
-        if (oldSelection != _selection)
-        {
-            SelectionChanged?.Invoke(this, EventArgs.Empty);
-        }
-
+        RaiseCaretEvents(oldCaretSet, _caretSet, oldSelection);
         return true;
     }
 
@@ -190,10 +197,11 @@ public sealed class Document
         _undo.Add(record);
 
         var oldSnapshot = _snapshot;
-        var oldSelection = _selection;
+        var oldSelection = Selection;
+        var oldCaretSet = _caretSet;
         _tree = record.NewTree;
         _snapshot = new TextSnapshot(_tree);
-        _selection = record.NewSelection;
+        _caretSet = record.NewCaretSet;
 
         Changed?.Invoke(
             this,
@@ -202,13 +210,9 @@ public sealed class Document
                 _snapshot,
                 record.Change,
                 oldSelection,
-                _selection,
+                Selection,
                 DocumentChangeKind.Redo));
-        if (oldSelection != _selection)
-        {
-            SelectionChanged?.Invoke(this, EventArgs.Empty);
-        }
-
+        RaiseCaretEvents(oldCaretSet, _caretSet, oldSelection);
         return true;
     }
 
@@ -221,28 +225,36 @@ public sealed class Document
     private TextChange ApplyEdit(
         TextRange range,
         string newText,
-        TextSelection? requestedSelection = null)
+        TextSelection? requestedSelection = null,
+        TextCaretSet? caretSet = null)
     {
         ValidateRange(range);
         ArgumentNullException.ThrowIfNull(newText);
+        if (requestedSelection is not null && caretSet is not null)
+        {
+            throw new ArgumentException("A selection and a caret set cannot both be supplied.");
+        }
 
         var oldText = _snapshot.GetText(range);
         var change = new TextChange(range, oldText, newText);
         var oldSnapshot = _snapshot;
-        var oldSelection = _selection;
+        var oldSelection = Selection;
+        var oldCaretSet = _caretSet;
         var newSelection = requestedSelection
             ?? TextSelection.Caret(checked(range.Start + newText.Length));
         var newLength = checked(Length - range.Length + newText.Length);
         ValidateSelection(newSelection, newLength);
+        var newCaretSet = caretSet ?? new TextCaretSet(new[] {
+            new TextCaretState(newSelection, GetDisplayColumn(newSelection.CaretPosition, newLength))
+        });
+        foreach (var caret in newCaretSet)
+        {
+            ValidateSelection(caret.Selection, newLength);
+        }
 
         if (string.Equals(oldText, newText, StringComparison.Ordinal))
         {
-            _selection = newSelection;
-            if (oldSelection != _selection)
-            {
-                SelectionChanged?.Invoke(this, EventArgs.Empty);
-            }
-
+            SetCaretSetCore(newCaretSet);
             return change;
         }
 
@@ -250,9 +262,9 @@ public sealed class Document
         var newTree = _tree.Replace(range, newText);
         _tree = newTree;
         _snapshot = new TextSnapshot(_tree);
-        _selection = newSelection;
+        _caretSet = newCaretSet;
 
-        var record = new EditRecord(change, oldTree, newTree, oldSelection, newSelection);
+        var record = new EditRecord(change, oldTree, newTree, oldCaretSet, newCaretSet);
         AddUndo(record);
         _redo.Clear();
 
@@ -263,14 +275,38 @@ public sealed class Document
                 _snapshot,
                 change,
                 oldSelection,
-                newSelection,
+                Selection,
                 DocumentChangeKind.Edit));
-        if (oldSelection != newSelection)
+        RaiseCaretEvents(oldCaretSet, newCaretSet, oldSelection);
+        return change;
+    }
+
+    private void SetCaretSetCore(TextCaretSet caretSet)
+    {
+        var old = _caretSet;
+        if (old.Equals(caretSet))
+        {
+            return;
+        }
+
+        _caretSet = caretSet;
+        RaiseCaretEvents(old, caretSet, old.Primary.Selection);
+    }
+
+    private void RaiseCaretEvents(
+        TextCaretSet oldCaretSet,
+        TextCaretSet newCaretSet,
+        TextSelection oldPrimarySelection)
+    {
+        if (!oldCaretSet.Equals(newCaretSet))
+        {
+            CaretSetChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        if (oldPrimarySelection != newCaretSet.Primary.Selection)
         {
             SelectionChanged?.Invoke(this, EventArgs.Empty);
         }
-
-        return change;
     }
 
     private void AddUndo(EditRecord record)
@@ -303,10 +339,8 @@ public sealed class Document
         }
     }
 
-    private void ValidateSelection(TextSelection selection)
-    {
+    private void ValidateSelection(TextSelection selection) =>
         ValidateSelection(selection, Length);
-    }
 
     private static void ValidateSelection(TextSelection selection, int length)
     {
@@ -324,10 +358,33 @@ public sealed class Document
         return record;
     }
 
+    private int GetDisplayColumn(int position, int? length = null)
+    {
+        var bounded = Math.Clamp(position, 0, Math.Min(length ?? Length, Length));
+        var line = _snapshot.Lines.GetLine(bounded);
+        var lineStart = _snapshot.Lines.GetLineStart(line);
+        var lineEnd = _snapshot.Lines.GetLineEnd(line);
+        var local = Math.Clamp(bounded - lineStart, 0, lineEnd - lineStart);
+        var column = 0;
+        for (var index = 0; index < local; index++)
+        {
+            column = _snapshot.Text[lineStart + index] == '\t'
+                ? column + 4 - (column % 4)
+                : column + 1;
+        }
+
+        return column;
+    }
+
     private sealed record EditRecord(
         TextChange Change,
         TextTree OldTree,
         TextTree NewTree,
-        TextSelection OldSelection,
-        TextSelection NewSelection);
+        TextCaretSet OldCaretSet,
+        TextCaretSet NewCaretSet)
+    {
+        public TextSelection OldSelection => OldCaretSet.Primary.Selection;
+
+        public TextSelection NewSelection => NewCaretSet.Primary.Selection;
+    }
 }

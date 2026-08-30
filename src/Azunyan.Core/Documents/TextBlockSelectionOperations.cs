@@ -220,6 +220,29 @@ public static class TextBlockSelectionOperations
             tabDisplaySize);
     }
 
+    public static int GetDisplayColumn(
+        TextSnapshot snapshot,
+        int position,
+        int tabDisplaySize)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentOutOfRangeException.ThrowIfLessThan(tabDisplaySize, 1);
+
+        var line = snapshot.Lines.GetLine(Math.Clamp(position, 0, snapshot.Length));
+        var lineRange = snapshot.Lines.GetLineRange(line);
+        var local = Math.Clamp(position - lineRange.Start, 0, lineRange.Length);
+        var text = snapshot.GetText(lineRange);
+        var column = 0;
+        for (var index = 0; index < local; index++)
+        {
+            column = text[index] == '\t'
+                ? column + tabDisplaySize - (column % tabDisplaySize)
+                : column + 1;
+        }
+
+        return column;
+    }
+
     public static string GetPreferredLineEnding(TextSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);

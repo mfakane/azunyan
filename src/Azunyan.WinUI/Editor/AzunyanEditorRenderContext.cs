@@ -15,6 +15,7 @@ internal sealed class AzunyanEditorRenderContext
         TextSnapshot snapshot,
         TextSelection selection,
         TextBlockSelection? blockSelection,
+        TextCaretSet? caretSet,
         TextRange? compositionRange,
         AzunyanColorScheme colorScheme,
         Canvas gutterLayer,
@@ -42,6 +43,7 @@ internal sealed class AzunyanEditorRenderContext
         Snapshot = snapshot;
         Selection = selection;
         BlockSelection = blockSelection;
+        CaretSet = caretSet;
         CompositionRange = compositionRange;
         ColorScheme = colorScheme ?? throw new ArgumentNullException(nameof(colorScheme));
         GutterLayer = gutterLayer;
@@ -77,6 +79,7 @@ internal sealed class AzunyanEditorRenderContext
             frame.Snapshot,
             frame.Selection,
             frame.BlockSelection,
+            frame.CaretSet,
             frame.CompositionRange,
             frame.ColorScheme,
             gutterLayer,
@@ -108,6 +111,8 @@ internal sealed class AzunyanEditorRenderContext
     public TextSelection Selection { get; }
 
     public TextBlockSelection? BlockSelection { get; }
+
+    public TextCaretSet? CaretSet { get; }
 
     /// <summary>
     /// The transient UTF-16 range currently owned by the native IME text

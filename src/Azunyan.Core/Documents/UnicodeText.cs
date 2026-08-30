@@ -157,6 +157,56 @@ public static class UnicodeText
         return position;
     }
 
+    public static int MoveByWord(string text, int position, int count)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        ValidatePosition(text, position, allowEnd: true);
+
+        while (count > 0 && position < text.Length)
+        {
+            while (position < text.Length && char.IsWhiteSpace(text[position]))
+            {
+                position = GetNextTextElementPosition(text, position);
+            }
+
+            var word = IsWordCharacter(text, position);
+            while (position < text.Length
+                && IsWordCharacter(text, position) == word
+                && !char.IsWhiteSpace(text[position]))
+            {
+                position = GetNextTextElementPosition(text, position);
+            }
+
+            count--;
+        }
+
+        while (count < 0 && position > 0)
+        {
+            position = GetPreviousTextElementPosition(text, position);
+            while (position > 0 && char.IsWhiteSpace(text[position]))
+            {
+                position = GetPreviousTextElementPosition(text, position);
+            }
+
+            var word = IsWordCharacter(text, position);
+            while (position > 0)
+            {
+                var previous = GetPreviousTextElementPosition(text, position);
+                if (char.IsWhiteSpace(text[previous])
+                    || IsWordCharacter(text, previous) != word)
+                {
+                    break;
+                }
+
+                position = previous;
+            }
+
+            count++;
+        }
+
+        return position;
+    }
+
     public static TextRange GetBackwardDeleteRange(string text, int position)
     {
         ArgumentNullException.ThrowIfNull(text);
@@ -243,4 +293,13 @@ public static class UnicodeText
             throw new ArgumentOutOfRangeException(nameof(position));
         }
     }
+
+    private static bool IsWordCharacter(string text, int position) =>
+        position < text.Length
+        && (char.IsLetterOrDigit(text[position])
+            || char.GetUnicodeCategory(text[position]) is
+                UnicodeCategory.ConnectorPunctuation
+                or UnicodeCategory.NonSpacingMark
+                or UnicodeCategory.SpacingCombiningMark
+                or UnicodeCategory.EnclosingMark);
 }

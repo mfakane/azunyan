@@ -15,6 +15,7 @@ public sealed class AzunyanEditorRenderFrame
         TextSnapshot snapshot,
         TextSelection selection,
         TextBlockSelection? blockSelection,
+        TextCaretSet? caretSet,
         TextRange? compositionRange,
         AzunyanColorScheme colorScheme,
         double lineHeight,
@@ -39,6 +40,7 @@ public sealed class AzunyanEditorRenderFrame
         Snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
         Selection = selection;
         BlockSelection = blockSelection;
+        CaretSet = caretSet;
         CompositionRange = compositionRange;
         ColorScheme = colorScheme ?? throw new ArgumentNullException(nameof(colorScheme));
         LineHeight = lineHeight;
@@ -72,6 +74,8 @@ public sealed class AzunyanEditorRenderFrame
     /// linear selection for compatibility with existing renderers.
     /// </summary>
     public TextBlockSelection? BlockSelection { get; }
+
+    public TextCaretSet? CaretSet { get; }
 
     /// <summary>
     /// The transient UTF-16 range currently owned by the native IME text

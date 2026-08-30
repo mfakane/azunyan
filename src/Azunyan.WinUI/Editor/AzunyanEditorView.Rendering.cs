@@ -82,6 +82,7 @@ public sealed partial class AzunyanEditorView
             Snapshot,
             Document.Selection,
             _blockSelection,
+            Document.CaretSet.Count > 1 ? Document.CaretSet : null,
             CompositionRange,
             _colorScheme,
             _lineHeight,
