@@ -362,7 +362,7 @@
             Grid.Row="2"
             AllowDrop="True"
             AcceptsReturn="True"
-            FontFamily="Cascadia Mono,Consolas"
+            FontFamily="Consolas"
             FontSize="14"
             TextWrapping="NoWrap"
             KeyDown="Editor_KeyDown"

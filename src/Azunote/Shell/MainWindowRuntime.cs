@@ -84,7 +84,8 @@ internal sealed class MainWindowRuntime : IDisposable
             RunConfiguredExternalToolAsync,
             GetExternalToolMenuState,
             OpenDefinitionAsync,
-            ShowFileInExplorerAsync);
+            ShowFileInExplorerAsync,
+            ApplySettings);
         _editorCommands = new EditorCommandController(_view, _view);
         _view.SetTabDisplaySizeLabel(_view.TabDisplaySize);
         _view.SetIndentSizeLabel(_view.IndentSize);
@@ -112,6 +113,12 @@ internal sealed class MainWindowRuntime : IDisposable
     internal string DocumentName => _documents.CurrentDocumentName;
 
     public Task InitializeSettingsAsync() => _settings.InitializeAsync();
+
+    private void ApplySettings(AzunoteSettings settings)
+    {
+        _view.SetFontFamily(settings.FontFamily);
+        _view.SetFontSize(settings.FontSize);
+    }
 
     public Task OpenStartupDocumentAsync(
         string path,

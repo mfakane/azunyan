@@ -30,6 +30,8 @@ public sealed class SettingsWorkflowTests
             await workflow.InitializeAsync();
 
             Assert.Empty(prompt.Errors);
+            Assert.Equal(AzunoteSettings.DefaultFontFamily, editor.FontFamily);
+            Assert.Equal(AzunoteSettings.DefaultFontSize, editor.FontSize);
             Assert.NotEmpty(languageMenu.Entries);
             Assert.Contains(externalMenu.Nodes, node => node.Name == "Format");
         }

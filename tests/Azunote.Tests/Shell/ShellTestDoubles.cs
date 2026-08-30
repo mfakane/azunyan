@@ -28,6 +28,10 @@ internal sealed class FakeEditorView : IEditorView
 
     public bool WordWrapEnabled { get; private set; }
 
+    public string FontFamily { get; private set; } = AzunoteSettings.DefaultFontFamily;
+
+    public double FontSize { get; private set; } = AzunoteSettings.DefaultFontSize;
+
     public int TabDisplaySize { get; private set; } = 4;
 
     public int? IndentSize { get; private set; }
@@ -76,6 +80,10 @@ internal sealed class FakeEditorView : IEditorView
 
     public void ApplyLanguage(EditorLanguageConfiguration configuration) =>
         LanguageConfiguration = configuration;
+
+    public void SetFontFamily(string fontFamily) => FontFamily = fontFamily;
+
+    public void SetFontSize(double fontSize) => FontSize = fontSize;
 
     public void RefreshProviders() => RefreshProvidersCount++;
 

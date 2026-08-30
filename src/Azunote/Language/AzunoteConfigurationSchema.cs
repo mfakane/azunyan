@@ -54,6 +54,12 @@ public static class AzunoteSchemaCatalog
         ["settings.toml"],
         [
             new AzunoteSchemaTable(
+                string.Empty,
+                [
+                    Field("fontFamily", AzunoteSchemaValueKind.String, documentation: "Font used by the editor and its renderer."),
+                    Field("fontSize", AzunoteSchemaValueKind.Integer, documentation: "Font size used by the editor and its renderer.")
+                ]),
+            new AzunoteSchemaTable(
                 "terminal",
                 [
                     Field("command", AzunoteSchemaValueKind.String, "command", supportsPlaceholders: true),

@@ -49,6 +49,10 @@ internal interface IEditorView : IEditorBuffer
 
     void ApplyLanguage(EditorLanguageConfiguration configuration);
 
+    void SetFontFamily(string fontFamily);
+
+    void SetFontSize(double fontSize);
+
     void RefreshProviders();
 
     void SetWordWrap(bool enabled);

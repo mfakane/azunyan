@@ -1,6 +1,10 @@
 # Azunote settings. This file uses TOML syntax.
 # External tools are defined below the tools/ directory.
 
+# Font used by the editor and its renderer.
+fontFamily = "Consolas"
+fontSize = 14
+
 # Configure the status bar's "Open Folder in Terminal" command here.
 [terminal]
 command = "wt.exe"

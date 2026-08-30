@@ -269,6 +269,29 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
     }
 
+    public void SetFontFamily(string fontFamily)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(fontFamily);
+        var family = new FontFamily(fontFamily.Trim());
+        FontFamily = family;
+        InputWindow.NativeTextBoxControl.FontFamily = family;
+        UpdateTextMetrics();
+        RenderViewport();
+    }
+
+    public void SetFontSize(double fontSize)
+    {
+        if (!double.IsFinite(fontSize) || fontSize <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(fontSize));
+        }
+
+        FontSize = fontSize;
+        InputWindow.NativeTextBoxControl.FontSize = fontSize;
+        UpdateTextMetrics();
+        RenderViewport();
+    }
+
     /// <summary>
     /// Compatibility view of the channel frame for existing renderers.
     /// </summary>

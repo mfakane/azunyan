@@ -14,6 +14,7 @@ internal sealed class SettingsWorkflow : IDisposable
     private readonly Func<ExternalToolSettings, ExternalToolMenuState> _getToolState;
     private readonly Func<string, Task> _editDefinition;
     private readonly Func<string, Task> _showDefinitionInExplorer;
+    private readonly Action<AzunoteSettings> _applySettings;
     private IReadOnlyList<ExternalToolMenuNode> _externalToolMenu = [];
     private IFileChangeMonitor? _settingsMonitor;
     private bool _disposed;
@@ -30,7 +31,8 @@ internal sealed class SettingsWorkflow : IDisposable
         Func<ExternalToolSettings, Task> runConfiguredTool,
         Func<ExternalToolSettings, ExternalToolMenuState>? getToolState = null,
         Func<string, Task>? editDefinition = null,
-        Func<string, Task>? showDefinitionInExplorer = null)
+        Func<string, Task>? showDefinitionInExplorer = null,
+        Action<AzunoteSettings>? applySettings = null)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _languageModes = languageModes ?? throw new ArgumentNullException(nameof(languageModes));
@@ -44,6 +46,7 @@ internal sealed class SettingsWorkflow : IDisposable
         _getToolState = getToolState ?? (_ => new ExternalToolMenuState(true, true));
         _editDefinition = editDefinition ?? (_ => Task.CompletedTask);
         _showDefinitionInExplorer = showDefinitionInExplorer ?? (_ => Task.CompletedTask);
+        _applySettings = applySettings ?? (_ => { });
     }
 
     public AzunoteSettings Current => _settings.Current;
@@ -93,6 +96,7 @@ internal sealed class SettingsWorkflow : IDisposable
         try
         {
             var settings = await _settings.LoadAsync();
+            _applySettings(settings);
             _languageModes.Initialize(settings.CustomSyntaxModes);
             if (!_languageModes.IsManuallySelected
                 && _currentFilePath() is { } path)

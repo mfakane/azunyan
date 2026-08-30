@@ -257,6 +257,10 @@ internal sealed class MainWindowViewAdapter :
         _editor.Providers.BlockAdornment = null;
     }
 
+    public void SetFontFamily(string fontFamily) => _editor.SetFontFamily(fontFamily);
+
+    public void SetFontSize(double fontSize) => _editor.SetFontSize(fontSize);
+
     public void RefreshProviders() => _editor.RefreshProviders();
 
     public void SetWordWrap(bool enabled)

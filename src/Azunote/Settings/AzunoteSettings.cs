@@ -8,6 +8,13 @@ namespace Azunote;
 
 public sealed class AzunoteSettings
 {
+    public const string DefaultFontFamily = "Consolas";
+    public const double DefaultFontSize = 14;
+
+    public string FontFamily { get; set; } = DefaultFontFamily;
+
+    public double FontSize { get; set; } = DefaultFontSize;
+
     public ShellCommandSettings Terminal { get; set; } = new()
     {
         Command = "wt.exe",
@@ -363,6 +370,12 @@ public static class SettingsFileService
                 AzunoteTomlSerializerContext.Default.AzunoteSettings,
                 cancellationToken)
             : new AzunoteSettings();
+        settings.FontFamily = string.IsNullOrWhiteSpace(settings.FontFamily)
+            ? AzunoteSettings.DefaultFontFamily
+            : settings.FontFamily.Trim();
+        settings.FontSize = double.IsFinite(settings.FontSize) && settings.FontSize > 0
+            ? settings.FontSize
+            : AzunoteSettings.DefaultFontSize;
         settings.Terminal ??= new();
         settings.Terminal.Validate("terminal");
         settings.Explorer ??= new();

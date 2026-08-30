@@ -139,6 +139,9 @@ The status bar's `Open Folder in Terminal` command can be configured in
 `settings.toml`. The default is equivalent to:
 
 ```toml
+fontFamily = "Consolas"
+fontSize = 14
+
 [terminal]
 command = "wt.exe"
 args = ["-d", "${documentDir}"]
