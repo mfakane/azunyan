@@ -227,26 +227,29 @@ public sealed class DirectWriteTextLayout : IDisposable
             textOffset += run.Text.Length;
         }
 
+        // CanvasLineMetrics contains a WinRT BOOL. With the current CsWinRT
+        // projection, reading the CanvasLineMetrics[] returned by LineMetrics
+        // fails while the non-blittable array is being released. Caret
+        // positions are returned as a blittable Vector2 and expose the same
+        // line transitions without crossing that broken array marshalling
+        // path.
         var boundaries = new List<int>();
-        var covered = 0;
-        foreach (var line in layout.LineMetrics)
+        var previousLineY = layout.GetCaretPosition(0, trailingSideOfCharacter: false).Y;
+        var lineTolerance = MathF.Max(0.01f, lineHeight * 0.25f);
+        for (var characterIndex = 1; characterIndex < text.Length; characterIndex++)
         {
-            var end = checked(covered + line.CharacterCount);
-            if (end <= covered || end > text.Length)
+            var lineY = layout.GetCaretPosition(
+                characterIndex,
+                trailingSideOfCharacter: false).Y;
+            if (MathF.Abs(lineY - previousLineY) > lineTolerance)
             {
-                break;
+                boundaries.Add(characterIndex);
             }
 
-            covered = end;
-            if (covered < text.Length)
-            {
-                boundaries.Add(covered);
-            }
+            previousLineY = lineY;
         }
 
-        return covered == text.Length
-            ? boundaries
-            : Array.Empty<int>();
+        return boundaries;
     }
 
     public void Draw(CanvasDrawingSession drawingSession, float x, float y, Color fallbackColor)
