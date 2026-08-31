@@ -70,6 +70,23 @@ public sealed class AzunoteConfigurationCompletionProviderTests
     }
 
     [Fact]
+    public async Task Settings_schema_completes_debug_logging_field()
+    {
+        const string text = "[debug]\nlog";
+        var provider = new AzunoteConfigurationCompletionProvider(
+            [AzunoteSchemaCatalog.Settings]);
+
+        var result = await provider.GetCompletionsAsync(
+            new EditorProviderContext(
+                new TextSnapshot(text),
+                text.Length,
+                TextSelection.Caret(text.Length)));
+
+        Assert.NotNull(result);
+        Assert.Contains(result!.Items, item => item.Label == "logging");
+    }
+
+    [Fact]
     public async Task Tool_schema_completes_enum_values_inside_a_string()
     {
         const string text = "[launch]\ninput = \"fi";

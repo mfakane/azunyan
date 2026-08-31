@@ -5,6 +5,11 @@
 fontFamily = "Consolas"
 fontSize = 14
 
+# Detailed operation logs are disabled by default. Available categories are
+# "all", "render", "clipboard", "key", and "input".
+[debug]
+logging = []
+
 # Configure the status bar's "Open Folder in Terminal" command here.
 [terminal]
 command = "wt.exe"

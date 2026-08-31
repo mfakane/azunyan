@@ -96,6 +96,12 @@ internal sealed class MainWindowViewAdapter :
     {
         ArgumentNullException.ThrowIfNull(window);
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
+        _editor.DiagnosticSink = (category, message) => ErrorReporter.LogMessage(
+            $"Editor diagnostic/{AzunyanDiagnosticCategories.GetName(category)}",
+            message);
+        _editor.DiagnosticExceptionSink = (source, exception) => ErrorReporter.LogException(
+            $"Editor exception/{source}",
+            exception);
         _editorBuffer = new AzunyanEditorBuffer(editor);
         _rootGrid = rootGrid ?? throw new ArgumentNullException(nameof(rootGrid));
         _auxiliarySplitMenuFlyoutItemStyle = _rootGrid.Resources["AuxiliarySplitMenuFlyoutItemStyle"] as Style
@@ -263,6 +269,25 @@ internal sealed class MainWindowViewAdapter :
     public void SetFontFamily(string fontFamily) => _editor.SetFontFamily(fontFamily);
 
     public void SetFontSize(double fontSize) => _editor.SetFontSize(fontSize);
+
+    internal void SetDiagnosticLogging(IReadOnlyList<string> logging)
+    {
+        ArgumentNullException.ThrowIfNull(logging);
+        var categories = AzunyanDiagnosticCategory.None;
+        foreach (var value in logging)
+        {
+            if (!AzunyanDiagnosticCategories.TryParse(value, out var category))
+            {
+                throw new ArgumentException(
+                    $"Unknown editor diagnostic category '{value}'.",
+                    nameof(logging));
+            }
+
+            categories |= category;
+        }
+
+        _editor.DiagnosticCategories = categories;
+    }
 
     public void RefreshProviders() => _editor.RefreshProviders();
 

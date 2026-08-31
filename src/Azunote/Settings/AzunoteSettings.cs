@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json.Serialization;
+using Azunyan.Core;
 using Azunyan.Syntax;
 using Tomlyn;
 using Tomlyn.Serialization;
@@ -14,6 +15,8 @@ public sealed class AzunoteSettings
     public string FontFamily { get; set; } = DefaultFontFamily;
 
     public double FontSize { get; set; } = DefaultFontSize;
+
+    public AzunoteDebugSettings Debug { get; set; } = new();
 
     public ShellCommandSettings Terminal { get; set; } = new()
     {
@@ -49,10 +52,42 @@ public sealed class AzunoteSettings
     public IReadOnlyList<ExternalToolMenuNode> ExternalToolMenu { get; internal set; } = [];
 }
 
+public sealed class AzunoteDebugSettings
+{
+    /// <summary>
+    /// Detailed editor operation-log categories. An empty list keeps the
+    /// high-volume diagnostic log disabled.
+    /// </summary>
+    public string[] Logging { get; set; } = [];
+
+    internal void Validate()
+    {
+        Logging ??= [];
+        var categories = AzunyanDiagnosticCategory.None;
+        foreach (var value in Logging)
+        {
+            if (!AzunyanDiagnosticCategories.TryParse(value, out var category))
+            {
+                var allowed = string.Join(
+                    ", ",
+                    new[] { AzunyanDiagnosticCategories.AllName }
+                        .Concat(AzunyanDiagnosticCategories.Names));
+                throw new SettingsFileException(
+                    $"Invalid debug.logging category '{value}'. Expected one of: {allowed}.");
+            }
+
+            categories |= category;
+        }
+
+        Logging = AzunyanDiagnosticCategories.ToNames(categories).ToArray();
+    }
+}
+
 [TomlSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     WriteIndented = true)]
 [TomlSerializable(typeof(AzunoteSettings))]
+[TomlSerializable(typeof(AzunoteDebugSettings))]
 [TomlSerializable(typeof(AzunoteState))]
 [TomlSerializable(typeof(WindowLayoutState))]
 [TomlSerializable(typeof(ShellCommandSettings))]
@@ -376,6 +411,8 @@ public static class SettingsFileService
         settings.FontSize = double.IsFinite(settings.FontSize) && settings.FontSize > 0
             ? settings.FontSize
             : AzunoteSettings.DefaultFontSize;
+        settings.Debug ??= new();
+        settings.Debug.Validate();
         settings.Terminal ??= new();
         settings.Terminal.Validate("terminal");
         settings.Explorer ??= new();
@@ -402,6 +439,9 @@ public static class SettingsFileService
         var directory = GetFullDirectoryPath(settingsDirectory);
         Directory.CreateDirectory(directory);
         Directory.CreateDirectory(Path.Combine(directory, ToolsDirectoryName));
+
+        settings.Debug ??= new();
+        settings.Debug.Validate();
 
         var toml = TomlSerializer.Serialize(
             settings,

@@ -142,6 +142,10 @@ The status bar's `Open Folder in Terminal` command can be configured in
 fontFamily = "Consolas"
 fontSize = 14
 
+[debug]
+# Empty disables detailed operation logging.
+logging = []
+
 [terminal]
 command = "wt.exe"
 args = ["-d", "${documentDir}"]
@@ -152,6 +156,12 @@ command = "explorer.exe"
 args = ["/select,\"${file}\""]
 workingDirectory = "${documentDir}"
 ```
+
+For crash or input troubleshooting, enable only the detailed categories you
+need in the `[debug]` section. Use `logging = ["all"]`, or select from
+`"render"`, `"clipboard"`, `"key"`, and `"input"`, for example
+`logging = ["render", "clipboard", "key"]`. Caught exceptions and crash
+reports remain in the log regardless of this setting.
 
 `terminal.*` and `explorer.*` support the same placeholders as external tools,
 including `${documentDir}`, `${file}`, `${fileName}`, and `${env:NAME}`. If

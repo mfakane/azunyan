@@ -516,6 +516,7 @@ public sealed class ExternalToolsTests
             Assert.True(Directory.Exists(SettingsFileService.GetToolsDirectoryPath(root)));
             var settingsText = await File.ReadAllTextAsync(SettingsFileService.GetSettingsFilePath(root));
             Assert.Contains("TOML", settingsText, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("[debug]", settingsText, StringComparison.Ordinal);
             Assert.Contains("[terminal]", settingsText, StringComparison.Ordinal);
             Assert.Contains("[explorer]", settingsText, StringComparison.Ordinal);
             var settings = await SettingsFileService.LoadAsync(root);

@@ -125,6 +125,7 @@ internal sealed class MainWindowRuntime : IDisposable
 
     private void ApplySettings(AzunoteSettings settings)
     {
+        _view.SetDiagnosticLogging(settings.Debug.Logging);
         _view.SetFontFamily(settings.FontFamily);
         _view.SetFontSize(settings.FontSize);
     }

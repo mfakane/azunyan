@@ -60,6 +60,14 @@ public static class AzunoteSchemaCatalog
                     Field("fontSize", AzunoteSchemaValueKind.Integer, documentation: "Font size used by the editor and its renderer.")
                 ]),
             new AzunoteSchemaTable(
+                "debug",
+                [
+                    Field(
+                        "logging",
+                        AzunoteSchemaValueKind.Array,
+                        documentation: "Detailed operation logs: all, render, clipboard, key, or input. Empty disables them.")
+                ]),
+            new AzunoteSchemaTable(
                 "terminal",
                 [
                     Field("command", AzunoteSchemaValueKind.String, "command", supportsPlaceholders: true),
