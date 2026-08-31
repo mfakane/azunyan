@@ -980,7 +980,17 @@ public sealed class TextProjectionBuilder
             : oldLines.GetLineStart(oldWindow.EndLine);
         var mappedStart = Math.Clamp(MapPosition(oldWindowStart, change, delta), 0, snapshot.Length);
         var mappedEnd = Math.Clamp(MapPosition(oldWindowEnd, change, delta), mappedStart, snapshot.Length);
-        var newWindow = GetLineWindow(snapshot, TextRange.FromBounds(mappedStart, mappedEnd));
+        // The mapped old window is empty for an insertion into an empty
+        // document. Include the inserted range itself, otherwise new logical
+        // lines are left with no visual-line mapping and caret hit testing can
+        // index past the incremental projection table.
+        var newWindowStart = Math.Min(mappedStart, change.NewRange.Start);
+        var newWindowEnd = Math.Max(mappedEnd, change.NewRange.End);
+        var newWindow = GetLineWindow(
+            snapshot,
+            TextRange.FromBounds(
+                Math.Clamp(newWindowStart, 0, snapshot.Length),
+                Math.Clamp(newWindowEnd, newWindowStart, snapshot.Length)));
         newWindow = IncludeTrailingLineIfNeeded(oldWindow, oldLines, snapshot, newWindow);
         var chunks = new List<ProjectedLineChunk>();
         previous.LineTable.AddRange(chunks, 0, oldWindow.StartLine);

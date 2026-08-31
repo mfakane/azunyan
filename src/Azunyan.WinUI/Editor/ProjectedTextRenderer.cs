@@ -323,7 +323,15 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             }
         }
 
-        var position = layout.Rows.Projection.MapDocumentPosition(anchor);
+        if (!TryMapDocumentPosition(
+                layout.Rows.Projection,
+                layout.Snapshot,
+                anchor,
+                out var position))
+        {
+            return false;
+        }
+
         var textLine = layout.Rows.Projection.Lines[position.VisualLine];
         foreach (var index in layout.Rows.GetTextRowIndices(textLine))
         {
@@ -369,7 +377,11 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         }
 
         var projection = layout.Rows.Projection;
-        var position = projection.MapDocumentPosition(anchor);
+        if (!TryMapDocumentPosition(projection, layout.Snapshot, anchor, out var position))
+        {
+            return false;
+        }
+
         var projectedLine = projection.Lines[position.VisualLine];
         var rowIndex = -1;
         foreach (var index in layout.Rows.GetTextRowIndices(projectedLine))
@@ -481,8 +493,15 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             var startColumn = row.TextStartColumn;
             if (range.Start > textLine.SourceRange.Start)
             {
-                var position = projection.MapDocumentPosition(
-                    DocumentAnchor.Before(range.Start));
+                if (!TryMapDocumentPosition(
+                        projection,
+                        layout.Snapshot,
+                        DocumentAnchor.Before(range.Start),
+                        out var position))
+                {
+                    return false;
+                }
+
                 if (projection.TryGetVisualLine(
                         textLine.LogicalLine,
                         out var textLineVisualLine)
@@ -498,8 +517,15 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             var endColumn = row.TextEndColumn;
             if (range.End < textLine.SourceRange.End)
             {
-                var position = projection.MapDocumentPosition(
-                    DocumentAnchor.Before(range.End));
+                if (!TryMapDocumentPosition(
+                        projection,
+                        layout.Snapshot,
+                        DocumentAnchor.Before(range.End),
+                        out var position))
+                {
+                    return false;
+                }
+
                 if (projection.TryGetVisualLine(
                         textLine.LogicalLine,
                         out var textLineVisualLine)
@@ -530,6 +556,43 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
 
         rectangles = result;
         return true;
+    }
+
+    private static bool TryMapDocumentPosition(
+        TextProjection projection,
+        TextSnapshot snapshot,
+        DocumentAnchor anchor,
+        out VisualPosition position)
+    {
+        position = default;
+        var offset = anchor.Position.Offset;
+        if (offset < 0 || offset > snapshot.Length)
+        {
+            return false;
+        }
+
+        var logicalLine = snapshot.Lines.GetLine(offset);
+        if (!projection.TryGetVisualLine(logicalLine, out var visualLine)
+            || visualLine < 0
+            || visualLine >= projection.VisualLineCount)
+        {
+            return false;
+        }
+
+        try
+        {
+            position = projection.MapDocumentPosition(anchor);
+            return position.VisualLine >= 0
+                && position.VisualLine < projection.VisualLineCount;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return false;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
     }
 
     private float GetCaretX(int rowIndex, int localStop, double characterWidth)
@@ -1485,6 +1548,8 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         int startColumn,
         int endColumn)
     {
+        startColumn = Math.Clamp(startColumn, 0, textLayout.Text.Length);
+        endColumn = Math.Clamp(endColumn, startColumn, textLayout.Text.Length);
         if (endColumn <= startColumn)
         {
             return;

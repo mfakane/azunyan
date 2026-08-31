@@ -75,6 +75,26 @@ public sealed class ProjectionTests
     }
 
     [Fact]
+    public void Incremental_plain_projection_maps_all_lines_inserted_into_empty_document()
+    {
+        var document = new Document();
+        var oldSnapshot = document.Snapshot;
+        var previous = TextProjectionBuilder.Build(oldSnapshot);
+
+        var change = document.Insert(0, "first\nsecond\nthird");
+        var incremental = TextProjectionBuilder.BuildIncremental(
+            oldSnapshot,
+            document.Snapshot,
+            previous,
+            change);
+
+        Assert.Equal(3, incremental.VisualLineCount);
+        Assert.Equal(
+            new VisualPosition(2, 5),
+            incremental.MapDocumentPosition(DocumentAnchor.Before(document.Length)));
+    }
+
+    [Fact]
     public void Incremental_decorated_projection_rebases_unaffected_folds_and_inlays()
     {
         var document = new Document("zz\naa\nbb\ncc\ndd\nee\n");
