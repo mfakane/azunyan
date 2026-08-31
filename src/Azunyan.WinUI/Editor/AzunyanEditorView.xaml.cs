@@ -69,6 +69,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private int? _pointerSelectionAnchor;
     private TextBlockPosition? _pointerBlockSelectionAnchor;
     private bool _pointerSelectingBlock;
+    private bool _pointerRenderScheduled;
     private uint? _selectionPointerId;
     private string _projectedAutomationStructureKey = string.Empty;
     private long _documentProviderGeneration;
@@ -107,6 +108,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         InputWindow.NativeTextBoxControl.AfterKeyUp += OnInputKeyUp;
         EditorPointerSurface.PointerPressed += OnInputPointerPressed;
         EditorPointerSurface.PointerReleased += OnInputPointerReleased;
+        EditorPointerSurface.PointerCanceled += OnInputPointerCanceled;
+        EditorPointerSurface.PointerCaptureLost += OnInputPointerCaptureLost;
         EditorPointerSurface.PointerMoved += OnInputPointerMoved;
         EditorPointerSurface.PointerExited += OnInputPointerExited;
         CompletionList.ItemClick += OnCompletionItemClick;
@@ -134,6 +137,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         InputWindow.NativeTextBoxControl.BeforeKeyDown -= OnInputKeyDown;
         InputWindow.NativeTextBoxControl.AfterKeyUp -= OnInputKeyUp;
         EditorPointerSurface.PointerReleased -= OnInputPointerReleased;
+        EditorPointerSurface.PointerCanceled -= OnInputPointerCanceled;
+        EditorPointerSurface.PointerCaptureLost -= OnInputPointerCaptureLost;
         StopPointerSelection();
         _providerScheduler.Dispose();
         if (_renderer is IDisposable renderer
@@ -460,6 +465,12 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             var hadBlockSelection = _blockSelection is not null;
             _blockSelection = null;
             _document.Selection = selection;
+            if (_selectionPointerId is not null)
+            {
+                RequestPointerRender();
+                return;
+            }
+
             SyncInputWindow();
             if (hadBlockSelection)
             {
@@ -1164,6 +1175,11 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     {
         if (args.Generation == _inputWindowGeneration)
         {
+            if (_selectionPointerId is not null)
+            {
+                return;
+            }
+
             // The native textbox moves its primary selection as part of text
             // input before TextChanged is raised.  That intermediate event
             // must not collapse the virtual caret set; the projected editor
@@ -1191,6 +1207,12 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             return;
         }
 
+        if (_selectionPointerId is not null)
+        {
+            _automationPeer?.NotifySelectionChanged();
+            return;
+        }
+
         SyncInputWindow();
         RenderViewport();
         _automationPeer?.NotifySelectionChanged();
@@ -1203,6 +1225,12 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private void OnDocumentCaretSetChanged(object? sender, EventArgs args)
     {
         if (_applyingDocumentCommand || _applyingInputChange)
+        {
+            _automationPeer?.NotifySelectionChanged();
+            return;
+        }
+
+        if (_selectionPointerId is not null)
         {
             _automationPeer?.NotifySelectionChanged();
             return;
@@ -1791,6 +1819,28 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         InputKeyboardSource.GetKeyStateForCurrentThread(key)
             .HasFlag(CoreVirtualKeyStates.Down);
 
+    private static VirtualKeyModifiers GetPointerModifiers(
+        PointerRoutedEventArgs args)
+    {
+        var modifiers = args.KeyModifiers;
+        if (IsKeyDown(VirtualKey.Control))
+        {
+            modifiers |= VirtualKeyModifiers.Control;
+        }
+
+        if (IsKeyDown(VirtualKey.Menu))
+        {
+            modifiers |= VirtualKeyModifiers.Menu;
+        }
+
+        if (IsKeyDown(VirtualKey.Shift))
+        {
+            modifiers |= VirtualKeyModifiers.Shift;
+        }
+
+        return modifiers;
+    }
+
     private void OnInputPointerPressed(object sender, PointerRoutedEventArgs args)
     {
         if (!IsProjectedTextSurface)
@@ -1847,8 +1897,13 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
         else
         {
+            var pointerModifiers = GetPointerModifiers(args);
+            var isShiftSelection = pointerModifiers.HasFlag(VirtualKeyModifiers.Shift);
             var isBlockSelection = TextWrapping == TextWrapping.NoWrap
-                && IsKeyDown(VirtualKey.Menu);
+                && pointerModifiers.HasFlag(VirtualKeyModifiers.Menu);
+            var pointerAnchor = isShiftSelection && !isBlockSelection
+                ? Document.Selection.Anchor
+                : anchor.Position.Offset;
             if (isBlockSelection)
             {
                 _pointerBlockSelectionAnchor = blockPosition;
@@ -1860,12 +1915,14 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             else
             {
                 _blockSelection = null;
-                _pointerSelectionAnchor = anchor.Position.Offset;
+                _pointerSelectionAnchor = pointerAnchor;
             }
 
             _selectionPointerId = point.PointerId;
             EditorPointerSurface.CapturePointer(args.Pointer);
-            _document.Selection = TextSelection.Caret(anchor.Position.Offset);
+            _document.Selection = isShiftSelection && !isBlockSelection
+                ? new TextSelection(pointerAnchor, anchor.Position.Offset)
+                : TextSelection.Caret(anchor.Position.Offset);
             SyncInputWindow();
             RenderViewport();
         }
@@ -1887,13 +1944,60 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             return;
         }
 
+        CompletePointerSelection();
+        args.Handled = true;
+    }
+
+    private void OnInputPointerCanceled(object sender, PointerRoutedEventArgs args) =>
+        CompletePointerSelection();
+
+    private void OnInputPointerCaptureLost(object sender, PointerRoutedEventArgs args) =>
+        CompletePointerSelection();
+
+    private void CompletePointerSelection()
+    {
+        if (_selectionPointerId is null)
+        {
+            return;
+        }
+
         var blockSelection = _pointerSelectingBlock ? _blockSelection : null;
         StopPointerSelection();
         if (blockSelection is { } committedSelection)
         {
             CommitBlockSelection(committedSelection);
         }
-        args.Handled = true;
+        else
+        {
+            SyncInputWindow();
+            RenderViewport();
+        }
+    }
+
+    private void RequestPointerRender()
+    {
+        if (_disposed || _pointerRenderScheduled)
+        {
+            return;
+        }
+
+        _pointerRenderScheduled = true;
+        if (DispatcherQueue.TryEnqueue(
+                Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
+                () =>
+                {
+                    _pointerRenderScheduled = false;
+                    if (!_disposed && _selectionPointerId is not null)
+                    {
+                        RenderViewport();
+                    }
+                }))
+        {
+            return;
+        }
+
+        _pointerRenderScheduled = false;
+        RenderViewport();
     }
 
     private void StopPointerSelection()
@@ -1919,8 +2023,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
         if (changed)
         {
-            SyncInputWindow();
-            RenderViewport();
+            RequestPointerRender();
         }
     }
 
@@ -2001,18 +2104,15 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                     GetVerticalOffset(),
                     _characterWidth,
                     out var dragAnchor,
-                    out var dragFoldId,
-                    out var dragAdornmentId,
+                    out _,
+                    out _,
                     out var dragBlockPosition))
             {
-                if (dragFoldId is null && dragAdornmentId is null)
-                {
-                    UpdateBlockSelection(
-                        new TextBlockSelection(
-                            blockSelectionAnchor,
-                            dragBlockPosition),
-                        dragAnchor.Position.Offset);
-                }
+                UpdateBlockSelection(
+                    new TextBlockSelection(
+                        blockSelectionAnchor,
+                        dragBlockPosition),
+                    dragAnchor.Position.Offset);
             }
 
             args.Handled = true;
@@ -2027,6 +2127,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 && !point.Properties.IsLeftButtonPressed)
             {
                 StopPointerSelection();
+                SyncInputWindow();
+                RenderViewport();
                 return;
             }
 
