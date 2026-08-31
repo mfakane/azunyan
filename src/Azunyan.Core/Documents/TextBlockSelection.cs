@@ -1,6 +1,24 @@
 namespace Azunyan.Core;
 
 /// <summary>
+/// The coordinate space used by a rectangular selection.
+/// </summary>
+public enum TextBlockSelectionCoordinateSpace
+{
+    /// <summary>
+    /// Lines in the document snapshot. This is the traditional block-selection
+    /// coordinate space used when wrapping is disabled.
+    /// </summary>
+    LogicalLines,
+
+    /// <summary>
+    /// Rows after projection and soft wrapping. Line numbers are visual-row
+    /// indices and columns are local display columns within each row.
+    /// </summary>
+    VisualRows
+}
+
+/// <summary>
 /// A position used by a block selection. Column is a display column rather
 /// than a UTF-16 offset, so tabs occupy the display cells up to their next
 /// tab stop.
@@ -26,26 +44,36 @@ public readonly record struct TextBlockPosition
 /// </summary>
 public readonly record struct TextBlockSelection
 {
-    public TextBlockSelection(TextBlockPosition anchor, TextBlockPosition active)
+    public TextBlockSelection(
+        TextBlockPosition anchor,
+        TextBlockPosition active,
+        TextBlockSelectionCoordinateSpace coordinateSpace =
+            TextBlockSelectionCoordinateSpace.LogicalLines)
     {
         Anchor = anchor;
         Active = active;
+        CoordinateSpace = coordinateSpace;
     }
 
     public TextBlockSelection(
         int anchorLine,
         int anchorColumn,
         int activeLine,
-        int activeColumn)
+        int activeColumn,
+        TextBlockSelectionCoordinateSpace coordinateSpace =
+            TextBlockSelectionCoordinateSpace.LogicalLines)
         : this(
             new TextBlockPosition(anchorLine, anchorColumn),
-            new TextBlockPosition(activeLine, activeColumn))
+            new TextBlockPosition(activeLine, activeColumn),
+            coordinateSpace)
     {
     }
 
     public TextBlockPosition Anchor { get; }
 
     public TextBlockPosition Active { get; }
+
+    public TextBlockSelectionCoordinateSpace CoordinateSpace { get; }
 
     public int TopLine => Math.Min(Anchor.Line, Active.Line);
 

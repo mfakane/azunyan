@@ -44,6 +44,65 @@ public sealed class TextCaretSetTests
     }
 
     [Fact]
+    public void Visual_block_selection_creates_one_caret_per_wrapped_row()
+    {
+        var snapshot = new TextSnapshot("abcdef\nXYZ");
+        var projection = TextProjectionBuilder.Build(snapshot);
+        var rows = VisualRowMapBuilder.Build(projection, wrapColumns: 3);
+        var selection = new TextBlockSelection(
+            new TextBlockPosition(0, 0),
+            new TextBlockPosition(1, 3),
+            TextBlockSelectionCoordinateSpace.VisualRows);
+
+        var carets = TextCaretSetOperations.FromVisualBlockSelection(
+            snapshot,
+            selection,
+            rows,
+            tabDisplaySize: 4);
+
+        Assert.Equal(2, carets.Count);
+        Assert.Equal(
+            new[]
+            {
+                new TextSelection(0, 3),
+                new TextSelection(3, 6),
+            },
+            carets.Select(caret => caret.Selection));
+        Assert.Equal(1, carets.PrimaryIndex);
+        Assert.Equal("abc\ndef", string.Join(
+            "\n",
+            carets.Select(caret => snapshot.GetText(caret.Selection.Range))));
+    }
+
+    [Fact]
+    public void Visual_block_replacement_keeps_adjacent_wrapped_rows_independent()
+    {
+        var snapshot = new TextSnapshot("abcdef");
+        var projection = TextProjectionBuilder.Build(snapshot);
+        var rows = VisualRowMapBuilder.Build(projection, wrapColumns: 3);
+        var selection = new TextBlockSelection(
+            new TextBlockPosition(0, 0),
+            new TextBlockPosition(1, 3),
+            TextBlockSelectionCoordinateSpace.VisualRows);
+        var carets = TextCaretSetOperations.FromVisualBlockSelection(
+            snapshot,
+            selection,
+            rows,
+            tabDisplaySize: 4);
+
+        var edit = TextCaretSetOperations.CreateReplacement(
+            snapshot,
+            carets,
+            new string?[] { "X", "Y" },
+            tabDisplaySize: 4);
+
+        var result = snapshot.Text[..edit.Range.Start]
+            + edit.Replacement
+            + snapshot.Text[edit.Range.End..];
+        Assert.Equal("XY", result);
+    }
+
+    [Fact]
     public void Movement_keeps_each_selection_anchor_when_shift_is_pressed()
     {
         var snapshot = new TextSnapshot("abc\ndef");

@@ -337,11 +337,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     public string SelectedText
     {
         get => _blockSelection is { } block
-            ? TextBlockSelectionOperations.GetSelectedText(
-                Snapshot,
-                block,
-                TabDisplaySize,
-                TextBlockSelectionOperations.GetPreferredLineEnding(Snapshot))
+            ? GetBlockSelectionText(block)
             : Snapshot.GetText(Document.Selection.Range);
         set
         {
@@ -776,11 +772,12 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private static void OnTextWrappingChanged(DependencyObject sender, DependencyPropertyChangedEventArgs args)
     {
         var view = (AzunyanEditorView)sender;
-        if ((TextWrapping)args.NewValue != TextWrapping.NoWrap)
+        if ((TextWrapping)args.OldValue != (TextWrapping)args.NewValue)
         {
             view._blockSelection = null;
             view.StopPointerSelection();
-            if (view.Document.CaretSet.Count > 1)
+            if ((TextWrapping)args.NewValue != TextWrapping.NoWrap
+                && view.Document.CaretSet.Count > 1)
             {
                 view._document.Selection = view.Document.Selection;
             }
@@ -947,6 +944,19 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         IReadOnlyList<string> replacementLines,
         bool repeatSingleLine)
     {
+        if (selection.CoordinateSpace == TextBlockSelectionCoordinateSpace.VisualRows)
+        {
+            if (!TryCreateBlockSelectionCaretSet(selection, out var caretSet))
+            {
+                _blockSelection = null;
+                return;
+            }
+
+            _blockSelection = null;
+            ApplyVisualBlockReplacement(caretSet, replacementLines);
+            return;
+        }
+
         var edit = TextBlockSelectionOperations.CreateReplacement(
             Snapshot,
             selection,
@@ -975,12 +985,53 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             TextSelection.Caret(caretPosition));
     }
 
-    private string GetBlockSelectionText(TextBlockSelection selection) =>
-        TextBlockSelectionOperations.GetSelectedText(
+    private void ApplyVisualBlockReplacement(
+        TextCaretSet caretSet,
+        IReadOnlyList<string> replacementLines)
+    {
+        var edit = TextCaretSetOperations.CreatePaste(
+            Snapshot,
+            caretSet,
+            replacementLines,
+            TextBlockSelectionOperations.GetPreferredLineEnding(Snapshot),
+            TabDisplaySize);
+        _document.Replace(edit.Range, edit.Replacement, edit.CaretSet);
+    }
+
+    private bool TryCreateBlockSelectionCaretSet(
+        TextBlockSelection selection,
+        out TextCaretSet caretSet)
+    {
+        if (selection.CoordinateSpace == TextBlockSelectionCoordinateSpace.VisualRows)
+        {
+            return _defaultRenderer.TextRenderer.TryCreateVisualBlockSelectionCaretSet(
+                selection,
+                TabDisplaySize,
+                out caretSet);
+        }
+
+        caretSet = TextCaretSetOperations.FromBlockSelection(
+            Snapshot,
+            selection,
+            TabDisplaySize);
+        return true;
+    }
+
+    private string GetBlockSelectionText(TextBlockSelection selection)
+    {
+        if (selection.CoordinateSpace == TextBlockSelectionCoordinateSpace.VisualRows)
+        {
+            return TryCreateBlockSelectionCaretSet(selection, out var visualCarets)
+                ? GetCaretSetSelectedText(visualCarets)
+                : string.Empty;
+        }
+
+        return TextBlockSelectionOperations.GetSelectedText(
             Snapshot,
             selection,
             TabDisplaySize,
             TextBlockSelectionOperations.GetPreferredLineEnding(Snapshot));
+    }
 
     private static void SetClipboardText(string text)
     {
@@ -1020,11 +1071,14 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     }
 
     private string GetCaretSetSelectedText()
+        => GetCaretSetSelectedText(Document.CaretSet);
+
+    private string GetCaretSetSelectedText(TextCaretSet caretSet)
     {
         var lineEnding = TextBlockSelectionOperations.GetPreferredLineEnding(Snapshot);
         return string.Join(
             lineEnding,
-            Document.CaretSet.Select(caret => Snapshot.GetText(caret.Selection.Range)));
+            caretSet.Select(caret => Snapshot.GetText(caret.Selection.Range)));
     }
 
     private void ApplyCaretSetReplacement(string text)
@@ -1899,8 +1953,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         {
             var pointerModifiers = GetPointerModifiers(args);
             var isShiftSelection = pointerModifiers.HasFlag(VirtualKeyModifiers.Shift);
-            var isBlockSelection = TextWrapping == TextWrapping.NoWrap
-                && pointerModifiers.HasFlag(VirtualKeyModifiers.Menu);
+            var isBlockSelection = pointerModifiers.HasFlag(VirtualKeyModifiers.Menu);
             var pointerAnchor = isShiftSelection && !isBlockSelection
                 ? Document.Selection.Anchor
                 : anchor.Position.Offset;
@@ -1910,7 +1963,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 _pointerSelectingBlock = true;
                 _blockSelection = new TextBlockSelection(
                     blockPosition,
-                    blockPosition);
+                    blockPosition,
+                    GetBlockSelectionCoordinateSpace());
             }
             else
             {
@@ -2027,12 +2081,21 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
     }
 
+    private TextBlockSelectionCoordinateSpace GetBlockSelectionCoordinateSpace() =>
+        TextWrapping == TextWrapping.Wrap
+            ? TextBlockSelectionCoordinateSpace.VisualRows
+            : TextBlockSelectionCoordinateSpace.LogicalLines;
+
     private void CommitBlockSelection(TextBlockSelection selection)
     {
-        var caretSet = TextCaretSetOperations.FromBlockSelection(
-            Snapshot,
-            selection,
-            TabDisplaySize);
+        if (!TryCreateBlockSelectionCaretSet(selection, out var caretSet))
+        {
+            _blockSelection = null;
+            SyncInputWindow();
+            RenderViewport();
+            return;
+        }
+
         _blockSelection = null;
         if (caretSet.Count == 1)
         {
@@ -2111,7 +2174,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 UpdateBlockSelection(
                     new TextBlockSelection(
                         blockSelectionAnchor,
-                        dragBlockPosition),
+                        dragBlockPosition,
+                        GetBlockSelectionCoordinateSpace()),
                     dragAnchor.Position.Offset);
             }
 

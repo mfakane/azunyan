@@ -66,6 +66,86 @@ public static class TextCaretSetOperations
         return new TextCaretSet(carets, primaryIndex);
     }
 
+    public static TextCaretSet FromVisualBlockSelection(
+        TextSnapshot snapshot,
+        TextBlockSelection selection,
+        VisualRowMap rows,
+        int tabDisplaySize)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(rows);
+        ArgumentOutOfRangeException.ThrowIfLessThan(tabDisplaySize, 1);
+        if (selection.CoordinateSpace != TextBlockSelectionCoordinateSpace.VisualRows)
+        {
+            throw new ArgumentException(
+                "The selection must use visual-row coordinates.",
+                nameof(selection));
+        }
+
+        if (rows.Rows.Count == 0)
+        {
+            throw new ArgumentException("The visual row map cannot be empty.", nameof(rows));
+        }
+
+        var firstRow = Math.Clamp(selection.TopLine, 0, rows.Rows.Count - 1);
+        var lastRow = Math.Clamp(
+            selection.BottomLine,
+            firstRow,
+            rows.Rows.Count - 1);
+        var carets = new List<TextCaretState>(lastRow - firstRow + 1);
+        var primaryIndex = -1;
+        for (var rowIndex = firstRow; rowIndex <= lastRow; rowIndex++)
+        {
+            var row = rows.Rows[rowIndex];
+            if (row.TextLine is not { } textLine)
+            {
+                continue;
+            }
+
+            var leftColumn = Math.Clamp(selection.LeftColumn, 0, row.TextLength);
+            var rightColumn = Math.Clamp(selection.RightColumn, 0, row.TextLength);
+            var start = textLine.GetAnchor(row.TextStartColumn + leftColumn)
+                .Position.Offset;
+            var end = textLine.GetAnchor(row.TextStartColumn + rightColumn)
+                .Position.Offset;
+            var rowSelection = start == end
+                ? TextSelection.Caret(start)
+                : selection.Active.Column >= selection.Anchor.Column
+                    ? new TextSelection(start, end)
+                    : new TextSelection(end, start);
+            carets.Add(new TextCaretState(
+                rowSelection,
+                TextBlockSelectionOperations.GetDisplayColumn(
+                    snapshot,
+                    rowSelection.CaretPosition,
+                    tabDisplaySize)));
+
+            if (row.VisualRowIndex == selection.Active.Line)
+            {
+                primaryIndex = carets.Count - 1;
+            }
+        }
+
+        if (carets.Count == 0)
+        {
+            throw new ArgumentException(
+                "The selection does not contain a text row.",
+                nameof(selection));
+        }
+
+        if (primaryIndex < 0)
+        {
+            primaryIndex = FindNearestVisualRowIndex(
+                rows,
+                firstRow,
+                lastRow,
+                selection.Active.Line,
+                carets);
+        }
+
+        return new TextCaretSet(carets, primaryIndex);
+    }
+
     public static TextCaretSet MoveHorizontal(
         TextSnapshot snapshot,
         TextCaretSet carets,
@@ -360,7 +440,7 @@ public static class TextCaretSetOperations
         var result = new List<ReplacementOperation>();
         foreach (var operation in sorted)
         {
-            if (result.Count == 0 || operation.Range.Start > result[^1].Range.End)
+            if (result.Count == 0 || !Overlaps(result[^1].Range, operation.Range))
             {
                 result.Add(operation with { Indices = new List<int> { operation.Index } });
                 continue;
@@ -375,6 +455,48 @@ public static class TextCaretSetOperations
         }
 
         return result;
+    }
+
+    private static int FindNearestVisualRowIndex(
+        VisualRowMap rows,
+        int firstRow,
+        int lastRow,
+        int activeRow,
+        List<TextCaretState> carets)
+    {
+        var nearest = -1;
+        var nearestDistance = int.MaxValue;
+        var caretIndex = 0;
+        for (var rowIndex = firstRow; rowIndex <= lastRow; rowIndex++)
+        {
+            if (rows.Rows[rowIndex].TextLine is null)
+            {
+                continue;
+            }
+
+            var distance = Math.Abs(rows.Rows[rowIndex].VisualRowIndex - activeRow);
+            if (distance < nearestDistance)
+            {
+                nearest = caretIndex;
+                nearestDistance = distance;
+            }
+
+            caretIndex++;
+        }
+
+        return Math.Clamp(nearest, 0, carets.Count - 1);
+    }
+
+    private static bool Overlaps(TextRange left, TextRange right)
+    {
+        if (left.IsEmpty || right.IsEmpty)
+        {
+            return left.IsEmpty
+                && right.IsEmpty
+                && left.Start == right.Start;
+        }
+
+        return right.Start < left.End && left.Start < right.End;
     }
 
     private static int MapPosition(int position, IReadOnlyList<ReplacementOperation> operations)

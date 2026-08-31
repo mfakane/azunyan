@@ -687,7 +687,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         // characterWidth below.
         var xInTextPixels = x + horizontalOffset - contentLeft;
         blockPosition = new TextBlockPosition(
-            textLine.LogicalLine,
+            layout.WrapColumns > 0 ? row.VisualRowIndex : textLine.LogicalLine,
             GetDisplayColumn(xInTextPixels, characterWidth));
         var localColumn = GetNearestCaretStop(
             rowIndex,
@@ -732,6 +732,28 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             }
         }
 
+        return true;
+    }
+
+    internal bool TryCreateVisualBlockSelectionCaretSet(
+        TextBlockSelection selection,
+        int tabDisplaySize,
+        out TextCaretSet caretSet)
+    {
+        caretSet = null!;
+        if (selection.CoordinateSpace != TextBlockSelectionCoordinateSpace.VisualRows
+            || _cachedLayout is not { } layout
+            || layout.WrapColumns <= 0
+            || !ReferenceEquals(layout.Snapshot, _renderFrame?.Context.Snapshot))
+        {
+            return false;
+        }
+
+        caretSet = TextCaretSetOperations.FromVisualBlockSelection(
+            layout.Snapshot,
+            selection,
+            layout.Rows,
+            tabDisplaySize);
         return true;
     }
 
@@ -1256,7 +1278,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             _textLayouts.Add(row, textLayout);
         }
 
-        DrawSelection(drawingSession, context, line, textLayout, top);
+        DrawSelection(drawingSession, context, line, textLayout, top, row);
         textLayout.Draw(
             drawingSession,
             (float)(context.ContentLeft - context.HorizontalOffset),
@@ -1318,10 +1340,38 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         AzunyanEditorRenderContext context,
         UnwrappedLineLayout layout,
         DirectWriteTextLayout textLayout,
-        double top)
+        double top,
+        VisualRow row)
     {
         if (context.BlockSelection is { } blockSelection)
         {
+            if (blockSelection.CoordinateSpace ==
+                TextBlockSelectionCoordinateSpace.VisualRows)
+            {
+                if (row.VisualRowIndex < blockSelection.TopLine
+                    || row.VisualRowIndex > blockSelection.BottomLine)
+                {
+                    return;
+                }
+
+                var startColumn = Math.Clamp(
+                    blockSelection.LeftColumn,
+                    0,
+                    row.TextLength);
+                var endColumn = Math.Clamp(
+                    blockSelection.RightColumn,
+                    0,
+                    row.TextLength);
+                DrawSelectionColumns(
+                    drawingSession,
+                    context,
+                    textLayout,
+                    top,
+                    startColumn,
+                    endColumn);
+                return;
+            }
+
             if (context.TextWrapping == TextWrapping.NoWrap)
             {
                 var logicalLine = layout.SourceLine.LogicalLine;
@@ -1420,6 +1470,33 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             drawingSession.FillRectangle(
                 new Rect(
                     left + bounds.X,
+                    top,
+                    Math.Max(1, bounds.Width),
+                    context.LineHeight),
+                context.ColorScheme.SelectionBackground);
+        }
+    }
+
+    private static void DrawSelectionColumns(
+        CanvasDrawingSession drawingSession,
+        AzunyanEditorRenderContext context,
+        DirectWriteTextLayout textLayout,
+        double top,
+        int startColumn,
+        int endColumn)
+    {
+        if (endColumn <= startColumn)
+        {
+            return;
+        }
+
+        foreach (var bounds in textLayout.GetCharacterBounds(
+            startColumn,
+            endColumn - startColumn))
+        {
+            drawingSession.FillRectangle(
+                new Rect(
+                    context.ContentLeft - context.HorizontalOffset + bounds.X,
                     top,
                     Math.Max(1, bounds.Width),
                     context.LineHeight),
