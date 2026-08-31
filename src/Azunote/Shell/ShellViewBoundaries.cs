@@ -13,6 +13,7 @@ internal sealed record StatusBarState(
     string Encoding,
     string LineEnding,
     string Indentation,
+    string LanguageMode,
     string FilePath,
     bool HasFilePath = false);
 

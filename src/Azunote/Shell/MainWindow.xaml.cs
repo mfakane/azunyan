@@ -66,6 +66,7 @@ public sealed partial class MainWindow : Window, IDisposable
             EncodingStatus,
             LineEndingStatus,
             IndentationStatus,
+            LanguageModeStatus,
             FilePathStatus);
         _view.ConfigureTheme();
         _runtime = new MainWindowRuntime(

@@ -47,6 +47,7 @@ internal sealed class MainWindowViewAdapter :
     private readonly TextBlock _encodingStatus;
     private readonly TextBlock _lineEndingStatus;
     private readonly TextBlock _indentationStatus;
+    private readonly TextBlock _languageModeStatus;
     private readonly TextBlock _filePathStatus;
     private readonly List<KeyboardAccelerator> _externalToolAccelerators = [];
     private readonly List<MenuFlyoutItemBase> _externalToolMenuItems = [];
@@ -90,6 +91,7 @@ internal sealed class MainWindowViewAdapter :
         TextBlock encodingStatus,
         TextBlock lineEndingStatus,
         TextBlock indentationStatus,
+        TextBlock languageModeStatus,
         TextBlock filePathStatus)
     {
         ArgumentNullException.ThrowIfNull(window);
@@ -139,6 +141,7 @@ internal sealed class MainWindowViewAdapter :
         _encodingStatus = encodingStatus ?? throw new ArgumentNullException(nameof(encodingStatus));
         _lineEndingStatus = lineEndingStatus ?? throw new ArgumentNullException(nameof(lineEndingStatus));
         _indentationStatus = indentationStatus ?? throw new ArgumentNullException(nameof(indentationStatus));
+        _languageModeStatus = languageModeStatus ?? throw new ArgumentNullException(nameof(languageModeStatus));
         _filePathStatus = filePathStatus ?? throw new ArgumentNullException(nameof(filePathStatus));
 
         _windowHandle = WindowNative.GetWindowHandle(window);
@@ -298,6 +301,7 @@ internal sealed class MainWindowViewAdapter :
         _encodingStatus.Text = state.Encoding;
         _lineEndingStatus.Text = state.LineEnding;
         _indentationStatus.Text = state.Indentation;
+        _languageModeStatus.Text = state.LanguageMode;
         _filePathStatus.Text = state.FilePath;
         SetFilePathMenuState(state.HasFilePath);
     }

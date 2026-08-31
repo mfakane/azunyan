@@ -30,6 +30,11 @@ internal sealed class LanguageModeController
 
     public string CurrentModeId => _currentModeId;
 
+    public string CurrentModeDisplayName =>
+        _catalog.TryGet(_currentModeId, out var mode)
+            ? mode.DisplayName
+            : _currentModeId;
+
     public bool IsManuallySelected => _manuallySelected;
 
     public event EventHandler? Changed;

@@ -90,7 +90,12 @@ internal sealed class MainWindowRuntime : IDisposable
         _view.SetTabDisplaySizeLabel(_view.TabDisplaySize);
         _view.SetIndentSizeLabel(_view.IndentSize);
         _view.SetIndentationInputModeLabel(_view.IndentationInputMode);
-        _status = new DocumentStatusPresenter(_view, _session, _view, _view);
+        _status = new DocumentStatusPresenter(
+            _view,
+            _session,
+            _view,
+            _view,
+            () => _languageModes.CurrentModeDisplayName);
         _findReplace = new FindReplaceController(
             _view,
             _view,
@@ -414,8 +419,11 @@ internal sealed class MainWindowRuntime : IDisposable
         _refreshWindowMenus();
     }
 
-    private void LanguageModes_Changed(object? sender, EventArgs args) =>
+    private void LanguageModes_Changed(object? sender, EventArgs args)
+    {
+        _status.Refresh();
         RefreshExternalToolsMenu();
+    }
 
     private ExternalToolMenuState GetExternalToolMenuState(ExternalToolSettings tool)
     {

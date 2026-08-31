@@ -378,6 +378,7 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="PositionStatus" Grid.Column="0" Text="Ln 1, Col 1" />
@@ -385,7 +386,8 @@
                 <TextBlock x:Name="LineEndingStatus" Grid.Column="2" Text="LF" />
                 <TextBlock x:Name="IndentationStatus" Grid.Column="3" Text="Spaces: 2"
                            Tapped="IndentationStatus_Tapped" />
-                <TextBlock x:Name="FilePathStatus" Grid.Column="4" HorizontalAlignment="Right" Text="Untitled" TextTrimming="CharacterEllipsis"
+                <TextBlock x:Name="LanguageModeStatus" Grid.Column="4" Text="Plain Text" />
+                <TextBlock x:Name="FilePathStatus" Grid.Column="5" HorizontalAlignment="Right" Text="Untitled" TextTrimming="CharacterEllipsis"
                            Tapped="FilePathStatus_Tapped" />
             </Grid>
         </Border>
