@@ -18,6 +18,32 @@ public sealed class ExternalToolsTests
     }
 
     [Fact]
+    public void Command_line_detects_help_before_the_end_of_options()
+    {
+        Assert.True(AzunoteCommandLine.IsHelpRequested(new[] { "notes.md", "--help" }));
+        Assert.True(AzunoteCommandLine.IsHelpRequested(new[] { "-h" }));
+        Assert.False(AzunoteCommandLine.IsHelpRequested(new[] { "--", "--help" }));
+    }
+
+    [Fact]
+    public void Command_line_writes_help_for_the_supported_options()
+    {
+        using var writer = new StringWriter();
+
+        AzunoteCommandLine.WriteUsage(writer);
+
+        var output = writer.ToString();
+        Assert.Equal(AzunoteCommandLine.Usage + Environment.NewLine, output);
+        Assert.Contains("-h, --help", output, StringComparison.Ordinal);
+        Assert.Contains("-w, --wait", output, StringComparison.Ordinal);
+        Assert.Contains("-l, --line N", output, StringComparison.Ordinal);
+        Assert.Contains("-c, --column N", output, StringComparison.Ordinal);
+        Assert.Contains("--stdin, -", output, StringComparison.Ordinal);
+        Assert.Contains("+N[:M]", output, StringComparison.Ordinal);
+        Assert.Contains("--", output, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Command_line_supports_external_editor_goto_and_stdin()
     {
         var gotoOptions = AzunoteCommandLine.Parse(new[] { "+4:9", "notes.md" });

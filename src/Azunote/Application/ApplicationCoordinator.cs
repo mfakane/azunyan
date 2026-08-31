@@ -68,14 +68,16 @@ internal sealed class ApplicationCoordinator : IDisposable
 
         if (options.ReadStandardInput)
         {
-            _ = OpenStandardInputAsync(runtime, options);
+            await OpenStandardInputAsync(runtime, options);
+            await WaitForCloseIfRequestedAsync(registration, options);
         }
         else if (!string.IsNullOrWhiteSpace(options.FilePath))
         {
-            _ = runtime.OpenStartupDocumentAsync(
+            await runtime.OpenStartupDocumentAsync(
                 options.FilePath,
                 options.Line,
                 options.Column);
+            await WaitForCloseIfRequestedAsync(registration, options);
         }
         else if (options.ShowHelp)
         {

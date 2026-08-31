@@ -5,6 +5,9 @@ namespace Azunote;
 
 public partial class App : Application, IDisposable
 {
+    private const uint AttachParentProcess = 0xFFFFFFFF;
+    private const uint StandardOutputHandle = 0xFFFFFFF5;
+    private const nint InvalidHandleValue = -1;
     private const uint MessageBoxOk = 0x00000000;
     private const uint MessageBoxIconError = 0x00000010;
     private static int _unhandledDialogShown;
@@ -41,6 +44,15 @@ public partial class App : Application, IDisposable
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         var arguments = Environment.GetCommandLineArgs().Skip(1).ToArray();
+        if (AzunoteCommandLine.IsHelpRequested(arguments))
+        {
+            AttachParentConsoleForOutput();
+            AzunoteCommandLine.WriteUsage(Console.Out);
+            Console.Out.Flush();
+            Environment.Exit(0);
+            return;
+        }
+
         if (!_singleInstance.TryAcquire())
         {
             var exitCode = 0;
@@ -174,6 +186,35 @@ public partial class App : Application, IDisposable
             ErrorReporter.LogException("Fallback error dialog failure", exception);
         }
     }
+
+    private static void AttachParentConsoleForOutput()
+    {
+        var standardOutput = GetStdHandle(StandardOutputHandle);
+        if (standardOutput != nint.Zero && standardOutput != InvalidHandleValue)
+        {
+            return;
+        }
+
+        if (AttachConsole(AttachParentProcess) == 0)
+        {
+            return;
+        }
+
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true
+        });
+        Console.SetError(new StreamWriter(Console.OpenStandardError())
+        {
+            AutoFlush = true
+        });
+    }
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    private static partial int AttachConsole(uint processId);
+
+    [LibraryImport("kernel32.dll")]
+    private static partial nint GetStdHandle(uint standardHandle);
 
     [LibraryImport("user32.dll", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
     private static partial int MessageBoxW(

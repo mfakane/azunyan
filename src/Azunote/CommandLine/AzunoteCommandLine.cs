@@ -30,6 +30,51 @@ public sealed class CommandLineParseException : ArgumentException
 
 public static class AzunoteCommandLine
 {
+    private static readonly string[] UsageLines =
+    [
+        "Usage: Azunote [options] [path]",
+        "",
+        "Options:",
+        "  -h, --help              Show this help and exit.",
+        "  -w, --wait              Wait until the opened document window closes.",
+        "  -l, --line N            Open at one-based line N.",
+        "      --line=N            Equivalent form of --line N.",
+        "  -c, --column N          Open at one-based column N.",
+        "      --column=N          Equivalent form of --column N.",
+        "      --stdin, -          Read the document from standard input.",
+        "      +N[:M]              Open at one-based line N and optional column M.",
+        "      --                  Treat remaining arguments as a document path.",
+        "  path                    Open one document path.",
+    ];
+
+    internal static bool IsHelpRequested(IEnumerable<string> arguments)
+    {
+        ArgumentNullException.ThrowIfNull(arguments);
+
+        var positionalsAllowed = true;
+        foreach (var argument in arguments)
+        {
+            if (positionalsAllowed && argument == "--")
+            {
+                positionalsAllowed = false;
+                continue;
+            }
+
+            if (positionalsAllowed && (argument == "-h" || argument == "--help"))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    internal static void WriteUsage(TextWriter writer)
+    {
+        ArgumentNullException.ThrowIfNull(writer);
+        writer.WriteLine(Usage);
+    }
+
     public static AzunoteCommandLineOptions Parse(IEnumerable<string> arguments)
     {
         ArgumentNullException.ThrowIfNull(arguments);
@@ -133,8 +178,7 @@ public static class AzunoteCommandLine
         return options;
     }
 
-    public static string Usage =>
-        "Usage: Azunote [--wait] [--line N] [--column N] [--stdin | path]";
+    public static string Usage => string.Join(Environment.NewLine, UsageLines);
 
     private static bool TryReadOptionValue(
         string argument,
