@@ -214,24 +214,24 @@
         </Grid.RowDefinitions>
         <MenuBar Grid.Row="0">
             <MenuBarItem Title="File">
-                <MenuFlyoutItem Text="New" Click="NewMenuItem_Click" KeyboardAcceleratorPlacementMode="Auto">
+                <MenuFlyoutItem Text="New" Click="NewMenuItem_Click">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="N" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Open..." Click="OpenButton_Click" KeyboardAcceleratorPlacementMode="Auto">
+                <MenuFlyoutItem Text="Open..." Click="OpenButton_Click">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="O" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
                 <MenuFlyoutSubItem x:Name="OpenRecentMenuItem" Text="Open Recent" />
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Save" Click="SaveButton_Click" KeyboardAcceleratorPlacementMode="Auto">
+                <MenuFlyoutItem Text="Save" Click="SaveButton_Click">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="S" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Save As..." Click="SaveAsButton_Click" KeyboardAcceleratorPlacementMode="Auto">
+                <MenuFlyoutItem Text="Save As..." Click="SaveAsButton_Click">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="S" Modifiers="Control,Shift" />
                     </MenuFlyoutItem.KeyboardAccelerators>
@@ -240,35 +240,58 @@
                 <MenuFlyoutItem Text="Exit" Click="ExitMenuItem_Click" />
             </MenuBarItem>
             <MenuBarItem Title="Edit">
-                <MenuFlyoutItem Text="Undo" Click="UndoMenuItem_Click" />
-                <MenuFlyoutItem Text="Redo" Click="RedoMenuItem_Click" />
+                <MenuFlyoutItem Text="Undo" Click="UndoMenuItem_Click">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="Z" Modifiers="Control" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Redo" Click="RedoMenuItem_Click">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="Y" Modifiers="Control" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Cut" Click="CutMenuItem_Click" />
-                <MenuFlyoutItem Text="Copy" Click="CopyMenuItem_Click" />
-                <MenuFlyoutItem Text="Paste" Click="PasteMenuItem_Click" />
+                <MenuFlyoutItem Text="Cut" Click="CutMenuItem_Click">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="X" Modifiers="Control" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Copy" Click="CopyMenuItem_Click">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="C" Modifiers="Control" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Paste" Click="PasteMenuItem_Click">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="V" Modifiers="Control" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Find..." Click="FindButton_Click" KeyboardAcceleratorPlacementMode="Auto">
+                <MenuFlyoutItem Text="Find..." Click="FindButton_Click">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="F" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Replace..." Click="ReplaceButton_Click" KeyboardAcceleratorPlacementMode="Auto">
+                <MenuFlyoutItem Text="Replace..." Click="ReplaceButton_Click">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="H" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Go to Line..." Click="GoToLineMenuItem_Click" KeyboardAcceleratorPlacementMode="Auto">
+                <MenuFlyoutItem Text="Go to Line..." Click="GoToLineMenuItem_Click">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="G" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Select All" Click="SelectAllMenuItem_Click" />
+                <MenuFlyoutItem Text="Select All" Click="SelectAllMenuItem_Click">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="A" Modifiers="Control" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem
                     Text="Show Completions"
-                    Click="ShowCompletionMenuItem_Click"
-                    KeyboardAcceleratorPlacementMode="Auto">
+                    Click="ShowCompletionMenuItem_Click">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <!-- Keep the shortcut attached to the command; the
                              editor host provides a fallback when native text
