@@ -253,7 +253,9 @@ public static class TextEditorCommands
     /// line's leading spaces and tabs onto the new line. The existing document
     /// line-ending style is preserved when one is present.
     /// </summary>
-    public static TextChange InsertNewLineWithAutoIndent(Document document)
+    public static TextChange InsertNewLineWithAutoIndent(
+        Document document,
+        string? preferredLineEnding = null)
     {
         ArgumentNullException.ThrowIfNull(document);
 
@@ -263,7 +265,10 @@ public static class TextEditorCommands
             selection.Range);
         return document.Replace(
             replacementRange,
-            GetNewLineWithAutoIndentation(document.Snapshot, selection.Start));
+            GetNewLineWithAutoIndentation(
+                document.Snapshot,
+                selection.Start,
+                preferredLineEnding));
     }
 
     /// <summary>
@@ -300,10 +305,13 @@ public static class TextEditorCommands
     /// from the line containing <paramref name="position"/> and adjusted for
     /// the surrounding bracket structure.
     /// </summary>
-    public static string GetNewLineWithAutoIndentation(TextSnapshot snapshot, int position)
+    public static string GetNewLineWithAutoIndentation(
+        TextSnapshot snapshot,
+        int position,
+        string? preferredLineEnding = null)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
-        return GetPreferredLineEnding(snapshot.Text)
+        return GetPreferredLineEnding(snapshot.Text, preferredLineEnding)
             + GetAutoIndentation(snapshot, position);
     }
 
@@ -440,8 +448,22 @@ public static class TextEditorCommands
         return text[start..indentationEnd];
     }
 
-    private static string GetPreferredLineEnding(string text)
+    private static string GetPreferredLineEnding(
+        string text,
+        string? preferredLineEnding = null)
     {
+        if (preferredLineEnding is not null)
+        {
+            if (preferredLineEnding is not "\n" and not "\r\n" and not "\r")
+            {
+                throw new ArgumentException(
+                    "The preferred line ending must be LF, CRLF, or CR.",
+                    nameof(preferredLineEnding));
+            }
+
+            return preferredLineEnding;
+        }
+
         for (var index = 0; index < text.Length; index++)
         {
             switch (text[index])

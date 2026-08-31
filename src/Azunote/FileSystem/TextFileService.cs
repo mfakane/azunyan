@@ -8,6 +8,7 @@ public enum TextEncodingKind
     Utf8Bom,
     Utf16LittleEndian,
     Utf16BigEndian,
+    Latin1,
     SystemDefault
 }
 
@@ -36,17 +37,27 @@ public static class TextFileService
     private static readonly UTF8Encoding Utf8Bom = new(encoderShouldEmitUTF8Identifier: true, throwOnInvalidBytes: true);
     private static readonly UnicodeEncoding Utf16LittleEndian = new(bigEndian: false, byteOrderMark: true);
     private static readonly UnicodeEncoding Utf16BigEndian = new(bigEndian: true, byteOrderMark: true);
+    private static readonly Encoding Latin1 = Encoding.Latin1;
 
-    public static async Task<TextFileData> ReadAsync(string path, CancellationToken cancellationToken = default)
+    public static Task<TextFileData> ReadAsync(
+        string path,
+        CancellationToken cancellationToken = default) =>
+        ReadAsync(path, encodingHint: null, cancellationToken);
+
+    public static async Task<TextFileData> ReadAsync(
+        string path,
+        TextEncodingKind? encodingHint,
+        CancellationToken cancellationToken = default)
     {
         var bytes = await File.ReadAllBytesAsync(path, cancellationToken);
-        var (encoding, body) = DetectEncoding(bytes);
+        var (encoding, body) = DetectEncoding(bytes, encodingHint);
         var text = encoding switch
         {
             TextEncodingKind.Utf8 => Utf8.GetString(body),
             TextEncodingKind.Utf8Bom => Utf8Bom.GetString(body),
             TextEncodingKind.Utf16LittleEndian => Utf16LittleEndian.GetString(body),
             TextEncodingKind.Utf16BigEndian => Utf16BigEndian.GetString(body),
+            TextEncodingKind.Latin1 => Latin1.GetString(body),
             _ => GetSystemDefaultEncoding().GetString(body)
         };
 
@@ -197,6 +208,7 @@ public static class TextFileService
         TextEncodingKind.Utf8Bom => "UTF-8 BOM",
         TextEncodingKind.Utf16LittleEndian => "UTF-16 LE",
         TextEncodingKind.Utf16BigEndian => "UTF-16 BE",
+        TextEncodingKind.Latin1 => "Latin-1",
         _ => "System default"
     };
 
@@ -209,7 +221,9 @@ public static class TextFileService
         _ => "None"
     };
 
-    private static (TextEncodingKind Encoding, byte[] Body) DetectEncoding(byte[] bytes)
+    private static (TextEncodingKind Encoding, byte[] Body) DetectEncoding(
+        byte[] bytes,
+        TextEncodingKind? encodingHint)
     {
         if (bytes.AsSpan().StartsWith(new byte[] { 0xEF, 0xBB, 0xBF }))
         {
@@ -224,6 +238,21 @@ public static class TextFileService
         if (bytes.AsSpan().StartsWith(new byte[] { 0xFE, 0xFF }))
         {
             return (TextEncodingKind.Utf16BigEndian, bytes[2..]);
+        }
+
+        if (encodingHint is { } hintedEncoding
+            && hintedEncoding != TextEncodingKind.SystemDefault)
+        {
+            try
+            {
+                _ = GetEncoding(hintedEncoding).GetString(bytes);
+                return (hintedEncoding, bytes);
+            }
+            catch (DecoderFallbackException)
+            {
+                // Fall back to the existing byte-based detection when the
+                // configured encoding cannot decode this file.
+            }
         }
 
         try
@@ -243,6 +272,7 @@ public static class TextFileService
         TextEncodingKind.Utf8Bom => Utf8Bom,
         TextEncodingKind.Utf16LittleEndian => Utf16LittleEndian,
         TextEncodingKind.Utf16BigEndian => Utf16BigEndian,
+        TextEncodingKind.Latin1 => Latin1,
         _ => GetSystemDefaultEncoding()
     };
 

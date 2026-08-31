@@ -64,6 +64,8 @@ internal interface IEditorView : IEditorBuffer
 
     void SetIndentationInputMode(IndentationInputMode mode);
 
+    void ApplyEditorConfig(EditorConfigSettings settings);
+
     void SetPosition(LineColumn position);
 
     void SetStartupPosition(int? line, int? column);

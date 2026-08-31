@@ -45,6 +45,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private bool _suppressVerticalCaretNavigation;
     private int? _indentSize;
     private IndentationInputMode _indentationInputMode;
+    private string? _preferredLineEnding;
     private readonly Queue<Action> _pendingCompositionOperations = new();
     private readonly List<(VirtualKey Key, Action Action)> _pendingKeyEdits = [];
     private readonly Queue<Func<Task>> _pendingPasteOperations = new();
@@ -450,6 +451,20 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
             SetValue(IndentationInputModeProperty, value);
         }
+    }
+
+    public void SetPreferredLineEnding(string? lineEnding)
+    {
+        if (lineEnding is not null
+            && lineEnding is not "\n" and not "\r\n" and not "\r")
+        {
+            throw new ArgumentException(
+                "The preferred line ending must be LF, CRLF, or CR.",
+                nameof(lineEnding));
+        }
+
+        _preferredLineEnding = lineEnding;
+        InputWindow.PreferredLineEnding = lineEnding;
     }
 
     public bool AcceptsReturn
@@ -1016,7 +1031,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 {
                     var autoIndentedBreak = TextEditorCommands.GetNewLineWithAutoIndentation(
                         oldSnapshot,
-                        args.Change.OldRange.Start);
+                        args.Change.OldRange.Start,
+                        _preferredLineEnding);
                     if (TryGetLeadingLineEndingLength(
                             autoIndentedBreak,
                             out var generatedLineEndingLength)
@@ -1080,7 +1096,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             TabDisplaySize,
             replacementLines,
             repeatSingleLine,
-            TextBlockSelectionOperations.GetPreferredLineEnding(Snapshot));
+            TextBlockSelectionOperations.GetPreferredLineEnding(
+                Snapshot,
+                _preferredLineEnding));
         _blockSelection = null;
         if (edit is not { } blockEdit)
         {
@@ -1110,7 +1128,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             Snapshot,
             caretSet,
             replacementLines,
-            TextBlockSelectionOperations.GetPreferredLineEnding(Snapshot),
+            TextBlockSelectionOperations.GetPreferredLineEnding(
+                Snapshot,
+                _preferredLineEnding),
             TabDisplaySize);
         _document.Replace(edit.Range, edit.Replacement, edit.CaretSet);
     }
@@ -1147,7 +1167,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             Snapshot,
             selection,
             TabDisplaySize,
-            TextBlockSelectionOperations.GetPreferredLineEnding(Snapshot));
+            TextBlockSelectionOperations.GetPreferredLineEnding(
+                Snapshot,
+                _preferredLineEnding));
     }
 
     private static void SetClipboardText(string text)
@@ -1214,7 +1236,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                     Snapshot,
                     Document.CaretSet,
                     lines,
-                    TextBlockSelectionOperations.GetPreferredLineEnding(Snapshot),
+                    TextBlockSelectionOperations.GetPreferredLineEnding(
+                        Snapshot,
+                        _preferredLineEnding),
                     TabDisplaySize);
                 _document.Replace(edit.Range, edit.Replacement, edit.CaretSet);
             });
@@ -1238,7 +1262,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     private string GetCaretSetSelectedText(TextCaretSet caretSet)
     {
-        var lineEnding = TextBlockSelectionOperations.GetPreferredLineEnding(Snapshot);
+        var lineEnding = TextBlockSelectionOperations.GetPreferredLineEnding(
+            Snapshot,
+            _preferredLineEnding);
         return string.Join(
             lineEnding,
             caretSet.Select(caret => Snapshot.GetText(caret.Selection.Range)));

@@ -131,7 +131,10 @@ public sealed class ExternalToolController
     {
         if (temporaryFilePath is not null)
         {
-            await _documents.ReloadFromTemporaryFileAsync(temporaryFilePath, cancellationToken);
+            await _documents.ReloadFromTemporaryFileAsync(
+                temporaryFilePath,
+                _documents.Session.State.Encoding,
+                cancellationToken);
             return;
         }
 
@@ -145,12 +148,17 @@ public sealed class ExternalToolController
 
         if (_documents.Session.State.IsDirty)
         {
-            var changedDocument = await _files.ReadAsync(filePath, cancellationToken);
+            var changedDocument = await _files.ReadAsync(
+                filePath,
+                _documents.Session.State.Encoding,
+                cancellationToken);
             await _documents.ApplyExternalChangeAsync(changedDocument, cancellationToken);
         }
         else
         {
-            await _documents.ReloadFromDiskAsync(cancellationToken);
+            await _documents.ReloadFromDiskAsync(
+                _documents.Session.State.Encoding,
+                cancellationToken);
         }
     }
 

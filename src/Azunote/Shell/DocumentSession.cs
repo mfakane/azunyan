@@ -96,6 +96,18 @@ public sealed class DocumentSession
         });
     }
 
+    public void ApplyEditorConfig(EditorConfigSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        Update(_state with
+        {
+            Encoding = settings.Encoding ?? _state.Encoding,
+            LineEnding = settings.LineEnding is { } lineEnding
+                ? GetLineEndingOrDefault(lineEnding)
+                : _state.LineEnding
+        });
+    }
+
     public static LineEndingKind GetDefaultLineEnding() =>
         OperatingSystem.IsWindows() ? LineEndingKind.CrLf : LineEndingKind.Lf;
 

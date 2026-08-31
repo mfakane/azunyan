@@ -74,6 +74,62 @@ public sealed class DocumentControllerTests
         Assert.False(session.State.IsDirty);
     }
 
+    [Fact]
+    public async Task Save_applies_editorconfig_save_rules_and_updates_the_editor()
+    {
+        var editor = new FakeEditorBuffer();
+        var session = new DocumentSession();
+        var files = new FakeTextFileStore();
+        var prompt = new FakeUserPrompt();
+        var controller = new DocumentController(editor, session, files, prompt);
+        session.Load(
+            "notes.txt",
+            new TextFileData("first  \nsecond", TextEncodingKind.Utf8, LineEndingKind.Lf));
+        editor.SetText("first  \nsecond");
+        session.ObserveText(editor.Text);
+        var settings = new EditorConfigSettings(
+            LineEnding: LineEndingKind.Lf,
+            InsertFinalNewline: true,
+            TrimTrailingWhitespace: true);
+        session.ApplyEditorConfig(settings);
+
+        Assert.True(await controller.SaveAsync(editorConfig: settings));
+
+        Assert.Equal("first\nsecond\n", editor.Text);
+        Assert.Equal("first\nsecond\n", files.Files[Path.GetFullPath("notes.txt")].Text);
+        Assert.False(session.State.IsDirty);
+    }
+
+    [Fact]
+    public async Task SaveAs_uses_the_dialog_encoding_and_line_ending_over_editorconfig()
+    {
+        var editor = new FakeEditorBuffer();
+        var session = new DocumentSession();
+        var files = new FakeTextFileStore();
+        var prompt = new FakeUserPrompt();
+        var controller = new DocumentController(editor, session, files, prompt);
+        editor.SetText("first  \nsecond");
+        var settings = new EditorConfigSettings(
+            Encoding: TextEncodingKind.Utf16BigEndian,
+            LineEnding: LineEndingKind.CrLf,
+            InsertFinalNewline: true,
+            TrimTrailingWhitespace: true);
+
+        await controller.SaveAsAsync(
+            new SaveFileDialogResult(
+                "saved.txt",
+                TextEncodingKind.Utf8,
+                LineEndingKind.Lf),
+            editorConfig: settings);
+
+        var saved = files.Files[Path.GetFullPath("saved.txt")];
+        Assert.Equal(TextEncodingKind.Utf8, saved.Encoding);
+        Assert.Equal(LineEndingKind.Lf, saved.LineEnding);
+        Assert.Equal("first\nsecond\n", saved.Text);
+        Assert.Equal(TextEncodingKind.Utf8, session.State.Encoding);
+        Assert.Equal(LineEndingKind.Lf, session.State.LineEnding);
+    }
+
     private sealed class FakeEditorBuffer : IEditorBuffer
     {
         private Document _document = new();
@@ -99,7 +155,15 @@ public sealed class DocumentControllerTests
     {
         public Dictionary<string, TextFileData> Files { get; } = new(StringComparer.OrdinalIgnoreCase);
 
-        public Task<TextFileData> ReadAsync(string path, CancellationToken cancellationToken = default) =>
+        public Task<TextFileData> ReadAsync(
+            string path,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(Files[Path.GetFullPath(path)]);
+
+        public Task<TextFileData> ReadAsync(
+            string path,
+            TextEncodingKind? encodingHint,
+            CancellationToken cancellationToken = default) =>
             Task.FromResult(Files[Path.GetFullPath(path)]);
 
         public Task WriteAsync(

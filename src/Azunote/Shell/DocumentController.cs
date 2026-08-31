@@ -32,6 +32,12 @@ public sealed class DocumentController
         CancellationToken cancellationToken = default) =>
         _files.ReadAsync(path, cancellationToken);
 
+    public Task<TextFileData> ReadAsync(
+        string path,
+        TextEncodingKind? encodingHint,
+        CancellationToken cancellationToken = default) =>
+        _files.ReadAsync(path, encodingHint, cancellationToken);
+
     public async Task<bool> ConfirmPendingChangesAsync(Func<Task<bool>> saveAsync)
     {
         ArgumentNullException.ThrowIfNull(saveAsync);
@@ -48,9 +54,22 @@ public sealed class DocumentController
         };
     }
 
-    public async Task OpenAsync(string path, CancellationToken cancellationToken = default)
+    public async Task OpenAsync(
+        string path,
+        CancellationToken cancellationToken = default)
     {
-        var data = await _files.ReadAsync(path, cancellationToken);
+        await OpenAsync(
+            path,
+            encodingHint: null,
+            cancellationToken: cancellationToken);
+    }
+
+    public async Task OpenAsync(
+        string path,
+        TextEncodingKind? encodingHint,
+        CancellationToken cancellationToken = default)
+    {
+        var data = await _files.ReadAsync(path, encodingHint, cancellationToken);
         ReplaceEditorText(data.Text);
         _session.Load(path, data);
         _editor.SetSelection(TextSelection.Caret(0));
@@ -75,7 +94,12 @@ public sealed class DocumentController
             DocumentSession.GetDefaultLineEnding());
     }
 
-    public async Task<bool> SaveAsync(CancellationToken cancellationToken = default)
+    public Task<bool> SaveAsync(CancellationToken cancellationToken = default) =>
+        SaveAsync(editorConfig: null, cancellationToken: cancellationToken);
+
+    public async Task<bool> SaveAsync(
+        EditorConfigSettings? editorConfig,
+        CancellationToken cancellationToken = default)
     {
         var path = _session.State.FilePath;
         if (path is null)
@@ -83,12 +107,18 @@ public sealed class DocumentController
             return false;
         }
 
+        var currentText = _editor.Text;
+        var textToSave = EditorConfigTextNormalizer.NormalizeForSave(
+            currentText,
+            editorConfig,
+            _session.State.LineEnding);
         await _files.WriteAsync(
             path,
-            _editor.Text,
+            textToSave,
             _session.State.Encoding,
             _session.State.LineEnding,
             cancellationToken);
+        ApplySavedText(textToSave);
         _session.MarkSaved(
             path,
             _editor.Text,
@@ -97,22 +127,42 @@ public sealed class DocumentController
         return true;
     }
 
+    public Task SaveAsAsync(
+        SaveFileDialogResult save,
+        CancellationToken cancellationToken = default) =>
+        SaveAsAsync(
+            save,
+            editorConfig: null,
+            cancellationToken: cancellationToken);
+
     public async Task SaveAsAsync(
         SaveFileDialogResult save,
+        EditorConfigSettings? editorConfig,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(save);
         var path = Path.GetFullPath(save.Path);
+        var lineEnding = DocumentSession.GetLineEndingOrDefault(save.LineEnding);
+        var textToSave = EditorConfigTextNormalizer.NormalizeForSave(
+            _editor.Text,
+            editorConfig,
+            lineEnding);
         await _files.WriteAsync(
             path,
-            _editor.Text,
+            textToSave,
             save.Encoding,
             save.LineEnding,
             cancellationToken);
-        _session.MarkSaved(path, _editor.Text, save.Encoding, save.LineEnding);
+        ApplySavedText(textToSave);
+        _session.MarkSaved(path, _editor.Text, save.Encoding, lineEnding);
     }
 
-    public async Task<bool> ReloadFromDiskAsync(CancellationToken cancellationToken = default)
+    public Task<bool> ReloadFromDiskAsync(CancellationToken cancellationToken = default) =>
+        ReloadFromDiskAsync(encodingHint: null, cancellationToken: cancellationToken);
+
+    public async Task<bool> ReloadFromDiskAsync(
+        TextEncodingKind? encodingHint,
+        CancellationToken cancellationToken = default)
     {
         var path = _session.State.FilePath;
         if (path is null)
@@ -120,7 +170,7 @@ public sealed class DocumentController
             return false;
         }
 
-        var data = await _files.ReadAsync(path, cancellationToken);
+        var data = await _files.ReadAsync(path, encodingHint, cancellationToken);
         var selection = _editor.Selection;
         ReplaceEditorText(data.Text);
         _session.ApplyDiskReload(path, data);
@@ -128,11 +178,20 @@ public sealed class DocumentController
         return true;
     }
 
+    public Task<bool> ReloadFromTemporaryFileAsync(
+        string path,
+        CancellationToken cancellationToken = default) =>
+        ReloadFromTemporaryFileAsync(
+            path,
+            encodingHint: null,
+            cancellationToken: cancellationToken);
+
     public async Task<bool> ReloadFromTemporaryFileAsync(
         string path,
+        TextEncodingKind? encodingHint,
         CancellationToken cancellationToken = default)
     {
-        var data = await _files.ReadAsync(path, cancellationToken);
+        var data = await _files.ReadAsync(path, encodingHint, cancellationToken);
         var selection = _editor.Selection;
         ReplaceEditorText(data.Text);
         _session.ApplyTemporaryReload(data, data.Text);
@@ -175,5 +234,19 @@ public sealed class DocumentController
         _editor.SetSelection(new TextSelection(
             Math.Min(selection.Anchor, textLength),
             Math.Min(selection.Active, textLength)));
+    }
+
+    private void ApplySavedText(string text)
+    {
+        if (string.Equals(_editor.Text, text, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var selection = _editor.Selection;
+        _editor.Replace(
+            TextRange.FromBounds(0, _editor.Text.Length),
+            text);
+        RestoreSelection(selection, text.Length);
     }
 }

@@ -8,6 +8,11 @@ public interface ITextFileStore
         string path,
         CancellationToken cancellationToken = default);
 
+    Task<TextFileData> ReadAsync(
+        string path,
+        TextEncodingKind? encodingHint,
+        CancellationToken cancellationToken = default);
+
     Task WriteAsync(
         string path,
         string text,
@@ -22,6 +27,12 @@ public sealed class TextFileStore : ITextFileStore
         string path,
         CancellationToken cancellationToken = default) =>
         TextFileService.ReadAsync(path, cancellationToken);
+
+    public Task<TextFileData> ReadAsync(
+        string path,
+        TextEncodingKind? encodingHint,
+        CancellationToken cancellationToken = default) =>
+        TextFileService.ReadAsync(path, encodingHint, cancellationToken);
 
     public Task WriteAsync(
         string path,

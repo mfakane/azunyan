@@ -38,6 +38,8 @@ internal sealed class FakeEditorView : IEditorView
 
     public IndentationInputMode IndentationInputMode { get; private set; }
 
+    public string? PreferredLineEnding { get; private set; }
+
     public EditorLanguageConfiguration? LanguageConfiguration { get; private set; }
 
     public TextSelection? LastStartupSelection { get; private set; }
@@ -95,6 +97,20 @@ internal sealed class FakeEditorView : IEditorView
 
     public void SetIndentationInputMode(IndentationInputMode mode) =>
         IndentationInputMode = mode;
+
+    public void ApplyEditorConfig(EditorConfigSettings settings)
+    {
+        TabDisplaySize = settings.GetEffectiveTabWidth();
+        IndentSize = settings.IndentSize;
+        IndentationInputMode = settings.IndentationInputMode ?? IndentationInputMode.Auto;
+        PreferredLineEnding = settings.LineEnding switch
+        {
+            LineEndingKind.Lf => "\n",
+            LineEndingKind.CrLf => "\r\n",
+            LineEndingKind.Cr => "\r",
+            _ => null
+        };
+    }
 
     public void SetPosition(LineColumn target)
     {
@@ -316,7 +332,15 @@ internal sealed class FakeTextFileStore : ITextFileStore
 {
     public Dictionary<string, TextFileData> Files { get; } = new(StringComparer.OrdinalIgnoreCase);
 
-    public Task<TextFileData> ReadAsync(string path, CancellationToken cancellationToken = default) =>
+    public Task<TextFileData> ReadAsync(
+        string path,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Files[Path.GetFullPath(path)]);
+
+    public Task<TextFileData> ReadAsync(
+        string path,
+        TextEncodingKind? encodingHint,
+        CancellationToken cancellationToken = default) =>
         Task.FromResult(Files[Path.GetFullPath(path)]);
 
     public Task WriteAsync(

@@ -21,6 +21,7 @@ public sealed partial class AzunyanTextInputWindow : UserControl
     private TextRange? _compositionRange;
     private int _windowStart;
     private long _generation;
+    private string? _preferredLineEnding;
 
     public AzunyanTextInputWindow()
     {
@@ -56,6 +57,12 @@ public sealed partial class AzunyanTextInputWindow : UserControl
     public bool IsComposing => _compositionRange is not null;
 
     public TextRange? CompositionRange => _compositionRange;
+
+    internal string? PreferredLineEnding
+    {
+        get => _preferredLineEnding;
+        set => _preferredLineEnding = value;
+    }
 
     public event EventHandler<AzunyanTextInputChangedEventArgs>? InputChanged;
 
@@ -198,7 +205,10 @@ public sealed partial class AzunyanTextInputWindow : UserControl
             var localStart = ToDocumentOffset(_synchronizedText, localNativeRange.Start);
             var localEnd = ToDocumentOffset(_synchronizedText, localNativeRange.End);
             var localRange = TextRange.FromBounds(localStart, localEnd);
-            var insertedText = FromNativeText(insertedNativeText, _synchronizedText);
+            var insertedText = FromNativeText(
+                insertedNativeText,
+                _synchronizedText,
+                _preferredLineEnding);
             var change = new TextChange(
                 new TextRange(_windowStart + localRange.Start, localRange.Length),
                 localRange.Length == 0
@@ -399,9 +409,12 @@ public sealed partial class AzunyanTextInputWindow : UserControl
         return nativeText.ToString();
     }
 
-    private static string FromNativeText(string text, string referenceText)
+    private static string FromNativeText(
+        string text,
+        string referenceText,
+        string? preferredLineEnding)
     {
-        var lineEnding = GetPreferredLineEnding(referenceText);
+        var lineEnding = preferredLineEnding ?? GetPreferredLineEnding(referenceText);
         if (text.IndexOf('\r') < 0)
         {
             return text;

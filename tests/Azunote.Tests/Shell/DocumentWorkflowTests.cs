@@ -235,6 +235,109 @@ public sealed class DocumentWorkflowTests
     }
 
     [Fact]
+    public async Task Open_file_applies_editorconfig_to_editor_and_session_settings()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            $"azunote-workflow-editorconfig-{Guid.NewGuid():N}");
+        var path = Path.Combine(root, "sample.cs");
+        try
+        {
+            Directory.CreateDirectory(root);
+            await File.WriteAllTextAsync(
+                Path.Combine(root, ".editorconfig"),
+                "root = true\n"
+                + "[*.cs]\n"
+                + "indent_style = space\n"
+                + "indent_size = 2\n"
+                + "tab_width = 8\n"
+                + "end_of_line = crlf\n"
+                + "charset = utf-8-bom\n");
+
+            var editor = new FakeEditorView();
+            var session = new DocumentSession();
+            var files = new FakeTextFileStore();
+            var prompt = new FakeUserPrompt();
+            var dialogs = new FakeFileDialogService { OpenPath = path };
+            files.Files[Path.GetFullPath(path)] = new TextFileData(
+                "first\nsecond",
+                TextEncodingKind.Utf8,
+                LineEndingKind.Lf);
+            var workflow = CreateWorkflow(editor, session, files, prompt, dialogs);
+
+            await workflow.OpenFileAsync();
+
+            Assert.Equal(8, editor.TabDisplaySize);
+            Assert.Equal(2, editor.IndentSize);
+            Assert.Equal(IndentationInputMode.Spaces, editor.IndentationInputMode);
+            Assert.Equal("\r\n", editor.PreferredLineEnding);
+            Assert.Equal(TextEncodingKind.Utf8Bom, workflow.CurrentEncoding);
+            Assert.Equal(LineEndingKind.CrLf, workflow.CurrentLineEnding);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Save_as_uses_target_editorconfig_but_keeps_dialog_file_format()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            $"azunote-workflow-editorconfig-{Guid.NewGuid():N}");
+        var path = Path.Combine(root, "saved.txt");
+        try
+        {
+            Directory.CreateDirectory(root);
+            await File.WriteAllTextAsync(
+                Path.Combine(root, ".editorconfig"),
+                "root = true\n"
+                + "[*.txt]\n"
+                + "indent_style = tab\n"
+                + "indent_size = tab\n"
+                + "tab_width = 8\n"
+                + "end_of_line = lf\n"
+                + "charset = utf-16le\n"
+                + "insert_final_newline = true\n"
+                + "trim_trailing_whitespace = true\n");
+
+            var editor = new FakeEditorView();
+            var session = new DocumentSession();
+            var files = new FakeTextFileStore();
+            var prompt = new FakeUserPrompt();
+            var dialogs = new FakeFileDialogService
+            {
+                SaveResult = new SaveFileDialogResult(
+                    path,
+                    TextEncodingKind.Utf8,
+                    LineEndingKind.CrLf)
+            };
+            var workflow = CreateWorkflow(editor, session, files, prompt, dialogs);
+            await workflow.OpenStartupTextAsync("first  \nsecond");
+
+            Assert.True(await workflow.SaveAsAsync());
+
+            Assert.Equal("first\nsecond\r\n", files.Files[Path.GetFullPath(path)].Text);
+            Assert.Equal(TextEncodingKind.Utf8, workflow.CurrentEncoding);
+            Assert.Equal(LineEndingKind.CrLf, workflow.CurrentLineEnding);
+            Assert.Equal(8, editor.TabDisplaySize);
+            Assert.Equal(IndentationInputMode.Tab, editor.IndentationInputMode);
+            Assert.Equal("\r\n", editor.PreferredLineEnding);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task File_change_reload_uses_current_monitor_and_prompt_decision()
     {
         var path = Path.GetTempFileName();

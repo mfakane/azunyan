@@ -30,6 +30,8 @@ internal sealed class DocumentWorkflow : IDisposable
     private readonly Func<string> _languageModeId;
     private readonly Func<Task> _createNewWindow;
     private readonly Func<string, Task> _openFileInNewWindow;
+    private readonly IEditorConfigResolver _editorConfigResolver;
+    private EditorConfigSettings _editorConfig = EditorConfigSettings.Empty;
     private IFileChangeMonitor? _fileMonitor;
     private bool _isApplying;
     private bool _externalChangeDialogOpen;
@@ -47,7 +49,8 @@ internal sealed class DocumentWorkflow : IDisposable
         Func<IReadOnlyList<FileDialogFilter>> fileDialogFilters,
         Func<string> languageModeId,
         Func<Task> createNewWindow,
-        Func<string, Task> openFileInNewWindow)
+        Func<string, Task> openFileInNewWindow,
+        IEditorConfigResolver? editorConfigResolver = null)
     {
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
         _documents = documents ?? throw new ArgumentNullException(nameof(documents));
@@ -60,6 +63,7 @@ internal sealed class DocumentWorkflow : IDisposable
         _languageModeId = languageModeId ?? throw new ArgumentNullException(nameof(languageModeId));
         _createNewWindow = createNewWindow ?? throw new ArgumentNullException(nameof(createNewWindow));
         _openFileInNewWindow = openFileInNewWindow ?? throw new ArgumentNullException(nameof(openFileInNewWindow));
+        _editorConfigResolver = editorConfigResolver ?? new EditorConfigResolver();
     }
 
     public event EventHandler<DocumentWorkflowChangedEventArgs>? Changed;
@@ -150,6 +154,7 @@ internal sealed class DocumentWorkflow : IDisposable
         ArgumentNullException.ThrowIfNull(text);
         StopFileWatcher();
         ApplyDocument(() => _documents.LoadUntitledText(text));
+        ApplyEditorConfig(EditorConfigSettings.Empty);
         NotifyChanged(lineEnding: null, opened: false);
         _editor.SetStartupPosition(line, column);
         _editor.Focus();
@@ -170,7 +175,7 @@ internal sealed class DocumentWorkflow : IDisposable
 
         try
         {
-            await _documents.SaveAsync();
+            await _documents.SaveAsync(editorConfig: _editorConfig);
             NotifyChanged(lineEnding: null, opened: false);
             StartFileWatcher();
             return true;
@@ -197,7 +202,11 @@ internal sealed class DocumentWorkflow : IDisposable
                 return false;
             }
 
-            await _documents.SaveAsAsync(save);
+            var targetConfig = await _editorConfigResolver.ResolveAsync(save.Path);
+            await _documents.SaveAsAsync(save, editorConfig: targetConfig);
+            ApplyEditorConfig(targetConfig.WithExplicitFileFormat(
+                save.Encoding,
+                DocumentSession.GetLineEndingOrDefault(save.LineEnding)));
             NotifyChanged(lineEnding: null, opened: false);
             StartFileWatcher();
             return true;
@@ -211,14 +220,19 @@ internal sealed class DocumentWorkflow : IDisposable
 
     public async Task ReloadFromDiskAsync()
     {
-        if (CurrentFilePath is null)
+        if (CurrentFilePath is not { } currentPath)
         {
             return;
         }
 
         StopFileWatcher();
-        await ApplyDocumentAsync(() => _documents.ReloadFromDiskAsync());
-        NotifyChanged(TextFileService.DetectLineEnding(_editor.Text), opened: false);
+        var editorConfig = await _editorConfigResolver.ResolveAsync(currentPath);
+        await ApplyDocumentAsync(() => _documents.ReloadFromDiskAsync(
+            encodingHint: editorConfig.Encoding));
+        ApplyEditorConfig(editorConfig);
+        NotifyChanged(
+            editorConfig.LineEnding ?? TextFileService.DetectLineEnding(_editor.Text),
+            opened: false);
         StartFileWatcher();
     }
 
@@ -232,7 +246,11 @@ internal sealed class DocumentWorkflow : IDisposable
             return;
         }
 
-        await ApplyDocumentAsync(() => _documents.ReloadFromTemporaryFileAsync(path));
+        var editorConfig = await ResolveCurrentEditorConfigAsync();
+        await ApplyDocumentAsync(() => _documents.ReloadFromTemporaryFileAsync(
+            path,
+            encodingHint: editorConfig.Encoding));
+        ApplyEditorConfig(editorConfig);
         NotifyChanged(lineEnding: null, opened: false);
     }
 
@@ -254,6 +272,11 @@ internal sealed class DocumentWorkflow : IDisposable
             else
             {
                 StopFileWatcher();
+            }
+
+            if (CurrentFilePath is null)
+            {
+                ApplyEditorConfig(EditorConfigSettings.Empty);
             }
 
             NotifyChanged(lineEnding: null, opened: false);
@@ -325,10 +348,30 @@ internal sealed class DocumentWorkflow : IDisposable
     private async Task LoadDocumentAsync(string path)
     {
         StopFileWatcher();
-        await ApplyDocumentAsync(() => _documents.OpenAsync(path));
-        NotifyChanged(TextFileService.DetectLineEnding(_editor.Text), opened: true);
+        var editorConfig = await _editorConfigResolver.ResolveAsync(path);
+        await ApplyDocumentAsync(() => _documents.OpenAsync(
+            path,
+            encodingHint: editorConfig.Encoding));
+        ApplyEditorConfig(editorConfig);
+        NotifyChanged(
+            editorConfig.LineEnding ?? TextFileService.DetectLineEnding(_editor.Text),
+            opened: true);
         _editor.Focus();
         StartFileWatcher();
+    }
+
+    private async Task<EditorConfigSettings> ResolveCurrentEditorConfigAsync()
+    {
+        return CurrentFilePath is { } path
+            ? await _editorConfigResolver.ResolveAsync(path)
+            : EditorConfigSettings.Empty;
+    }
+
+    private void ApplyEditorConfig(EditorConfigSettings settings)
+    {
+        _editorConfig = settings;
+        _documents.Session.ApplyEditorConfig(settings);
+        _editor.ApplyEditorConfig(settings);
     }
 
     private void ApplyDocument(Action action)
@@ -409,7 +452,10 @@ internal sealed class DocumentWorkflow : IDisposable
                 return;
             }
 
-            var document = await _documents.ReadAsync(path);
+            var editorConfig = await _editorConfigResolver.ResolveAsync(path);
+            var document = await _documents.ReadAsync(
+                path,
+                encodingHint: editorConfig.Encoding);
             if (_documents.Session.IsSameAsSaved(document.Text))
             {
                 return;
@@ -449,7 +495,10 @@ internal sealed class DocumentWorkflow : IDisposable
             _externalChangeDialogOpen = false;
         }
 
-        NotifyChanged(TextFileService.DetectLineEnding(_editor.Text), opened: false);
+        ApplyEditorConfig(await ResolveCurrentEditorConfigAsync());
+        NotifyChanged(
+            _editorConfig.LineEnding ?? TextFileService.DetectLineEnding(_editor.Text),
+            opened: false);
         StartFileWatcher();
     }
 }

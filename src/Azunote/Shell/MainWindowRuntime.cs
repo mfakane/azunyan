@@ -420,6 +420,9 @@ internal sealed class MainWindowRuntime : IDisposable
             _languageModes.DocumentOpened(path);
         }
 
+        _view.SetTabDisplaySizeLabel(_view.TabDisplaySize);
+        _view.SetIndentSizeLabel(_view.IndentSize);
+        _view.SetIndentationInputModeLabel(_view.IndentationInputMode);
         _status.Refresh(args.LineEnding);
         _status.RefreshTitle();
         RefreshExternalToolsMenu();

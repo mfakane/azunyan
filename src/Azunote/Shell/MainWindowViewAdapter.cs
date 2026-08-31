@@ -306,6 +306,22 @@ internal sealed class MainWindowViewAdapter :
     public void SetIndentationInputMode(IndentationInputMode mode) =>
         _editor.IndentationInputMode = mode;
 
+    public void ApplyEditorConfig(EditorConfigSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        _editor.TabDisplaySize = settings.GetEffectiveTabWidth();
+        _editor.IndentSize = settings.IndentSize;
+        _editor.IndentationInputMode =
+            settings.IndentationInputMode ?? IndentationInputMode.Auto;
+        _editor.SetPreferredLineEnding(settings.LineEnding switch
+        {
+            LineEndingKind.Lf => "\n",
+            LineEndingKind.CrLf => "\r\n",
+            LineEndingKind.Cr => "\r",
+            _ => null
+        });
+    }
+
     public void SetPosition(LineColumn position)
     {
         var snapshot = _editor.Snapshot;

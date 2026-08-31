@@ -415,6 +415,25 @@ public sealed class DocumentTests
     }
 
     [Fact]
+    public void Newline_auto_indent_uses_an_explicit_line_ending_when_configured()
+    {
+        var snapshot = new TextSnapshot("{\n  value");
+
+        Assert.Equal(
+            "\r\n  ",
+            TextEditorCommands.GetNewLineWithAutoIndentation(
+                snapshot,
+                snapshot.Length,
+                "\r\n"));
+
+        var document = new Document("value");
+        document.SetCaret(document.Length);
+        TextEditorCommands.InsertNewLineWithAutoIndent(document, "\r");
+
+        Assert.Equal("value\r", document.Text);
+    }
+
+    [Fact]
     public void Indentation_settings_infer_spaces_and_tabs()
     {
         Assert.Equal(

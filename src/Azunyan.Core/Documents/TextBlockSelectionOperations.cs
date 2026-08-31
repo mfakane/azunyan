@@ -243,9 +243,23 @@ public static class TextBlockSelectionOperations
         return column;
     }
 
-    public static string GetPreferredLineEnding(TextSnapshot snapshot)
+    public static string GetPreferredLineEnding(
+        TextSnapshot snapshot,
+        string? preferredLineEnding = null)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
+        if (preferredLineEnding is not null)
+        {
+            if (preferredLineEnding is not "\n" and not "\r\n" and not "\r")
+            {
+                throw new ArgumentException(
+                    "The preferred line ending must be LF, CRLF, or CR.",
+                    nameof(preferredLineEnding));
+            }
+
+            return preferredLineEnding;
+        }
+
         var text = snapshot.Text;
         for (var index = 0; index < text.Length; index++)
         {
