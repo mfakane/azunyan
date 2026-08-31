@@ -238,6 +238,7 @@ internal static class AzunotePlaceholderCatalog
         new("documentExtension", "Placeholder", "Extension of the document file.", "${documentExtension} -> .azunote"),
         new("tempFile", "Placeholder", "Temporary execution-file path used when the document is dirty.", "${tempFile} -> C:\\Users\\user\\AppData\\Local\\Temp\\azunote\\current.azunote"),
         new("toolDir", "Placeholder", "Directory containing the external-tool definition.", "${toolDir} -> C:\\work\\tools"),
+        new("workspaceFolder", "Placeholder", "Workspace root containing .git or an EditorConfig root marker.", "${workspaceFolder} -> C:\\work"),
         new("document", "Placeholder", "The complete document text.", "${document} -> # Heading"),
         new("selection", "Placeholder", "The currently selected text.", "${selection} -> selected text"),
         new("userHome", "Placeholder", "The current user's home directory.", "${userHome} -> C:\\Users\\user"),

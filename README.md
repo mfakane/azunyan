@@ -112,7 +112,7 @@ the `ExternalToolRunner` API. Commands run without a shell and can receive
 placeholders `${file}`, `${filePath}`, `${executionFile}`, `${fileDir}`,
 `${fileName}`, `${fileStem}`, `${fileExtension}`, `${documentFile}`,
 `${documentDir}`, `${documentName}`, `${documentStem}`, `${documentExtension}`,
-`${tempFile}`, `${toolDir}`, `${document}`, `${selection}`, `${userHome}`,
+`${tempFile}`, `${toolDir}`, `${workspaceFolder}`, `${document}`, `${selection}`, `${userHome}`,
 `${languageId}`, `${encoding}`, `${lineEnding}`, `${platform}`,
 `${architecture}`, `${lineNumber}`, `${columnNumber}`, `${selectionStartLine}`,
 `${selectionStartColumn}`, `${selectionEndLine}`, and `${selectionEndColumn}`.
@@ -126,6 +126,10 @@ reload the current file. When the current buffer is unsaved, the tool receives
 a temporary file containing the current text through `${file}` or `FilePath`;
 the temporary file is removed after the tool finishes. Non-zero exit codes
 leave the document unchanged and show stderr.
+
+`${workspaceFolder}` expands to the nearest ancestor of the document directory
+that contains `.git` (directory or file) or an `.editorconfig` with
+`root = true`. It is empty when no such ancestor exists.
 
 Files opened from disk are watched for external changes. A clean document is
 reloaded automatically; if it has unsaved edits, Azunote asks whether to reload

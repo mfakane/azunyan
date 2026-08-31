@@ -109,6 +109,81 @@ public sealed class ExternalToolsTests
     }
 
     [Fact]
+    public void Context_expands_workspace_folder_from_nearest_git_marker()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"azunote-workspace-{Guid.NewGuid():N}");
+        var nested = Path.Combine(root, "src", "nested");
+        var path = Path.Combine(nested, "notes.md");
+        try
+        {
+            Directory.CreateDirectory(nested);
+            Directory.CreateDirectory(Path.Combine(root, ".git"));
+
+            var context = new ExternalToolContext(path, string.Empty, string.Empty);
+
+            Assert.Equal(Path.GetFullPath(root), context.WorkspaceFolder);
+            Assert.Equal(Path.GetFullPath(root), context.Expand("${workspaceFolder}"));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void Context_expands_workspace_folder_from_root_editorconfig()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"azunote-workspace-{Guid.NewGuid():N}");
+        var nested = Path.Combine(root, "src", "nested");
+        var path = Path.Combine(nested, "notes.md");
+        try
+        {
+            Directory.CreateDirectory(nested);
+            File.WriteAllText(
+                Path.Combine(root, ".editorconfig"),
+                "root = true\n[*]\nindent_size = 2\n");
+
+            var context = new ExternalToolContext(path, string.Empty, string.Empty);
+
+            Assert.Equal(Path.GetFullPath(root), context.WorkspaceFolder);
+            Assert.Equal(Path.GetFullPath(root), context.Expand("${workspaceFolder}"));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void Context_leaves_workspace_folder_empty_without_a_root_marker()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"azunote-workspace-{Guid.NewGuid():N}");
+        var path = Path.Combine(root, "src", "notes.md");
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+
+            var context = new ExternalToolContext(path, string.Empty, string.Empty);
+
+            Assert.Null(context.WorkspaceFolder);
+            Assert.Equal("", context.Expand("${workspaceFolder}"));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void Availability_evaluates_all_when_conditions_and_visibility()
     {
         var settings = new ExternalToolSettings

@@ -221,6 +221,8 @@ public sealed partial record ExternalToolContext
         ToolDirectory = string.IsNullOrWhiteSpace(toolDirectory)
             ? null
             : Path.GetFullPath(toolDirectory);
+        WorkspaceFolder = WorkspaceFolderResolver.FindForFile(
+            DocumentFilePath ?? ExecutionFilePath);
         Document = document;
         Selection = selection;
         LineNumber = lineNumber;
@@ -269,6 +271,8 @@ public sealed partial record ExternalToolContext
             : ExecutionFilePath;
 
     public string? ToolDirectory { get; }
+
+    public string? WorkspaceFolder { get; }
 
     public string Document { get; }
 
@@ -331,6 +335,7 @@ public sealed partial record ExternalToolContext
                 "documentExtension" => DocumentExtension ?? string.Empty,
                 "tempFile" => TempFile ?? string.Empty,
                 "toolDir" => ToolDirectory ?? string.Empty,
+                "workspaceFolder" => WorkspaceFolder ?? string.Empty,
                 "document" => Document,
                 "selection" => Selection,
                 "userHome" => UserHome,
