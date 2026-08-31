@@ -280,6 +280,22 @@ internal sealed class MainWindowViewAdapter :
     public void SetIndentationInputMode(IndentationInputMode mode) =>
         _editor.IndentationInputMode = mode;
 
+    public void SetPosition(LineColumn position)
+    {
+        var snapshot = _editor.Snapshot;
+        var zeroBasedLine = Math.Clamp(
+            position.Line,
+            0,
+            Math.Max(0, snapshot.Lines.LineCount - 1));
+        var zeroBasedColumn = Math.Min(
+            position.Column,
+            snapshot.Lines.GetLineLength(zeroBasedLine));
+        var absolutePosition = snapshot.Lines.GetPosition(
+            new LineColumn(zeroBasedLine, zeroBasedColumn));
+        _editor.SetDocumentSelection(TextSelection.Caret(absolutePosition));
+        _editor.ScrollSelectionIntoView();
+    }
+
     public void SetStartupPosition(int? line, int? column)
     {
         if (line is null && column is null)
@@ -287,12 +303,9 @@ internal sealed class MainWindowViewAdapter :
             return;
         }
 
-        var snapshot = _editor.Snapshot;
-        var zeroBasedLine = Math.Clamp((line ?? 1) - 1, 0, snapshot.Lines.LineCount - 1);
-        var zeroBasedColumn = Math.Max(0, (column ?? 1) - 1);
-        var clampedColumn = Math.Min(zeroBasedColumn, snapshot.Lines.GetLineLength(zeroBasedLine));
-        _editor.SetDocumentSelection(TextSelection.Caret(
-            snapshot.Lines.GetPosition(new LineColumn(zeroBasedLine, clampedColumn))));
+        var zeroBasedLine = line is > 1 ? line.Value - 1 : 0;
+        var zeroBasedColumn = column is > 1 ? column.Value - 1 : 0;
+        SetPosition(new LineColumn(zeroBasedLine, zeroBasedColumn));
     }
 
     public void Apply(StatusBarState state)

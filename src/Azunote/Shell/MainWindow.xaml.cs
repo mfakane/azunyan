@@ -193,6 +193,9 @@ public sealed partial class MainWindow : Window, IDisposable
     private void FilePathStatus_Tapped(object sender, TappedRoutedEventArgs e) =>
         _runtime.ShowFilePathMenu();
 
+    private async void PositionStatus_Tapped(object sender, TappedRoutedEventArgs e) =>
+        await _runtime.ShowGoToLineAsync();
+
     private void CopyFilePathMenuItem_Click(object sender, RoutedEventArgs e) =>
         _runtime.CopyFilePath();
 
@@ -247,6 +250,9 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private void ShowCompletionMenuItem_Click(object sender, RoutedEventArgs e) =>
         _runtime.ShowCompletion();
+
+    private async void GoToLineMenuItem_Click(object sender, RoutedEventArgs e) =>
+        await _runtime.ShowGoToLineAsync();
 
     private void ShowCompletionAccelerator_Invoked(
         KeyboardAccelerator sender,

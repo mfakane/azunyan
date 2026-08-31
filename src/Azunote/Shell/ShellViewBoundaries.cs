@@ -64,6 +64,8 @@ internal interface IEditorView : IEditorBuffer
 
     void SetIndentationInputMode(IndentationInputMode mode);
 
+    void SetPosition(LineColumn position);
+
     void SetStartupPosition(int? line, int? column);
 }
 
@@ -177,6 +179,11 @@ internal interface ISettingsFolderOpener
 internal interface IExternalToolDialog
 {
     Task<ExternalToolDefinition?> ShowAsync(CancellationToken cancellationToken = default);
+}
+
+internal interface IGoToLineDialog
+{
+    Task<GoToLineTarget?> ShowAsync(string initialText);
 }
 
 internal interface IMessageDialog

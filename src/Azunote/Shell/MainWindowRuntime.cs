@@ -13,6 +13,7 @@ internal sealed class MainWindowRuntime : IDisposable
     private readonly SettingsWorkflow _settings;
     private readonly EditorCommandController _editorCommands;
     private readonly FindReplaceController _findReplace;
+    private readonly GoToLineController _goToLine;
     private readonly DocumentStatusPresenter _status;
     private readonly IFilePathActions _filePathActions;
     private readonly WinUiMessageDialog _messageDialog;
@@ -101,6 +102,9 @@ internal sealed class MainWindowRuntime : IDisposable
             _view,
             RefreshDocumentView,
             ObserveTextChanged);
+        _goToLine = new GoToLineController(
+            _view,
+            new WinUiGoToLineDialog(() => _view.XamlRoot));
         _messageDialog = new WinUiMessageDialog(() => _view.XamlRoot);
         _externalToolDialog = new WinUiExternalToolDialog(() => _view.XamlRoot);
 
@@ -304,6 +308,8 @@ internal sealed class MainWindowRuntime : IDisposable
     public void ToggleAlwaysOnTop() => _view.ToggleAlwaysOnTop();
 
     public void ShowCompletion() => _editorCommands.ShowCompletion();
+
+    public Task ShowGoToLineAsync() => _goToLine.ShowAsync();
 
     public void ShowFindPanel(bool replace) => _findReplace.Show(replace);
 

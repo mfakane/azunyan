@@ -133,6 +133,76 @@ internal sealed class WinUiMessageDialog : IMessageDialog
     }
 }
 
+internal sealed class WinUiGoToLineDialog : IGoToLineDialog
+{
+    private readonly Func<XamlRoot?> _xamlRoot;
+
+    public WinUiGoToLineDialog(Func<XamlRoot?> xamlRoot)
+    {
+        _xamlRoot = xamlRoot ?? throw new ArgumentNullException(nameof(xamlRoot));
+    }
+
+    public async Task<GoToLineTarget?> ShowAsync(string initialText)
+    {
+        ArgumentNullException.ThrowIfNull(initialText);
+
+        var root = _xamlRoot();
+        if (root is null)
+        {
+            return null;
+        }
+
+        var inputBox = new TextBox
+        {
+            Header = "Type line number or line:column",
+            PlaceholderText = "12 or 12:4",
+            Text = initialText,
+            IsSpellCheckEnabled = false,
+            IsTextPredictionEnabled = false
+        };
+        var errorText = new TextBlock
+        {
+            Text = "Enter a positive line number or line:column.",
+            Visibility = Visibility.Collapsed
+        };
+        var panel = new StackPanel { Spacing = 8 };
+        panel.Children.Add(inputBox);
+        panel.Children.Add(errorText);
+
+        GoToLineTarget? target = null;
+        var dialog = new ContentDialog
+        {
+            Title = "Go to Line",
+            Content = panel,
+            PrimaryButtonText = "Go",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = root
+        };
+        dialog.Opened += (_, _) =>
+        {
+            inputBox.Focus(FocusState.Programmatic);
+            inputBox.SelectAll();
+        };
+        dialog.PrimaryButtonClick += (_, args) =>
+        {
+            if (!GoToLineService.TryParse(inputBox.Text, out var parsed))
+            {
+                errorText.Visibility = Visibility.Visible;
+                args.Cancel = true;
+                return;
+            }
+
+            errorText.Visibility = Visibility.Collapsed;
+            target = parsed;
+        };
+
+        return await dialog.ShowAsync() == ContentDialogResult.Primary
+            ? target
+            : null;
+    }
+}
+
 internal sealed class WinUiExternalToolDialog : IExternalToolDialog
 {
     private readonly Func<XamlRoot?> _xamlRoot;

@@ -475,6 +475,19 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         });
     }
 
+    public void ScrollSelectionIntoView()
+    {
+        RunAfterComposition(() =>
+        {
+            if (IsProjectedTextSurface)
+            {
+                ScrollProjectedRangeIntoView(
+                    TextRange.Empty(Document.Selection.CaretPosition),
+                    alignToTop: false);
+            }
+        });
+    }
+
     public void ReplaceDocumentRange(TextRange range, string replacement) =>
         RunAfterComposition(() => ReplaceDocumentRangeAndNotify(range, replacement));
 

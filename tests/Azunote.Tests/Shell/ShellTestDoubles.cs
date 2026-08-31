@@ -96,6 +96,21 @@ internal sealed class FakeEditorView : IEditorView
     public void SetIndentationInputMode(IndentationInputMode mode) =>
         IndentationInputMode = mode;
 
+    public void SetPosition(LineColumn target)
+    {
+        var snapshot = Snapshot;
+        var zeroBasedLine = Math.Clamp(
+            target.Line,
+            0,
+            Math.Max(0, snapshot.Lines.LineCount - 1));
+        var zeroBasedColumn = Math.Min(
+            Math.Max(0, target.Column),
+            snapshot.Lines.GetLineLength(zeroBasedLine));
+        var absolutePosition = snapshot.Lines.GetPosition(
+            new LineColumn(zeroBasedLine, zeroBasedColumn));
+        SetSelection(TextSelection.Caret(absolutePosition));
+    }
+
     public void SetStartupPosition(int? line, int? column)
     {
         if (line is null && column is null)
@@ -103,14 +118,9 @@ internal sealed class FakeEditorView : IEditorView
             return;
         }
 
-        var snapshot = Snapshot;
-        var zeroBasedLine = Math.Clamp((line ?? 1) - 1, 0, snapshot.Lines.LineCount - 1);
-        var zeroBasedColumn = Math.Min(
-            Math.Max(0, (column ?? 1) - 1),
-            snapshot.Lines.GetLineLength(zeroBasedLine));
-        var position = snapshot.Lines.GetPosition(
-            new LineColumn(zeroBasedLine, zeroBasedColumn));
-        SetSelection(TextSelection.Caret(position));
+        var zeroBasedLine = line is > 1 ? line.Value - 1 : 0;
+        var zeroBasedColumn = column is > 1 ? column.Value - 1 : 0;
+        SetPosition(new LineColumn(zeroBasedLine, zeroBasedColumn));
         LastStartupSelection = Selection;
     }
 }
