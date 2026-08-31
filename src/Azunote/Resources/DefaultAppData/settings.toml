@@ -13,11 +13,11 @@ logging = []
 # Configure the status bar's "Open Folder in Terminal" command here.
 [terminal]
 command = "wt.exe"
-args = ["-d", "${documentDir}"]
-workingDirectory = "${documentDir}"
+args = ["-d", "${documentDirname}"]
+workingDirectory = "${documentDirname}"
 
 # Configure the status bar's "Show in Explorer" command here.
 [explorer]
 command = "explorer.exe"
 args = ["/select,\"${file}\""]
-workingDirectory = "${documentDir}"
+workingDirectory = "${documentDirname}"

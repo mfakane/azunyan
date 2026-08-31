@@ -109,12 +109,16 @@ until that document window is closed, including any save confirmation.
 External commands are available from Tools > Run External Tool... and through
 the `ExternalToolRunner` API. Commands run without a shell and can receive
 `FilePath`, `Document`, or `Selection` through stdin. Arguments support the
-placeholders `${file}`, `${filePath}`, `${executionFile}`, `${fileDir}`,
-`${fileName}`, `${fileStem}`, `${fileExtension}`, `${documentFile}`,
-`${documentDir}`, `${documentName}`, `${documentStem}`, `${documentExtension}`,
-`${tempFile}`, `${toolDir}`, `${workspaceFolder}`, `${document}`, `${selection}`, `${userHome}`,
-`${languageId}`, `${encoding}`, `${lineEnding}`, `${platform}`,
-`${architecture}`, `${lineNumber}`, `${columnNumber}`, `${selectionStartLine}`,
+VS Code-style placeholders `${userHome}`, `${workspaceFolder}`,
+`${workspaceFolderBasename}`, `${file}`, `${fileWorkspaceFolder}`,
+`${relativeFile}`, `${relativeFileDirname}`, `${fileBasename}`,
+`${fileBasenameNoExtension}`, `${fileExtname}`, `${fileDirname}`,
+`${fileDirnameBasename}`, `${cwd}`, `${lineNumber}`, `${columnNumber}`,
+`${selectedText}`, `${execPath}`, `${pathSeparator}`, and `${/}`.
+Azunote-specific placeholders include `${documentFile}`, `${documentDirname}`,
+`${documentName}`, `${documentBasenameNoExtension}`, `${documentExtension}`, `${tempFile}`,
+`${toolFolder}`, `${document}`, `${languageId}`, `${encoding}`, `${lineEnding}`,
+`${platform}`, `${architecture}`, `${selectionStartLine}`,
 `${selectionStartColumn}`, `${selectionEndLine}`, and `${selectionEndColumn}`.
 Azunote mode offers completion for these placeholders in fields that expand
 values. Environment variables are available as `${env:NAME}` and are
@@ -157,13 +161,13 @@ logging = []
 
 [terminal]
 command = "wt.exe"
-args = ["-d", "${documentDir}"]
-workingDirectory = "${documentDir}"
+args = ["-d", "${documentDirname}"]
+workingDirectory = "${documentDirname}"
 
 [explorer]
 command = "explorer.exe"
 args = ["/select,\"${file}\""]
-workingDirectory = "${documentDir}"
+workingDirectory = "${documentDirname}"
 ```
 
 For crash or input troubleshooting, enable only the detailed categories you
@@ -173,7 +177,7 @@ need in the `[debug]` section. Use `logging = ["all"]`, or select from
 reports remain in the log regardless of this setting.
 
 `terminal.*` and `explorer.*` support the same placeholders as external tools,
-including `${documentDir}`, `${file}`, `${fileName}`, and `${env:NAME}`. If
+including `${documentDirname}`, `${file}`, `${fileBasename}`, and `${env:NAME}`. If
 `workingDirectory` is omitted, the current document's folder is used. The
 bundled example is copied from `Resources/DefaultAppData/settings.toml` when
 the settings file is created.

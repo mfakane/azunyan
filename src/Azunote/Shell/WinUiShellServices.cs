@@ -225,7 +225,7 @@ internal sealed class WinUiExternalToolDialog : IExternalToolDialog
         var argumentsBox = new TextBox
         {
             Header = "Arguments",
-            PlaceholderText = "Use ${file}, ${workspaceFolder}, or ${env:USERNAME}"
+            PlaceholderText = "Use ${file}, ${fileBasename}, or ${env:USERNAME}"
         };
         var inputModeBox = new ComboBox
         {

@@ -21,7 +21,7 @@ public sealed class AzunoteSettings
     public ShellCommandSettings Terminal { get; set; } = new()
     {
         Command = "wt.exe",
-        Arguments = ["-d", "${documentDir}"]
+        Arguments = ["-d", "${documentDirname}"]
     };
 
     public ShellCommandSettings Explorer { get; set; } = new()

@@ -75,14 +75,17 @@ public sealed class ExternalToolsTests
             columnNumber: 7);
 
         Assert.Equal("notes.md", context.FileName);
-        Assert.EndsWith("folder", context.FileDir, StringComparison.OrdinalIgnoreCase);
+        Assert.EndsWith("folder", context.FileDirname, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(
-            $"{context.FilePath}|{context.FileDir}|notes.md|whole document|selected text|12|7|{ExternalToolContext.UserHome}",
-            context.Expand("${file}|${fileDir}|${fileName}|${document}|${selection}|${lineNumber}|${columnNumber}|${userHome}"));
+            $"{context.FilePath}|{context.FileDirname}|notes.md|whole document|selected text|12|7|{ExternalToolContext.UserHome}|{context.Cwd}|{context.ExecPath}|{context.PathSeparator}|{context.PathSeparator}",
+            context.Expand("${file}|${fileDirname}|${fileBasename}|${document}|${selectedText}|${lineNumber}|${columnNumber}|${userHome}|${cwd}|${execPath}|${pathSeparator}|${/}"));
         Assert.Equal(
             Environment.GetEnvironmentVariable("PATH") ?? string.Empty,
             context.Expand("${env:PATH}"));
         Assert.Equal("selected text", context.GetInput(ExternalToolInputMode.Selection));
+        Assert.Equal(
+            "${fileName}|${selection}|${filePath}",
+            context.Expand("${fileName}|${selection}|${filePath}"));
     }
 
     [Fact]
@@ -104,6 +107,16 @@ public sealed class ExternalToolsTests
         Assert.Equal(Path.GetFullPath(temporaryPath), context.FilePath);
         Assert.Equal(Path.GetFullPath(documentPath), context.DocumentFilePath);
         Assert.Equal(Path.GetFullPath(temporaryPath), context.TempFile);
+        Assert.Equal(Path.GetFileName(temporaryPath), context.FileBasename);
+        Assert.Equal(Path.GetFileNameWithoutExtension(temporaryPath), context.FileBasenameNoExtension);
+        Assert.Equal(".md", context.FileExtname);
+        Assert.Equal(context.FileDirname, context.FileDirname);
+        Assert.Equal(
+            Path.GetFileName(Path.TrimEndingDirectorySeparator(context.FileDirname!)),
+            context.FileDirnameBasename);
+        Assert.Equal(
+            $"{context.FileBasenameNoExtension}|{context.FileExtname}|{context.FileDirnameBasename}",
+            context.Expand("${fileBasenameNoExtension}|${fileExtname}|${fileDirnameBasename}"));
         Assert.Equal("notes.md", context.Expand("${documentName}"));
         Assert.Equal("markdown|Utf8Bom|CrLf", context.Expand("${languageId}|${encoding}|${lineEnding}"));
     }
@@ -123,6 +136,18 @@ public sealed class ExternalToolsTests
 
             Assert.Equal(Path.GetFullPath(root), context.WorkspaceFolder);
             Assert.Equal(Path.GetFullPath(root), context.Expand("${workspaceFolder}"));
+            Assert.Equal(
+                Path.GetFileName(root),
+                context.Expand("${workspaceFolderBasename}"));
+            Assert.Equal(
+                Path.GetFullPath(root),
+                context.Expand("${fileWorkspaceFolder}"));
+            Assert.Equal(
+                Path.GetRelativePath(root, path),
+                context.Expand("${relativeFile}"));
+            Assert.Equal(
+                Path.GetRelativePath(root, nested),
+                context.Expand("${relativeFileDirname}"));
         }
         finally
         {
@@ -173,6 +198,7 @@ public sealed class ExternalToolsTests
 
             Assert.Null(context.WorkspaceFolder);
             Assert.Equal("", context.Expand("${workspaceFolder}"));
+            Assert.Equal("||", context.Expand("${relativeFile}|${relativeFileDirname}|${fileWorkspaceFolder}"));
         }
         finally
         {
@@ -477,25 +503,25 @@ public sealed class ExternalToolsTests
                 """
                 [terminal]
                 command = "conhost.exe"
-                args = ["cmd.exe", "/K", "cd", "/d", "${documentDir}"]
-                workingDirectory = "${documentDir}"
+                args = ["cmd.exe", "/K", "cd", "/d", "${documentDirname}"]
+                workingDirectory = "${documentDirname}"
 
                 [explorer]
                 command = "explorer.exe"
                 args = ["/select,\"${file}\""]
-                workingDirectory = "${documentDir}"
+                workingDirectory = "${documentDirname}"
                 """);
 
             var settings = await SettingsFileService.LoadAsync(root);
 
             Assert.Equal("conhost.exe", settings.Terminal.Command);
             Assert.Equal(
-                ["cmd.exe", "/K", "cd", "/d", "${documentDir}"],
+                ["cmd.exe", "/K", "cd", "/d", "${documentDirname}"],
                 settings.Terminal.Arguments);
-            Assert.Equal("${documentDir}", settings.Terminal.WorkingDirectory);
+            Assert.Equal("${documentDirname}", settings.Terminal.WorkingDirectory);
             Assert.Equal("explorer.exe", settings.Explorer.Command);
             Assert.Equal(["/select,\"${file}\""], settings.Explorer.Arguments);
-            Assert.Equal("${documentDir}", settings.Explorer.WorkingDirectory);
+            Assert.Equal("${documentDirname}", settings.Explorer.WorkingDirectory);
         }
         finally
         {
@@ -525,7 +551,7 @@ public sealed class ExternalToolsTests
                 [launch]
                 command = "cmd.exe"
                 args = ["/c", "more"]
-                workingDirectory = "${documentDir}"
+                workingDirectory = "${documentDirname}"
                 input = "document"
                 output = "replaceDocument"
 

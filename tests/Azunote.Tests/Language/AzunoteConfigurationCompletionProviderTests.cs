@@ -137,7 +137,10 @@ public sealed class AzunoteConfigurationCompletionProviderTests
 
         Assert.NotNull(result);
         Assert.Contains(result!.Items, item => item.Label == "${file}");
+        Assert.Contains(result.Items, item => item.Label == "${fileBasename}");
+        Assert.Contains(result.Items, item => item.Label == "${selectedText}");
         Assert.Contains(result.Items, item => item.Label == "${selectionEndColumn}");
+        Assert.Contains(result.Items, item => item.Label == "${/}");
         var fileItem = Assert.Single(result.Items, item => item.Label == "${file}");
         Assert.Equal("${file}", fileItem.InsertText);
         Assert.Equal("Placeholder", fileItem.Detail);
@@ -163,6 +166,24 @@ public sealed class AzunoteConfigurationCompletionProviderTests
 
         Assert.NotNull(result);
         Assert.Contains(result!.Items, item => item.Label == "${document}");
+    }
+
+    [Fact]
+    public async Task Tool_schema_completes_path_separator_shorthand()
+    {
+        const string text = "[launch]\nargs = [\"${/";
+        var provider = new AzunoteConfigurationCompletionProvider(
+            [AzunoteSchemaCatalog.ExternalTool]);
+
+        var result = await provider.GetCompletionsAsync(
+            new EditorProviderContext(
+                new TextSnapshot(text),
+                text.Length,
+                TextSelection.Caret(text.Length)));
+
+        Assert.NotNull(result);
+        var item = Assert.Single(result!.Items, candidate => candidate.Label == "${/}");
+        Assert.Equal("${/}", item.InsertText);
     }
 
     [Fact]

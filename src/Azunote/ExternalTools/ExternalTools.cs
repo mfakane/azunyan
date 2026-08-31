@@ -233,31 +233,44 @@ public sealed partial record ExternalToolContext
         IsDirty = isDirty;
         SelectionStart = selectionStart ?? new LineColumn(lineNumber - 1, columnNumber - 1);
         SelectionEnd = selectionEnd ?? SelectionStart;
+        Cwd = Environment.CurrentDirectory;
+        ExecPath = Environment.ProcessPath ?? string.Empty;
+        PathSeparator = Path.DirectorySeparatorChar.ToString();
     }
 
     public string? FilePath => ExecutionFilePath;
 
     public string? ExecutionFilePath { get; }
 
-    public string? FileDir => FilePath is null ? null : Path.GetDirectoryName(FilePath);
-
     public string? FileName => FilePath is null ? null : Path.GetFileName(FilePath);
 
-    public string? FileStem => FileName is null ? null : Path.GetFileNameWithoutExtension(FileName);
+    public string? FileBasenameNoExtension => FileName is null ? null : Path.GetFileNameWithoutExtension(FileName);
 
     public string? FileExtension => FileName is null ? null : Path.GetExtension(FileName);
 
+    public string? FileBasename => FileName;
+
+    public string? FileExtname => FileExtension;
+
+    public string? FileDirname => FilePath is null ? null : Path.GetDirectoryName(FilePath);
+
+    public string? FileDirnameBasename => GetPathBasename(FileDirname);
+
     public string? DocumentFilePath { get; }
 
-    public string? DocumentDir => DocumentFilePath is null
+    public string? DocumentDirname => DocumentFilePath is null
         ? null
         : Path.GetDirectoryName(DocumentFilePath);
+
+    public string? DocumentDirnameBasename => DocumentDirname is null
+        ? null
+        : GetPathBasename(DocumentDirname);
 
     public string? DocumentFileName => DocumentFilePath is null
         ? null
         : Path.GetFileName(DocumentFilePath);
 
-    public string? DocumentStem => DocumentFileName is null
+    public string? DocumentBasenameNoExtension => DocumentFileName is null
         ? null
         : Path.GetFileNameWithoutExtension(DocumentFileName);
 
@@ -273,6 +286,14 @@ public sealed partial record ExternalToolContext
     public string? ToolDirectory { get; }
 
     public string? WorkspaceFolder { get; }
+
+    public string? WorkspaceFolderBasename => GetPathBasename(WorkspaceFolder);
+
+    public string? FileWorkspaceFolder => WorkspaceFolder;
+
+    public string? RelativeFile => GetRelativeWorkspacePath(DocumentFilePath);
+
+    public string? RelativeFileDirname => GetRelativeWorkspacePath(DocumentDirname);
 
     public string Document { get; }
 
@@ -293,6 +314,12 @@ public sealed partial record ExternalToolContext
     public LineColumn SelectionStart { get; }
 
     public LineColumn SelectionEnd { get; }
+
+    public string Cwd { get; }
+
+    public string ExecPath { get; }
+
+    public string PathSeparator { get; }
 
     public static string UserHome
     {
@@ -322,22 +349,26 @@ public sealed partial record ExternalToolContext
             return name switch
             {
                 "file" => FilePath ?? string.Empty,
-                "filePath" => FilePath ?? string.Empty,
-                "executionFile" => ExecutionFilePath ?? string.Empty,
-                "fileDir" => FileDir ?? string.Empty,
-                "fileName" => FileName ?? string.Empty,
-                "fileStem" => FileStem ?? string.Empty,
-                "fileExtension" => FileExtension ?? string.Empty,
+                "workspaceFolderBasename" => WorkspaceFolderBasename ?? string.Empty,
+                "fileWorkspaceFolder" => FileWorkspaceFolder ?? string.Empty,
+                "relativeFile" => RelativeFile ?? string.Empty,
+                "relativeFileDirname" => RelativeFileDirname ?? string.Empty,
+                "fileBasename" => FileBasename ?? string.Empty,
+                "fileBasenameNoExtension" => FileBasenameNoExtension ?? string.Empty,
+                "fileExtname" => FileExtname ?? string.Empty,
+                "fileDirname" => FileDirname ?? string.Empty,
+                "fileDirnameBasename" => FileDirnameBasename ?? string.Empty,
                 "documentFile" => DocumentFilePath ?? string.Empty,
-                "documentDir" => DocumentDir ?? string.Empty,
+                "documentDirname" => DocumentDirname ?? string.Empty,
+                "documentDirnameBasename" => DocumentDirnameBasename ?? string.Empty,
                 "documentName" => DocumentFileName ?? string.Empty,
-                "documentStem" => DocumentStem ?? string.Empty,
+                "documentBasenameNoExtension" => DocumentBasenameNoExtension ?? string.Empty,
                 "documentExtension" => DocumentExtension ?? string.Empty,
                 "tempFile" => TempFile ?? string.Empty,
                 "toolDir" => ToolDirectory ?? string.Empty,
                 "workspaceFolder" => WorkspaceFolder ?? string.Empty,
                 "document" => Document,
-                "selection" => Selection,
+                "selectedText" => Selection,
                 "userHome" => UserHome,
                 "languageId" => LanguageId,
                 "encoding" => Encoding.ToString(),
@@ -346,6 +377,10 @@ public sealed partial record ExternalToolContext
                     OperatingSystem.IsLinux() ? "linux" :
                     OperatingSystem.IsMacOS() ? "macos" : "unknown",
                 "architecture" => System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant(),
+                "cwd" => Cwd,
+                "execPath" => ExecPath,
+                "pathSeparator" => PathSeparator,
+                "/" => PathSeparator,
                 "lineNumber" => LineNumber.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 "columnNumber" => ColumnNumber.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 "selectionStartLine" => (SelectionStart.Line + 1).ToString(System.Globalization.CultureInfo.InvariantCulture),
@@ -369,6 +404,27 @@ public sealed partial record ExternalToolContext
         ExternalToolInputMode.Selection => Selection,
         _ => throw new ArgumentOutOfRangeException(nameof(inputMode))
     };
+
+    private string? GetRelativeWorkspacePath(string? path)
+    {
+        if (path is null || WorkspaceFolder is null)
+        {
+            return null;
+        }
+
+        var relativePath = Path.GetRelativePath(WorkspaceFolder, path);
+        return relativePath == "." ? string.Empty : relativePath;
+    }
+
+    private static string? GetPathBasename(string? path)
+    {
+        if (path is null)
+        {
+            return null;
+        }
+
+        return Path.GetFileName(Path.TrimEndingDirectorySeparator(path));
+    }
 
 }
 
@@ -896,7 +952,7 @@ public sealed class ExternalToolRunner
         ExternalToolContext context)
     {
         var configured = definition.WorkingDirectory is null
-            ? context.DocumentDir ?? context.FileDir
+            ? context.DocumentDirname ?? context.FileDirname
             : context.Expand(definition.WorkingDirectory);
 
         if (!string.IsNullOrWhiteSpace(configured)

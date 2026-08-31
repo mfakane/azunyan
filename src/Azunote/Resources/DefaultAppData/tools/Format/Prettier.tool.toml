@@ -5,7 +5,7 @@ visibility = "whenAvailable"
 [launch]
 command = "prettier"
 args = ["--write", "${file}"]   # or "--write ${file}"
-workingDirectory = "${documentDir}"
+workingDirectory = "${documentDirname}"
 output = "reloadFile"
 
 [when]
