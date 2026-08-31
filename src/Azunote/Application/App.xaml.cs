@@ -13,10 +13,29 @@ public partial class App : Application, IDisposable
 
     public App()
     {
+        var dumpPath = NativeCrashReporter.Install();
+        var previousDumpPath = NativeCrashReporter.FindLatestPreviousDump();
+        if (dumpPath is not null)
+        {
+            ErrorReporter.LogMessage(
+                "Native crash reporter installed",
+                $"Crash dump reserved at: {dumpPath}");
+        }
+
+        if (previousDumpPath is not null)
+        {
+            ErrorReporter.LogMessage(
+                "Previous native crash dump",
+                previousDumpPath);
+        }
+
         InitializeComponent();
         UnhandledException += OnUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += OnAppDomainUnhandledException;
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+        // WinUI initialization may install its own process-level exception
+        // handling. Reassert ours after the framework has initialized.
+        NativeCrashReporter.Install();
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
@@ -50,6 +69,7 @@ public partial class App : Application, IDisposable
         }
 
         _application.Launch(arguments);
+        NativeCrashReporter.Install();
         _singleInstance.Start(_application.HandleForwardedCommandLineAsync);
     }
 
@@ -94,7 +114,13 @@ public partial class App : Application, IDisposable
 
     private void ReportUnhandledException(string source, Exception exception)
     {
+        var dumpPath = NativeCrashReporter.WriteSnapshotDump();
         var logPath = ErrorReporter.LogException(source, exception);
+        if (dumpPath is not null)
+        {
+            ErrorReporter.LogMessage("Exception dump created", dumpPath);
+        }
+
         if (Interlocked.Exchange(ref _unhandledDialogShown, 1) != 0)
         {
             return;
