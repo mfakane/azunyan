@@ -38,6 +38,7 @@ public sealed partial class AzunyanTextInputWindow : UserControl
         NativeTextBox.TextCompositionStarted += OnTextCompositionStarted;
         NativeTextBox.TextCompositionChanged += OnTextCompositionChanged;
         NativeTextBox.TextCompositionEnded += OnTextCompositionEnded;
+        NativeTextBox.ExceptionSink = ReportCallbackException;
     }
 
     public int WindowStart => _windowStart;
@@ -63,6 +64,13 @@ public sealed partial class AzunyanTextInputWindow : UserControl
     public event EventHandler<AzunyanTextInputCompositionChangedEventArgs>? CompositionChanged;
 
     public event EventHandler? NativeFocusChanged;
+
+    /// <summary>
+    /// Receives exceptions that crossed a native TextBox callback boundary.
+    /// These must not escape into CoreMessaging, which terminates the process
+    /// with 0xc000027b instead of raising a managed application exception.
+    /// </summary>
+    internal Action<string, Exception>? ExceptionSink { get; set; }
 
     /// <summary>
     /// Replaces the native window atomically. All offsets in the supplied
@@ -135,14 +143,28 @@ public sealed partial class AzunyanTextInputWindow : UserControl
 
     protected override void OnGotFocus(RoutedEventArgs e)
     {
-        base.OnGotFocus(e);
-        NativeFocusChanged?.Invoke(this, EventArgs.Empty);
+        try
+        {
+            base.OnGotFocus(e);
+            NativeFocusChanged?.Invoke(this, EventArgs.Empty);
+        }
+        catch (Exception exception)
+        {
+            ReportCallbackException("GotFocus", exception);
+        }
     }
 
     protected override void OnLostFocus(RoutedEventArgs e)
     {
-        base.OnLostFocus(e);
-        NativeFocusChanged?.Invoke(this, EventArgs.Empty);
+        try
+        {
+            base.OnLostFocus(e);
+            NativeFocusChanged?.Invoke(this, EventArgs.Empty);
+        }
+        catch (Exception exception)
+        {
+            ReportCallbackException("LostFocus", exception);
+        }
     }
 
     private void OnBeforeTextChanging(
@@ -161,35 +183,42 @@ public sealed partial class AzunyanTextInputWindow : UserControl
             return;
         }
 
-        var currentText = NativeTextBox.Text;
-        if (string.Equals(_synchronizedNativeText, currentText, StringComparison.Ordinal))
+        try
         {
-            RaiseSelectionChanged();
-            return;
-        }
+            var currentText = NativeTextBox.Text;
+            if (string.Equals(_synchronizedNativeText, currentText, StringComparison.Ordinal))
+            {
+                RaiseSelectionChanged();
+                return;
+            }
 
-        var (localNativeRange, insertedNativeText) = FindReplacement(
-            _synchronizedNativeText,
-            currentText);
-        var localStart = ToDocumentOffset(_synchronizedText, localNativeRange.Start);
-        var localEnd = ToDocumentOffset(_synchronizedText, localNativeRange.End);
-        var localRange = TextRange.FromBounds(localStart, localEnd);
-        var insertedText = FromNativeText(insertedNativeText, _synchronizedText);
-        var change = new TextChange(
-            new TextRange(_windowStart + localRange.Start, localRange.Length),
-            localRange.Length == 0
-                ? string.Empty
-                : _synchronizedText.Substring(localRange.Start, localRange.Length),
-            insertedText);
-        _synchronizedText = ReplaceText(_synchronizedText, localRange, insertedText);
-        _synchronizedNativeText = currentText;
-        InputChanged?.Invoke(
-            this,
-            new AzunyanTextInputChangedEventArgs(
-                _generation,
-                change,
-                ToDocumentSelection(),
-                _compositionRange));
+            var (localNativeRange, insertedNativeText) = FindReplacement(
+                _synchronizedNativeText,
+                currentText);
+            var localStart = ToDocumentOffset(_synchronizedText, localNativeRange.Start);
+            var localEnd = ToDocumentOffset(_synchronizedText, localNativeRange.End);
+            var localRange = TextRange.FromBounds(localStart, localEnd);
+            var insertedText = FromNativeText(insertedNativeText, _synchronizedText);
+            var change = new TextChange(
+                new TextRange(_windowStart + localRange.Start, localRange.Length),
+                localRange.Length == 0
+                    ? string.Empty
+                    : _synchronizedText.Substring(localRange.Start, localRange.Length),
+                insertedText);
+            _synchronizedText = ReplaceText(_synchronizedText, localRange, insertedText);
+            _synchronizedNativeText = currentText;
+            InputChanged?.Invoke(
+                this,
+                new AzunyanTextInputChangedEventArgs(
+                    _generation,
+                    change,
+                    ToDocumentSelection(),
+                    _compositionRange));
+        }
+        catch (Exception exception)
+        {
+            ReportCallbackException("TextChanged", exception);
+        }
     }
 
     private void OnSelectionChanged(object sender, RoutedEventArgs args)
@@ -199,30 +228,62 @@ public sealed partial class AzunyanTextInputWindow : UserControl
             return;
         }
 
-        RaiseSelectionChanged();
+        try
+        {
+            RaiseSelectionChanged();
+        }
+        catch (Exception exception)
+        {
+            ReportCallbackException("SelectionChanged", exception);
+        }
     }
 
     private void OnTextCompositionStarted(
         TextBox sender,
-        TextCompositionStartedEventArgs args) =>
-        SetComposition(args.StartIndex, args.Length);
+        TextCompositionStartedEventArgs args)
+    {
+        try
+        {
+            SetComposition(args.StartIndex, args.Length);
+        }
+        catch (Exception exception)
+        {
+            ReportCallbackException("TextCompositionStarted", exception);
+        }
+    }
 
     private void OnTextCompositionChanged(
         TextBox sender,
-        TextCompositionChangedEventArgs args) =>
-        SetComposition(args.StartIndex, args.Length);
+        TextCompositionChangedEventArgs args)
+    {
+        try
+        {
+            SetComposition(args.StartIndex, args.Length);
+        }
+        catch (Exception exception)
+        {
+            ReportCallbackException("TextCompositionChanged", exception);
+        }
+    }
 
     private void OnTextCompositionEnded(
         TextBox sender,
         TextCompositionEndedEventArgs args)
     {
         _compositionRange = null;
-        CompositionChanged?.Invoke(
-            this,
-            new AzunyanTextInputCompositionChangedEventArgs(
-                _generation,
-                null,
-                isComposing: false));
+        try
+        {
+            CompositionChanged?.Invoke(
+                this,
+                new AzunyanTextInputCompositionChangedEventArgs(
+                    _generation,
+                    null,
+                    isComposing: false));
+        }
+        catch (Exception exception)
+        {
+            ReportCallbackException("TextCompositionEnded", exception);
+        }
     }
 
     private void SetComposition(int start, int length)
@@ -237,12 +298,19 @@ public sealed partial class AzunyanTextInputWindow : UserControl
         _compositionRange = new TextRange(
             _windowStart + documentStart,
             documentEnd - documentStart);
-        CompositionChanged?.Invoke(
-            this,
-            new AzunyanTextInputCompositionChangedEventArgs(
-                _generation,
-                _compositionRange,
-                isComposing: true));
+        try
+        {
+            CompositionChanged?.Invoke(
+                this,
+                new AzunyanTextInputCompositionChangedEventArgs(
+                    _generation,
+                    _compositionRange,
+                    isComposing: true));
+        }
+        catch (Exception exception)
+        {
+            ReportCallbackException("TextCompositionChanged", exception);
+        }
     }
 
     private void RaiseSelectionChanged() =>
@@ -251,6 +319,19 @@ public sealed partial class AzunyanTextInputWindow : UserControl
             new AzunyanTextInputSelectionChangedEventArgs(
                 _generation,
                 ToDocumentSelection()));
+
+    private void ReportCallbackException(string source, Exception exception)
+    {
+        try
+        {
+            ExceptionSink?.Invoke(source, exception);
+        }
+        catch (Exception sinkException)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"Azunyan text input exception sink failed: {sinkException}");
+        }
+    }
 
     private TextSelection ToDocumentSelection()
     {

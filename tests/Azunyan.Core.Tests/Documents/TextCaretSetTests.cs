@@ -103,6 +103,35 @@ public sealed class TextCaretSetTests
     }
 
     [Fact]
+    public void Visual_block_paste_maps_clipboard_rows_and_appends_extra_rows()
+    {
+        var snapshot = new TextSnapshot("abcdef");
+        var projection = TextProjectionBuilder.Build(snapshot);
+        var rows = VisualRowMapBuilder.Build(projection, wrapColumns: 3);
+        var selection = new TextBlockSelection(
+            new TextBlockPosition(0, 1),
+            new TextBlockPosition(1, 2),
+            TextBlockSelectionCoordinateSpace.VisualRows);
+        var carets = TextCaretSetOperations.FromVisualBlockSelection(
+            snapshot,
+            selection,
+            rows,
+            tabDisplaySize: 4);
+
+        var edit = TextCaretSetOperations.CreatePaste(
+            snapshot,
+            carets,
+            new[] { "X", "Y", "Z" },
+            "\n",
+            tabDisplaySize: 4);
+
+        var result = snapshot.Text[..edit.Range.Start]
+            + edit.Replacement
+            + snapshot.Text[edit.Range.End..];
+        Assert.Equal("aXcdYf\nZ", result);
+    }
+
+    [Fact]
     public void Movement_keeps_each_selection_anchor_when_shift_is_pressed()
     {
         var snapshot = new TextSnapshot("abc\ndef");

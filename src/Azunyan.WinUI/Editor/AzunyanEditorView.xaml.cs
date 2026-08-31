@@ -1,6 +1,7 @@
 using Azunyan.Core;
 using System.Globalization;
 using System.Runtime.ExceptionServices;
+using System.Runtime.InteropServices;
 using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI;
 using Microsoft.UI.Input;
@@ -39,13 +40,21 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private bool _applyingInputChange;
     private bool _inputWindowSynchronizationPending;
     private bool _inputWindowSynchronizationScheduled;
-    private bool _nativeKeyDownPending;
+    private readonly HashSet<VirtualKey> _nativeKeysDown = new();
     private bool _autoIndentOnEnter = true;
     private bool _suppressVerticalCaretNavigation;
     private int? _indentSize;
     private IndentationInputMode _indentationInputMode;
     private readonly Queue<Action> _pendingCompositionOperations = new();
-    private readonly Queue<(VirtualKey Key, Action Action)> _pendingKeyEdits = new();
+    private readonly List<(VirtualKey Key, Action Action)> _pendingKeyEdits = [];
+    private readonly Queue<Func<Task>> _pendingPasteOperations = new();
+    private bool _pasteOperationRunning;
+    private bool _pasteBatchActive;
+    private bool _pasteBatchRefreshPending;
+    private bool _pasteBatchRefreshScheduled;
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _pasteBatchRefreshTimer;
+    private long _pasteOperationSequence;
+    private DateTimeOffset _clipboardUnavailableUntil;
     private AzunyanColorScheme _colorScheme;
     private readonly EditorProviderSet _providers = new();
     private readonly EditorProviderScheduler _providerScheduler;
@@ -78,6 +87,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private DocumentChangedEventArgs? _pendingProviderDocumentChange;
     private DocumentChangedEventArgs? _pendingAutomationDocumentChange;
     private AzunyanEditorViewAutomationPeer? _automationPeer;
+    private long _diagnosticOperationSequence;
+    private string? _diagnosticOperation;
+    private string? _diagnosticPasteOperation;
 
     public AzunyanEditorView()
     {
@@ -96,6 +108,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         _document.Changed += OnInputDocumentChanged;
         _document.SelectionChanged += OnDocumentSelectionChanged;
         _document.CaretSetChanged += OnDocumentCaretSetChanged;
+        InputWindow.ExceptionSink = OnNativeInputCallbackException;
         InputWindow.NativeTextBoxControl.Padding = new Thickness(8, 6, 8, 6);
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
@@ -134,6 +147,13 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         _disposed = true;
+        if (_pasteBatchRefreshTimer is { } pasteBatchRefreshTimer)
+        {
+            pasteBatchRefreshTimer.Stop();
+            pasteBatchRefreshTimer.Tick -= OnPasteBatchRefreshTimerTick;
+        }
+
+        _pasteBatchRefreshTimer = null;
         InputWindow.NativeTextBoxControl.BeforeKeyDown -= OnInputKeyDown;
         InputWindow.NativeTextBoxControl.AfterKeyUp -= OnInputKeyUp;
         EditorPointerSurface.PointerReleased -= OnInputPointerReleased;
@@ -313,6 +333,25 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     public event EventHandler<AdornmentInvokedEventArgs>? AdornmentInvoked;
 
     public IReadOnlySet<string> CollapsedFoldIds => _collapsedFoldIds;
+
+    /// <summary>
+    /// Categories enabled for the detailed operation log. The default is
+    /// <see cref="AzunyanDiagnosticCategory.None"/>, so the high-volume
+    /// diagnostic path is disabled until the host opts in.
+    /// </summary>
+    public AzunyanDiagnosticCategory DiagnosticCategories { get; set; }
+
+    /// <summary>
+    /// Receives detailed diagnostics for enabled categories. The host may
+    /// connect this to its crash log.
+    /// </summary>
+    public Action<AzunyanDiagnosticCategory, string>? DiagnosticSink { get; set; }
+
+    /// <summary>
+    /// Receives caught callback and operation exceptions independently of the
+    /// detailed operation-log category filter.
+    /// </summary>
+    public Action<string, Exception>? DiagnosticExceptionSink { get; set; }
 
     internal TextBox InputHost => InputWindow.NativeTextBoxControl;
 
@@ -617,6 +656,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     public void CutSelectionToClipboard()
     {
+        LogDiagnostic(
+            AzunyanDiagnosticCategory.Clipboard,
+            $"cut-request; {DescribeDiagnosticState()}");
         RunAfterComposition(CutSelectionToClipboardCore);
     }
 
@@ -650,6 +692,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     public void CopySelectionToClipboard()
     {
+        LogDiagnostic(
+            AzunyanDiagnosticCategory.Clipboard,
+            $"copy-request; {DescribeDiagnosticState()}");
         if (_blockSelection is { } blockSelection)
         {
             SetClipboardText(GetBlockSelectionText(blockSelection));
@@ -668,23 +713,74 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     public void PasteFromClipboard()
     {
-        if (_blockSelection is not null)
+        RunAfterComposition(() => QueuePasteOperation(PasteFromClipboardAsync));
+    }
+
+    private void QueuePasteOperation(Func<Task> operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        _pendingPasteOperations.Enqueue(operation);
+        LogDiagnostic(
+            AzunyanDiagnosticCategory.Clipboard,
+            $"queued-paste pending={_pendingPasteOperations.Count}; {DescribeDiagnosticState()}");
+        if (!_pasteOperationRunning)
         {
-            RunAfterComposition(() => _ = PasteBlockFromClipboardAsync());
+            _ = DrainPasteOperationsAsync();
+        }
+    }
+
+    private async Task DrainPasteOperationsAsync()
+    {
+        if (_pasteOperationRunning)
+        {
             return;
         }
 
-        if (Document.CaretSet.Count > 1)
+        _pasteOperationRunning = true;
+        _pasteBatchActive = true;
+        try
         {
-            RunAfterComposition(() => _ = PasteCaretSetFromClipboardAsync());
-            return;
+            while (!_disposed && _pendingPasteOperations.Count > 0)
+            {
+                var operation = _pendingPasteOperations.Dequeue();
+                var operationId = $"paste-{Interlocked.Increment(ref _pasteOperationSequence)}";
+                LogDiagnostic(
+                    AzunyanDiagnosticCategory.Clipboard,
+                    $"BEGIN {operationId}; pending={_pendingPasteOperations.Count}; "
+                    + DescribeDiagnosticState());
+                var previousPasteDiagnosticOperation = _diagnosticPasteOperation;
+                _diagnosticPasteOperation = operationId;
+                try
+                {
+                    await operation();
+                    LogDiagnostic(
+                        AzunyanDiagnosticCategory.Clipboard,
+                        $"END {operationId}; pending={_pendingPasteOperations.Count}; "
+                        + DescribeDiagnosticState());
+                }
+                catch (Exception exception)
+                {
+                    ReportDiagnosticException($"Paste/{operationId}", exception);
+                    LogDiagnostic(
+                        AzunyanDiagnosticCategory.Clipboard,
+                        $"FAILED {operationId}; {exception}");
+                }
+                finally
+                {
+                    _diagnosticPasteOperation = previousPasteDiagnosticOperation;
+                }
+            }
         }
-
-        RunAfterComposition(() =>
+        finally
         {
-            SyncInputWindow();
-            InputWindow.NativeTextBoxControl.PasteFromClipboard();
-        });
+            _pasteBatchActive = false;
+            _pasteOperationRunning = false;
+            RequestPendingPasteBatchRefresh();
+            if (!_disposed && _pendingPasteOperations.Count > 0)
+            {
+                _ = DrainPasteOperationsAsync();
+            }
+        }
     }
 
     public void SelectAll()
@@ -868,9 +964,17 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     {
         if (args.Generation != _inputWindowGeneration)
         {
+            LogDiagnostic(
+                AzunyanDiagnosticCategory.Input,
+                $"native-text-changed-stale generation={args.Generation}; currentGeneration={_inputWindowGeneration}");
             return;
         }
 
+        LogDiagnostic(
+            AzunyanDiagnosticCategory.Input,
+            $"native-text-changed generation={args.Generation}; oldRange={args.Change.OldRange}; "
+            + $"newTextLength={args.Change.NewText.Length}; selection={args.Selection}; "
+            + $"composition={args.CompositionRange?.ToString() ?? "none"}; {DescribeDiagnosticState()}");
         var oldSnapshot = Snapshot;
         _applyingInputChange = true;
         try
@@ -946,7 +1050,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 documentChange: documentChange);
         }
 
-        if (!_nativeKeyDownPending)
+        if (_nativeKeysDown.Count == 0)
         {
             RequestInputWindowSynchronization();
         }
@@ -1053,25 +1157,71 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         Clipboard.SetContent(dataPackage);
     }
 
-    private async Task PasteBlockFromClipboardAsync()
+    private async Task PasteFromClipboardAsync()
     {
-        var content = Clipboard.GetContent();
-        if (!content.Contains(StandardDataFormats.Text))
+        if (DateTimeOffset.UtcNow < _clipboardUnavailableUntil)
         {
             return;
         }
 
-        var text = await content.GetTextAsync();
-        if (_disposed || _blockSelection is not { } selection)
+        string text;
+        try
+        {
+            var content = Clipboard.GetContent();
+            if (!content.Contains(StandardDataFormats.Text))
+            {
+                return;
+            }
+
+            text = await content.GetTextAsync();
+            _clipboardUnavailableUntil = default;
+        }
+        catch (COMException exception) when (
+            unchecked((uint)exception.HResult) == 0x800401D3u)
+        {
+            // The clipboard broker can transiently expose malformed data while
+            // another application is replacing the clipboard. Repeating the
+            // WinRT request for every queued Ctrl+V only amplifies that race.
+            _clipboardUnavailableUntil = DateTimeOffset.UtcNow.AddMilliseconds(250);
+            LogDiagnostic(
+                AzunyanDiagnosticCategory.Clipboard,
+                $"clipboard-text-unavailable hresult=0x{exception.HResult:X8}; "
+                + DescribeDiagnosticState());
+            return;
+        }
+
+        if (_disposed)
         {
             return;
         }
 
-        var lines = SplitBlockInput(text);
-        ApplyDocumentCommand(() => ApplyBlockReplacement(
-            selection,
-            lines,
-            repeatSingleLine: lines.Length == 1));
+        if (_blockSelection is { } selection)
+        {
+            var lines = SplitBlockInput(text);
+            ApplyDocumentCommand(() => ApplyBlockReplacement(
+                selection,
+                lines,
+                repeatSingleLine: lines.Length == 1));
+            return;
+        }
+
+        if (Document.CaretSet.Count > 1)
+        {
+            var lines = SplitBlockInput(text);
+            ApplyDocumentCommand(() =>
+            {
+                var edit = TextCaretSetOperations.CreatePaste(
+                    Snapshot,
+                    Document.CaretSet,
+                    lines,
+                    TextBlockSelectionOperations.GetPreferredLineEnding(Snapshot),
+                    TabDisplaySize);
+                _document.Replace(edit.Range, edit.Replacement, edit.CaretSet);
+            });
+            return;
+        }
+
+        ApplyDocumentCommand(() => _document.Replace(Document.Selection.Range, text));
     }
 
     private static string[] SplitBlockInput(string text)
@@ -1137,33 +1287,6 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         _document.Replace(edit.Range, edit.Replacement, edit.CaretSet);
     }
 
-    private async Task PasteCaretSetFromClipboardAsync()
-    {
-        var content = Clipboard.GetContent();
-        if (!content.Contains(StandardDataFormats.Text))
-        {
-            return;
-        }
-
-        var text = await content.GetTextAsync();
-        if (_disposed || Document.CaretSet.Count <= 1)
-        {
-            return;
-        }
-
-        var lines = SplitBlockInput(text);
-        ApplyDocumentCommand(() =>
-        {
-            var edit = TextCaretSetOperations.CreatePaste(
-                Snapshot,
-                Document.CaretSet,
-                lines,
-                TextBlockSelectionOperations.GetPreferredLineEnding(Snapshot),
-                TabDisplaySize);
-            _document.Replace(edit.Range, edit.Replacement, edit.CaretSet);
-        });
-    }
-
     private void OnInputDocumentChanged(
         object? sender,
         DocumentChangedEventArgs args)
@@ -1209,9 +1332,16 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     {
         if (args.Generation != _inputWindowGeneration)
         {
+            LogDiagnostic(
+                AzunyanDiagnosticCategory.Input,
+                $"native-composition-changed-stale generation={args.Generation}; currentGeneration={_inputWindowGeneration}");
             return;
         }
 
+        LogDiagnostic(
+            AzunyanDiagnosticCategory.Input,
+            $"native-composition-changed generation={args.Generation}; composing={args.IsComposing}; "
+            + $"range={args.CompositionRange?.ToString() ?? "none"}; {DescribeDiagnosticState()}");
         _compositionRange = args.CompositionRange;
         _pendingProviderDocumentChange = null;
         _completionRequested = false;
@@ -1222,6 +1352,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         if (!args.IsComposing)
         {
             DrainPendingCompositionOperations();
+            RequestPendingPasteBatchRefresh();
             FlushPendingAutomationDocumentChange(render: false);
 
             RequestProviderResults(true, true, true);
@@ -1242,6 +1373,21 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     {
         if (args.Generation == _inputWindowGeneration)
         {
+            LogDiagnostic(
+                AzunyanDiagnosticCategory.Input,
+                $"native-selection-changed generation={args.Generation}; selection={args.Selection}; "
+                + DescribeDiagnosticState());
+            // Managed paste updates the document first and intentionally
+            // delays the native sliding-window refresh. SelectionChanged can
+            // therefore arrive from the previous native snapshot. Applying
+            // it here would move the document caret backwards.
+            if (_pasteBatchActive
+                || _pasteBatchRefreshPending
+                || _pasteBatchRefreshScheduled)
+            {
+                return;
+            }
+
             if (_selectionPointerId is not null)
             {
                 return;
@@ -1386,6 +1532,12 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
         var generation = checked(++_inputWindowGeneration);
 
+        LogDiagnosticStage(
+            AzunyanDiagnosticCategory.Input,
+            "before-native-window-set",
+            $"generation={generation}; windowStart={window.Start}; windowLength={window.Length}; "
+            + $"selection={Document.Selection}");
+
         _synchronizingInputWindow = true;
         try
         {
@@ -1402,6 +1554,10 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         _inputWindowSynchronizationPending = false;
+        LogDiagnosticStage(
+            AzunyanDiagnosticCategory.Input,
+            "after-native-window-set",
+            $"generation={generation}; windowStart={window.Start}; windowLength={window.Length}");
     }
 
     private TextRange CalculateInputWindow(TextRange currentWindow) =>
@@ -1458,6 +1614,61 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
     }
 
+    private void RequestPendingPasteBatchRefresh()
+    {
+        if (!_pasteBatchRefreshPending
+            || _pasteOperationRunning
+            || IsComposing
+            || _nativeKeysDown.Count != 0)
+        {
+            return;
+        }
+
+        _pasteBatchRefreshTimer ??= DispatcherQueue.CreateTimer();
+        _pasteBatchRefreshTimer.Interval = TimeSpan.FromMilliseconds(120);
+        _pasteBatchRefreshTimer.IsRepeating = false;
+        _pasteBatchRefreshTimer.Stop();
+        _pasteBatchRefreshScheduled = true;
+        _pasteBatchRefreshTimer.Tick -= OnPasteBatchRefreshTimerTick;
+        _pasteBatchRefreshTimer.Tick += OnPasteBatchRefreshTimerTick;
+        _pasteBatchRefreshTimer.Start();
+    }
+
+    private void OnPasteBatchRefreshTimerTick(
+        Microsoft.UI.Dispatching.DispatcherQueueTimer sender,
+        object args)
+    {
+        _pasteBatchRefreshScheduled = false;
+        if (_disposed
+            || _pasteOperationRunning
+            || IsComposing
+            || _nativeKeysDown.Count != 0
+            || !_pasteBatchRefreshPending)
+        {
+            return;
+        }
+
+        try
+        {
+            SyncInputWindow();
+            RenderViewport();
+            _pasteBatchRefreshPending = false;
+            LogDiagnostic(
+                AzunyanDiagnosticCategory.Clipboard,
+                $"paste-batch-refresh; {DescribeDiagnosticState()}");
+        }
+        catch (Exception exception)
+        {
+            // A dispatcher callback must not leak a managed exception into
+            // the WinUI/CoreMessaging input loop. Keep the pending flag set
+            // so a later input turn can retry.
+            ReportDiagnosticException("PasteBatchRefresh", exception);
+            LogDiagnostic(
+                AzunyanDiagnosticCategory.Clipboard,
+                $"paste-batch-refresh-failed; {exception}");
+        }
+    }
+
     private void RunAfterComposition(Action action)
     {
         ArgumentNullException.ThrowIfNull(action);
@@ -1498,7 +1709,10 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     private void OnInputKeyDown(object sender, KeyRoutedEventArgs args)
     {
-        _nativeKeyDownPending = true;
+        _nativeKeysDown.Add(args.Key);
+        LogDiagnostic(
+            AzunyanDiagnosticCategory.Key,
+            $"keydown key={args.Key}; {DescribeDiagnosticState()}");
 
         if (IsCompletionPopupOpen)
         {
@@ -1536,6 +1750,19 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         var control = IsKeyDown(VirtualKey.Control);
         var menu = IsKeyDown(VirtualKey.Menu);
         var extendSelection = IsKeyDown(VirtualKey.Shift);
+        if (args.Key == VirtualKey.V && control)
+        {
+            var pasteMode = _blockSelection is not null
+                ? "block-selection"
+                : Document.CaretSet.Count > 1
+                    ? "caret-set"
+                    : "single-caret";
+            LogDiagnostic(
+                AzunyanDiagnosticCategory.Key,
+                $"ctrl-v-keydown mode={pasteMode}; implementation=managed; "
+                + DescribeDiagnosticState());
+        }
+
         switch (args.Key)
         {
             case VirtualKey.Tab
@@ -1586,9 +1813,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 QueueKeyEdit(args.Key, CutSelectionToClipboard);
                 args.Handled = true;
                 break;
-            case VirtualKey.V when control
-                && (_blockSelection is not null || Document.CaretSet.Count > 1)
-                && !IsComposing:
+            case VirtualKey.V when control:
                 QueueKeyEdit(args.Key, PasteFromClipboard);
                 args.Handled = true;
                 break;
@@ -1700,8 +1925,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 });
                 args.Handled = true;
                 break;
-            case VirtualKey.Back when (_blockSelection is not null || Document.CaretSet.Count > 1)
-                && !IsComposing:
+            case VirtualKey.Back when !IsComposing:
                 QueueKeyEdit(args.Key, () =>
                 {
                     ApplyDocumentCommand(() =>
@@ -1716,6 +1940,10 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                         else if (Document.CaretSet.Count > 1)
                         {
                             ApplyCaretSetDeletion(backward: true);
+                        }
+                        else if (!IsComposing)
+                        {
+                            Document.DeleteBackward();
                         }
                     });
                 });
@@ -1752,26 +1980,139 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private void QueueKeyEdit(VirtualKey key, Action action)
     {
         ArgumentNullException.ThrowIfNull(action);
-        _pendingKeyEdits.Enqueue((key, action));
+        LogDiagnostic(
+            AzunyanDiagnosticCategory.Key,
+            $"queued-key-edit key={key}; {DescribeDiagnosticState()}");
+        _pendingKeyEdits.Add((key, action));
+    }
+
+    private void ExecutePendingKeyEdit(VirtualKey key, Action action)
+    {
+        var operation = $"key-edit-{Interlocked.Increment(ref _diagnosticOperationSequence)}:{key}";
+        _diagnosticOperation = operation;
+        LogDiagnostic(
+            AzunyanDiagnosticCategory.Key,
+            $"BEGIN {operation}; {DescribeDiagnosticState()}");
+        try
+        {
+            action();
+            LogDiagnostic(
+                AzunyanDiagnosticCategory.Key,
+                $"END {operation}; {DescribeDiagnosticState()}");
+        }
+        catch (Exception exception)
+        {
+            ReportDiagnosticException("KeyEdit", exception);
+            LogDiagnostic(
+                AzunyanDiagnosticCategory.Key,
+                $"FAILED {operation}; {exception}");
+            throw;
+        }
+        finally
+        {
+            _diagnosticOperation = null;
+        }
+    }
+
+    private void LogDiagnosticStage(
+        AzunyanDiagnosticCategory category,
+        string stage,
+        string details)
+    {
+        var operation = _diagnosticOperation ?? _diagnosticPasteOperation;
+        var operationPrefix = operation is null ? string.Empty : $"{operation} ";
+        LogDiagnostic(category, $"{operationPrefix}{stage}; {details}");
+    }
+
+    private void LogDiagnostic(
+        AzunyanDiagnosticCategory category,
+        string message)
+    {
+        if ((DiagnosticCategories & category) == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            DiagnosticSink?.Invoke(category, message);
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"Azunyan editor diagnostic sink failed: {exception}");
+        }
+    }
+
+    private void OnNativeInputCallbackException(string source, Exception exception)
+    {
+        ReportDiagnosticException($"NativeInput/{source}", exception);
+        LogDiagnostic(
+            AzunyanDiagnosticCategory.Input,
+            $"native-input-callback-failed source={source}; {exception}");
+    }
+
+    private void ReportDiagnosticException(string source, Exception exception)
+    {
+        try
+        {
+            DiagnosticExceptionSink?.Invoke(source, exception);
+        }
+        catch (Exception sinkException)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"Azunyan editor diagnostic exception sink failed: {sinkException}");
+        }
+    }
+
+    private string DescribeDiagnosticState()
+    {
+        var selection = Document.Selection;
+        var blockSelection = _blockSelection is { } block
+            ? block.CoordinateSpace.ToString()
+            : "none";
+        return $"snapshotLength={Snapshot.Length}; selection={selection}; "
+            + $"caretCount={Document.CaretSet.Count}; wrapping={TextWrapping}; "
+            + $"blockSelection={blockSelection}; inputWindowStart={InputWindow.WindowStart}; "
+            + $"inputWindowLength={InputWindow.WindowText.Length}; composing={IsComposing}; "
+            + $"nativeKeys={string.Join(',', _nativeKeysDown)}; "
+            + $"pasteBatch={_pasteBatchActive}; "
+            + $"pasteRefreshPending={_pasteBatchRefreshPending}; "
+            + $"pasteRefreshScheduled={_pasteBatchRefreshScheduled}";
     }
 
     private void OnInputKeyUp(object sender, KeyRoutedEventArgs args)
     {
-        _nativeKeyDownPending = false;
-        var hasPendingEdit = _pendingKeyEdits.Count > 0
-            && _pendingKeyEdits.Peek().Key == args.Key;
-        if (!hasPendingEdit)
+        _nativeKeysDown.Remove(args.Key);
+        var pendingIndex = _pendingKeyEdits.FindIndex(
+            pending => pending.Key == args.Key);
+        LogDiagnostic(
+            AzunyanDiagnosticCategory.Key,
+            $"keyup key={args.Key}; pending={pendingIndex >= 0}; {DescribeDiagnosticState()}");
+        if (pendingIndex < 0)
         {
-            RequestInputWindowSynchronization();
+            if (_nativeKeysDown.Count == 0)
+            {
+                if (_pasteBatchRefreshPending)
+                {
+                    RequestPendingPasteBatchRefresh();
+                }
+                else
+                {
+                    RequestInputWindowSynchronization();
+                }
+            }
+
             return;
         }
 
-        var pending = _pendingKeyEdits.Dequeue();
+        var pending = _pendingKeyEdits[pendingIndex];
+        _pendingKeyEdits.RemoveAt(pendingIndex);
         if (!DispatcherQueue.TryEnqueue(() =>
             {
                 if (!_disposed)
                 {
-                    pending.Action();
+                    ExecutePendingKeyEdit(pending.Key, pending.Action);
                 }
             }))
         {
@@ -1812,8 +2153,20 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             _applyingDocumentCommand = false;
         }
 
-        SyncInputWindow();
-        RenderViewport();
+        if (_pasteBatchActive)
+        {
+            // Consecutive managed pastes can arrive faster than the native
+            // TextBox text service can settle. Keep the document authoritative
+            // and coalesce the native sliding-window update until the batch is
+            // idle.
+            _inputWindowSynchronizationPending = true;
+            _pasteBatchRefreshPending = true;
+        }
+        else
+        {
+            SyncInputWindow();
+            RenderViewport();
+        }
         if (ReferenceEquals(previousSnapshot, Snapshot))
         {
             // SelectionChanged is intentionally suppressed while the command
@@ -1837,8 +2190,23 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             documentChange: documentChange);
     }
 
-    private void OnInputFocusChanged(object? sender, EventArgs args) =>
+    private void OnInputFocusChanged(object? sender, EventArgs args)
+    {
+        LogDiagnostic(
+            AzunyanDiagnosticCategory.Input,
+            $"native-focus-changed state={InputWindow.FocusState}; {DescribeDiagnosticState()}");
+        if (InputWindow.FocusState == FocusState.Unfocused)
+        {
+            // A window deactivation can lose the physical KeyUp messages.
+            // Do not retain delayed commands or native suppression markers
+            // across the next focus session.
+            _nativeKeysDown.Clear();
+            _pendingKeyEdits.Clear();
+            InputWindow.NativeTextBoxControl.ResetHandledKeyState();
+        }
+
         _automationPeer?.NotifyFocusChanged();
+    }
 
     private void OnCompletionListKeyDown(object sender, KeyRoutedEventArgs args)
     {

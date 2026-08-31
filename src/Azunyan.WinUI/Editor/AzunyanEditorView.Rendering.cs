@@ -16,6 +16,11 @@ public sealed partial class AzunyanEditorView
             return;
         }
 
+        LogDiagnosticStage(
+            AzunyanDiagnosticCategory.Render,
+            "render-start",
+            $"selection={Document.Selection}; caretCount={Document.CaretSet.Count}; "
+            + $"wrapping={TextWrapping}");
         UpdateTextMetrics();
 
         var lineIndex = Snapshot.Lines;
@@ -138,6 +143,10 @@ public sealed partial class AzunyanEditorView
         UpdateCompletionPopup();
         UpdateTooltipPopup();
         _automationPeer?.NotifyLayoutChanged();
+        LogDiagnosticStage(
+            AzunyanDiagnosticCategory.Render,
+            "render-finished",
+            DescribeDiagnosticState());
     }
 
     private void ReconcileInputWindowCaret()
