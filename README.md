@@ -83,16 +83,21 @@ Visual Studio AppxPackage directory explicitly with `-p:AppxMSBuildToolsPath`.
 ## Usage
 
 ```powershell
-Azunote.exe path\to\file.txt
+azu path\to\file.txt
 ```
+
+The publish output includes `azu.cmd` and `azu.ps1` next to `Azunote.exe`.
+Add that directory to `PATH` to invoke Azunote as the `azu` command.
+Normal launches return the prompt immediately; `--wait` keeps it blocked until
+the opened document window is closed.
 
 The command-line contract also accepts external-editor positions and standard
 input:
 
 ```powershell
-Azunote.exe --wait --line 12 --column 4 path\to\file.txt
-Get-Content input.md | Azunote.exe --stdin
-Azunote.exe +12:4 path\to\file.txt
+azu --wait --line 12 --column 4 path\to\file.txt
+Get-Content input.md | azu --stdin
+azu +12:4 path\to\file.txt
 ```
 
 Line and column are one-based and are clamped to the opened document. Azunote
