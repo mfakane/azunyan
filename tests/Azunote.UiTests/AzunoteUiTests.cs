@@ -21,6 +21,12 @@ public sealed class AzunoteUiTests : IClassFixture<AzunoteUiFixture>
     }
 
     [AzunoteUiFact]
+    public void Main_window_starts_without_initialization_exception()
+    {
+        Assert.NotNull(_fixture.Editor);
+    }
+
+    [AzunoteUiFact]
     public void Projected_editor_exposes_snapshot_text_and_visible_ranges()
     {
         var editor = _fixture.Editor;

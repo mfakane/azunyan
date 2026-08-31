@@ -62,6 +62,7 @@ internal sealed class MainWindowViewAdapter :
         MainWindow window,
         AzunyanEditorView editor,
         Grid rootGrid,
+        Style auxiliarySplitMenuFlyoutItemStyle,
         Border findPanel,
         TextBox findTextBox,
         TextBox replaceTextBox,
@@ -104,8 +105,8 @@ internal sealed class MainWindowViewAdapter :
             exception);
         _editorBuffer = new AzunyanEditorBuffer(editor);
         _rootGrid = rootGrid ?? throw new ArgumentNullException(nameof(rootGrid));
-        _auxiliarySplitMenuFlyoutItemStyle = _rootGrid.Resources["AuxiliarySplitMenuFlyoutItemStyle"] as Style
-            ?? throw new InvalidOperationException("The auxiliary split menu item style is not defined.");
+        _auxiliarySplitMenuFlyoutItemStyle = auxiliarySplitMenuFlyoutItemStyle
+            ?? throw new ArgumentNullException(nameof(auxiliarySplitMenuFlyoutItemStyle));
         _findPanel = findPanel ?? throw new ArgumentNullException(nameof(findPanel));
         _findTextBox = findTextBox ?? throw new ArgumentNullException(nameof(findTextBox));
         _replaceTextBox = replaceTextBox ?? throw new ArgumentNullException(nameof(replaceTextBox));
