@@ -397,6 +397,22 @@ The native implementation can later be replaced by a lower-level Windows
 text-services implementation without changing projection, layout, provider, or
 rendering contracts.
 
+Keyboard ownership follows the same boundary. While composition is active,
+the native control owns composition-sensitive navigation and editing keys so
+candidate selection, segment movement, commit, and cancellation retain their
+platform behavior. Outside composition, the projected editor owns document
+navigation, selection, deletion, line insertion, indentation, clipboard, and
+undo/redo commands; the native control receives only the remaining
+text-producing/dead-key path. Ctrl+Alt is treated as AltGr rather than as an
+editor shortcut.
+
+Managed commands are scheduled immediately after KeyDown returns, including
+repeat KeyDown events. KeyUp never performs the document command: it only
+balances the native TextBox's handled-key state and flushes the coalesced
+sliding-window synchronization after the physical chord is fully released.
+This lets the projected caret move while a modifier remains held without
+mutating the native TextBox inside its active key pipeline.
+
 ## 10. Accessibility
 
 The outer editor peer is the single owner of the `Text`, `Text2`, and `Value`
