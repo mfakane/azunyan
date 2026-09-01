@@ -4,9 +4,9 @@ Status: In progress
 
 Implemented in the current milestone: the temporary syntax glyph overlay is
 removed from Azunote, viewport layers are clipped, Core owns projection and
-anchor mapping, `Azunyan.Layout` provides monospace line layout, wrapped
-continuation rows, and a variable-height viewport index, provider scheduling is
-split into document/viewport/position channels with stale-result,
+anchor mapping, and the `Azunyan.Layout` namespace in Core provides monospace
+line layout, wrapped continuation rows, and a variable-height viewport index.
+Provider scheduling is split into document/viewport/position channels with stale-result,
 cancellation, and provider-error isolation, and Azunote has a projected-text
 renderer for visible lines. Visual rows model block adornment heights, inline
 inlay identity, and fold-hidden blocks. Tooltip and completion popups are
@@ -72,8 +72,9 @@ document.
 
 ## 3. Package boundaries
 
-The target solution is split into the following responsibilities. They may be
-separate projects once the first custom-rendered surface is introduced.
+The solution is split into the following project responsibilities. Within
+`Azunyan.Core`, namespaces keep the document, projection, and layout areas
+distinct without introducing another assembly boundary.
 
 ### Azunyan.Core
 
@@ -81,18 +82,15 @@ separate projects once the first custom-rendered surface is introduced.
 - UTF-16 document positions, ranges, selections, and changes;
 - provider contracts and snapshot-bound result types;
 - projection primitives and document/visual position mapping;
+- framework-independent visual-line construction, wrapping, and tab expansion;
+- line height indexing and bounded viewport lookup;
+- text-layout abstractions, layout runs, caret stops, and hit-test maps;
+- caches keyed by snapshot, projection version, and typography;
 - no WinUI, DirectWrite, brush, font, or UIElement dependencies.
 
-### Azunyan.Layout
-
-- construction of visual lines from a snapshot and projection data;
-- wrapping and tab expansion;
-- line height index and viewport range lookup;
-- text shaping abstraction, glyph runs, caret stops, and hit-test maps;
-- caches keyed by snapshot, projection version, and typography.
-
-The shaping implementation may be platform-specific, but its inputs and
-outputs remain UI-framework independent.
+Layout types retain the `Azunyan.Layout` namespace. The shaping implementation
+may be platform-specific, but its inputs and outputs remain UI-framework
+independent.
 
 ### Azunyan.WinUI
 

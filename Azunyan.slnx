@@ -1,6 +1,5 @@
 <Solution>
   <Project Path="src/Azunyan.Core/Azunyan.Core.csproj" />
-  <Project Path="src/Azunyan.Layout/Azunyan.Layout.csproj" />
   <Project Path="src/Azunyan.Syntax/Azunyan.Syntax.csproj" />
   <Project Path="src/Azunyan.WinUI/Azunyan.WinUI.csproj" />
   <Project Path="tests/Azunyan.Core.Tests/Azunyan.Core.Tests.csproj" />

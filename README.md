@@ -9,13 +9,12 @@ build, usage, configuration, and runtime documentation is maintained in
 
 | Project | Responsibility |
 | --- | --- |
-| `Azunyan.Core` | Documents, immutable snapshots, editing commands, provider contracts, projections, and visual-row indexing |
+| `Azunyan.Core` | Documents, provider contracts, projections, line layout, wrapping, and viewport realization |
 | `Azunyan.Syntax` | Composable lexical rules and built-in language definitions |
-| `Azunyan.Layout` | Framework-independent line layout, wrapping, and bounded viewport realization |
 | `Azunyan.WinUI` | Reusable WinUI editor control, DirectWrite/Win2D rendering, input, and accessibility |
 | `Azunote` | Application shell, file I/O, settings, language modes, external tools, and command-line integration |
 
-The first three projects target `net10.0` and do not depend on WinUI.
+`Azunyan.Core` and `Azunyan.Syntax` target `net10.0` and do not depend on WinUI.
 `Azunyan.WinUI` and Azunote target Windows x64 and use Windows App SDK 2.4.0.
 
 ## Requirements
@@ -66,10 +65,10 @@ src/
     Documents/         document model, snapshots, ranges, and editing commands
     Providers/         provider contracts, frames, and scheduling
     Projection/        projected rows, folds, adornments, and height indexing
+    Layout/
+      LineLayout/      logical-line and wrapping layout
+      Viewport/        bounded viewport realization and scrolling calculations
   Azunyan.Syntax/      composable lexical rules and built-in languages
-  Azunyan.Layout/
-    LineLayout/        logical-line and wrapping layout
-    Viewport/          bounded viewport realization and scrolling calculations
   Azunyan.WinUI/
     Editor/            WinUI editor control, rendering host, input, and accessibility
     Rendering/         DirectWrite/Win2D primitives and color scheme
@@ -143,10 +142,10 @@ Editor.ColorScheme = Editor.ColorScheme with
 
 `Azunyan.Core.Projection` maps folds and inline adornments through document
 anchors, creates wrapped and block-adornment visual rows, and maintains the
-variable-height row index. `Azunyan.Layout` measures projected line runs and
-selects a bounded viewport window. The WinUI projected surface uses those same
-rows for drawing and pointer hit testing, including fold toggling, inlay
-identity, wrapped rows, and block-row anchors.
+variable-height row index. The `Azunyan.Layout` namespace in `Azunyan.Core`
+measures projected line runs and selects a bounded viewport window. The WinUI
+projected surface uses those same rows for drawing and pointer hit testing,
+including fold toggling, inlay identity, wrapped rows, and block-row anchors.
 
 `Azunyan.WinUI` supplies the DirectWrite-backed Win2D layout and rendering
 surface. `AzunyanEditorView.ColorScheme` provides one palette for text, gutter,

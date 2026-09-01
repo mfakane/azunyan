@@ -5,9 +5,11 @@ SDK 2.4.0. Each window owns one document; there is intentionally no project or
 workspace layer in this phase.
 
 This directory contains the application layer built on the reusable
-`Azunyan.Core`, `Azunyan.Syntax`, `Azunyan.Layout`, and `Azunyan.WinUI`
-components. The application-specific command-line contract, shell, external
-tools, TOML settings, file I/O, language modes, and theme are kept here.
+`Azunyan.Core`, `Azunyan.Syntax`, and `Azunyan.WinUI` components. The
+framework-independent layout APIs live in `Azunyan.Core` under the
+`Azunyan.Layout` namespace. The application-specific command-line contract,
+shell, external tools, TOML settings, file I/O, language modes, and theme are
+kept here.
 
 ## Build and test
 
