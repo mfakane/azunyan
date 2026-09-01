@@ -697,12 +697,10 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             return;
         }
 
-        SyncInputWindow();
-        InputWindow.NativeTextBoxControl.CutSelectionToClipboard();
         if (Document.Selection.Length > 0)
         {
-            Document.DeleteSelection();
-            SyncInputWindow();
+            SetClipboardText(Snapshot.GetText(Document.Selection.Range));
+            ApplyDocumentCommand(() => Document.DeleteSelection());
         }
     }
 
@@ -723,8 +721,10 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             return;
         }
 
-        SyncInputWindow();
-        InputWindow.NativeTextBoxControl.CopySelectionToClipboard();
+        if (Document.Selection.Length > 0)
+        {
+            SetClipboardText(Snapshot.GetText(Document.Selection.Range));
+        }
     }
 
     public void PasteFromClipboard()
