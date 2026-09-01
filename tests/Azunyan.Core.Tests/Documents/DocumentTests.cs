@@ -492,6 +492,74 @@ public sealed class DocumentTests
     }
 
     [Fact]
+    public void Matching_bracket_navigation_handles_nesting_from_either_bracket()
+    {
+        const string text = "call({ value: [1, (2)] })";
+        var snapshot = new TextSnapshot(text);
+        var opening = text.IndexOf('[', StringComparison.Ordinal);
+        var closing = text.IndexOf(']', StringComparison.Ordinal);
+
+        Assert.True(TextEditorCommands.TryFindMatchingBracket(
+            snapshot,
+            opening,
+            out var matchingClosing));
+        Assert.Equal(closing, matchingClosing);
+
+        Assert.True(TextEditorCommands.TryFindMatchingBracket(
+            snapshot,
+            closing + 1,
+            out var matchingOpening));
+        Assert.Equal(opening, matchingOpening);
+    }
+
+    [Fact]
+    public void Matching_bracket_navigation_ignores_strings_and_comments()
+    {
+        const string text = "{ \"}\": 1, /* ] */ value: [0] // )\n}";
+        var snapshot = new TextSnapshot(text);
+        var outerClosing = text.LastIndexOf('}');
+        var quotedClosing = text.IndexOf('}');
+        var commentedClosing = text.IndexOf(']');
+        var arrayOpening = text.LastIndexOf('[');
+        var arrayClosing = text.LastIndexOf(']');
+
+        Assert.True(TextEditorCommands.TryFindMatchingBracket(
+            snapshot,
+            0,
+            out var matchingOuterClosing));
+        Assert.Equal(outerClosing, matchingOuterClosing);
+        Assert.False(TextEditorCommands.TryFindMatchingBracket(
+            snapshot,
+            quotedClosing,
+            out _));
+        Assert.False(TextEditorCommands.TryFindMatchingBracket(
+            snapshot,
+            commentedClosing,
+            out _));
+        Assert.True(TextEditorCommands.TryFindMatchingBracket(
+            snapshot,
+            arrayOpening,
+            out var matchingArrayClosing));
+        Assert.Equal(arrayClosing, matchingArrayClosing);
+    }
+
+    [Fact]
+    public void Matching_bracket_navigation_is_a_no_op_without_a_pair()
+    {
+        var snapshot = new TextSnapshot("text (");
+
+        Assert.False(TextEditorCommands.TryFindMatchingBracket(
+            snapshot,
+            snapshot.Length,
+            out var matchingPosition));
+        Assert.Equal(-1, matchingPosition);
+        Assert.False(TextEditorCommands.TryFindMatchingBracket(
+            snapshot,
+            2,
+            out _));
+    }
+
+    [Fact]
     public async Task Provider_coordinator_runs_all_providers_for_one_snapshot_and_position()
     {
         var providers = new EditorProviderSet

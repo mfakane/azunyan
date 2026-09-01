@@ -78,6 +78,129 @@ public static class TextEditorCommands
         }
     }
 
+    /// <summary>
+    /// Finds the bracket paired with the bracket at the caret. The character
+    /// under the caret is preferred; when that is not a bracket, the character
+    /// immediately before the caret is considered. Brackets inside quoted
+    /// strings and C-style comments are ignored.
+    /// </summary>
+    public static bool TryFindMatchingBracket(
+        TextSnapshot snapshot,
+        int caretPosition,
+        out int matchingPosition)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentOutOfRangeException.ThrowIfNegative(caretPosition);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(caretPosition, snapshot.Length);
+
+        matchingPosition = -1;
+        var text = snapshot.Text;
+        var bracketPosition = caretPosition < text.Length
+            && IsDelimiter(text[caretPosition])
+                ? caretPosition
+                : caretPosition > 0 && IsDelimiter(text[caretPosition - 1])
+                    ? caretPosition - 1
+                    : -1;
+        if (bracketPosition < 0)
+        {
+            return false;
+        }
+
+        var stack = new List<BracketEntry>();
+        var quote = '\0';
+        var inLineComment = false;
+        var inBlockComment = false;
+        for (var index = 0; index < text.Length; index++)
+        {
+            var current = text[index];
+            var next = index + 1 < text.Length ? text[index + 1] : '\0';
+
+            if (inLineComment)
+            {
+                if (current is '\r' or '\n')
+                {
+                    inLineComment = false;
+                }
+
+                continue;
+            }
+
+            if (inBlockComment)
+            {
+                if (current == '*' && next == '/')
+                {
+                    inBlockComment = false;
+                    index++;
+                }
+
+                continue;
+            }
+
+            if (quote != '\0')
+            {
+                if (current == '\\')
+                {
+                    index++;
+                }
+                else if (current == quote)
+                {
+                    quote = '\0';
+                }
+
+                continue;
+            }
+
+            if (current is '\'' or '"')
+            {
+                quote = current;
+                continue;
+            }
+
+            if (current == '/' && next == '/')
+            {
+                inLineComment = true;
+                index++;
+                continue;
+            }
+
+            if (current == '/' && next == '*')
+            {
+                inBlockComment = true;
+                index++;
+                continue;
+            }
+
+            if (IsOpeningDelimiter(current))
+            {
+                stack.Add(new BracketEntry(current, index));
+                continue;
+            }
+
+            if (!IsClosingDelimiter(current)
+                || stack.Count == 0
+                || !IsMatchingDelimiter(stack[^1].Delimiter, current))
+            {
+                continue;
+            }
+
+            var opening = stack[^1];
+            stack.RemoveAt(stack.Count - 1);
+            if (opening.Position == bracketPosition)
+            {
+                matchingPosition = index;
+                return true;
+            }
+
+            if (index == bracketPosition)
+            {
+                matchingPosition = opening.Position;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static TextChange DeleteBackward(Document document)
     {
         ArgumentNullException.ThrowIfNull(document);
@@ -666,6 +789,8 @@ public static class TextEditorCommands
 
     private readonly record struct IndentationEdit(int Position, int Delta);
 
+    private readonly record struct BracketEntry(char Delimiter, int Position);
+
     private static List<char> GetBracketStack(string text, int position)
     {
         var stack = new List<char>();
@@ -774,6 +899,9 @@ public static class TextEditorCommands
     private static bool IsOpeningDelimiter(char value) => value is '{' or '[' or '(';
 
     private static bool IsClosingDelimiter(char value) => value is '}' or ']' or ')';
+
+    private static bool IsDelimiter(char value) =>
+        IsOpeningDelimiter(value) || IsClosingDelimiter(value);
 
     private static bool IsMatchingDelimiter(char opening, char closing) =>
         (opening, closing) is ('{', '}') or ('[', ']') or ('(', ')');
