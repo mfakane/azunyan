@@ -149,6 +149,27 @@ public sealed class TextCaretSetTests
     }
 
     [Fact]
+    public void Matching_bracket_movement_supports_multiple_carets_and_selection_extension()
+    {
+        var snapshot = new TextSnapshot("(a) [b]");
+        var carets = new TextCaretSet(new[]
+        {
+            new TextCaretState(TextSelection.Caret(0), 0),
+            new TextCaretState(TextSelection.Caret(snapshot.Length), 7),
+        }, primaryIndex: 1);
+
+        var moved = TextCaretSetOperations.MoveToMatchingBracket(
+            snapshot,
+            carets,
+            extendSelection: true,
+            tabDisplaySize: 4);
+
+        Assert.Equal(new TextSelection(0, 2), moved[0].Selection);
+        Assert.Equal(new TextSelection(snapshot.Length, 4), moved[1].Selection);
+        Assert.Equal(1, moved.PrimaryIndex);
+    }
+
+    [Fact]
     public void Replacement_is_one_edit_and_undo_restores_the_full_caret_set()
     {
         var document = new Document("aa\nbb\ncc");
@@ -196,6 +217,99 @@ public sealed class TextCaretSetTests
 
         Assert.Equal("abcd", result);
         Assert.Single(edit.CaretSet);
+    }
+
+    [Fact]
+    public void Vertical_movement_accepts_page_sized_line_deltas()
+    {
+        var snapshot = new TextSnapshot("zero\none\ntwo\nthree");
+        var carets = new TextCaretSet(new[]
+        {
+            new TextCaretState(TextSelection.Caret(snapshot.Text.IndexOf("three", StringComparison.Ordinal) + 2), 2),
+        });
+
+        var moved = TextCaretSetOperations.MoveVertical(
+            snapshot,
+            carets,
+            direction: -2,
+            tabDisplaySize: 4,
+            extendSelection: false);
+
+        Assert.Equal(snapshot.Text.IndexOf("one", StringComparison.Ordinal) + 2, moved.Primary.CaretPosition);
+        Assert.Equal(2, moved.Primary.PreferredDisplayColumn);
+    }
+
+    [Fact]
+    public void Smart_home_toggles_between_indentation_and_logical_line_start()
+    {
+        var snapshot = new TextSnapshot("    value");
+        var carets = new TextCaretSet(new[]
+        {
+            new TextCaretState(TextSelection.Caret(snapshot.Length), snapshot.Length),
+        });
+
+        var indentation = TextCaretSetOperations.MoveToSmartLineStart(
+            snapshot,
+            carets,
+            extendSelection: false,
+            tabDisplaySize: 4);
+        var lineStart = TextCaretSetOperations.MoveToSmartLineStart(
+            snapshot,
+            indentation,
+            extendSelection: false,
+            tabDisplaySize: 4);
+
+        Assert.Equal(4, indentation.Primary.CaretPosition);
+        Assert.Equal(0, lineStart.Primary.CaretPosition);
+
+        var whitespace = new TextSnapshot("    ");
+        var whitespaceHome = TextCaretSetOperations.MoveToSmartLineStart(
+            whitespace,
+            new TextCaretSet(new[]
+            {
+                new TextCaretState(TextSelection.Caret(2), 2),
+            }),
+            extendSelection: false,
+            tabDisplaySize: 4);
+        Assert.Equal(0, whitespaceHome.Primary.CaretPosition);
+    }
+
+    [Fact]
+    public void Word_deletion_and_auto_indented_newlines_apply_to_every_caret()
+    {
+        var deletionSnapshot = new TextSnapshot("one two");
+        var deletionCarets = new TextCaretSet(new[]
+        {
+            new TextCaretState(TextSelection.Caret(deletionSnapshot.Length), 7),
+        });
+        var deletion = TextCaretSetOperations.CreateDeletion(
+            deletionSnapshot,
+            deletionCarets,
+            backward: true,
+            tabDisplaySize: 4,
+            byWord: true);
+        var deleted = deletionSnapshot.Text[..deletion.Range.Start]
+            + deletion.Replacement
+            + deletionSnapshot.Text[deletion.Range.End..];
+
+        var newlineSnapshot = new TextSnapshot("  one\n\tsecond");
+        var newlineCarets = new TextCaretSet(new[]
+        {
+            new TextCaretState(TextSelection.Caret(5), 5),
+            new TextCaretState(TextSelection.Caret(newlineSnapshot.Length), 8),
+        });
+        var newline = TextCaretSetOperations.CreateNewLineWithAutoIndent(
+            newlineSnapshot,
+            newlineCarets,
+            preferredLineEnding: "\n",
+            tabDisplaySize: 4);
+        var inserted = newlineSnapshot.Text[..newline.Range.Start]
+            + newline.Replacement
+            + newlineSnapshot.Text[newline.Range.End..];
+
+        Assert.Equal("one ", deleted);
+        Assert.Equal("  one\n  \n\tsecond\n\t", inserted);
+        Assert.Equal(2, newline.CaretSet.Count);
     }
 
     [Fact]

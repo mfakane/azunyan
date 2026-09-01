@@ -205,7 +205,7 @@ public static class TextCaretSetOperations
                 : direction < 0 ? selection.Start : selection.End;
             var line = snapshot.Lines.GetLine(sourcePosition);
             var targetLine = Math.Clamp(
-                line + Math.Sign(direction),
+                line + direction,
                 0,
                 snapshot.Lines.LineCount - 1);
             var target = TextBlockSelectionOperations.GetCaretPosition(
@@ -253,6 +253,95 @@ public static class TextCaretSetOperations
         return Deduplicate(result, carets.PrimaryIndex);
     }
 
+    public static TextCaretSet MoveToSmartLineStart(
+        TextSnapshot snapshot,
+        TextCaretSet carets,
+        bool extendSelection,
+        int tabDisplaySize)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(carets);
+
+        var result = new List<TextCaretState>(carets.Count);
+        foreach (var caret in carets)
+        {
+            var selection = caret.Selection;
+            var sourcePosition = extendSelection || selection.IsEmpty
+                ? selection.CaretPosition
+                : selection.Start;
+            var line = snapshot.Lines.GetLine(sourcePosition);
+            var lineStart = snapshot.Lines.GetLineStart(line);
+            var lineEnd = snapshot.Lines.GetLineEnd(line);
+            var firstNonWhitespace = lineStart;
+            while (firstNonWhitespace < lineEnd
+                && char.IsWhiteSpace(snapshot.Text[firstNonWhitespace]))
+            {
+                firstNonWhitespace++;
+            }
+
+            if (firstNonWhitespace == lineEnd)
+            {
+                firstNonWhitespace = lineStart;
+            }
+
+            var target = sourcePosition == firstNonWhitespace
+                ? lineStart
+                : firstNonWhitespace;
+            var nextSelection = extendSelection
+                ? new TextSelection(selection.Anchor, target)
+                : TextSelection.Caret(target);
+            result.Add(new TextCaretState(
+                nextSelection,
+                TextBlockSelectionOperations.GetDisplayColumn(
+                    snapshot,
+                    target,
+                    tabDisplaySize)));
+        }
+
+        return Deduplicate(result, carets.PrimaryIndex);
+    }
+
+    public static TextCaretSet MoveToMatchingBracket(
+        TextSnapshot snapshot,
+        TextCaretSet carets,
+        bool extendSelection,
+        int tabDisplaySize)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(carets);
+        ArgumentOutOfRangeException.ThrowIfLessThan(tabDisplaySize, 1);
+
+        var moved = false;
+        var result = new List<TextCaretState>(carets.Count);
+        foreach (var caret in carets)
+        {
+            var selection = caret.Selection;
+            if (!TextEditorCommands.TryFindMatchingBracket(
+                snapshot,
+                selection.CaretPosition,
+                out var target))
+            {
+                result.Add(caret);
+                continue;
+            }
+
+            moved = true;
+            var nextSelection = extendSelection
+                ? new TextSelection(selection.Anchor, target)
+                : TextSelection.Caret(target);
+            result.Add(new TextCaretState(
+                nextSelection,
+                TextBlockSelectionOperations.GetDisplayColumn(
+                    snapshot,
+                    target,
+                    tabDisplaySize)));
+        }
+
+        return moved
+            ? Deduplicate(result, carets.PrimaryIndex)
+            : carets;
+    }
+
     public static TextCaretEdit CreateReplacement(
         TextSnapshot snapshot,
         TextCaretSet carets,
@@ -288,7 +377,8 @@ public static class TextCaretSetOperations
         TextSnapshot snapshot,
         TextCaretSet carets,
         bool backward,
-        int tabDisplaySize)
+        int tabDisplaySize,
+        bool byWord = false)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(carets);
@@ -297,13 +387,54 @@ public static class TextCaretSetOperations
         for (var index = 0; index < carets.Count; index++)
         {
             var selection = carets[index].Selection;
-            var range = selection.IsEmpty
-                ? backward
-                    ? UnicodeText.GetBackwardDeleteRange(snapshot.Text, selection.CaretPosition)
-                    : UnicodeText.GetForwardDeleteRange(snapshot.Text, selection.CaretPosition)
-                : selection.Range;
+            var range = selection.Range;
+            if (selection.IsEmpty)
+            {
+                if (byWord)
+                {
+                    var target = UnicodeText.MoveByWord(
+                        snapshot.Text,
+                        selection.CaretPosition,
+                        backward ? -1 : 1);
+                    range = TextRange.FromBounds(
+                        Math.Min(target, selection.CaretPosition),
+                        Math.Max(target, selection.CaretPosition));
+                }
+                else
+                {
+                    range = backward
+                        ? UnicodeText.GetBackwardDeleteRange(snapshot.Text, selection.CaretPosition)
+                        : UnicodeText.GetForwardDeleteRange(snapshot.Text, selection.CaretPosition);
+                }
+            }
+
             range = NormalizeLineEndingRange(snapshot.Text, range);
             operations.Add(new ReplacementOperation(index, range, string.Empty));
+        }
+
+        return BuildEdit(snapshot, carets, operations, tabDisplaySize);
+    }
+
+    public static TextCaretEdit CreateNewLineWithAutoIndent(
+        TextSnapshot snapshot,
+        TextCaretSet carets,
+        string? preferredLineEnding,
+        int tabDisplaySize)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(carets);
+
+        var operations = new List<ReplacementOperation>(carets.Count);
+        for (var index = 0; index < carets.Count; index++)
+        {
+            var selection = carets[index].Selection;
+            operations.Add(new ReplacementOperation(
+                index,
+                TextEditorCommands.GetNewLineReplacementRange(snapshot, selection.Range),
+                TextEditorCommands.GetNewLineWithAutoIndentation(
+                    snapshot,
+                    selection.Start,
+                    preferredLineEnding)));
         }
 
         return BuildEdit(snapshot, carets, operations, tabDisplaySize);
