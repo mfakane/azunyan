@@ -47,7 +47,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private IndentationInputMode _indentationInputMode;
     private string? _preferredLineEnding;
     private readonly Queue<Action> _pendingCompositionOperations = new();
-    private readonly List<(VirtualKey Key, Action Action)> _pendingKeyEdits = [];
+    private readonly HashSet<VirtualKey> _queuedNonRepeatingKeys = new();
+    private long _keyInputEpoch;
     private readonly Queue<Func<Task>> _pendingPasteOperations = new();
     private bool _pasteOperationRunning;
     private bool _pasteBatchActive;
@@ -1419,6 +1420,16 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 return;
             }
 
+            // Outside an active composition the projected document owns
+            // selection. Committed text carries its authoritative selection
+            // in InputChanged; accepting an independent TextBox selection
+            // here would reintroduce native Home/End/arrow movement from the
+            // bounded IME window.
+            if (!IsComposing)
+            {
+                return;
+            }
+
             // The native textbox moves its primary selection as part of text
             // input before TextChanged is raised.  That intermediate event
             // must not collapse the virtual caret set; the projected editor
@@ -1537,6 +1548,16 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     {
         if (_synchronizingInputWindow)
         {
+            return;
+        }
+
+        if (_nativeKeysDown.Count != 0)
+        {
+            // Keep the projected document and caret responsive while a
+            // shortcut modifier remains held, but do not mutate the native
+            // TextBox from inside its active key pipeline. KeyUp requests the
+            // deferred synchronization after the complete chord is released.
+            _inputWindowSynchronizationPending = true;
             return;
         }
 
@@ -1735,10 +1756,10 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     private void OnInputKeyDown(object sender, KeyRoutedEventArgs args)
     {
-        _nativeKeysDown.Add(args.Key);
+        var isRepeat = !_nativeKeysDown.Add(args.Key);
         LogDiagnostic(
             AzunyanDiagnosticCategory.Key,
-            $"keydown key={args.Key}; {DescribeDiagnosticState()}");
+            $"keydown key={args.Key}; repeat={isRepeat}; {DescribeDiagnosticState()}");
 
         if (IsCompletionPopupOpen)
         {
@@ -1987,29 +2008,44 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                                 new[] { string.Empty },
                                 repeatSingleLine: true);
                         }
-                        else if (Document.CaretSet.Count > 1)
+                        else
                         {
-                            ApplyCaretSetDeletion();
-                        }
-                        else if (!IsComposing)
-                        {
-                            Document.DeleteForward();
+                            ApplyCaretSetDeletion(backward: false, byWord: control);
                         }
                     });
-                });
+                }, repeatable: true);
                 args.Handled = true;
                 break;
         }
 
     }
 
-    private void QueueKeyEdit(VirtualKey key, Action action)
+    private void QueueKeyEdit(VirtualKey key, Action action, bool repeatable)
     {
         ArgumentNullException.ThrowIfNull(action);
+        if (!repeatable && !_queuedNonRepeatingKeys.Add(key))
+        {
+            LogDiagnostic(
+                AzunyanDiagnosticCategory.Key,
+                $"ignored-repeated-key-edit key={key}; {DescribeDiagnosticState()}");
+            return;
+        }
+
+        var inputEpoch = _keyInputEpoch;
         LogDiagnostic(
             AzunyanDiagnosticCategory.Key,
             $"queued-key-edit key={key}; {DescribeDiagnosticState()}");
-        _pendingKeyEdits.Add((key, action));
+        if (!DispatcherQueue.TryEnqueue(() =>
+            {
+                if (!_disposed && inputEpoch == _keyInputEpoch)
+                {
+                    ExecutePendingKeyEdit(key, action);
+                }
+            }))
+        {
+            throw new InvalidOperationException(
+                "The editor dispatcher is no longer available.");
+        }
     }
 
     private void ExecutePendingKeyEdit(VirtualKey key, Action action)
@@ -2227,7 +2263,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             // Do not retain delayed commands or native suppression markers
             // across the next focus session.
             _nativeKeysDown.Clear();
-            _pendingKeyEdits.Clear();
+            _queuedNonRepeatingKeys.Clear();
+            _keyInputEpoch++;
             InputWindow.NativeTextBoxControl.ResetHandledKeyState();
         }
 
