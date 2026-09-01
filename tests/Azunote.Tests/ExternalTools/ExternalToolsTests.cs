@@ -210,6 +210,145 @@ public sealed class ExternalToolsTests
     }
 
     [Fact]
+    public async Task DotEnv_loader_uses_the_nearest_ancestor_and_parses_supported_values()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"azunote-dotenv-{Guid.NewGuid():N}");
+        var nested = Path.Combine(root, "src", "nested");
+        try
+        {
+            Directory.CreateDirectory(nested);
+            await File.WriteAllTextAsync(
+                Path.Combine(root, ".env"),
+                "ROOT_VALUE=root\nSHOULD_NOT_BE_USED=root\n");
+            await File.WriteAllTextAsync(
+                Path.Combine(nested, ".env"),
+                "# comment\n"
+                + "ROOT_VALUE=nested\n"
+                + "export PLAIN_VALUE = plain\n"
+                + "SINGLE_VALUE = 'single value'\n"
+                + "DOUBLE_VALUE = \"double value\" # comment\n"
+                + "EMPTY_VALUE=\n"
+                + "DUPLICATE_VALUE=first\n"
+                + "DUPLICATE_VALUE=last\n"
+                + "INLINE_VALUE=value # comment\n"
+                + "HASH_VALUE=value#not-comment\n"
+                + "INVALID-NAME=ignored\n"
+                + "INVALID_LINE\n"
+                + "UNMATCHED_VALUE=\"ignored\n");
+
+            var values = DotEnvFileLoader.Load(nested);
+
+            Assert.Equal("nested", values["ROOT_VALUE"]);
+            Assert.False(values.ContainsKey("SHOULD_NOT_BE_USED"));
+            Assert.Equal("plain", values["PLAIN_VALUE"]);
+            Assert.Equal("single value", values["SINGLE_VALUE"]);
+            Assert.Equal("double value", values["DOUBLE_VALUE"]);
+            Assert.Equal(string.Empty, values["EMPTY_VALUE"]);
+            Assert.Equal("last", values["DUPLICATE_VALUE"]);
+            Assert.Equal("value", values["INLINE_VALUE"]);
+            Assert.Equal("value#not-comment", values["HASH_VALUE"]);
+            Assert.False(values.ContainsKey("INVALID-NAME"));
+            Assert.False(values.ContainsKey("INVALID_LINE"));
+            Assert.False(values.ContainsKey("UNMATCHED_VALUE"));
+            Assert.Empty(DotEnvFileLoader.Load(null));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void External_tool_environment_resolves_dotenv_and_tool_values_for_expansion()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"azunote-dotenv-{Guid.NewGuid():N}");
+        var documentDirectory = Path.Combine(root, "src");
+        var documentPath = Path.Combine(documentDirectory, "notes.md");
+        var dotenvName = $"AZUNOTE_DOTENV_{Guid.NewGuid():N}";
+        var overrideName = $"AZUNOTE_OVERRIDE_{Guid.NewGuid():N}";
+        try
+        {
+            Directory.CreateDirectory(documentDirectory);
+            File.WriteAllText(
+                Path.Combine(root, ".env"),
+                $"{dotenvName}=from dotenv\n{overrideName}=from dotenv\n");
+
+            var context = new ExternalToolContext(
+                documentPath,
+                documentPath,
+                string.Empty,
+                string.Empty);
+            var definition = new ExternalToolDefinition(
+                "test-command",
+                environment: new Dictionary<string, string>
+                {
+                    [overrideName] = "from tool",
+                    ["AZUNOTE_DERIVED"] = $"prefix-${{env:{dotenvName}}}"
+                });
+
+            var environment = ExternalToolEnvironmentResolver.Resolve(definition, context);
+
+            Assert.Equal("from dotenv", environment.Values[dotenvName]);
+            Assert.Equal("from tool", environment.Values[overrideName]);
+            Assert.Equal("prefix-from dotenv", environment.Values["AZUNOTE_DERIVED"]);
+            Assert.Equal("from dotenv", environment.Overrides[dotenvName]);
+            Assert.Equal("from tool", environment.Overrides[overrideName]);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void Availability_resolves_dotenv_command_values()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var root = Path.Combine(Path.GetTempPath(), $"azunote-dotenv-{Guid.NewGuid():N}");
+        var documentDirectory = Path.Combine(root, "src");
+        var documentPath = Path.Combine(documentDirectory, "notes.md");
+        var scriptPath = Path.Combine(root, "tool.cmd");
+        var commandName = $"AZUNOTE_COMMAND_{Guid.NewGuid():N}";
+        try
+        {
+            Directory.CreateDirectory(documentDirectory);
+            File.WriteAllText(Path.Combine(root, ".env"), $"{commandName}={scriptPath}\n");
+            File.WriteAllText(scriptPath, "@echo off\r\n");
+
+            var settings = new ExternalToolSettings
+            {
+                Name = "Dotenv command",
+                Launch = new ExternalToolLaunchSettings
+                {
+                    Command = $"${{env:{commandName}}}"
+                }
+            };
+            var state = ExternalToolAvailability.Evaluate(
+                settings,
+                new ExternalToolContext(documentPath, documentPath, string.Empty, string.Empty));
+
+            Assert.True(state.IsEnabled, state.DisabledReason);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void Availability_evaluates_all_when_conditions_and_visibility()
     {
         var settings = new ExternalToolSettings
@@ -315,6 +454,65 @@ public sealed class ExternalToolsTests
 
         Assert.True(result.Succeeded, result.StandardError);
         Assert.Equal("stdin payload", result.StandardOutput.TrimEnd('\r', '\n'));
+    }
+
+    [Fact]
+    public async Task Runner_expands_dotenv_values_and_passes_them_to_the_child_process()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            $"azunote external dotenv {Guid.NewGuid():N}");
+        var documentDirectory = Path.Combine(root, "src");
+        var documentPath = Path.Combine(documentDirectory, "notes.md");
+        var dotenvName = $"AZUNOTE_DOTENV_{Guid.NewGuid():N}";
+        var overrideName = $"AZUNOTE_OVERRIDE_{Guid.NewGuid():N}";
+        var scriptPath = Path.Combine(root, "echo environment.cmd");
+        try
+        {
+            Directory.CreateDirectory(documentDirectory);
+            await File.WriteAllTextAsync(
+                Path.Combine(root, ".env"),
+                $"{dotenvName}=from dotenv\n{overrideName}=from dotenv\n");
+            await File.WriteAllTextAsync(
+                scriptPath,
+                $"@echo off\r\necho %~1\r\necho %{dotenvName}%\r\necho %~2\r\necho %{overrideName}%\r\n");
+
+            var definition = new ExternalToolDefinition(
+                scriptPath,
+                [
+                    $"${{env:{dotenvName}}}",
+                    $"${{env:{overrideName}}}"
+                ],
+                environment: new Dictionary<string, string>
+                {
+                    [overrideName] = "from tool"
+                });
+            var result = await ExternalToolRunner.RunAsync(
+                definition,
+                new ExternalToolContext(
+                    documentPath,
+                    documentPath,
+                    string.Empty,
+                    string.Empty));
+
+            Assert.True(result.Succeeded, result.StandardError);
+            Assert.Equal(
+                ["from dotenv", "from dotenv", "from tool", "from tool"],
+                result.StandardOutput
+                    .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
     }
 
     [Fact]

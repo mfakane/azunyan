@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using System.Text.RegularExpressions;
 using Azunyan.Core;
 using Azunyan.Syntax;
@@ -334,7 +335,11 @@ public sealed partial record ExternalToolContext
         }
     }
 
-    public string Expand(string value)
+    public string Expand(string value) => Expand(value, environment: null);
+
+    public string Expand(
+        string value,
+        IReadOnlyDictionary<string, string>? environment)
     {
         ArgumentNullException.ThrowIfNull(value);
 
@@ -343,6 +348,13 @@ public sealed partial record ExternalToolContext
             var name = match.Groups["name"].Value;
             if (name.StartsWith("env:", StringComparison.Ordinal))
             {
+                if (environment is not null)
+                {
+                    return environment.TryGetValue(name[4..], out var environmentValue)
+                        ? environmentValue
+                        : string.Empty;
+                }
+
                 return Environment.GetEnvironmentVariable(name[4..]) ?? string.Empty;
             }
 
@@ -365,7 +377,7 @@ public sealed partial record ExternalToolContext
                 "documentBasenameNoExtension" => DocumentBasenameNoExtension ?? string.Empty,
                 "documentExtension" => DocumentExtension ?? string.Empty,
                 "tempFile" => TempFile ?? string.Empty,
-                "toolDir" => ToolDirectory ?? string.Empty,
+                "toolFolder" => ToolDirectory ?? string.Empty,
                 "workspaceFolder" => WorkspaceFolder ?? string.Empty,
                 "document" => Document,
                 "selectedText" => Selection,
@@ -392,7 +404,15 @@ public sealed partial record ExternalToolContext
         });
     }
 
-    public string[] Expand(string[] arguments) => [.. arguments.Select(Expand)];
+    public string[] Expand(string[] arguments) => Expand(arguments, environment: null);
+
+    public string[] Expand(
+        string[] arguments,
+        IReadOnlyDictionary<string, string>? environment)
+    {
+        ArgumentNullException.ThrowIfNull(arguments);
+        return [.. arguments.Select(argument => Expand(argument, environment))];
+    }
 
     public string GetInput(ExternalToolInputMode inputMode) => inputMode switch
     {
@@ -426,6 +446,217 @@ public sealed partial record ExternalToolContext
         return Path.GetFileName(Path.TrimEndingDirectorySeparator(path));
     }
 
+}
+
+internal sealed record ExternalToolEnvironmentSnapshot(
+    IReadOnlyDictionary<string, string> Values,
+    IReadOnlyDictionary<string, string> Overrides);
+
+internal static class ExternalToolEnvironmentResolver
+{
+    public static ExternalToolEnvironmentSnapshot Resolve(
+        ExternalToolDefinition definition,
+        ExternalToolContext context)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        ArgumentNullException.ThrowIfNull(context);
+
+        var values = LoadProcessEnvironment();
+        var dotenvValues = DotEnvFileLoader.Load(context.DocumentDirname);
+        foreach (var environmentVariable in dotenvValues)
+        {
+            values[environmentVariable.Key] = environmentVariable.Value;
+        }
+
+        var baseValues = new Dictionary<string, string>(values, StringComparer.OrdinalIgnoreCase);
+        var configuredValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var environmentVariable in definition.Environment)
+        {
+            configuredValues[environmentVariable.Key] = context.Expand(
+                environmentVariable.Value,
+                baseValues);
+        }
+
+        var overrides = new Dictionary<string, string>(dotenvValues, StringComparer.OrdinalIgnoreCase);
+        foreach (var environmentVariable in configuredValues)
+        {
+            values[environmentVariable.Key] = environmentVariable.Value;
+            overrides[environmentVariable.Key] = environmentVariable.Value;
+        }
+
+        return new ExternalToolEnvironmentSnapshot(values, overrides);
+    }
+
+    private static Dictionary<string, string> LoadProcessEnvironment()
+    {
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (System.Collections.DictionaryEntry environmentVariable in
+                 Environment.GetEnvironmentVariables())
+        {
+            if (environmentVariable.Key is string key)
+            {
+                values[key] = environmentVariable.Value?.ToString() ?? string.Empty;
+            }
+        }
+
+        return values;
+    }
+}
+
+internal static class DotEnvFileLoader
+{
+    private const string DotEnvFileName = ".env";
+    private static readonly UTF8Encoding Utf8 = new(
+        encoderShouldEmitUTF8Identifier: false,
+        throwOnInvalidBytes: true);
+
+    public static IReadOnlyDictionary<string, string> Load(string? documentDirectory)
+    {
+        var path = FindNearestFile(documentDirectory);
+        if (path is null)
+        {
+            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        try
+        {
+            return Parse(File.ReadAllLines(path, Utf8));
+        }
+        catch (Exception exception) when (
+            exception is IOException
+                or UnauthorizedAccessException
+                or DecoderFallbackException
+                or ArgumentException)
+        {
+            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        }
+    }
+
+    private static Dictionary<string, string> Parse(IEnumerable<string> lines)
+    {
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var rawLine in lines)
+        {
+            if (!TryParseLine(rawLine, out var key, out var value))
+            {
+                continue;
+            }
+
+            values[key] = value;
+        }
+
+        return values;
+    }
+
+    private static bool TryParseLine(
+        string rawLine,
+        out string key,
+        out string value)
+    {
+        key = string.Empty;
+        value = string.Empty;
+
+        var line = rawLine.TrimStart('\uFEFF').Trim();
+        if (line.Length == 0 || line.StartsWith('#'))
+        {
+            return false;
+        }
+
+        if (line.StartsWith("export", StringComparison.Ordinal)
+            && line.Length > "export".Length
+            && char.IsWhiteSpace(line["export".Length]))
+        {
+            line = line["export".Length..].TrimStart();
+        }
+
+        var separator = line.IndexOf('=');
+        if (separator <= 0)
+        {
+            return false;
+        }
+
+        key = line[..separator].Trim();
+        if (!IsValidKey(key))
+        {
+            key = string.Empty;
+            return false;
+        }
+
+        return TryParseValue(line[(separator + 1)..].Trim(), out value);
+    }
+
+    private static bool TryParseValue(string text, out string value)
+    {
+        value = string.Empty;
+        if (text.Length == 0)
+        {
+            return true;
+        }
+
+        if (text[0] is '\'' or '"')
+        {
+            var quote = text[0];
+            var closingQuote = text.IndexOf(quote, 1);
+            if (closingQuote < 0)
+            {
+                return false;
+            }
+
+            var suffix = text[(closingQuote + 1)..].Trim();
+            if (suffix.Length > 0 && !suffix.StartsWith('#'))
+            {
+                return false;
+            }
+
+            value = text[1..closingQuote];
+            return true;
+        }
+
+        if (text[0] == '#')
+        {
+            return true;
+        }
+
+        var comment = text.IndexOf(" #", StringComparison.Ordinal);
+        value = (comment < 0 ? text : text[..comment]).TrimEnd();
+        return true;
+    }
+
+    private static bool IsValidKey(string key)
+    {
+        if (key.Length == 0
+            || !(char.IsLetter(key[0]) || key[0] == '_'))
+        {
+            return false;
+        }
+
+        return key.Skip(1).All(character =>
+            char.IsLetterOrDigit(character) || character == '_');
+    }
+
+    private static string? FindNearestFile(string? documentDirectory)
+    {
+        for (var current = documentDirectory;
+             !string.IsNullOrWhiteSpace(current);
+             current = GetParentDirectory(current))
+        {
+            var path = Path.Combine(current, DotEnvFileName);
+            if (File.Exists(path))
+            {
+                return path;
+            }
+        }
+
+        return null;
+    }
+
+    private static string? GetParentDirectory(string directory)
+    {
+        var parent = Directory.GetParent(directory)?.FullName;
+        return string.Equals(parent, directory, StringComparison.OrdinalIgnoreCase)
+            ? null
+            : parent;
+    }
 }
 
 public sealed record ExternalToolMenuState(
@@ -665,7 +896,8 @@ public static class ExternalToolAvailability
         }
 
         var definition = settings.ToDefinition();
-        var command = context.Expand(definition.FileName);
+        var environment = ExternalToolEnvironmentResolver.Resolve(definition, context);
+        var command = context.Expand(definition.FileName, environment.Values);
         var launchPlan = ExternalToolLaunchResolver.Resolve(
             command,
             definition.DefinitionDirectory);
@@ -808,10 +1040,11 @@ public sealed class ExternalToolRunner
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(context);
 
+        var environment = ExternalToolEnvironmentResolver.Resolve(definition, context);
         var input = definition.InputMode == ExternalToolInputMode.None
             ? null
             : context.GetInput(definition.InputMode);
-        var command = context.Expand(definition.FileName);
+        var command = context.Expand(definition.FileName, environment.Values);
         var launchPlan = ExternalToolLaunchResolver.Resolve(
             command,
             definition.DefinitionDirectory);
@@ -828,7 +1061,7 @@ public sealed class ExternalToolRunner
             throw exception;
         }
 
-        var arguments = context.Expand(definition.Arguments);
+        var arguments = context.Expand(definition.Arguments, environment.Values);
         var startInfo = new ProcessStartInfo
         {
             FileName = launchPlan.LauncherPath,
@@ -837,11 +1070,14 @@ public sealed class ExternalToolRunner
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            WorkingDirectory = ResolveWorkingDirectory(definition, context)
+            WorkingDirectory = ResolveWorkingDirectory(
+                definition,
+                context,
+                environment.Values)
         };
-        foreach (var environmentVariable in definition.Environment)
+        foreach (var environmentVariable in environment.Overrides)
         {
-            startInfo.Environment[environmentVariable.Key] = context.Expand(environmentVariable.Value);
+            startInfo.Environment[environmentVariable.Key] = environmentVariable.Value;
         }
 
         launchPlan.AddArguments(startInfo, arguments);
@@ -949,11 +1185,12 @@ public sealed class ExternalToolRunner
 
     private static string ResolveWorkingDirectory(
         ExternalToolDefinition definition,
-        ExternalToolContext context)
+        ExternalToolContext context,
+        IReadOnlyDictionary<string, string> environment)
     {
         var configured = definition.WorkingDirectory is null
             ? context.DocumentDirname ?? context.FileDirname
-            : context.Expand(definition.WorkingDirectory);
+            : context.Expand(definition.WorkingDirectory, environment);
 
         if (!string.IsNullOrWhiteSpace(configured)
             && !Path.IsPathRooted(configured)

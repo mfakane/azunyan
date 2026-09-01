@@ -131,6 +131,14 @@ a temporary file containing the current text through `${file}` or `FilePath`;
 the temporary file is removed after the tool finishes. Non-zero exit codes
 leave the document unchanged and show stderr.
 
+When an external tool runs, Azunote searches from the current document's
+directory toward its ancestors for the nearest `.env` file. A document without
+a file path does not load `.env`. The file accepts blank lines, comments,
+`KEY=value`, optional `export`, quoted values, and empty values; malformed
+lines are ignored. Environment precedence is the inherited process
+environment, then `.env`, then the tool's `[env]` table. The resolved values
+are available to `${env:NAME}` and are passed to the external process.
+
 `${workspaceFolder}` expands to the nearest ancestor of the document directory
 that contains `.git` (directory or file) or an `.editorconfig` with
 `root = true`. It is empty when no such ancestor exists.
