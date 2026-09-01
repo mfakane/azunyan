@@ -798,6 +798,267 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         return true;
     }
 
+    internal bool TryNavigateCarets(
+        TextCaretSet carets,
+        AzunyanEditorNavigationKind kind,
+        bool extendSelection,
+        int tabDisplaySize,
+        out TextCaretSet result)
+    {
+        ArgumentNullException.ThrowIfNull(carets);
+        result = carets;
+        if (_cachedLayout is not { } layout
+            || _renderFrame is not { } frame
+            || !ReferenceEquals(layout.Snapshot, frame.Context.Snapshot))
+        {
+            return false;
+        }
+
+        var states = new List<TextCaretState>(carets.Count);
+        foreach (var caret in carets)
+        {
+            var direction = kind is AzunyanEditorNavigationKind.Up
+                or AzunyanEditorNavigationKind.PageUp
+                or AzunyanEditorNavigationKind.SmartHome
+                    ? -1
+                    : 1;
+            var sourceAnchor = GetNavigationSource(caret, direction, extendSelection);
+            if (!TryGetCaretRow(layout, sourceAnchor, out var sourceRowIndex, out var sourceStop))
+            {
+                states.Add(caret);
+                continue;
+            }
+
+            DocumentAnchor targetAnchor;
+            double? preferredHorizontalOffset = null;
+            switch (kind)
+            {
+                case AzunyanEditorNavigationKind.Up:
+                case AzunyanEditorNavigationKind.Down:
+                    {
+                        var targetRowIndex = FindAdjacentTextRow(
+                            layout.Rows,
+                            sourceRowIndex,
+                            direction);
+                        preferredHorizontalOffset = caret.PreferredHorizontalOffset
+                            ?? GetCaretXForGlobalRow(
+                                sourceRowIndex,
+                                layout.Rows.Rows[sourceRowIndex],
+                                sourceStop - layout.Rows.Rows[sourceRowIndex].TextStartColumn,
+                                frame.Context.CharacterWidth);
+                        targetAnchor = GetAnchorAtHorizontalOffset(
+                            targetRowIndex,
+                            preferredHorizontalOffset.Value,
+                            frame.Context.CharacterWidth);
+                        break;
+                    }
+                case AzunyanEditorNavigationKind.PageUp:
+                case AzunyanEditorNavigationKind.PageDown:
+                    {
+                        var pageDistance = Math.Max(
+                            frame.Context.LineHeight,
+                            frame.Context.ViewportHeight - frame.Context.LineHeight);
+                        var sourceTop = layout.Heights.GetOffset(sourceRowIndex);
+                        var targetOffset = Math.Clamp(
+                            sourceTop + (direction * pageDistance),
+                            0,
+                            layout.Heights.TotalHeight);
+                        var targetRowIndex = FindTextRowNear(
+                            layout.Rows,
+                            layout.Heights.FindLine(targetOffset),
+                            direction);
+                        preferredHorizontalOffset = caret.PreferredHorizontalOffset
+                            ?? GetCaretXForGlobalRow(
+                                sourceRowIndex,
+                                layout.Rows.Rows[sourceRowIndex],
+                                sourceStop - layout.Rows.Rows[sourceRowIndex].TextStartColumn,
+                                frame.Context.CharacterWidth);
+                        targetAnchor = GetAnchorAtHorizontalOffset(
+                            targetRowIndex,
+                            preferredHorizontalOffset.Value,
+                            frame.Context.CharacterWidth);
+                        break;
+                    }
+                case AzunyanEditorNavigationKind.SmartHome:
+                    targetAnchor = GetSmartHomeAnchor(
+                        layout.Snapshot,
+                        layout.Rows.Rows[sourceRowIndex],
+                        sourceAnchor);
+                    break;
+                case AzunyanEditorNavigationKind.End:
+                    targetAnchor = GetRowBoundaryAnchor(
+                        layout.Rows.Rows[sourceRowIndex],
+                        end: true);
+                    break;
+                default:
+                    states.Add(caret);
+                    continue;
+            }
+
+            var target = targetAnchor.Position.Offset;
+            var selection = extendSelection
+                ? new TextSelection(caret.Selection.Anchor, target)
+                : TextSelection.Caret(target);
+            states.Add(TextCaretState.CreateNavigation(
+                selection,
+                TextBlockSelectionOperations.GetDisplayColumn(
+                    layout.Snapshot,
+                    target,
+                    tabDisplaySize),
+                targetAnchor,
+                preferredHorizontalOffset));
+        }
+
+        result = new TextCaretSet(states, carets.PrimaryIndex);
+        return true;
+    }
+
+    private static bool TryGetCaretRow(
+        ProjectedTextLayoutState layout,
+        DocumentAnchor anchor,
+        out int rowIndex,
+        out int caretStop)
+    {
+        rowIndex = -1;
+        caretStop = 0;
+        if (!TryMapDocumentPosition(layout.Rows.Projection, layout.Snapshot, anchor, out var position))
+        {
+            return false;
+        }
+
+        var line = layout.Rows.Projection.Lines[position.VisualLine];
+        foreach (var index in layout.Rows.GetTextRowIndices(line))
+        {
+            if (ContainsCaret(layout.Rows.Rows[index], position.CaretStop, anchor.Affinity))
+            {
+                rowIndex = index;
+                caretStop = position.CaretStop;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private DocumentAnchor GetAnchorAtHorizontalOffset(
+        int rowIndex,
+        double horizontalOffset,
+        double characterWidth)
+    {
+        var row = _cachedLayout!.Rows.Rows[rowIndex];
+        var localStop = GetNearestCaretStop(
+            rowIndex,
+            row,
+            horizontalOffset,
+            characterWidth);
+        return GetLineLayoutForGlobalRow(rowIndex, row)
+            ?.GetDocumentAnchorAtCaretStop(localStop)
+            ?? row.TextLine!.GetAnchor(row.TextStartColumn + localStop);
+    }
+
+    private static DocumentAnchor GetNavigationSource(
+        TextCaretState caret,
+        int direction,
+        bool extendSelection)
+    {
+        if (extendSelection || caret.Selection.IsEmpty)
+        {
+            return caret.CaretAnchor;
+        }
+
+        return direction < 0
+            ? DocumentAnchor.Before(caret.Selection.Start)
+            : DocumentAnchor.After(caret.Selection.End);
+    }
+
+    private static int FindAdjacentTextRow(
+        VisualRowMap rows,
+        int sourceRowIndex,
+        int direction)
+    {
+        var index = sourceRowIndex;
+        while (index + direction >= 0 && index + direction < rows.Rows.Count)
+        {
+            index += direction;
+            if (rows.Rows[index].Kind == VisualRowKind.Text)
+            {
+                return index;
+            }
+        }
+
+        return sourceRowIndex;
+    }
+
+    private static int FindTextRowNear(
+        VisualRowMap rows,
+        int candidate,
+        int direction)
+    {
+        candidate = Math.Clamp(candidate, 0, rows.Rows.Count - 1);
+        if (rows.Rows[candidate].Kind == VisualRowKind.Text)
+        {
+            return candidate;
+        }
+
+        var forward = candidate;
+        while (forward >= 0 && forward < rows.Rows.Count)
+        {
+            if (rows.Rows[forward].Kind == VisualRowKind.Text)
+            {
+                return forward;
+            }
+
+            forward += direction;
+        }
+
+        return FindAdjacentTextRow(rows, candidate, -direction);
+    }
+
+    private static DocumentAnchor GetSmartHomeAnchor(
+        TextSnapshot snapshot,
+        VisualRow row,
+        DocumentAnchor sourceAnchor)
+    {
+        var projectedText = string.Concat(row.TextLine!.Inlines.Select(inline =>
+            GetProjectedInlineText(snapshot, inline)));
+        var rowText = projectedText.Substring(row.TextStartColumn, row.TextLength);
+        var firstNonWhitespace = 0;
+        while (firstNonWhitespace < rowText.Length
+            && char.IsWhiteSpace(rowText[firstNonWhitespace]))
+        {
+            firstNonWhitespace++;
+        }
+
+        if (firstNonWhitespace == rowText.Length)
+        {
+            firstNonWhitespace = 0;
+        }
+
+        var rowStart = GetRowBoundaryAnchor(row, end: false);
+        var indentationEnd = row.TextLine.GetAnchor(
+            row.TextStartColumn + firstNonWhitespace);
+        return sourceAnchor.Position.Offset == indentationEnd.Position.Offset
+                ? rowStart
+                : indentationEnd;
+    }
+
+    private static DocumentAnchor GetRowBoundaryAnchor(VisualRow row, bool end)
+    {
+        var column = end ? row.TextEndColumn : row.TextStartColumn;
+        var anchor = row.TextLine!.GetAnchor(column);
+        if (row.TextStartColumn > 0 && !end)
+        {
+            return new DocumentAnchor(anchor.Position, AnchorAffinity.Before);
+        }
+
+        if (row.TextEndColumn < row.TextLine.VisualLength && end)
+        {
+            return new DocumentAnchor(anchor.Position, AnchorAffinity.After);
+        }
+
+        return anchor;
+    }
+
     internal bool TryCreateVisualBlockSelectionCaretSet(
         TextBlockSelection selection,
         int tabDisplaySize,
@@ -1918,7 +2179,9 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
     }
 }
 
-internal sealed class AzunyanEditorRenderer : IAzunyanEditorRenderer
+internal sealed class AzunyanEditorRenderer :
+    IAzunyanEditorRenderer,
+    IAzunyanEditorNavigationGeometry
 {
     private readonly Canvas _gutterLayer;
     private readonly Canvas _textLayer;
@@ -1954,6 +2217,16 @@ internal sealed class AzunyanEditorRenderer : IAzunyanEditorRenderer
 
     public bool TryGetCaretRect(DocumentAnchor anchor, out Rect rect) =>
         TextRenderer.TryGetCaretRect(anchor, out rect);
+
+    public bool TryNavigate(
+        AzunyanEditorNavigationRequest request,
+        out TextCaretSet result) =>
+        TextRenderer.TryNavigateCarets(
+            request.Carets,
+            request.Kind,
+            request.ExtendSelection,
+            request.TabDisplaySize,
+            out result);
 
     public void Dispose() => TextRenderer.Dispose();
 }
