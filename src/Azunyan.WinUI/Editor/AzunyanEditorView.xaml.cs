@@ -30,6 +30,8 @@ namespace Azunyan.WinUI;
 /// </summary>
 public sealed partial class AzunyanEditorView : UserControl, IDisposable
 {
+    private const VirtualKey OemOpenBracketKey = (VirtualKey)0xdb;
+
     private readonly AzunyanEditorRenderer _defaultRenderer;
     private Document _document = new();
     private readonly SlidingInputWindowCalculator _inputWindowCalculator = new();
@@ -1314,6 +1316,56 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         _document.Replace(edit.Range, edit.Replacement, edit.CaretSet);
     }
 
+    private void ApplyCaretSetDeletion(bool backward, bool byWord)
+    {
+        var edit = TextCaretSetOperations.CreateDeletion(
+            Snapshot,
+            Document.CaretSet,
+            backward,
+            TabDisplaySize,
+            byWord);
+        _document.Replace(edit.Range, edit.Replacement, edit.CaretSet);
+    }
+
+    private void ApplyManagedNewLine()
+    {
+        var caretSet = Document.CaretSet;
+        if (_blockSelection is { } blockSelection)
+        {
+            if (!TryCreateBlockSelectionCaretSet(blockSelection, out caretSet))
+            {
+                _blockSelection = null;
+                return;
+            }
+
+            _blockSelection = null;
+        }
+
+        if (!_autoIndentOnEnter)
+        {
+            var lineEnding = TextBlockSelectionOperations.GetPreferredLineEnding(
+                Snapshot,
+                _preferredLineEnding);
+            var edit = TextCaretSetOperations.CreateReplacement(
+                Snapshot,
+                caretSet,
+                Enumerable.Repeat<string?>(lineEnding, caretSet.Count).ToArray(),
+                TabDisplaySize);
+            _document.Replace(edit.Range, edit.Replacement, edit.CaretSet);
+            return;
+        }
+
+        var newLineEdit = TextCaretSetOperations.CreateNewLineWithAutoIndent(
+            Snapshot,
+            caretSet,
+            _preferredLineEnding,
+            TabDisplaySize);
+        _document.Replace(
+            newLineEdit.Range,
+            newLineEdit.Replacement,
+            newLineEdit.CaretSet);
+    }
+
     private void OnInputDocumentChanged(
         object? sender,
         DocumentChangedEventArgs args)
@@ -1775,7 +1827,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                     return;
                 case VirtualKey.Enter:
                 case VirtualKey.Tab when !IsKeyDown(VirtualKey.Shift):
-                    QueueKeyEdit(args.Key, () => TryAcceptSelectedCompletion());
+                    QueueKeyEdit(args.Key, () => TryAcceptSelectedCompletion(), repeatable: false);
                     args.Handled = true;
                     return;
                 case VirtualKey.Escape:
@@ -1812,6 +1864,52 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
         switch (args.Key)
         {
+            case OemOpenBracketKey when control && !menu && !IsComposing:
+                QueueKeyEdit(args.Key, () =>
+                {
+                    ApplyDocumentCommand(() =>
+                    {
+                        if (_blockSelection is not null)
+                        {
+                            _blockSelection = null;
+                        }
+                        else
+                        {
+                            _document.SetCaretSet(
+                                TextCaretSetOperations.MoveToMatchingBracket(
+                                    Snapshot,
+                                    Document.CaretSet,
+                                    extendSelection,
+                                    TabDisplaySize));
+                        }
+                    });
+                    ScrollSelectionIntoView();
+                }, repeatable: false);
+                args.Handled = true;
+                break;
+            case VirtualKey.A when control && !menu && !IsComposing:
+                QueueKeyEdit(args.Key, () =>
+                {
+                    ApplyDocumentCommand(() =>
+                    {
+                        _blockSelection = null;
+                        _document.Selection = new TextSelection(0, Snapshot.Length);
+                    });
+                }, repeatable: false);
+                args.Handled = true;
+                break;
+            case VirtualKey.Enter
+                when !IsComposing
+                && !control
+                && !menu
+                && AcceptsReturn:
+                QueueKeyEdit(args.Key, () =>
+                {
+                    ApplyDocumentCommand(ApplyManagedNewLine);
+                    ScrollSelectionIntoView();
+                }, repeatable: true);
+                args.Handled = true;
+                break;
             case VirtualKey.Tab
                 when !IsComposing
                 && !control
@@ -1829,42 +1927,40 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                                 _indentationInputMode);
                         }
                     });
-                });
+                }, repeatable: true);
                 args.Handled = true;
                 break;
-            case VirtualKey.Z when control && !IsComposing:
+            case VirtualKey.Z when control && !menu && !IsComposing:
                 if (extendSelection)
                 {
-                    QueueKeyEdit(args.Key, () => _ = RedoDocument());
+                    QueueKeyEdit(args.Key, () => _ = RedoDocument(), repeatable: false);
                 }
                 else
                 {
-                    QueueKeyEdit(args.Key, () => _ = UndoDocument());
+                    QueueKeyEdit(args.Key, () => _ = UndoDocument(), repeatable: false);
                 }
 
                 args.Handled = true;
                 break;
-            case VirtualKey.Y when control && !IsComposing:
-                QueueKeyEdit(args.Key, () => _ = RedoDocument());
+            case VirtualKey.Y when control && !menu && !IsComposing:
+                QueueKeyEdit(args.Key, () => _ = RedoDocument(), repeatable: false);
                 args.Handled = true;
                 break;
-            case VirtualKey.C when control
-                && (_blockSelection is not null || Document.CaretSet.Count > 1)
+            case VirtualKey.C when control && !menu
                 && !IsComposing:
-                QueueKeyEdit(args.Key, CopySelectionToClipboard);
+                QueueKeyEdit(args.Key, CopySelectionToClipboard, repeatable: false);
                 args.Handled = true;
                 break;
-            case VirtualKey.X when control
-                && (_blockSelection is not null || Document.CaretSet.Count > 1)
+            case VirtualKey.X when control && !menu
                 && !IsComposing:
-                QueueKeyEdit(args.Key, CutSelectionToClipboard);
+                QueueKeyEdit(args.Key, CutSelectionToClipboard, repeatable: false);
                 args.Handled = true;
                 break;
-            case VirtualKey.V when control:
-                QueueKeyEdit(args.Key, PasteFromClipboard);
+            case VirtualKey.V when control && !menu && !IsComposing:
+                QueueKeyEdit(args.Key, PasteFromClipboard, repeatable: false);
                 args.Handled = true;
                 break;
-            case VirtualKey.Left when !IsComposing:
+            case VirtualKey.Left when !IsComposing && !menu:
                 QueueKeyEdit(args.Key, () =>
                 {
                     ApplyDocumentCommand(() =>
@@ -1873,7 +1969,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                         {
                             _blockSelection = null;
                         }
-                        else if (Document.CaretSet.Count > 1)
+                        else
                         {
                             _document.SetCaretSet(TextCaretSetOperations.MoveHorizontal(
                                 Snapshot,
@@ -1883,15 +1979,11 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                                 byWord: control,
                                 tabDisplaySize: TabDisplaySize));
                         }
-                        else if (!IsComposing)
-                        {
-                            Document.MoveCaretByGrapheme(-1, extendSelection);
-                        }
                     });
-                });
+                }, repeatable: true);
                 args.Handled = true;
                 break;
-            case VirtualKey.Right when !IsComposing:
+            case VirtualKey.Right when !IsComposing && !menu:
                 QueueKeyEdit(args.Key, () =>
                 {
                     ApplyDocumentCommand(() =>
@@ -1900,7 +1992,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                         {
                             _blockSelection = null;
                         }
-                        else if (Document.CaretSet.Count > 1)
+                        else
                         {
                             _document.SetCaretSet(TextCaretSetOperations.MoveHorizontal(
                                 Snapshot,
@@ -1910,69 +2002,151 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                                 byWord: control,
                                 tabDisplaySize: TabDisplaySize));
                         }
-                        else if (!IsComposing)
-                        {
-                            Document.MoveCaretByGrapheme(1, extendSelection);
-                        }
                     });
-                });
+                }, repeatable: true);
                 args.Handled = true;
                 break;
-            case VirtualKey.Up when Document.CaretSet.Count > 1 && !IsComposing:
+            case VirtualKey.Up
+                when !IsComposing
+                && control
+                && !menu
+                && !extendSelection
+                && IsProjectedTextSurface:
+                QueueKeyEdit(
+                    args.Key,
+                    () => ScrollProjectedBy(-_lineHeight),
+                    repeatable: true);
+                args.Handled = true;
+                break;
+            case VirtualKey.Down
+                when !IsComposing
+                && control
+                && !menu
+                && !extendSelection
+                && IsProjectedTextSurface:
+                QueueKeyEdit(
+                    args.Key,
+                    () => ScrollProjectedBy(_lineHeight),
+                    repeatable: true);
+                args.Handled = true;
+                break;
+            case VirtualKey.Up when !IsComposing && !control && !menu:
                 QueueKeyEdit(args.Key, () =>
                 {
-                    ApplyDocumentCommand(() =>
-                        _document.SetCaretSet(TextCaretSetOperations.MoveVertical(
+                    ApplyProjectedNavigation(
+                        AzunyanEditorNavigationKind.Up,
+                        extendSelection,
+                        () => TextCaretSetOperations.MoveVertical(
                             Snapshot,
                             Document.CaretSet,
                             -1,
                             TabDisplaySize,
-                            extendSelection)));
-                });
+                            extendSelection));
+                    ScrollSelectionIntoView();
+                }, repeatable: true);
                 args.Handled = true;
                 break;
-            case VirtualKey.Down when Document.CaretSet.Count > 1 && !IsComposing:
+            case VirtualKey.Down when !IsComposing && !control && !menu:
                 QueueKeyEdit(args.Key, () =>
                 {
-                    ApplyDocumentCommand(() =>
-                        _document.SetCaretSet(TextCaretSetOperations.MoveVertical(
+                    ApplyProjectedNavigation(
+                        AzunyanEditorNavigationKind.Down,
+                        extendSelection,
+                        () => TextCaretSetOperations.MoveVertical(
                             Snapshot,
                             Document.CaretSet,
                             1,
                             TabDisplaySize,
-                            extendSelection)));
-                });
+                            extendSelection));
+                    ScrollSelectionIntoView();
+                }, repeatable: true);
                 args.Handled = true;
                 break;
-            case VirtualKey.Home when Document.CaretSet.Count > 1 && !IsComposing:
+            case VirtualKey.PageUp when !IsComposing && !control && !menu:
+            case VirtualKey.PageDown when !IsComposing && !control && !menu:
+                var pageDirection = args.Key == VirtualKey.PageUp ? -1 : 1;
                 QueueKeyEdit(args.Key, () =>
                 {
-                    ApplyDocumentCommand(() =>
-                        _document.SetCaretSet(TextCaretSetOperations.MoveToLineBoundary(
+                    var pageLines = Math.Max(
+                        1,
+                        (int)Math.Floor(Math.Max(1, EditorHost.ActualHeight) / _lineHeight) - 1);
+                    var direction = pageDirection * pageLines;
+                    ApplyProjectedNavigation(
+                        pageDirection < 0
+                            ? AzunyanEditorNavigationKind.PageUp
+                            : AzunyanEditorNavigationKind.PageDown,
+                        extendSelection,
+                        () => TextCaretSetOperations.MoveVertical(
                             Snapshot,
                             Document.CaretSet,
-                            end: false,
-                            documentBoundary: control,
-                            extendSelection,
-                            TabDisplaySize)));
-                });
+                            direction,
+                            TabDisplaySize,
+                            extendSelection));
+                    ScrollSelectionIntoView();
+                }, repeatable: true);
                 args.Handled = true;
                 break;
-            case VirtualKey.End when Document.CaretSet.Count > 1 && !IsComposing:
+            case VirtualKey.Home when !IsComposing && !menu:
                 QueueKeyEdit(args.Key, () =>
                 {
-                    ApplyDocumentCommand(() =>
-                        _document.SetCaretSet(TextCaretSetOperations.MoveToLineBoundary(
-                            Snapshot,
-                            Document.CaretSet,
-                            end: true,
-                            documentBoundary: control,
+                    if (control)
+                    {
+                        ApplyDocumentCommand(() =>
+                            _document.SetCaretSet(TextCaretSetOperations.MoveToLineBoundary(
+                                Snapshot,
+                                Document.CaretSet,
+                                end: false,
+                                documentBoundary: true,
+                                extendSelection,
+                                TabDisplaySize)));
+                    }
+                    else
+                    {
+                        ApplyProjectedNavigation(
+                            AzunyanEditorNavigationKind.SmartHome,
                             extendSelection,
-                            TabDisplaySize)));
-                });
+                            () => TextCaretSetOperations.MoveToSmartLineStart(
+                                Snapshot,
+                                Document.CaretSet,
+                                extendSelection,
+                                TabDisplaySize));
+                    }
+                    ScrollSelectionIntoView();
+                }, repeatable: true);
                 args.Handled = true;
                 break;
-            case VirtualKey.Back when !IsComposing:
+            case VirtualKey.End when !IsComposing && !menu:
+                QueueKeyEdit(args.Key, () =>
+                {
+                    if (control)
+                    {
+                        ApplyDocumentCommand(() =>
+                            _document.SetCaretSet(TextCaretSetOperations.MoveToLineBoundary(
+                                Snapshot,
+                                Document.CaretSet,
+                                end: true,
+                                documentBoundary: true,
+                                extendSelection,
+                                TabDisplaySize)));
+                    }
+                    else
+                    {
+                        ApplyProjectedNavigation(
+                            AzunyanEditorNavigationKind.End,
+                            extendSelection,
+                            () => TextCaretSetOperations.MoveToLineBoundary(
+                                Snapshot,
+                                Document.CaretSet,
+                                end: true,
+                                documentBoundary: false,
+                                extendSelection,
+                                TabDisplaySize));
+                    }
+                    ScrollSelectionIntoView();
+                }, repeatable: true);
+                args.Handled = true;
+                break;
+            case VirtualKey.Back when !IsComposing && !menu:
                 QueueKeyEdit(args.Key, () =>
                 {
                     ApplyDocumentCommand(() =>
@@ -1984,19 +2158,15 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                                 new[] { string.Empty },
                                 repeatSingleLine: true);
                         }
-                        else if (Document.CaretSet.Count > 1)
+                        else
                         {
-                            ApplyCaretSetDeletion(backward: true);
-                        }
-                        else if (!IsComposing)
-                        {
-                            Document.DeleteBackward();
+                            ApplyCaretSetDeletion(backward: true, byWord: control);
                         }
                     });
-                });
+                }, repeatable: true);
                 args.Handled = true;
                 break;
-            case VirtualKey.Delete when !IsComposing:
+            case VirtualKey.Delete when !IsComposing && !menu:
                 QueueKeyEdit(args.Key, () =>
                 {
                     ApplyDocumentCommand(() =>
@@ -2146,41 +2316,70 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private void OnInputKeyUp(object sender, KeyRoutedEventArgs args)
     {
         _nativeKeysDown.Remove(args.Key);
-        var pendingIndex = _pendingKeyEdits.FindIndex(
-            pending => pending.Key == args.Key);
+        _queuedNonRepeatingKeys.Remove(args.Key);
         LogDiagnostic(
             AzunyanDiagnosticCategory.Key,
-            $"keyup key={args.Key}; pending={pendingIndex >= 0}; {DescribeDiagnosticState()}");
-        if (pendingIndex < 0)
+            $"keyup key={args.Key}; {DescribeDiagnosticState()}");
+        if (_nativeKeysDown.Count == 0)
         {
-            if (_nativeKeysDown.Count == 0)
+            if (_pasteBatchRefreshPending)
             {
-                if (_pasteBatchRefreshPending)
-                {
-                    RequestPendingPasteBatchRefresh();
-                }
-                else
-                {
-                    RequestInputWindowSynchronization();
-                }
+                RequestPendingPasteBatchRefresh();
             }
+            else
+            {
+                RequestInputWindowSynchronization();
+            }
+        }
+    }
 
+    private void ApplyProjectedNavigation(
+        AzunyanEditorNavigationKind kind,
+        bool extendSelection,
+        Func<TextCaretSet> fallback)
+    {
+        ArgumentNullException.ThrowIfNull(fallback);
+        ApplyDocumentCommand(() =>
+        {
+            var next = _renderer is IAzunyanEditorNavigationGeometry navigation
+                && navigation.TryNavigate(
+                    new AzunyanEditorNavigationRequest(
+                        Document.CaretSet,
+                        kind,
+                        extendSelection,
+                        TabDisplaySize),
+                    out var projected)
+                ? projected
+                : fallback();
+            _blockSelection = null;
+            _document.SetCaretSet(next);
+        });
+    }
+
+    private void ScrollProjectedBy(double delta)
+    {
+        if (!IsProjectedTextSurface || !double.IsFinite(delta))
+        {
             return;
         }
 
-        var pending = _pendingKeyEdits[pendingIndex];
-        _pendingKeyEdits.RemoveAt(pendingIndex);
-        if (!DispatcherQueue.TryEnqueue(() =>
-            {
-                if (!_disposed)
-                {
-                    ExecutePendingKeyEdit(pending.Key, pending.Action);
-                }
-            }))
+        var offset = Math.Clamp(
+            _projectedVerticalOffset + delta,
+            0,
+            ProjectedVerticalScrollBar.Maximum);
+        _synchronizingProjectedScroll = true;
+        try
         {
-            throw new InvalidOperationException(
-                "The editor dispatcher is no longer available.");
+            _projectedVerticalOffset = offset;
+            ProjectedVerticalScrollBar.Value = offset;
         }
+        finally
+        {
+            _synchronizingProjectedScroll = false;
+        }
+
+        RenderViewport();
+        RequestProviderResults(false, true, false);
     }
 
     private static bool TryGetLeadingLineEndingLength(string text, out int length)
@@ -2418,9 +2617,11 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
             _selectionPointerId = point.PointerId;
             EditorPointerSurface.CapturePointer(args.Pointer);
-            _document.Selection = isShiftSelection && !isBlockSelection
-                ? new TextSelection(pointerAnchor, anchor.Position.Offset)
-                : TextSelection.Caret(anchor.Position.Offset);
+            SetProjectedDocumentSelection(
+                isShiftSelection && !isBlockSelection
+                    ? new TextSelection(pointerAnchor, anchor.Position.Offset)
+                    : TextSelection.Caret(anchor.Position.Offset),
+                anchor);
             SyncInputWindow();
             RenderViewport();
         }
@@ -2651,9 +2852,10 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                     out var dragAnchor,
                     out _))
             {
-                SetDocumentSelection(new TextSelection(
-                    selectionAnchor,
-                    dragAnchor.Position.Offset));
+                SetProjectedDocumentSelection(
+                    new TextSelection(selectionAnchor, dragAnchor.Position.Offset),
+                    dragAnchor);
+                RequestPointerRender();
             }
 
             args.Handled = true;
@@ -2692,6 +2894,23 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     {
         _hoverPosition = -1;
         HideTooltipPopup();
+    }
+
+    private void SetProjectedDocumentSelection(
+        TextSelection selection,
+        DocumentAnchor activeAnchor)
+    {
+        _document.SetCaretSet(new TextCaretSet(new[]
+        {
+            new TextCaretState(
+                selection,
+                TextBlockSelectionOperations.GetDisplayColumn(
+                    Snapshot,
+                    selection.CaretPosition,
+                    TabDisplaySize),
+                activeAnchor.Affinity,
+                preferredHorizontalOffset: null)
+        }));
     }
 
     private void OnViewportChanged(object? sender, ScrollViewerViewChangedEventArgs args)
