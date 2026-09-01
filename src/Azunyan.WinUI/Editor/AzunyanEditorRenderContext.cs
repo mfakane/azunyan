@@ -200,3 +200,30 @@ public interface IAzunyanEditorRenderer
     /// </summary>
     bool TryGetCaretRect(DocumentAnchor anchor, out Windows.Foundation.Rect rect);
 }
+
+public enum AzunyanEditorNavigationKind
+{
+    Up,
+    Down,
+    PageUp,
+    PageDown,
+    SmartHome,
+    End
+}
+
+public readonly record struct AzunyanEditorNavigationRequest(
+    TextCaretSet Carets,
+    AzunyanEditorNavigationKind Kind,
+    bool ExtendSelection,
+    int TabDisplaySize);
+
+/// <summary>
+/// Optional capability for custom renderers whose visual rows differ from
+/// logical document lines.
+/// </summary>
+public interface IAzunyanEditorNavigationGeometry
+{
+    bool TryNavigate(
+        AzunyanEditorNavigationRequest request,
+        out TextCaretSet result);
+}
