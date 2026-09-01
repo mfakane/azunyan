@@ -336,7 +336,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         foreach (var index in layout.Rows.GetTextRowIndices(textLine))
         {
             var row = layout.Rows.Rows[index];
-            if (ContainsCaret(row, position.CaretStop))
+            if (ContainsCaret(row, position.CaretStop, anchor.Affinity))
             {
                 verticalOffset = layout.Heights.GetOffset(index) + offsetWithinRow;
                 return true;
@@ -387,7 +387,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         foreach (var index in layout.Rows.GetTextRowIndices(projectedLine))
         {
             var row = layout.Rows.Rows[index];
-            if (ContainsCaret(row, position.CaretStop))
+            if (ContainsCaret(row, position.CaretStop, anchor.Affinity))
             {
                 rowIndex = index;
                 break;
@@ -1586,7 +1586,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
                     layout,
                     textLayout,
                     top,
-                    caret.CaretPosition);
+                    caret.CaretAnchor);
             }
 
             return;
@@ -1598,7 +1598,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             layout,
             textLayout,
             top,
-            context.Selection.CaretPosition);
+            context.PrimaryCaretAnchor);
     }
 
     private static void DrawCaretAt(
@@ -1607,18 +1607,24 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         UnwrappedLineLayout layout,
         DirectWriteTextLayout textLayout,
         double top,
-        int position)
+        DocumentAnchor anchor)
     {
+        var position = anchor.Position.Offset;
         var range = layout.SourceLine.SourceRange;
         if (position < range.Start || position > range.End)
         {
             return;
         }
 
-        var column = layout.SourceLine.GetVisualColumn(DocumentAnchor.Before(position));
+        var column = layout.SourceLine.GetVisualColumn(anchor);
         if (column < layout.VisualStart
             || column > layout.VisualEnd
-            || (column == layout.VisualEnd && layout.VisualEnd < layout.SourceLine.VisualLength))
+            || (column == layout.VisualStart
+                && layout.VisualStart > 0
+                && anchor.Affinity == AnchorAffinity.After)
+            || (column == layout.VisualEnd
+                && layout.VisualEnd < layout.SourceLine.VisualLength
+                && anchor.Affinity != AnchorAffinity.After))
         {
             return;
         }
@@ -1825,11 +1831,19 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             context.ViewportWidth - context.ContentLeft - 18);
     }
 
-    private static bool ContainsCaret(VisualRow row, int caretStop) =>
+    private static bool ContainsCaret(
+        VisualRow row,
+        int caretStop,
+        AnchorAffinity affinity) =>
         row.TextLine is not null
         && caretStop >= row.TextStartColumn
-        && (caretStop < row.TextEndColumn
-            || caretStop == row.TextEndColumn && caretStop == row.TextLine.VisualLength);
+        && caretStop <= row.TextEndColumn
+        && (caretStop != row.TextStartColumn
+            || row.TextStartColumn == 0
+            || affinity != AnchorAffinity.After)
+        && (caretStop != row.TextEndColumn
+            || caretStop == row.TextLine.VisualLength
+            || affinity == AnchorAffinity.After);
 
     private sealed class GutterLayoutEntry
     {
