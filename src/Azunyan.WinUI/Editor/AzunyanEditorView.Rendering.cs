@@ -86,6 +86,7 @@ public sealed partial class AzunyanEditorView
         var frame = new AzunyanEditorRenderFrame(
             Snapshot,
             Document.Selection,
+            Document.CaretSet.Primary.CaretAnchor,
             _blockSelection,
             Document.CaretSet.Count > 1 ? Document.CaretSet : null,
             CompositionRange,
@@ -110,7 +111,7 @@ public sealed partial class AzunyanEditorView
             currentFrame);
         _renderer?.Render(frame);
         if (TryGetRendererCaretRect(
-                DocumentAnchor.Before(Document.Selection.CaretPosition),
+                Document.CaretSet.Primary.CaretAnchor,
                 out var caretRect))
         {
             InputWindow.SetCaretRect(caretRect);
@@ -153,7 +154,7 @@ public sealed partial class AzunyanEditorView
     {
         if (!IsLoaded
             || !TryGetRendererCaretRect(
-                DocumentAnchor.Before(Document.Selection.CaretPosition),
+                Document.CaretSet.Primary.CaretAnchor,
                 out var desiredRect))
         {
             return;

@@ -14,6 +14,7 @@ public sealed class AzunyanEditorRenderFrame
     internal AzunyanEditorRenderFrame(
         TextSnapshot snapshot,
         TextSelection selection,
+        DocumentAnchor primaryCaretAnchor,
         TextBlockSelection? blockSelection,
         TextCaretSet? caretSet,
         TextRange? compositionRange,
@@ -39,6 +40,7 @@ public sealed class AzunyanEditorRenderFrame
     {
         Snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
         Selection = selection;
+        PrimaryCaretAnchor = primaryCaretAnchor;
         BlockSelection = blockSelection;
         CaretSet = caretSet;
         CompositionRange = compositionRange;
@@ -67,6 +69,8 @@ public sealed class AzunyanEditorRenderFrame
     public TextSnapshot Snapshot { get; }
 
     public TextSelection Selection { get; }
+
+    public DocumentAnchor PrimaryCaretAnchor { get; }
 
     /// <summary>
     /// The optional display-column selection owned by the projected editor.

@@ -14,6 +14,7 @@ internal sealed class AzunyanEditorRenderContext
     internal AzunyanEditorRenderContext(
         TextSnapshot snapshot,
         TextSelection selection,
+        DocumentAnchor primaryCaretAnchor,
         TextBlockSelection? blockSelection,
         TextCaretSet? caretSet,
         TextRange? compositionRange,
@@ -42,6 +43,7 @@ internal sealed class AzunyanEditorRenderContext
     {
         Snapshot = snapshot;
         Selection = selection;
+        PrimaryCaretAnchor = primaryCaretAnchor;
         BlockSelection = blockSelection;
         CaretSet = caretSet;
         CompositionRange = compositionRange;
@@ -78,6 +80,7 @@ internal sealed class AzunyanEditorRenderContext
         : this(
             frame.Snapshot,
             frame.Selection,
+            frame.PrimaryCaretAnchor,
             frame.BlockSelection,
             frame.CaretSet,
             frame.CompositionRange,
@@ -109,6 +112,8 @@ internal sealed class AzunyanEditorRenderContext
     public TextSnapshot Snapshot { get; }
 
     public TextSelection Selection { get; }
+
+    public DocumentAnchor PrimaryCaretAnchor { get; }
 
     public TextBlockSelection? BlockSelection { get; }
 
