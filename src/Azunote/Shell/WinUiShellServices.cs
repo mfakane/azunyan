@@ -233,17 +233,67 @@ internal sealed class WinUiExternalToolDialog : IExternalToolDialog
             ItemsSource = Enum.GetNames<ExternalToolInputMode>(),
             SelectedIndex = 0
         };
-        var outputModeBox = new ComboBox
+        var perBox = new TextBox
         {
-            Header = "Output",
-            ItemsSource = Enum.GetNames<ExternalToolOutputMode>(),
-            SelectedIndex = 0
+            Header = "Per",
+            Text = "none",
+            PlaceholderText = "none, line, or regex:<pattern>"
         };
+        var stdinBox = new TextBox
+        {
+            Header = "Stdin",
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap,
+            PlaceholderText = "${input}"
+        };
+
+        static ComboBox CreateOutputActionBox(
+            string header,
+            ExternalToolOutputMode selected)
+        {
+            return new ComboBox
+            {
+                Header = header,
+                ItemsSource = Enum.GetNames<ExternalToolOutputMode>(),
+                SelectedItem = selected.ToString()
+            };
+        }
+
+        static ExternalToolOutputMode ReadOutputAction(ComboBox box) =>
+            Enum.Parse<ExternalToolOutputMode>(
+                box.SelectedItem?.ToString() ?? nameof(ExternalToolOutputMode.Ignore));
+
+        var outputSuccessBox = CreateOutputActionBox(
+            "Output (zero)",
+            ExternalToolOutputMode.Ignore);
+        var outputFailureBox = CreateOutputActionBox(
+            "Output (non-zero)",
+            ExternalToolOutputMode.Ignore);
+        var stdoutSuccessBox = CreateOutputActionBox(
+            "Stdout (zero)",
+            ExternalToolOutputMode.Ignore);
+        var stdoutFailureBox = CreateOutputActionBox(
+            "Stdout (non-zero)",
+            ExternalToolOutputMode.Ignore);
+        var stderrSuccessBox = CreateOutputActionBox(
+            "Stderr (zero)",
+            ExternalToolOutputMode.Ignore);
+        var stderrFailureBox = CreateOutputActionBox(
+            "Stderr (non-zero)",
+            ExternalToolOutputMode.Ignore);
+
         var panel = new StackPanel { Spacing = 10 };
         panel.Children.Add(commandBox);
         panel.Children.Add(argumentsBox);
         panel.Children.Add(inputModeBox);
-        panel.Children.Add(outputModeBox);
+        panel.Children.Add(perBox);
+        panel.Children.Add(stdinBox);
+        panel.Children.Add(outputSuccessBox);
+        panel.Children.Add(outputFailureBox);
+        panel.Children.Add(stdoutSuccessBox);
+        panel.Children.Add(stdoutFailureBox);
+        panel.Children.Add(stderrSuccessBox);
+        panel.Children.Add(stderrFailureBox);
 
         var root = _xamlRoot();
         if (root is null)
@@ -268,12 +318,20 @@ internal sealed class WinUiExternalToolDialog : IExternalToolDialog
         cancellationToken.ThrowIfCancellationRequested();
         var inputMode = Enum.Parse<ExternalToolInputMode>(
             inputModeBox.SelectedItem?.ToString() ?? nameof(ExternalToolInputMode.None));
-        var outputMode = Enum.Parse<ExternalToolOutputMode>(
-            outputModeBox.SelectedItem?.ToString() ?? nameof(ExternalToolOutputMode.Ignore));
         return new ExternalToolDefinition(
             commandBox.Text,
             ExternalToolDefinition.ParseArguments(argumentsBox.Text),
             inputMode,
-            outputMode);
+            perBox.Text,
+            stdinBox.Text,
+            new ExternalToolOutputActions(
+                ReadOutputAction(outputSuccessBox),
+                ReadOutputAction(outputFailureBox)),
+            new ExternalToolOutputActions(
+                ReadOutputAction(stdoutSuccessBox),
+                ReadOutputAction(stdoutFailureBox)),
+            new ExternalToolOutputActions(
+                ReadOutputAction(stderrSuccessBox),
+                ReadOutputAction(stderrFailureBox)));
     }
 }
