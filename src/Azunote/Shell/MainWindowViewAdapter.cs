@@ -51,6 +51,7 @@ internal sealed class MainWindowViewAdapter :
     private readonly TextBlock _filePathStatus;
     private readonly List<KeyboardAccelerator> _externalToolAccelerators = [];
     private readonly List<MenuFlyoutItemBase> _externalToolMenuItems = [];
+    private readonly List<MenuFlyoutItemBase> _externalToolContextMenuItems = [];
     private readonly List<MenuFlyoutItemBase> _recentFileMenuItems = [];
     private readonly List<MenuFlyoutItemBase> _windowMenuItems = [];
     private readonly Dictionary<string, RadioMenuFlyoutItem> _languageModeItems =
@@ -659,8 +660,15 @@ internal sealed class MainWindowViewAdapter :
         ArgumentNullException.ThrowIfNull(onShowInExplorer);
         ClearExternalToolAccelerators();
         ClearExternalToolMenuItems();
-        var visibleEntries = ExternalToolMenuBuilder.Build(nodes, getState);
-        if (visibleEntries.Count == 0)
+        ClearExternalToolContextMenuItems();
+
+        var visibleEntries = ExternalToolMenuBuilder.Build(
+            nodes,
+            getState,
+            ExternalToolMenuTarget.Tools);
+        var hasToolsTargets = ExternalToolMenuBuilder.EnumerateTools(nodes)
+            .Any(tool => tool.IsShownIn(ExternalToolMenuTarget.Tools));
+        if (visibleEntries.Count == 0 && hasToolsTargets)
         {
             var emptyItem = new MenuFlyoutItem
             {
@@ -669,19 +677,32 @@ internal sealed class MainWindowViewAdapter :
             };
             _toolsMenu.Items.Insert(0, emptyItem);
             _externalToolMenuItems.Add(emptyItem);
-            return;
+        }
+        else
+        {
+            var menuItems = CreateExternalToolMenuItems(
+                visibleEntries,
+                onSelected,
+                onEditDefinition,
+                onShowInExplorer);
+            for (var index = 0; index < menuItems.Count; index++)
+            {
+                _toolsMenu.Items.Insert(index, menuItems[index]);
+                _externalToolMenuItems.Add(menuItems[index]);
+            }
         }
 
-        var menuItems = CreateExternalToolMenuItems(
-            visibleEntries,
-            onSelected,
-            onEditDefinition,
-            onShowInExplorer);
-        for (var index = 0; index < menuItems.Count; index++)
-        {
-            _toolsMenu.Items.Insert(index, menuItems[index]);
-            _externalToolMenuItems.Add(menuItems[index]);
-        }
+        var contextEntries = ExternalToolMenuBuilder.BuildFlat(
+            nodes,
+            getState,
+            ExternalToolMenuTarget.Context);
+        var contextMenuItems = CreateExternalToolContextMenuItems(
+            contextEntries,
+            onSelected);
+        _editor.SetAdditionalContextMenuItems(contextMenuItems);
+        _externalToolContextMenuItems.AddRange(contextMenuItems);
+
+        RegisterExternalToolAccelerators(nodes, getState, onSelected);
     }
 
     public void DisposeEditor()
@@ -714,6 +735,40 @@ internal sealed class MainWindowViewAdapter :
         }
 
         _externalToolMenuItems.Clear();
+    }
+
+    private void ClearExternalToolContextMenuItems()
+    {
+        _editor.SetAdditionalContextMenuItems([]);
+        _externalToolContextMenuItems.Clear();
+    }
+
+    private void RegisterExternalToolAccelerators(
+        IReadOnlyList<ExternalToolMenuNode> nodes,
+        Func<ExternalToolSettings, ExternalToolMenuState> getState,
+        Func<ExternalToolSettings, Task> onSelected)
+    {
+        foreach (var tool in ExternalToolMenuBuilder.EnumerateTools(nodes))
+        {
+            if (!ExternalToolShortcut.TryParse(tool.Shortcut, out var shortcut)
+                || !getState(tool).IsEnabled)
+            {
+                continue;
+            }
+
+            var accelerator = new KeyboardAccelerator
+            {
+                Key = shortcut!.Key,
+                Modifiers = shortcut.Modifiers
+            };
+            accelerator.Invoked += (sender, args) =>
+            {
+                args.Handled = true;
+                _ = onSelected(tool);
+            };
+            _rootGrid.KeyboardAccelerators.Add(accelerator);
+            _externalToolAccelerators.Add(accelerator);
+        }
     }
 
     private void ClearRecentFileMenuItems()
@@ -812,31 +867,11 @@ internal sealed class MainWindowViewAdapter :
                 {
                     ToolTipService.SetToolTip(menuItem, reason);
                 }
-                if (ExternalToolShortcut.TryParse(tool.Shortcut, out var shortcut))
+                if (ExternalToolShortcut.TryParse(tool.Shortcut, out _))
                 {
                     if (menuItem is MenuFlyoutItem regularItem)
                     {
                         regularItem.KeyboardAcceleratorTextOverride = tool.Shortcut;
-                    }
-                    if (node.State.IsEnabled)
-                    {
-                        // MenuFlyoutSubItem descendants created at runtime are
-                        // only registered for keyboard accelerators while the
-                        // submenu is open. Register the shortcut on the
-                        // always-loaded root instead; the menu item only keeps
-                        // the display text for the same shortcut.
-                        var accelerator = new KeyboardAccelerator
-                        {
-                            Key = shortcut!.Key,
-                            Modifiers = shortcut.Modifiers
-                        };
-                        accelerator.Invoked += (sender, args) =>
-                        {
-                            args.Handled = true;
-                            _ = onSelected(tool);
-                        };
-                        _rootGrid.KeyboardAccelerators.Add(accelerator);
-                        _externalToolAccelerators.Add(accelerator);
                     }
                 }
 
@@ -855,6 +890,34 @@ internal sealed class MainWindowViewAdapter :
             }
 
             items.Add(subMenu);
+        }
+
+        return items;
+    }
+
+    private static List<MenuFlyoutItemBase> CreateExternalToolContextMenuItems(
+        IReadOnlyList<ExternalToolMenuEntry> entries,
+        Func<ExternalToolSettings, Task> onSelected)
+    {
+        var items = new List<MenuFlyoutItemBase>(entries.Count);
+        foreach (var entry in entries)
+        {
+            var tool = entry.Tool!;
+            var item = new MenuFlyoutItem
+            {
+                Text = entry.Name,
+                IsEnabled = entry.State!.IsEnabled
+            };
+            AutomationProperties.SetHelpText(
+                item,
+                entry.State.DisabledReason ?? string.Empty);
+            if (entry.State.DisabledReason is { } reason)
+            {
+                ToolTipService.SetToolTip(item, reason);
+            }
+
+            item.Click += (_, _) => _ = onSelected(tool);
+            items.Add(item);
         }
 
         return items;

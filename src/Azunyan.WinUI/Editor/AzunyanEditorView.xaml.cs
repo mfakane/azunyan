@@ -73,6 +73,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private bool _explicitCompletionRequested;
     private bool _applyingCompletion;
     private IReadOnlyList<CompletionItem>? _displayedCompletionItems;
+    private readonly List<MenuFlyoutItemBase> _additionalContextMenuItems = [];
+    private MenuFlyoutSeparator? _additionalContextMenuSeparator;
     private string[] _completionTriggerCharacters = Array.Empty<string>();
     private bool _disposed;
     private int _hoverPosition = -1;
@@ -160,6 +162,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         _pasteBatchRefreshTimer = null;
         InputWindow.NativeTextBoxControl.BeforeKeyDown -= OnInputKeyDown;
         InputWindow.NativeTextBoxControl.AfterKeyUp -= OnInputKeyUp;
+        SetAdditionalContextMenuItems([]);
         InputWindow.NativeTextBoxControl.ContextFlyout = null;
         EditorPointerSurface.ContextRequested -= OnEditorContextRequested;
         EditorPointerSurface.PointerReleased -= OnInputPointerReleased;
@@ -174,6 +177,44 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         _defaultRenderer.Dispose();
+    }
+
+    /// <summary>
+    /// Replaces items appended to the editor's built-in context menu.
+    /// </summary>
+    public void SetAdditionalContextMenuItems(IReadOnlyList<MenuFlyoutItemBase> items)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        ClearAdditionalContextMenuItems();
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        _additionalContextMenuSeparator = new MenuFlyoutSeparator();
+        EditorContextMenu.Items.Add(_additionalContextMenuSeparator);
+        foreach (var item in items)
+        {
+            ArgumentNullException.ThrowIfNull(item);
+            EditorContextMenu.Items.Add(item);
+            _additionalContextMenuItems.Add(item);
+        }
+    }
+
+    private void ClearAdditionalContextMenuItems()
+    {
+        if (_additionalContextMenuSeparator is { } separator)
+        {
+            EditorContextMenu.Items.Remove(separator);
+            _additionalContextMenuSeparator = null;
+        }
+
+        foreach (var item in _additionalContextMenuItems)
+        {
+            EditorContextMenu.Items.Remove(item);
+        }
+
+        _additionalContextMenuItems.Clear();
     }
 
     public static readonly DependencyProperty ShowLineNumbersProperty =

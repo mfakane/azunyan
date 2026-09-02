@@ -1,7 +1,8 @@
 # External Tools
 
-External tools are user-defined processes available from Tools > External
-Tools. They can also be invoked through the `ExternalToolRunner` API. See
+External tools are user-defined processes available from the Tools menu and,
+when configured, the editor context menu. They can also be invoked through the
+`ExternalToolRunner` API. See
 [Substitution Variables](substitution-variables.md) for command expansion and
 environment-variable behavior.
 
@@ -21,8 +22,15 @@ External tools are discovered below `%LOCALAPPDATA%\Azunote\tools`:
 - A directory ending in `.tool` with a `manifest.toml` file is one bundled
   tool. It appears as a tool leaf and is not traversed as a submenu.
 
-Each external-tool menu item is a split item. Its main area runs the tool; the
-`...` area provides `Edit...` and `Show in Explorer` for the definition file.
+Each Tools-menu external-tool item is a split item. Its main area runs the
+tool; the `...` area provides `Edit...` and `Show in Explorer` for the
+definition file.
+
+The `menus` field controls where a tool is shown. Tools menu entries retain the
+discovered folder hierarchy. Context-menu entries are added after the built-in
+editor actions as top-level items; their names include the full folder path,
+such as `Formatting: CSharp: Format`. Context-menu entries run the tool
+directly and do not include the definition-file actions.
 
 The settings watcher reloads tool definitions when files are added, edited, or
 removed. Invalid definitions are reported and do not replace the last valid
@@ -36,6 +44,7 @@ and reloads it after the command succeeds:
 ```toml
 name = "Format document"
 shortcut = "Alt+Shift+F"
+menus = ["tools"]
 visibility = "whenAvailable"
 
 [launch]
@@ -60,8 +69,9 @@ NODE_ENV = "development"
 
 | Field | Values | Description |
 | --- | --- | --- |
-| `name` | String | Name shown in the Tools menu. If omitted, the definition file or bundle name is used. |
+| `name` | String | Name shown in the selected menu. If omitted, the definition file or bundle name is used. |
 | `shortcut` | Shortcut string | Optional keyboard shortcut, such as `Alt+Shift+F`. |
+| `menus` | Array of `tools`, `context` | Menu surfaces where the tool is shown. Use both values to show it in both menus. Defaults to `["tools"]`. |
 | `visibility` | `always`, `whenAvailable` | Whether the item remains visible when its conditions or command are unavailable. |
 
 ### `[launch]`
@@ -82,6 +92,7 @@ NODE_ENV = "development"
 
 The defaults are:
 
+- `menus = ["tools"]`
 - `args = []`
 - `workingDirectory` is omitted; the current document's directory is used when
   available, otherwise the Azunote process directory.
@@ -164,6 +175,9 @@ is used for both exit statuses. All three fields support `ignore`,
 
 `showCompletion` treats each non-empty output line as one completion candidate
 and opens the completion window. Empty and whitespace-only lines are ignored.
+
+Shortcuts are available regardless of whether the tool is shown in the Tools
+menu, the context menu, or both.
 
 `output` receives the mixed stdout/stderr stream. The mixed stream is assembled
 from the order in which stdout/stderr read chunks arrive. The individual

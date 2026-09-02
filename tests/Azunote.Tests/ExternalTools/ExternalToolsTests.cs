@@ -978,6 +978,7 @@ public sealed class ExternalToolsTests
             var definition = tool.ToDefinition();
 
             Assert.Equal("Format document", tool.Name);
+            Assert.Equal(["tools"], tool.Menus);
             Assert.Equal("prettier", definition.FileName);
             Assert.Equal(["--write", "${file}"], definition.Arguments);
             Assert.Equal(ExternalToolInputMode.FilePath, definition.InputMode);
@@ -996,6 +997,69 @@ public sealed class ExternalToolsTests
             var csharp = Assert.Single(formatting.Children);
             Assert.Equal("CSharp", csharp.Name);
             Assert.Same(tool, Assert.Single(csharp.Children).Tool);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void External_tool_settings_normalize_menu_targets_and_reject_empty_or_unknown_values()
+    {
+        var settings = new ExternalToolSettings
+        {
+            Name = "Context formatter",
+            Menus = ["context", "tools", "context"],
+            Launch = new ExternalToolLaunchSettings { Command = "formatter" }
+        };
+
+        _ = settings.ToDefinition();
+
+        Assert.Equal(["context", "tools"], settings.Menus);
+
+        var empty = new ExternalToolSettings
+        {
+            Name = "No menu",
+            Menus = [],
+            Launch = new ExternalToolLaunchSettings { Command = "formatter" }
+        };
+        Assert.Throws<SettingsFileException>(() => empty.ToDefinition());
+
+        var unknown = new ExternalToolSettings
+        {
+            Name = "Unknown menu",
+            Menus = ["palette"],
+            Launch = new ExternalToolLaunchSettings { Command = "formatter" }
+        };
+        Assert.Throws<SettingsFileException>(() => unknown.ToDefinition());
+    }
+
+    [Fact]
+    public async Task Settings_service_loads_external_tool_menu_targets()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"azunote-menu-targets-{Guid.NewGuid():N}");
+        var tools = Path.Combine(root, SettingsFileService.ToolsDirectoryName);
+        Directory.CreateDirectory(tools);
+        try
+        {
+            await File.WriteAllTextAsync(
+                Path.Combine(tools, "format.tool.toml"),
+                """
+                name = "Format"
+                menus = ["tools", "context"]
+
+                [launch]
+                command = "formatter"
+                """);
+
+            var settings = await SettingsFileService.LoadAsync(root);
+            var tool = Assert.Single(settings.ExternalTools);
+
+            Assert.Equal(["tools", "context"], tool.Menus);
         }
         finally
         {

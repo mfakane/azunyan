@@ -277,6 +277,12 @@ public enum ExternalToolVisibility
     WhenAvailable
 }
 
+public enum ExternalToolMenuTarget
+{
+    Tools,
+    Context
+}
+
 public enum ExternalToolFileCondition
 {
     Any,
@@ -382,6 +388,9 @@ public sealed class ExternalToolSettings
 
     public string? Shortcut { get; set; }
 
+    public string[] Menus { get; set; } =
+        [ExternalToolEnumValues.ToTomlValue(ExternalToolMenuTarget.Tools)];
+
     public string Visibility { get; set; } = ExternalToolEnumValues.ToTomlValue(ExternalToolVisibility.Always);
 
     public ExternalToolLaunchSettings Launch { get; set; } = new();
@@ -438,6 +447,7 @@ public sealed class ExternalToolSettings
 
     internal void Validate()
     {
+        Menus ??= [ExternalToolEnumValues.ToTomlValue(ExternalToolMenuTarget.Tools)];
         Launch ??= new();
         Launch.Arguments ??= [];
         Launch.Stdin ??= string.Empty;
@@ -455,6 +465,18 @@ public sealed class ExternalToolSettings
         {
             throw new SettingsFileException("Each external tool needs a non-empty name.");
         }
+
+        if (Menus.Length == 0)
+        {
+            throw new SettingsFileException(
+                $"External tool '{Name}' needs at least one menu target.");
+        }
+
+        Menus = Menus
+            .Select(menu => ExternalToolEnumValues.Parse<ExternalToolMenuTarget>(menu, "menus"))
+            .Select(ExternalToolEnumValues.ToTomlValue)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
 
         var commandModes = new[]
         {
@@ -505,6 +527,9 @@ public sealed class ExternalToolSettings
 
     private static bool HasCommand(ExternalToolCommand? command) =>
         command is not null && !string.IsNullOrWhiteSpace(command.Value);
+
+    internal bool IsShownIn(ExternalToolMenuTarget target) =>
+        Menus.Contains(ExternalToolEnumValues.ToTomlValue(target), StringComparer.Ordinal);
 
 }
 

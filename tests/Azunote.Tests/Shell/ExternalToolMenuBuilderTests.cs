@@ -51,6 +51,78 @@ public sealed class ExternalToolMenuBuilderTests
         Assert.Empty(entry.Children);
     }
 
+    [Fact]
+    public void Filters_tools_by_the_requested_menu_target()
+    {
+        var toolsOnly = CreateTool("Tools only");
+        var contextOnly = CreateTool("Context only");
+        contextOnly.Menus = ["context"];
+        var nodes = new[]
+        {
+            new ExternalToolMenuNode("Tools", toolsOnly),
+            new ExternalToolMenuNode("Context", contextOnly)
+        };
+
+        var entries = ExternalToolMenuBuilder.Build(
+            nodes,
+            _ => new ExternalToolMenuState(true, true),
+            ExternalToolMenuTarget.Context);
+
+        var entry = Assert.Single(entries);
+        Assert.Same(contextOnly, entry.Tool);
+    }
+
+    [Fact]
+    public void Flattens_context_tools_with_their_full_folder_path()
+    {
+        var tool = CreateTool("Format");
+        tool.Menus = ["context"];
+        var nodes = new[]
+        {
+            new ExternalToolMenuNode(
+                "Formatting",
+                children:
+                [
+                    new ExternalToolMenuNode(
+                        "CSharp",
+                        children: [new ExternalToolMenuNode(tool.Name, tool)])
+                ])
+        };
+
+        var entries = ExternalToolMenuBuilder.BuildFlat(
+            nodes,
+            _ => new ExternalToolMenuState(true, true),
+            ExternalToolMenuTarget.Context);
+
+        var entry = Assert.Single(entries);
+        Assert.Equal("Formatting: CSharp: Format", entry.Name);
+        Assert.Same(tool, entry.Tool);
+        Assert.Empty(entry.Children);
+    }
+
+    [Fact]
+    public void A_tool_targeted_at_both_menus_is_present_in_both_builds()
+    {
+        var tool = CreateTool("Format");
+        tool.Menus = ["tools", "context"];
+        var nodes = new[] { new ExternalToolMenuNode(tool.Name, tool) };
+        var getState = new Func<ExternalToolSettings, ExternalToolMenuState>(
+            _ => new ExternalToolMenuState(true, true));
+
+        Assert.Same(
+            tool,
+            Assert.Single(ExternalToolMenuBuilder.Build(
+                nodes,
+                getState,
+                ExternalToolMenuTarget.Tools)).Tool);
+        Assert.Same(
+            tool,
+            Assert.Single(ExternalToolMenuBuilder.BuildFlat(
+                nodes,
+                getState,
+                ExternalToolMenuTarget.Context)).Tool);
+    }
+
     private static ExternalToolSettings CreateTool(string name) => new()
     {
         Name = name
