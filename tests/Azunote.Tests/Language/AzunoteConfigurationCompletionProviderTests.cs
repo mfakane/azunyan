@@ -36,6 +36,32 @@ public sealed class AzunoteConfigurationCompletionProviderTests
     }
 
     [Fact]
+    public async Task Tool_schema_completes_shell_launch_fields()
+    {
+        var provider = new AzunoteConfigurationCompletionProvider(
+            [AzunoteSchemaCatalog.ExternalTool]);
+
+        var result = await provider.GetCompletionsAsync(
+            new EditorProviderContext(
+                new TextSnapshot("[launch]\nc"),
+                10,
+                TextSelection.Caret(10)));
+
+        Assert.NotNull(result);
+        Assert.Contains(result!.Items, item => item.Label == "command");
+        Assert.Contains(result.Items, item => item.Label == "cmd");
+
+        result = await provider.GetCompletionsAsync(
+            new EditorProviderContext(
+                new TextSnapshot("[launch]\np"),
+                10,
+                TextSelection.Caret(10)));
+
+        Assert.NotNull(result);
+        Assert.Contains(result!.Items, item => item.Label == "pwsh");
+    }
+
+    [Fact]
     public async Task Settings_schema_completes_terminal_fields()
     {
         const string text = "[terminal]\nwork";

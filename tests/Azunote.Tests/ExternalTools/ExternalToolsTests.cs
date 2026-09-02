@@ -854,6 +854,46 @@ public sealed class ExternalToolsTests
     }
 
     [Fact]
+    public async Task Runner_executes_cmd_shell_commands_without_arguments()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var result = await ExternalToolRunner.RunAsync(
+            new ExternalToolDefinition(
+                "echo 日本語",
+                commandMode: ExternalToolCommandMode.Cmd),
+            new ExternalToolContext(null, string.Empty, string.Empty));
+
+        Assert.True(result.Succeeded, result.StandardError);
+        Assert.Equal("日本語", result.StandardOutput.Trim());
+    }
+
+    [Fact]
+    public async Task Runner_executes_pwsh_shell_commands_without_arguments()
+    {
+        if (!OperatingSystem.IsWindows()
+            || ExternalToolLaunchResolver.Resolve(
+                "Write-Output 'Hello'",
+                ExternalToolCommandMode.Pwsh,
+                null) is null)
+        {
+            return;
+        }
+
+        var result = await ExternalToolRunner.RunAsync(
+            new ExternalToolDefinition(
+                "Write-Output '日本語'",
+                commandMode: ExternalToolCommandMode.Pwsh),
+            new ExternalToolContext(null, string.Empty, string.Empty));
+
+        Assert.True(result.Succeeded, result.StandardError);
+        Assert.Equal("日本語", result.StandardOutput.Trim());
+    }
+
+    [Fact]
     public async Task Text_file_service_normalizes_lone_carriage_returns_when_saving()
     {
         var root = Path.Combine(Path.GetTempPath(), $"azunyan-text-{Guid.NewGuid():N}");
@@ -964,6 +1004,89 @@ public sealed class ExternalToolsTests
                 Directory.Delete(root, recursive: true);
             }
         }
+    }
+
+    [Fact]
+    public async Task Settings_service_loads_cmd_and_pwsh_launch_keys()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            $"azunyan-settings-shells-{Guid.NewGuid():N}");
+        var tools = Path.Combine(root, SettingsFileService.ToolsDirectoryName);
+        Directory.CreateDirectory(tools);
+        try
+        {
+            await File.WriteAllTextAsync(
+                Path.Combine(tools, "cmd.tool.toml"),
+                """
+                name = "Command shell"
+
+                [launch]
+                cmd = ["echo", "Hello World"]
+                """);
+            await File.WriteAllTextAsync(
+                Path.Combine(tools, "pwsh.tool.toml"),
+                """
+                name = "PowerShell"
+
+                [launch]
+                pwsh = ["Write-Output", "Hello World"]
+                """);
+
+            var settings = await SettingsFileService.LoadAsync(root);
+            var definitions = settings.ExternalTools
+                .ToDictionary(tool => tool.Name, tool => tool.ToDefinition());
+
+            Assert.Equal("echo \"Hello World\"", definitions["Command shell"].FileName);
+            Assert.Equal(
+                ExternalToolCommandMode.Cmd,
+                definitions["Command shell"].CommandMode);
+            Assert.Empty(definitions["Command shell"].Arguments);
+            Assert.Equal("Write-Output \"Hello World\"", definitions["PowerShell"].FileName);
+            Assert.Equal(
+                ExternalToolCommandMode.Pwsh,
+                definitions["PowerShell"].CommandMode);
+            Assert.Empty(definitions["PowerShell"].Arguments);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void External_tool_settings_reject_multiple_launch_modes_or_shell_args()
+    {
+        var mixedModes = new ExternalToolSettings
+        {
+            Name = "Mixed modes",
+            Launch = new ExternalToolLaunchSettings
+            {
+                Command = "tool.exe",
+                Cmd = "echo Hello"
+            }
+        };
+
+        var mixedModesException = Assert.Throws<SettingsFileException>(
+            () => mixedModes.ToDefinition());
+        Assert.Contains("only one", mixedModesException.Message, StringComparison.Ordinal);
+
+        var shellArgs = new ExternalToolSettings
+        {
+            Name = "Shell args",
+            Launch = new ExternalToolLaunchSettings
+            {
+                Pwsh = "Write-Output Hello",
+                Arguments = ["unexpected"]
+            }
+        };
+
+        var shellArgsException = Assert.Throws<SettingsFileException>(
+            () => shellArgs.ToDefinition());
+        Assert.Contains("cannot specify args", shellArgsException.Message, StringComparison.Ordinal);
     }
 
     [Fact]

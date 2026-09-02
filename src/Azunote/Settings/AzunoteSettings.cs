@@ -86,7 +86,9 @@ public sealed class AzunoteDebugSettings
 [TomlSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     WriteIndented = true,
-    Converters = [typeof(ExternalToolOutputActionsTomlConverter)])]
+    Converters = [
+        typeof(ExternalToolOutputActionsTomlConverter),
+        typeof(ExternalToolCommandTomlConverter)])]
 [TomlSerializable(typeof(AzunoteSettings))]
 [TomlSerializable(typeof(AzunoteDebugSettings))]
 [TomlSerializable(typeof(AzunoteState))]
@@ -178,6 +180,77 @@ public sealed class ExternalToolOutputActionsTomlConverter
     }
 }
 
+public sealed record ExternalToolCommand
+{
+    public ExternalToolCommand(string value) =>
+        Value = value ?? throw new ArgumentNullException(nameof(value));
+
+    public ExternalToolCommand(IReadOnlyList<string> values)
+        : this(Join(values))
+    {
+    }
+
+    public string Value { get; }
+
+    public static implicit operator ExternalToolCommand(string value) =>
+        new(value);
+
+    public static implicit operator ExternalToolCommand(string[] values) =>
+        new ExternalToolCommand((IReadOnlyList<string>)values);
+
+    private static string Join(IReadOnlyList<string> values)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        return string.Join(
+            " ",
+            values.Select(value =>
+                value.Length == 0 || value.Any(char.IsWhiteSpace)
+                    ? $"\"{value.Replace("\"", "\\\"", StringComparison.Ordinal)}\""
+                    : value));
+    }
+}
+
+public sealed class ExternalToolCommandTomlConverter : TomlConverter<ExternalToolCommand>
+{
+    public override ExternalToolCommand Read(TomlReader reader)
+    {
+        if (reader.TokenType == TomlTokenType.String)
+        {
+            return new ExternalToolCommand(reader.GetString());
+        }
+
+        if (reader.TokenType != TomlTokenType.StartArray)
+        {
+            throw reader.CreateException(
+                "Expected an external-tool shell command string or string array.");
+        }
+
+        var values = new List<string>();
+        while (reader.Read() && reader.TokenType != TomlTokenType.EndArray)
+        {
+            if (reader.TokenType != TomlTokenType.String)
+            {
+                throw reader.CreateException(
+                    "External-tool shell command arrays may contain only strings.");
+            }
+
+            values.Add(reader.GetString());
+        }
+
+        if (reader.TokenType != TomlTokenType.EndArray)
+        {
+            throw reader.CreateException(
+                "The external-tool shell command array was not closed.");
+        }
+
+        reader.Read();
+        return new ExternalToolCommand(values);
+    }
+
+    public override void Write(TomlWriter writer, ExternalToolCommand value) =>
+        writer.WriteStringValue(value.Value);
+}
+
 public sealed class ShellCommandSettings
 {
     public string Command { get; set; } = string.Empty;
@@ -257,7 +330,13 @@ internal static class ExternalToolEnumValues
 
 public sealed class ExternalToolLaunchSettings
 {
-    public string Command { get; set; } = string.Empty;
+    public string? Command { get; set; }
+
+    [TomlConverter(typeof(ExternalToolCommandTomlConverter))]
+    public ExternalToolCommand? Cmd { get; set; }
+
+    [TomlConverter(typeof(ExternalToolCommandTomlConverter))]
+    public ExternalToolCommand? Pwsh { get; set; }
 
     [TomlPropertyName("args")]
     public string[]? Arguments { get; set; } = [];
@@ -330,8 +409,20 @@ public sealed class ExternalToolSettings
     {
         Validate();
 
+        var commandMode = HasCommand(Launch.Cmd)
+            ? ExternalToolCommandMode.Cmd
+            : HasCommand(Launch.Pwsh)
+                ? ExternalToolCommandMode.Pwsh
+                : ExternalToolCommandMode.Executable;
+        var command = commandMode switch
+        {
+            ExternalToolCommandMode.Cmd => Launch.Cmd!.Value,
+            ExternalToolCommandMode.Pwsh => Launch.Pwsh!.Value,
+            _ => Launch.Command!
+        };
+
         return new ExternalToolDefinition(
-            Launch.Command,
+            command,
             Launch.Arguments ?? [],
             ExternalToolEnumValues.Parse<ExternalToolInputMode>(Launch.Input, "launch.input"),
             Launch.Per,
@@ -341,7 +432,8 @@ public sealed class ExternalToolSettings
             Launch.Stderr,
             Launch.WorkingDirectory,
             Environment,
-            DefinitionDirectory);
+            DefinitionDirectory,
+            commandMode);
     }
 
     internal void Validate()
@@ -364,9 +456,29 @@ public sealed class ExternalToolSettings
             throw new SettingsFileException("Each external tool needs a non-empty name.");
         }
 
-        if (string.IsNullOrWhiteSpace(Launch.Command))
+        var commandModes = new[]
         {
-            throw new SettingsFileException($"External tool '{Name}' needs a command.");
+            !string.IsNullOrWhiteSpace(Launch.Command),
+            HasCommand(Launch.Cmd),
+            HasCommand(Launch.Pwsh)
+        };
+        if (!commandModes.Any(mode => mode))
+        {
+            throw new SettingsFileException(
+                $"External tool '{Name}' needs command, cmd, or pwsh.");
+        }
+
+        if (commandModes.Count(mode => mode) > 1)
+        {
+            throw new SettingsFileException(
+                $"External tool '{Name}' must specify only one of command, cmd, or pwsh.");
+        }
+
+        if ((HasCommand(Launch.Cmd) || HasCommand(Launch.Pwsh))
+            && Launch.Arguments is { Length: > 0 })
+        {
+            throw new SettingsFileException(
+                $"External tool '{Name}' cannot specify args with cmd or pwsh.");
         }
 
         _ = ExternalToolEnumValues.Parse<ExternalToolInputMode>(Launch.Input, "launch.input");
@@ -390,6 +502,9 @@ public sealed class ExternalToolSettings
                 $"Invalid shortcut '{Shortcut}' for external tool '{Name}'.");
         }
     }
+
+    private static bool HasCommand(ExternalToolCommand? command) =>
+        command is not null && !string.IsNullOrWhiteSpace(command.Value);
 
 }
 

@@ -13,7 +13,8 @@ Variables are expanded in the following fields:
 - `settings.toml`: `terminal.command`, `terminal.args`,
   `terminal.workingDirectory`, and the corresponding `explorer` fields.
 - External tool definitions: `[launch].command`, `[launch].args`,
-  `[launch].workingDirectory`, `[launch].stdin`, and values in the `[env]`
+  `[launch].cmd`, `[launch].pwsh`, `[launch].workingDirectory`,
+  `[launch].stdin`, and values in the `[env]`
   table.
 
 Expansion is performed before each external process invocation. With

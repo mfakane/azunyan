@@ -15,6 +15,13 @@ public enum ExternalToolInputMode
     Selection
 }
 
+public enum ExternalToolCommandMode
+{
+    Executable,
+    Cmd,
+    Pwsh
+}
+
 public enum ExternalToolPerMode
 {
     None,
@@ -210,7 +217,9 @@ public sealed record ExternalToolShortcut(
 /// A declarative external process invocation. Arguments may contain the
 /// placeholders exposed by <see cref="ExternalToolContext"/>. Text payloads
 /// are normally better passed through stdin so quoting remains the tool's
-/// concern.
+/// concern. <see cref="ExternalToolCommandMode.Cmd"/> and
+/// <see cref="ExternalToolCommandMode.Pwsh"/> treat <see cref="FileName"/>
+/// as one shell command and do not use arguments.
 /// </summary>
 public sealed record ExternalToolDefinition
 {
@@ -225,12 +234,21 @@ public sealed record ExternalToolDefinition
         ExternalToolOutputActions? stderr = null,
         string? workingDirectory = null,
         IReadOnlyDictionary<string, string>? environment = null,
-        string? definitionDirectory = null)
+        string? definitionDirectory = null,
+        ExternalToolCommandMode commandMode = ExternalToolCommandMode.Executable)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
+        if (commandMode is not ExternalToolCommandMode.Executable
+            && arguments is { Length: > 0 })
+        {
+            throw new ArgumentException(
+                "Shell-command external tools cannot specify arguments.",
+                nameof(arguments));
+        }
 
         FileName = fileName;
         Arguments = arguments ?? [];
+        CommandMode = commandMode;
         InputMode = inputMode;
         Per = ExternalToolPer.Parse(per);
         Stdin = stdin ?? string.Empty;
@@ -247,6 +265,8 @@ public sealed record ExternalToolDefinition
     public string FileName { get; }
 
     public string[] Arguments { get; }
+
+    public ExternalToolCommandMode CommandMode { get; }
 
     public ExternalToolInputMode InputMode { get; }
 
@@ -840,7 +860,9 @@ internal enum ExternalToolLaunchKind
 {
     Direct,
     CommandShell,
-    PowerShell
+    CommandShellCommand,
+    PowerShell,
+    PowerShellCommand
 }
 
 internal sealed record ExternalToolLaunchPlan(
@@ -849,6 +871,11 @@ internal sealed record ExternalToolLaunchPlan(
     string LauncherPath,
     ExternalToolLaunchKind Kind)
 {
+    private const string ShellCommandEnvironmentVariable =
+        "AZUNOTE_EXTERNAL_TOOL_COMMAND";
+    private static readonly UnicodeEncoding CommandShellOutputEncoding =
+        new(bigEndian: false, byteOrderMark: false, throwOnInvalidBytes: false);
+
     public void AddArguments(
         ProcessStartInfo startInfo,
         IReadOnlyList<string> arguments)
@@ -862,9 +889,20 @@ internal sealed record ExternalToolLaunchPlan(
                 startInfo.Arguments = "/d /s /c "
                     + BuildCommandShellCommand(ResolvedPath, arguments);
                 break;
+            case ExternalToolLaunchKind.CommandShellCommand:
+                startInfo.Environment[ShellCommandEnvironmentVariable] = ResolvedPath;
+                startInfo.StandardOutputEncoding = CommandShellOutputEncoding;
+                startInfo.StandardErrorEncoding = CommandShellOutputEncoding;
+                startInfo.Arguments = BuildRawCommandShellCommand();
+                break;
             case ExternalToolLaunchKind.PowerShell:
                 startInfo.Arguments = "-NoLogo -NoProfile -NonInteractive -File " + QuoteCommandShellArgument(ResolvedPath);
                 AddAll(startInfo, arguments);
+                break;
+            case ExternalToolLaunchKind.PowerShellCommand:
+                startInfo.Environment[ShellCommandEnvironmentVariable] = ResolvedPath;
+                startInfo.Arguments = "-NoLogo -NoProfile -NonInteractive -Command "
+                    + BuildPowerShellCommand();
                 break;
             default:
                 throw new InvalidOperationException(
@@ -892,6 +930,16 @@ internal sealed record ExternalToolLaunchPlan(
         return "chcp 65001 >nul & " + string.Join(' ', commandParts);
     }
 
+    private static string BuildRawCommandShellCommand() =>
+        "/u /d /s /c chcp 65001 >nul & call %"
+        + ShellCommandEnvironmentVariable
+        + "%";
+
+    private static string BuildPowerShellCommand() =>
+        "$OutputEncoding = [System.Text.UTF8Encoding]::new($false); "
+        + "[Console]::OutputEncoding = $OutputEncoding; "
+        + "Invoke-Expression $env:" + ShellCommandEnvironmentVariable;
+
     private static string QuoteCommandShellArgument(string value) =>
         $"\"{value.Replace("\"", "\\\"", StringComparison.Ordinal)}\"";
 }
@@ -900,9 +948,39 @@ internal static class ExternalToolLaunchResolver
 {
     public static ExternalToolLaunchPlan? Resolve(
         string command,
+        string? definitionDirectory) =>
+        Resolve(command, ExternalToolCommandMode.Executable, definitionDirectory);
+
+    public static ExternalToolLaunchPlan? Resolve(
+        string command,
+        ExternalToolCommandMode commandMode,
         string? definitionDirectory)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(command);
+
+        if (commandMode == ExternalToolCommandMode.Cmd)
+        {
+            var commandShell = ResolveCommandShell();
+            return commandShell is null
+                ? null
+                : new ExternalToolLaunchPlan(
+                    command,
+                    command,
+                    commandShell,
+                    ExternalToolLaunchKind.CommandShellCommand);
+        }
+
+        if (commandMode == ExternalToolCommandMode.Pwsh)
+        {
+            var powerShell = ResolvePowerShell();
+            return powerShell is null
+                ? null
+                : new ExternalToolLaunchPlan(
+                    command,
+                    command,
+                    powerShell,
+                    ExternalToolLaunchKind.PowerShellCommand);
+        }
 
         var resolvedPath = ResolveExecutable(command, definitionDirectory);
         if (resolvedPath is null)
@@ -1085,6 +1163,7 @@ public static class ExternalToolAvailability
         var command = invocationContext.Expand(definition.FileName, environment.Values);
         var launchPlan = ExternalToolLaunchResolver.Resolve(
             command,
+            definition.CommandMode,
             definition.DefinitionDirectory);
         if (launchPlan is null)
         {
@@ -1279,6 +1358,7 @@ public sealed class ExternalToolRunner
         var command = context.Expand(definition.FileName, environment.Values);
         var launchPlan = ExternalToolLaunchResolver.Resolve(
             command,
+            definition.CommandMode,
             definition.DefinitionDirectory);
         if (launchPlan is null)
         {

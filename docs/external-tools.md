@@ -5,9 +5,10 @@ Tools. They can also be invoked through the `ExternalToolRunner` API. See
 [Substitution Variables](substitution-variables.md) for command expansion and
 environment-variable behavior.
 
-Commands run without a shell. Arguments remain separate arguments. On Windows,
-command and PowerShell scripts are launched through the appropriate system
-launcher.
+`command` runs without a shell and its `args` remain separate arguments. On
+Windows, command and PowerShell scripts are launched through the appropriate
+system launcher. Use `[launch].cmd` or `[launch].pwsh` when the value itself
+should be evaluated as one shell command.
 
 ## Discovery and menu layout
 
@@ -67,8 +68,10 @@ NODE_ENV = "development"
 
 | Field | Values | Description |
 | --- | --- | --- |
-| `command` | String | Executable or script to launch. |
-| `args` | Optional array of strings | Arguments passed to the process. Defaults to an empty array. |
+| `command` | Optional string | Executable or script to launch. Use this with `args`; it is mutually exclusive with `cmd` and `pwsh`. |
+| `args` | Optional array of strings | Arguments passed to `command`. Defaults to an empty array. Cannot be used with `cmd` or `pwsh`. |
+| `cmd` | Optional string or array of strings | One command line evaluated by `cmd.exe`. Array elements are joined with spaces; elements containing spaces are automatically quoted. Mutually exclusive with `command` and `pwsh`. |
+| `pwsh` | Optional string or array of strings | One command line evaluated by PowerShell (`pwsh.exe`, falling back to `powershell.exe`). Array elements are joined with spaces; elements containing spaces are automatically quoted. Mutually exclusive with `command` and `cmd`. |
 | `workingDirectory` | Optional string | Working directory. Relative paths are resolved from the tool definition directory. If omitted, the current document's directory is used when available; otherwise the Azunote process directory is used. |
 | `input` | `none`, `filePath`, `document`, `selection` | Selects the value exposed as `${input}`. It is not written to standard input automatically. |
 | `per` | `none`, `line`, `regex:<pattern>` | Runs once for the input, each line, or each regex match. |
@@ -88,7 +91,16 @@ The defaults are:
 - `output = "ignore"`, `stdout = "ignore"`, and `stderr = "ignore"` for both
   zero and non-zero exit codes.
 
-`command`, `args`, and `workingDirectory` support substitution variables. The
+Exactly one of `command`, `cmd`, or `pwsh` is required. `command` and `args`
+launch an executable without a shell. `cmd` and `pwsh` each launch their
+respective shell with the configured value as one command string:
+
+```toml
+[launch]
+cmd = "echo Hello"
+```
+
+`command`, `args`, `cmd`, `pwsh`, and `workingDirectory` support substitution variables. The
 `[env]` values do as well; see the [substitution variable documentation](substitution-variables.md)
 for details.
 

@@ -11,6 +11,7 @@ namespace Azunote;
 public enum AzunoteSchemaValueKind
 {
     String,
+    StringOrArray,
     Boolean,
     Integer,
     Array,
@@ -99,6 +100,8 @@ public static class AzunoteSchemaCatalog
                 [
                     Field("command", AzunoteSchemaValueKind.String, "command", supportsPlaceholders: true),
                     Field("args", AzunoteSchemaValueKind.Array, "property", supportsPlaceholders: true),
+                    Field("cmd", AzunoteSchemaValueKind.StringOrArray, "command", supportsPlaceholders: true),
+                    Field("pwsh", AzunoteSchemaValueKind.StringOrArray, "command", supportsPlaceholders: true),
                     Field("workingDirectory", AzunoteSchemaValueKind.String, "path", supportsPlaceholders: true),
                     EnumField("input", "none", "filePath", "document", "selection"),
                     Field("per", AzunoteSchemaValueKind.String, documentation: "none, line, or regex:<pattern>; regex runs once per match"),
