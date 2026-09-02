@@ -5,9 +5,9 @@ Tools. They can also be invoked through the `ExternalToolRunner` API. See
 [Substitution Variables](substitution-variables.md) for command expansion and
 environment-variable behavior.
 
-Commands run without a shell and receive input through standard input when
-configured. Arguments remain separate arguments. On Windows, command and
-PowerShell scripts are launched through the appropriate system launcher.
+Commands run without a shell. Arguments remain separate arguments. On Windows,
+command and PowerShell scripts are launched through the appropriate system
+launcher.
 
 ## Discovery and menu layout
 
@@ -41,8 +41,12 @@ visibility = "whenAvailable"
 command = "prettier"
 args = ["--write", "${file}"]
 workingDirectory = "${documentDirname}"
-input = "none"
-output = "reloadFile"
+input = "document"
+per = "none"
+stdin = "${input}"
+output = ["ignore", "ignore"]
+stdout = "ignore"
+stderr = "ignore"
 
 [when]
 extensions = [".js", ".jsx", ".ts", ".tsx", ".json", ".css", ".scss", ".html"]
@@ -66,8 +70,20 @@ NODE_ENV = "development"
 | `command` | String | Executable or script to launch. |
 | `args` | Array of strings | Arguments passed to the process. |
 | `workingDirectory` | String | Working directory. Relative paths are resolved from the tool definition directory. If omitted, the current document's directory is used when available. |
-| `input` | `none`, `filePath`, `document`, `selection` | Data written to standard input. |
-| `output` | `ignore`, `replaceDocument`, `replaceSelection`, `newDocument`, `reloadFile` | How successful standard output is applied. |
+| `input` | `none`, `filePath`, `document`, `selection` | Selects the value exposed as `${input}`. It is not written to standard input automatically. |
+| `per` | `none`, `line`, `regex:<pattern>` | Splits the input value and runs the tool once for each part. |
+| `stdin` | String | Text written to standard input after substitution expansion. Empty by default. |
+| `output` | Action or two-item array | Handles the mixed stdout/stderr stream. An array is `[zero, non-zero]`. |
+| `stdout` | Action or two-item array | Handles stdout only. An array is `[zero, non-zero]`. |
+| `stderr` | Action or two-item array | Handles stderr only. An array is `[zero, non-zero]`. |
+
+The defaults are:
+
+- `input = "none"`
+- `per = "none"`
+- `stdin` is empty, so nothing is sent to standard input.
+- `output = "ignore"`, `stdout = "ignore"`, and `stderr = "ignore"` for both
+  zero and non-zero exit codes.
 
 `command`, `args`, and `workingDirectory` support substitution variables. The
 `[env]` values do as well; see the [substitution variable documentation](substitution-variables.md)
@@ -94,23 +110,43 @@ remains visible but is disabled in those cases.
 
 ## Input and output
 
-`input` controls standard input:
+`input` selects the value exposed through `${input}`:
 
-- `none`: close standard input without sending data.
-- `filePath`: send the execution-file path.
-- `document`: send the complete document text.
-- `selection`: send the selected text.
+- `none`: expose an empty string.
+- `filePath`: expose the execution-file path.
+- `document`: expose the complete document text.
+- `selection`: expose the selected text.
+
+`per` controls how the selected input is split. `none` runs the tool once.
+`line` removes CRLF/LF/CR separators and preserves empty parts. `regex:<pattern>`
+uses .NET regular-expression splitting and preserves empty parts and captured
+groups. Runs are sequential, and all runs happen even when one exits with a
+non-zero code.
+
+`stdin` is expanded separately for each run and is the only configured value
+written to standard input. For example:
+
+```toml
+input = "selection"
+per = "line"
+stdin = "${input}\n"
+```
 
 When a document is dirty or untitled, Azunote writes the current text to a
 temporary execution file. `${file}` refers to that file, and it is removed
 after the tool finishes.
 
-`output` controls successful standard output:
+`output`, `stdout`, and `stderr` accept one action or an array of two actions.
+An array is ordered `[zero-exit-action, non-zero-exit-action]`; a single action
+is used for both exit statuses. All three fields support `ignore`,
+`replaceDocument`, `replaceSelection`, `newDocument`, and `reloadFile`.
 
-- `ignore`: discard standard output.
-- `replaceDocument`: replace the complete document.
-- `replaceSelection`: replace the current selection.
-- `newDocument`: open the output as a new document.
-- `reloadFile`: reload the file written by the tool.
+`output` receives the mixed stdout/stderr stream. The mixed stream is assembled
+from the order in which stdout/stderr read chunks arrive. The individual
+`stdout` and `stderr` streams remain available independently. Actions are
+applied in the order `output`, `stdout`, `stderr`.
 
-Non-zero exit codes leave the document unchanged and display standard error.
+For `per` runs, each stream is concatenated without adding a separator. The
+default for all three output fields is `ignore`.
+
+No migration is provided for the changed input semantics.

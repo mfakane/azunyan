@@ -13,10 +13,14 @@ Variables are expanded in the following fields:
 - `settings.toml`: `terminal.command`, `terminal.args`,
   `terminal.workingDirectory`, and the corresponding `explorer` fields.
 - External tool definitions: `[launch].command`, `[launch].args`,
-  `[launch].workingDirectory`, and values in the `[env]` table.
+  `[launch].workingDirectory`, `[launch].stdin`, and values in the `[env]`
+  table.
 
-Expansion is performed before an external process is started. The expanded
-arguments remain separate arguments; they are not passed through a shell.
+Expansion is performed before each external process invocation. With
+`per` enabled, `${input}` is the current partition for that invocation; it is
+otherwise the empty string unless an invocation context sets it explicitly.
+The expanded arguments remain separate arguments; they are not passed through a
+shell.
 
 ## VS Code-style variables
 
@@ -40,6 +44,7 @@ These variables follow the names used by VS Code's predefined variables.
 | `${lineNumber}` | The one-based line number of the caret. |
 | `${columnNumber}` | The one-based column number of the caret. |
 | `${selectedText}` | The currently selected text. |
+| `${input}` | The selected external-tool input for the current `per` invocation. |
 | `${execPath}` | The path of the running Azunote executable. |
 | `${pathSeparator}` | The operating system's path separator. |
 | `${/}` | A shorthand for `${pathSeparator}`. |

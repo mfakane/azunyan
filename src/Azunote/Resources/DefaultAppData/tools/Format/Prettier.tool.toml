@@ -6,7 +6,9 @@ visibility = "whenAvailable"
 command = "prettier"
 args = ["--write", "${file}"]   # or "--write ${file}"
 workingDirectory = "${documentDirname}"
-output = "reloadFile"
+output = ["reloadFile", "ignore"]
+stdout = "ignore"
+stderr = "ignore"
 
 [when]
 extensions = [".js", ".jsx", ".ts", ".tsx", ".json", ".css", ".scss", ".html"]

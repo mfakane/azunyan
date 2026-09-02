@@ -1364,7 +1364,11 @@ public sealed class ExternalToolRunner
             + $"Arguments:{Environment.NewLine}{formattedArguments}{Environment.NewLine}"
             + $"WorkingDirectory: {startInfo.WorkingDirectory}{Environment.NewLine}"
             + $"InputMode: {definition.InputMode}{Environment.NewLine}"
-            + $"OutputMode: {definition.OutputMode}{Environment.NewLine}"
+            + $"Per: {definition.Per}{Environment.NewLine}"
+            + $"StdinConfigured: {!string.IsNullOrEmpty(definition.Stdin)}{Environment.NewLine}"
+            + $"Output: {definition.Output}{Environment.NewLine}"
+            + $"Stdout: {definition.Stdout}{Environment.NewLine}"
+            + $"Stderr: {definition.Stderr}{Environment.NewLine}"
             + $"EnvironmentVariables: {environmentVariables}";
     }
 
@@ -1385,6 +1389,14 @@ public sealed class ExternalToolRunner
             argument = argument.Replace(
                 context.Selection,
                 "<selection text>",
+                StringComparison.Ordinal);
+        }
+
+        if (!string.IsNullOrEmpty(context.Input))
+        {
+            argument = argument.Replace(
+                context.Input,
+                "<input text>",
                 StringComparison.Ordinal);
         }
 
