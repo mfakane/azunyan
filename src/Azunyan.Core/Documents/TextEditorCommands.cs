@@ -79,10 +79,11 @@ public static class TextEditorCommands
     }
 
     /// <summary>
-    /// Finds the bracket paired with the bracket at the caret. The character
-    /// under the caret is preferred; when that is not a bracket, the character
-    /// immediately before the caret is considered. Brackets inside quoted
-    /// strings and C-style comments are ignored.
+    /// Finds the bracket paired with the bracket at the caret by scanning only
+    /// the same delimiter type in the required direction. The character under
+    /// the caret is preferred; when that is not a bracket, the character
+    /// immediately before the caret is considered. Otherwise, the innermost
+    /// pair enclosing the caret is used and its closing bracket is returned.
     /// </summary>
     public static bool TryFindMatchingBracket(
         TextSnapshot snapshot,
@@ -96,109 +97,42 @@ public static class TextEditorCommands
         matchingPosition = -1;
         var text = snapshot.Text;
         var bracketPosition = caretPosition < text.Length
-            && IsDelimiter(text[caretPosition])
+            && IsNavigationDelimiter(text[caretPosition])
                 ? caretPosition
-                : caretPosition > 0 && IsDelimiter(text[caretPosition - 1])
+                : caretPosition > 0 && IsNavigationDelimiter(text[caretPosition - 1])
                     ? caretPosition - 1
                     : -1;
-        if (bracketPosition < 0)
+        if (bracketPosition >= 0)
         {
-            return false;
+            return TryFindMatchingNavigationDelimiter(
+                text,
+                bracketPosition,
+                out matchingPosition);
         }
 
-        var stack = new List<BracketEntry>();
-        var quote = '\0';
-        var inLineComment = false;
-        var inBlockComment = false;
-        for (var index = 0; index < text.Length; index++)
+        var innermostOpening = -1;
+        foreach (var opening in "([{<")
         {
-            var current = text[index];
-            var next = index + 1 < text.Length ? text[index + 1] : '\0';
-
-            if (inLineComment)
-            {
-                if (current is '\r' or '\n')
-                {
-                    inLineComment = false;
-                }
-
-                continue;
-            }
-
-            if (inBlockComment)
-            {
-                if (current == '*' && next == '/')
-                {
-                    inBlockComment = false;
-                    index++;
-                }
-
-                continue;
-            }
-
-            if (quote != '\0')
-            {
-                if (current == '\\')
-                {
-                    index++;
-                }
-                else if (current == quote)
-                {
-                    quote = '\0';
-                }
-
-                continue;
-            }
-
-            if (current is '\'' or '"')
-            {
-                quote = current;
-                continue;
-            }
-
-            if (current == '/' && next == '/')
-            {
-                inLineComment = true;
-                index++;
-                continue;
-            }
-
-            if (current == '/' && next == '*')
-            {
-                inBlockComment = true;
-                index++;
-                continue;
-            }
-
-            if (IsOpeningDelimiter(current))
-            {
-                stack.Add(new BracketEntry(current, index));
-                continue;
-            }
-
-            if (!IsClosingDelimiter(current)
-                || stack.Count == 0
-                || !IsMatchingDelimiter(stack[^1].Delimiter, current))
+            var closing = GetClosingNavigationDelimiter(opening);
+            var openingPosition = FindEnclosingOpeningDelimiter(
+                text,
+                caretPosition,
+                opening,
+                closing);
+            if (openingPosition <= innermostOpening
+                || !TryFindMatchingNavigationDelimiter(
+                    text,
+                    openingPosition,
+                    out var closingPosition))
             {
                 continue;
             }
 
-            var opening = stack[^1];
-            stack.RemoveAt(stack.Count - 1);
-            if (opening.Position == bracketPosition)
-            {
-                matchingPosition = index;
-                return true;
-            }
-
-            if (index == bracketPosition)
-            {
-                matchingPosition = opening.Position;
-                return true;
-            }
+            innermostOpening = openingPosition;
+            matchingPosition = closingPosition;
         }
 
-        return false;
+        return matchingPosition >= 0;
     }
 
     public static TextChange DeleteBackward(Document document)
@@ -789,8 +723,6 @@ public static class TextEditorCommands
 
     private readonly record struct IndentationEdit(int Position, int Delta);
 
-    private readonly record struct BracketEntry(char Delimiter, int Position);
-
     private static List<char> GetBracketStack(string text, int position)
     {
         var stack = new List<char>();
@@ -900,8 +832,113 @@ public static class TextEditorCommands
 
     private static bool IsClosingDelimiter(char value) => value is '}' or ']' or ')';
 
-    private static bool IsDelimiter(char value) =>
-        IsOpeningDelimiter(value) || IsClosingDelimiter(value);
+    private static bool IsNavigationDelimiter(char value) =>
+        value is '(' or ')' or '[' or ']' or '{' or '}' or '<' or '>';
+
+    private static char GetClosingNavigationDelimiter(char opening) => opening switch
+    {
+        '(' => ')',
+        '[' => ']',
+        '{' => '}',
+        '<' => '>',
+        _ => throw new ArgumentOutOfRangeException(nameof(opening))
+    };
+
+    private static bool TryGetOpeningNavigationDelimiter(
+        char closing,
+        out char opening)
+    {
+        opening = closing switch
+        {
+            ')' => '(',
+            ']' => '[',
+            '}' => '{',
+            '>' => '<',
+            _ => '\0'
+        };
+        return opening != '\0';
+    }
+
+    private static bool TryFindMatchingNavigationDelimiter(
+        string text,
+        int delimiterPosition,
+        out int matchingPosition)
+    {
+        matchingPosition = -1;
+        var delimiter = text[delimiterPosition];
+        if (TryGetOpeningNavigationDelimiter(delimiter, out var opening))
+        {
+            var depth = 0;
+            for (var index = delimiterPosition - 1; index >= 0; index--)
+            {
+                if (text[index] == delimiter)
+                {
+                    depth++;
+                }
+                else if (text[index] == opening)
+                {
+                    if (depth == 0)
+                    {
+                        matchingPosition = index;
+                        return true;
+                    }
+
+                    depth--;
+                }
+            }
+
+            return false;
+        }
+
+        var closing = GetClosingNavigationDelimiter(delimiter);
+        var forwardDepth = 0;
+        for (var index = delimiterPosition + 1; index < text.Length; index++)
+        {
+            if (text[index] == delimiter)
+            {
+                forwardDepth++;
+            }
+            else if (text[index] == closing)
+            {
+                if (forwardDepth == 0)
+                {
+                    matchingPosition = index;
+                    return true;
+                }
+
+                forwardDepth--;
+            }
+        }
+
+        return false;
+    }
+
+    private static int FindEnclosingOpeningDelimiter(
+        string text,
+        int caretPosition,
+        char opening,
+        char closing)
+    {
+        var depth = 0;
+        for (var index = caretPosition - 1; index >= 0; index--)
+        {
+            if (text[index] == closing)
+            {
+                depth++;
+            }
+            else if (text[index] == opening)
+            {
+                if (depth == 0)
+                {
+                    return index;
+                }
+
+                depth--;
+            }
+        }
+
+        return -1;
+    }
 
     private static bool IsMatchingDelimiter(char opening, char closing) =>
         (opening, closing) is ('{', '}') or ('[', ']') or ('(', ')');

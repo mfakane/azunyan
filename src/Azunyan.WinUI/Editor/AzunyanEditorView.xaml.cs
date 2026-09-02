@@ -30,8 +30,6 @@ namespace Azunyan.WinUI;
 /// </summary>
 public sealed partial class AzunyanEditorView : UserControl, IDisposable
 {
-    private const VirtualKey OemOpenBracketKey = (VirtualKey)0xdb;
-
     private readonly AzunyanEditorRenderer _defaultRenderer;
     private Document _document = new();
     private readonly SlidingInputWindowCalculator _inputWindowCalculator = new();
@@ -813,6 +811,30 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             {
                 RenderViewport();
             }
+        });
+    }
+
+    public void MoveToMatchingBracket()
+    {
+        RunAfterComposition(() =>
+        {
+            ApplyDocumentCommand(() =>
+            {
+                if (_blockSelection is not null)
+                {
+                    _blockSelection = null;
+                }
+                else
+                {
+                    _document.SetCaretSet(
+                        TextCaretSetOperations.MoveToMatchingBracket(
+                            Snapshot,
+                            Document.CaretSet,
+                            extendSelection: false,
+                            TabDisplaySize));
+                }
+            });
+            ScrollSelectionIntoView();
         });
     }
 
@@ -1864,29 +1886,6 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
         switch (args.Key)
         {
-            case OemOpenBracketKey when control && !menu && !IsComposing:
-                QueueKeyEdit(args.Key, () =>
-                {
-                    ApplyDocumentCommand(() =>
-                    {
-                        if (_blockSelection is not null)
-                        {
-                            _blockSelection = null;
-                        }
-                        else
-                        {
-                            _document.SetCaretSet(
-                                TextCaretSetOperations.MoveToMatchingBracket(
-                                    Snapshot,
-                                    Document.CaretSet,
-                                    extendSelection,
-                                    TabDisplaySize));
-                        }
-                    });
-                    ScrollSelectionIntoView();
-                }, repeatable: false);
-                args.Handled = true;
-                break;
             case VirtualKey.A when control && !menu && !IsComposing:
                 QueueKeyEdit(args.Key, () =>
                 {

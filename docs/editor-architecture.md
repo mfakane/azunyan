@@ -406,6 +406,11 @@ undo/redo commands; the native control receives only the remaining
 text-producing/dead-key path. Ctrl+Alt is treated as AltGr rather than as an
 editor shortcut.
 
+Application-level commands are owned by the shell menu and its keyboard
+accelerators. For example, Edit > Go to Matching Bracket registers Ctrl+[ and
+invokes the editor's command API; the reusable editor component does not
+recognize that chord in its native-input key handler.
+
 Managed commands are scheduled immediately after KeyDown returns, including
 repeat KeyDown events. KeyUp never performs the document command: it only
 balances the native TextBox's handled-key state and flushes the coalesced

@@ -282,6 +282,11 @@
                         <KeyboardAccelerator Key="G" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
+                <MenuFlyoutItem
+                    x:Name="GoToMatchingBracketMenuItem"
+                    Text="Go to Matching Bracket"
+                    KeyboardAcceleratorTextOverride="Ctrl+["
+                    Click="GoToMatchingBracketMenuItem_Click" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="Select All" Click="SelectAllMenuItem_Click">
                     <MenuFlyoutItem.KeyboardAccelerators>

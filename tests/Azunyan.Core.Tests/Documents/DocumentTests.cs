@@ -513,34 +513,65 @@ public sealed class DocumentTests
     }
 
     [Fact]
-    public void Matching_bracket_navigation_ignores_strings_and_comments()
+    public void Matching_bracket_navigation_uses_the_innermost_pair_enclosing_the_caret()
     {
-        const string text = "{ \"}\": 1, /* ] */ value: [0] // )\n}";
+        const string text = "# Configure the status bar's command.\n[terminal]\ncall({ value: [1] })";
         var snapshot = new TextSnapshot(text);
-        var outerClosing = text.LastIndexOf('}');
+        var sectionCaret = text.IndexOf("terminal", StringComparison.Ordinal) + 3;
+        var sectionClosing = text.IndexOf(']', StringComparison.Ordinal);
+        var valueCaret = text.IndexOf("value", StringComparison.Ordinal) + 2;
+        var objectClosing = text.IndexOf('}', StringComparison.Ordinal);
+
+        Assert.True(TextEditorCommands.TryFindMatchingBracket(
+            snapshot,
+            sectionCaret,
+            out var matchingSectionClosing));
+        Assert.Equal(sectionClosing, matchingSectionClosing);
+
+        Assert.True(TextEditorCommands.TryFindMatchingBracket(
+            snapshot,
+            valueCaret,
+            out var matchingObjectClosing));
+        Assert.Equal(objectClosing, matchingObjectClosing);
+    }
+
+    [Fact]
+    public void Matching_bracket_navigation_scans_raw_text_without_language_semantics()
+    {
+        const string text = "{ \"}\": 1 } # [commented]";
+        var snapshot = new TextSnapshot(text);
         var quotedClosing = text.IndexOf('}');
-        var commentedClosing = text.IndexOf(']');
-        var arrayOpening = text.LastIndexOf('[');
-        var arrayClosing = text.LastIndexOf(']');
+        var commentedOpening = text.IndexOf('[', StringComparison.Ordinal);
+        var commentedClosing = text.IndexOf(']', StringComparison.Ordinal);
 
         Assert.True(TextEditorCommands.TryFindMatchingBracket(
             snapshot,
             0,
-            out var matchingOuterClosing));
-        Assert.Equal(outerClosing, matchingOuterClosing);
-        Assert.False(TextEditorCommands.TryFindMatchingBracket(
-            snapshot,
-            quotedClosing,
-            out _));
-        Assert.False(TextEditorCommands.TryFindMatchingBracket(
-            snapshot,
-            commentedClosing,
-            out _));
+            out var matchingQuotedClosing));
+        Assert.Equal(quotedClosing, matchingQuotedClosing);
         Assert.True(TextEditorCommands.TryFindMatchingBracket(
             snapshot,
-            arrayOpening,
-            out var matchingArrayClosing));
-        Assert.Equal(arrayClosing, matchingArrayClosing);
+            commentedOpening,
+            out var matchingCommentedClosing));
+        Assert.Equal(commentedClosing, matchingCommentedClosing);
+    }
+
+    [Fact]
+    public void Matching_bracket_navigation_supports_angle_brackets()
+    {
+        const string text = "<node>";
+        var snapshot = new TextSnapshot(text);
+
+        Assert.True(TextEditorCommands.TryFindMatchingBracket(
+            snapshot,
+            0,
+            out var matchingClosing));
+        Assert.Equal(5, matchingClosing);
+        Assert.True(TextEditorCommands.TryFindMatchingBracket(
+            snapshot,
+            snapshot.Length,
+            out var matchingOpening));
+        Assert.Equal(0, matchingOpening);
     }
 
     [Fact]

@@ -13,12 +13,15 @@ namespace Azunote;
 
 public sealed partial class MainWindow : Window, IDisposable
 {
+    private const VirtualKey OemOpenBracketKey = (VirtualKey)0xdb;
+
     private readonly ApplicationCoordinator _application;
     private readonly MainWindowViewAdapter _view;
     private readonly MainWindowRuntime _runtime;
     private readonly AppWindow? _appWindow;
     private bool _allowClose;
     private bool _completionShortcutInvoked;
+    private bool _matchingBracketShortcutInvoked;
     private bool _disposed;
 
     internal MainWindowRuntime Runtime => _runtime;
@@ -106,6 +109,14 @@ public sealed partial class MainWindow : Window, IDisposable
         };
         previousWindow.Invoked += PreviousWindowAccelerator_Invoked;
         RootGrid.KeyboardAccelerators.Add(previousWindow);
+
+        var goToMatchingBracket = new KeyboardAccelerator
+        {
+            Key = OemOpenBracketKey,
+            Modifiers = VirtualKeyModifiers.Control
+        };
+        goToMatchingBracket.Invoked += GoToMatchingBracketAccelerator_Invoked;
+        RootGrid.KeyboardAccelerators.Add(goToMatchingBracket);
     }
 
     private async void OpenButton_Click(object sender, RoutedEventArgs e) =>
@@ -133,6 +144,9 @@ public sealed partial class MainWindow : Window, IDisposable
     private void PasteMenuItem_Click(object sender, RoutedEventArgs e) => _runtime.Paste();
 
     private void SelectAllMenuItem_Click(object sender, RoutedEventArgs e) => _runtime.SelectAll();
+
+    private void GoToMatchingBracketMenuItem_Click(object sender, RoutedEventArgs e) =>
+        _runtime.MoveToMatchingBracket();
 
     private void WordWrapMenuItem_Click(object sender, RoutedEventArgs e) => _runtime.ToggleWordWrap();
 
@@ -258,6 +272,15 @@ public sealed partial class MainWindow : Window, IDisposable
         _runtime.ShowCompletion();
     }
 
+    private void GoToMatchingBracketAccelerator_Invoked(
+        KeyboardAccelerator sender,
+        KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = true;
+        _matchingBracketShortcutInvoked = true;
+        _runtime.MoveToMatchingBracket();
+    }
+
     private void EscapeAccelerator_Invoked(
         KeyboardAccelerator sender,
         KeyboardAcceleratorInvokedEventArgs args)
@@ -329,6 +352,24 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private void Editor_KeyDown(object sender, KeyRoutedEventArgs e)
     {
+        if (e.Key == OemOpenBracketKey
+            && IsKeyDown(VirtualKey.Control)
+            && !IsKeyDown(VirtualKey.Menu))
+        {
+            var acceleratorInvoked = _matchingBracketShortcutInvoked;
+            _matchingBracketShortcutInvoked = false;
+            e.Handled = true;
+            if (!acceleratorInvoked)
+            {
+                // WinUI does not consistently invoke KeyboardAccelerator for
+                // OEM punctuation keys. Keep this fallback in the shell so the
+                // editor component remains unaware of the application shortcut.
+                _runtime.MoveToMatchingBracket();
+            }
+
+            return;
+        }
+
         if (e.Key == VirtualKey.Space && IsKeyDown(VirtualKey.Control))
         {
             var acceleratorInvoked = _completionShortcutInvoked;

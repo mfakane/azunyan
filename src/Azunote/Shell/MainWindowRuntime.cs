@@ -200,6 +200,8 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public void SelectAll() => _editorCommands.SelectAll();
 
+    public void MoveToMatchingBracket() => _editorCommands.MoveToMatchingBracket();
+
     public void ToggleWordWrap()
     {
         _recordWordWrap(_editorCommands.ToggleWordWrap());

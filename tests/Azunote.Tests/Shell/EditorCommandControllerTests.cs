@@ -7,6 +7,18 @@ namespace Azunote.Tests.Shell;
 public sealed class EditorCommandControllerTests
 {
     [Fact]
+    public void Matching_bracket_command_focuses_and_delegates_to_the_editor()
+    {
+        var editor = new FakeEditorView();
+        var commands = new EditorCommandController(editor, new FakeWindowChromeView());
+
+        commands.MoveToMatchingBracket();
+
+        Assert.Equal(1, editor.FocusCount);
+        Assert.Equal(1, editor.MoveToMatchingBracketCount);
+    }
+
+    [Fact]
     public void Word_wrap_and_status_bar_commands_update_the_view()
     {
         var editor = new FakeEditorView();

@@ -26,6 +26,8 @@ internal sealed class EditorCommandController
 
     public void SelectAll() => Execute(_editor.SelectAll);
 
+    public void MoveToMatchingBracket() => Execute(_editor.MoveToMatchingBracket);
+
     public void ShowCompletion()
     {
         _editor.Focus();

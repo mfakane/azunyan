@@ -250,6 +250,8 @@ internal sealed class MainWindowViewAdapter :
 
     public void SelectAll() => _editor.SelectAll();
 
+    public void MoveToMatchingBracket() => _editor.MoveToMatchingBracket();
+
     public void Select(TextRange range) => _editor.Select(range.Start, range.Length);
 
     public void RequestCompletion() => _editor.RequestCompletion();
