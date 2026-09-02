@@ -185,7 +185,11 @@ public sealed record ExternalToolDefinition
         string fileName,
         string[]? arguments = null,
         ExternalToolInputMode inputMode = ExternalToolInputMode.None,
-        ExternalToolOutputMode outputMode = ExternalToolOutputMode.Ignore,
+        string? per = null,
+        string? stdin = null,
+        ExternalToolOutputActions? output = null,
+        ExternalToolOutputActions? stdout = null,
+        ExternalToolOutputActions? stderr = null,
         string? workingDirectory = null,
         IReadOnlyDictionary<string, string>? environment = null,
         string? definitionDirectory = null)
@@ -195,7 +199,11 @@ public sealed record ExternalToolDefinition
         FileName = fileName;
         Arguments = arguments ?? [];
         InputMode = inputMode;
-        OutputMode = outputMode;
+        Per = ExternalToolPer.Parse(per);
+        Stdin = stdin ?? string.Empty;
+        Output = output ?? ExternalToolOutputActions.Ignore;
+        Stdout = stdout ?? ExternalToolOutputActions.Ignore;
+        Stderr = stderr ?? ExternalToolOutputActions.Ignore;
         WorkingDirectory = workingDirectory;
         Environment = environment ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         DefinitionDirectory = string.IsNullOrWhiteSpace(definitionDirectory)
@@ -209,7 +217,15 @@ public sealed record ExternalToolDefinition
 
     public ExternalToolInputMode InputMode { get; }
 
-    public ExternalToolOutputMode OutputMode { get; }
+    public ExternalToolPer Per { get; }
+
+    public string Stdin { get; }
+
+    public ExternalToolOutputActions Output { get; }
+
+    public ExternalToolOutputActions Stdout { get; }
+
+    public ExternalToolOutputActions Stderr { get; }
 
     public string? WorkingDirectory { get; }
 
@@ -385,6 +401,13 @@ public sealed partial record ExternalToolContext
 
     public string Selection { get; }
 
+    /// <summary>
+    /// The input payload for the current external-tool invocation. This is
+    /// populated by <see cref="ExternalToolRunner"/> and changes for each
+    /// partition when <see cref="ExternalToolDefinition.Per"/> is enabled.
+    /// </summary>
+    public string Input { get; init; } = string.Empty;
+
     public int LineNumber { get; }
 
     public int ColumnNumber { get; }
@@ -466,6 +489,7 @@ public sealed partial record ExternalToolContext
                 "workspaceFolder" => WorkspaceFolder ?? string.Empty,
                 "document" => Document,
                 "selectedText" => Selection,
+                "input" => Input,
                 "userHome" => UserHome,
                 "languageId" => LanguageId,
                 "encoding" => Encoding.ToString(),
@@ -509,6 +533,12 @@ public sealed partial record ExternalToolContext
         ExternalToolInputMode.Selection => Selection,
         _ => throw new ArgumentOutOfRangeException(nameof(inputMode))
     };
+
+    public ExternalToolContext WithInput(string input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        return this with { Input = input };
+    }
 
     private string? GetRelativeWorkspacePath(string? path)
     {
