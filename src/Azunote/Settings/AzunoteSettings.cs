@@ -260,7 +260,7 @@ public sealed class ExternalToolLaunchSettings
     public string Command { get; set; } = string.Empty;
 
     [TomlPropertyName("args")]
-    public string[] Arguments { get; set; } = [];
+    public string[]? Arguments { get; set; } = [];
 
     public string? WorkingDirectory { get; set; }
 
@@ -332,7 +332,7 @@ public sealed class ExternalToolSettings
 
         return new ExternalToolDefinition(
             Launch.Command,
-            Launch.Arguments,
+            Launch.Arguments ?? [],
             ExternalToolEnumValues.Parse<ExternalToolInputMode>(Launch.Input, "launch.input"),
             Launch.Per,
             Launch.Stdin,

@@ -68,8 +68,8 @@ NODE_ENV = "development"
 | Field | Values | Description |
 | --- | --- | --- |
 | `command` | String | Executable or script to launch. |
-| `args` | Array of strings | Arguments passed to the process. |
-| `workingDirectory` | String | Working directory. Relative paths are resolved from the tool definition directory. If omitted, the current document's directory is used when available. |
+| `args` | Optional array of strings | Arguments passed to the process. Defaults to an empty array. |
+| `workingDirectory` | Optional string | Working directory. Relative paths are resolved from the tool definition directory. If omitted, the current document's directory is used when available; otherwise the Azunote process directory is used. |
 | `input` | `none`, `filePath`, `document`, `selection` | Selects the value exposed as `${input}`. It is not written to standard input automatically. |
 | `per` | `none`, `line`, `regex:<pattern>` | Splits the input value and runs the tool once for each part. |
 | `stdin` | String | Text written to standard input after substitution expansion. Empty by default. |
@@ -79,6 +79,9 @@ NODE_ENV = "development"
 
 The defaults are:
 
+- `args = []`
+- `workingDirectory` is omitted; the current document's directory is used when
+  available, otherwise the Azunote process directory.
 - `input = "none"`
 - `per = "none"`
 - `stdin` is empty, so nothing is sent to standard input.

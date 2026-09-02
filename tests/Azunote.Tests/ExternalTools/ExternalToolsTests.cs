@@ -888,6 +888,39 @@ public sealed class ExternalToolsTests
     }
 
     [Fact]
+    public async Task Settings_service_allows_external_tool_args_and_working_directory_to_be_omitted()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            $"azunyan-settings-minimal-{Guid.NewGuid():N}");
+        var tools = Path.Combine(root, SettingsFileService.ToolsDirectoryName);
+        var toolPath = Path.Combine(tools, "minimal.tool.toml");
+        Directory.CreateDirectory(tools);
+        try
+        {
+            await File.WriteAllTextAsync(
+                toolPath,
+                """
+                [launch]
+                command = "cmd.exe"
+                """);
+
+            var settings = await SettingsFileService.LoadAsync(root);
+            var definition = Assert.Single(settings.ExternalTools).ToDefinition();
+
+            Assert.Empty(definition.Arguments);
+            Assert.Null(definition.WorkingDirectory);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task Settings_service_loads_terminal_configuration()
     {
         var root = Path.Combine(Path.GetTempPath(), $"azunyan-settings-{Guid.NewGuid():N}");
