@@ -149,6 +149,16 @@ public sealed class ExternalToolsTests
     }
 
     [Fact]
+    public void Show_completion_uses_each_non_empty_output_line_as_a_candidate()
+    {
+        var items = ExternalToolOutputInterpreter.CreateCompletionItems(
+            " first\r\n\r\n   \nsecond\rthird\n");
+
+        Assert.Equal([" first", "second", "third"], items.Select(item => item.Label));
+        Assert.Equal(items.Select(item => item.Label), items.Select(item => item.InsertText));
+    }
+
+    [Fact]
     public void Output_interpreter_ignores_output_actions_when_regex_has_no_matches()
     {
         var output = ExternalToolOutputInterpreter.Interpret(
@@ -882,7 +892,7 @@ public sealed class ExternalToolsTests
                 input = "filePath"
                 per = "line"
                 stdin = "${input}"
-                output = ["reloadFile", "ignore"]
+                output = ["showCompletion", "ignore"]
                 stdout = "newDocument"
                 stderr = ["ignore", "newDocument"]
                 """);
@@ -897,7 +907,7 @@ public sealed class ExternalToolsTests
             Assert.Equal(ExternalToolInputMode.FilePath, definition.InputMode);
             Assert.Equal(ExternalToolPerMode.Line, definition.Per.Mode);
             Assert.Equal("${input}", definition.Stdin);
-            Assert.Equal(ExternalToolOutputMode.ReloadFile, definition.Output.OnSuccess);
+            Assert.Equal(ExternalToolOutputMode.ShowCompletion, definition.Output.OnSuccess);
             Assert.Equal(ExternalToolOutputMode.Ignore, definition.Output.OnFailure);
             Assert.Equal(ExternalToolOutputMode.NewDocument, definition.Stdout.OnSuccess);
             Assert.Equal(ExternalToolOutputMode.NewDocument, definition.Stdout.OnFailure);

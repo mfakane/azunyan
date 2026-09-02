@@ -129,6 +129,18 @@ public sealed class ExternalToolController
             case ExternalToolOutputMode.ReloadFile:
                 await ReloadOutputAsync(temporaryFilePath, filePath, cancellationToken);
                 return;
+            case ExternalToolOutputMode.ShowCompletion:
+                if (_editor is not IEditorView editorView)
+                {
+                    throw new InvalidOperationException(
+                        "The current editor does not support completion windows.");
+                }
+
+                editorView.ShowCompletion(
+                    new CompletionResult(
+                        new TextRange(_editor.CaretPosition, 0),
+                        ExternalToolOutputInterpreter.CreateCompletionItems(action.Text)));
+                return;
             default:
                 throw new InvalidOperationException($"Unsupported external-tool output mode: {action.Mode}.");
         }

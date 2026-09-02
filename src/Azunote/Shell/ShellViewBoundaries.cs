@@ -50,6 +50,8 @@ internal interface IEditorView : IEditorBuffer
 
     void RequestCompletion();
 
+    void ShowCompletion(CompletionResult completions);
+
     void ApplyLanguage(EditorLanguageConfiguration configuration);
 
     void SetFontFamily(string fontFamily);

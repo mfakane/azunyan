@@ -216,7 +216,7 @@ public static class AzunoteSchemaCatalog
         new(
             name,
             AzunoteSchemaValueKind.Enum,
-            AllowedValues: ["ignore", "replaceDocument", "replaceSelection", "newDocument", "reloadFile"],
+            AllowedValues: ["ignore", "replaceDocument", "replaceSelection", "newDocument", "reloadFile", "showCompletion"],
             Documentation: "An action or [zero-action, non-zero-action].");
 
     private static AzunoteSchemaField EnumField(

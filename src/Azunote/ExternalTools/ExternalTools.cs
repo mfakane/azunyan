@@ -28,7 +28,8 @@ public enum ExternalToolOutputMode
     ReplaceDocument,
     ReplaceSelection,
     NewDocument,
-    ReloadFile
+    ReloadFile,
+    ShowCompletion
 }
 
 public sealed record ExternalToolPer(
@@ -1531,6 +1532,16 @@ public sealed record ExternalToolOutput(
 
 public static class ExternalToolOutputInterpreter
 {
+    public static IReadOnlyList<CompletionItem> CreateCompletionItems(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+
+        return Regex.Split(text, "\\r\\n|\\r|\\n")
+            .Where(line => !string.IsNullOrWhiteSpace(line))
+            .Select(line => new CompletionItem(line))
+            .ToArray();
+    }
+
     public static ExternalToolOutput Interpret(
         ExternalToolDefinition definition,
         ExternalToolResult result)

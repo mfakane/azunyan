@@ -256,6 +256,8 @@ internal sealed class MainWindowViewAdapter :
 
     public void RequestCompletion() => _editor.RequestCompletion();
 
+    public void ShowCompletion(CompletionResult completions) => _editor.ShowCompletion(completions);
+
     public void ApplyLanguage(EditorLanguageConfiguration configuration)
     {
         _editor.CompletionTriggerCharacters = configuration.CompletionTriggers;

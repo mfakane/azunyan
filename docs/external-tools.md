@@ -144,7 +144,11 @@ after the tool finishes.
 `output`, `stdout`, and `stderr` accept one action or an array of two actions.
 An array is ordered `[zero-exit-action, non-zero-exit-action]`; a single action
 is used for both exit statuses. All three fields support `ignore`,
-`replaceDocument`, `replaceSelection`, `newDocument`, and `reloadFile`.
+`replaceDocument`, `replaceSelection`, `newDocument`, `reloadFile`, and
+`showCompletion`.
+
+`showCompletion` treats each non-empty output line as one completion candidate
+and opens the completion window. Empty and whitespace-only lines are ignored.
 
 `output` receives the mixed stdout/stderr stream. The mixed stream is assembled
 from the order in which stdout/stderr read chunks arrive. The individual

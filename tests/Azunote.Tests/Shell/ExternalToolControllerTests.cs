@@ -96,4 +96,53 @@ public sealed class ExternalToolControllerTests
             }
         }
     }
+
+    [Fact]
+    public async Task Show_completion_action_uses_non_empty_output_lines_as_candidates()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            $"azunote external controller completion {Guid.NewGuid():N}");
+        var scriptPath = Path.Combine(root, "write completion.cmd");
+        try
+        {
+            Directory.CreateDirectory(root);
+            await File.WriteAllTextAsync(
+                scriptPath,
+                "@echo off\r\necho first\r\necho.\r\necho second\r\n");
+
+            var editor = new FakeEditorView("before");
+            var session = new DocumentSession();
+            var files = new FakeTextFileStore();
+            var prompt = new FakeUserPrompt();
+            var documents = new DocumentController(editor, session, files, prompt);
+            var controller = new ExternalToolController(editor, documents, files, prompt);
+
+            var result = await controller.RunAsync(
+                new ExternalToolDefinition(
+                    scriptPath,
+                    stdout: new ExternalToolOutputActions(
+                        ExternalToolOutputMode.ShowCompletion,
+                        ExternalToolOutputMode.Ignore)));
+
+            Assert.True(result.Succeeded, result.StandardError);
+            Assert.NotNull(editor.LastCompletion);
+            Assert.Equal(
+                ["first", "second"],
+                editor.LastCompletion!.Items.Select(item => item.InsertText));
+            Assert.Empty(prompt.Errors);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
 }

@@ -66,6 +66,15 @@ public sealed class PositionProviderResults
     public TooltipData? Tooltip { get; }
 
     public CompletionResult? Completions { get; }
+
+    public static PositionProviderResults FromCompletion(
+        EditorProviderContext context,
+        CompletionResult completions)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(completions);
+        return new PositionProviderResults(context, null, completions);
+    }
 }
 
 /// <summary>

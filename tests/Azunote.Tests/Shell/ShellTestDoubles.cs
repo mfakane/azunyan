@@ -46,6 +46,8 @@ internal sealed class FakeEditorView : IEditorView
 
     public TextSelection? LastStartupSelection { get; private set; }
 
+    public CompletionResult? LastCompletion { get; private set; }
+
     public void SetText(string text) => _document = new Document(text);
 
     public void SetSelection(TextSelection selection) => _document.Selection = selection;
@@ -83,6 +85,8 @@ internal sealed class FakeEditorView : IEditorView
     public void RequestCompletion()
     {
     }
+
+    public void ShowCompletion(CompletionResult completions) => LastCompletion = completions;
 
     public void ApplyLanguage(EditorLanguageConfiguration configuration) =>
         LanguageConfiguration = configuration;

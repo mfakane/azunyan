@@ -868,6 +868,36 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         RequestProviderResults(false, false, true, requestCompletion: true);
     }
 
+    /// <summary>Shows the supplied completion candidates at the current caret.</summary>
+    public void ShowCompletion(CompletionResult completions)
+    {
+        ArgumentNullException.ThrowIfNull(completions);
+        if (!IsLoaded || IsComposing)
+        {
+            return;
+        }
+
+        Focus(FocusState.Programmatic);
+        _explicitCompletionRequested = true;
+        _completionRequested = true;
+        InvalidateProviderGenerations();
+
+        var snapshot = Snapshot;
+        var selection = Document.Selection;
+        var currentFrame = GetCurrentFrame();
+        var context = new EditorProviderContext(
+            snapshot,
+            selection.CaretPosition,
+            selection);
+        PublishProviderFrame(
+            new EditorProviderFrame(
+                snapshot,
+                selection,
+                currentFrame?.Document,
+                currentFrame?.Viewport,
+                PositionProviderResults.FromCompletion(context, completions)));
+    }
+
     public void SetFoldCollapsed(string foldId, bool collapsed)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(foldId);
