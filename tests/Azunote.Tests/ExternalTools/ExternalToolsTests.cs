@@ -488,13 +488,117 @@ public sealed class ExternalToolsTests
         var definition = new ExternalToolDefinition(
             isWindows ? "cmd.exe" : "/bin/cat",
             ExternalToolDefinition.ParseArguments(isWindows ? "/c more" : string.Empty),
-            ExternalToolInputMode.Document);
+            inputMode: ExternalToolInputMode.Document,
+            stdin: "${input}");
         var result = await ExternalToolRunner.RunAsync(
             definition,
             new ExternalToolContext(null, "stdin payload", string.Empty));
 
         Assert.True(result.Succeeded, result.StandardError);
         Assert.Equal("stdin payload", result.StandardOutput.TrimEnd('\r', '\n'));
+        Assert.Equal(result.StandardOutput, result.MixedOutput);
+    }
+
+    [Fact]
+    public async Task Runner_does_not_send_input_without_stdin_configuration()
+    {
+        var isWindows = OperatingSystem.IsWindows();
+        var definition = new ExternalToolDefinition(
+            isWindows ? "cmd.exe" : "/bin/cat",
+            ExternalToolDefinition.ParseArguments(isWindows ? "/c more" : string.Empty),
+            inputMode: ExternalToolInputMode.Document);
+        var result = await ExternalToolRunner.RunAsync(
+            definition,
+            new ExternalToolContext(null, "must not be sent", string.Empty));
+
+        Assert.True(result.Succeeded, result.StandardError);
+        Assert.Equal(string.Empty, result.StandardOutput.Trim());
+        Assert.Empty(result.StandardError);
+        Assert.Equal(string.Empty, result.MixedOutput.Trim());
+    }
+
+    [Fact]
+    public async Task Runner_captures_stdout_stderr_and_their_mixed_stream()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            $"azunote external mixed {Guid.NewGuid():N}");
+        var scriptPath = Path.Combine(root, "write mixed.cmd");
+        try
+        {
+            Directory.CreateDirectory(root);
+            await File.WriteAllTextAsync(
+                scriptPath,
+                "@echo off\r\necho standard output\r\necho standard error 1>&2\r\n");
+
+            var result = await ExternalToolRunner.RunAsync(
+                new ExternalToolDefinition(scriptPath),
+                new ExternalToolContext(null, string.Empty, string.Empty));
+
+            Assert.True(result.Succeeded, result.StandardError);
+            Assert.Contains("standard output", result.StandardOutput, StringComparison.Ordinal);
+            Assert.Contains("standard error", result.StandardError, StringComparison.Ordinal);
+            Assert.Contains("standard output", result.MixedOutput, StringComparison.Ordinal);
+            Assert.Contains("standard error", result.MixedOutput, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Runner_splits_input_per_line_and_continues_after_a_failure()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            $"azunote external per {Guid.NewGuid():N}");
+        var scriptPath = Path.Combine(root, "echo per.cmd");
+        try
+        {
+            Directory.CreateDirectory(root);
+            await File.WriteAllTextAsync(
+                scriptPath,
+                "@echo off\r\n"
+                + "set /p VALUE=\r\n"
+                + "echo [%VALUE%]\r\n"
+                + "if \"%VALUE%\"==\"bad\" exit /b 7\r\n");
+
+            var result = await ExternalToolRunner.RunAsync(
+                new ExternalToolDefinition(
+                    scriptPath,
+                    inputMode: ExternalToolInputMode.Document,
+                    per: "line",
+                    stdin: "${input}"),
+                new ExternalToolContext(null, "first\nbad\nlast", string.Empty));
+
+            Assert.False(result.Succeeded);
+            Assert.Equal(7, result.ExitCode);
+            Assert.Equal(
+                "[first]\r\n[bad]\r\n[last]\r\n",
+                result.StandardOutput);
+            Assert.Equal(result.StandardOutput, result.MixedOutput);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
     }
 
     [Fact]

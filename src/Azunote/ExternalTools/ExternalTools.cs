@@ -1011,8 +1011,21 @@ public static class ExternalToolAvailability
         }
 
         var definition = settings.ToDefinition();
-        var environment = ExternalToolEnvironmentResolver.Resolve(definition, context);
-        var command = context.Expand(definition.FileName, environment.Values);
+        ExternalToolContext invocationContext;
+        try
+        {
+            invocationContext = context.WithInput(
+                context.GetInput(definition.InputMode));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return visibility == ExternalToolVisibility.Always
+                ? new ExternalToolMenuState(true, false, exception.Message)
+                : new ExternalToolMenuState(false, false, exception.Message);
+        }
+
+        var environment = ExternalToolEnvironmentResolver.Resolve(definition, invocationContext);
+        var command = invocationContext.Expand(definition.FileName, environment.Values);
         var launchPlan = ExternalToolLaunchResolver.Resolve(
             command,
             definition.DefinitionDirectory);
@@ -1134,7 +1147,8 @@ public static class ExternalToolAvailability
 public sealed record ExternalToolResult(
     int ExitCode,
     string StandardOutput,
-    string StandardError)
+    string StandardError,
+    string MixedOutput)
 {
     public bool Succeeded => ExitCode == 0;
 }
@@ -1155,10 +1169,48 @@ public sealed class ExternalToolRunner
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(context);
 
+        var sourceInput = context.GetInput(definition.InputMode);
+        var standardOutput = new StringBuilder();
+        var standardError = new StringBuilder();
+        var mixedOutput = new StringBuilder();
+        var succeeded = true;
+        var exitCode = 0;
+
+        foreach (var input in definition.Per.Split(sourceInput))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = await RunSingleAsync(
+                definition,
+                context.WithInput(input),
+                cancellationToken);
+            standardOutput.Append(result.StandardOutput);
+            standardError.Append(result.StandardError);
+            mixedOutput.Append(result.MixedOutput);
+
+            if (!result.Succeeded)
+            {
+                if (succeeded)
+                {
+                    exitCode = result.ExitCode;
+                }
+
+                succeeded = false;
+            }
+        }
+
+        return new ExternalToolResult(
+            succeeded ? 0 : exitCode,
+            standardOutput.ToString(),
+            standardError.ToString(),
+            mixedOutput.ToString());
+    }
+
+    private static async Task<ExternalToolResult> RunSingleAsync(
+        ExternalToolDefinition definition,
+        ExternalToolContext context,
+        CancellationToken cancellationToken)
+    {
         var environment = ExternalToolEnvironmentResolver.Resolve(definition, context);
-        var input = definition.InputMode == ExternalToolInputMode.None
-            ? null
-            : context.GetInput(definition.InputMode);
         var command = context.Expand(definition.FileName, environment.Values);
         var launchPlan = ExternalToolLaunchResolver.Resolve(
             command,
@@ -1218,31 +1270,72 @@ public sealed class ExternalToolRunner
 
         try
         {
+            var mixedBuilder = new StringBuilder();
+            var mixedLock = new object();
+            void AppendMixed(string chunk)
+            {
+                lock (mixedLock)
+                {
+                    mixedBuilder.Append(chunk);
+                }
+            }
 
-            var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-            var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
+            var outputTask = ReadStreamAsync(
+                process.StandardOutput,
+                AppendMixed,
+                cancellationToken);
+            var errorTask = ReadStreamAsync(
+                process.StandardError,
+                AppendMixed,
+                cancellationToken);
+            var standardInput = context.Expand(definition.Stdin, environment.Values);
 
-            if (input is null)
+            if (standardInput.Length == 0)
             {
                 process.StandardInput.Close();
             }
             else
             {
-                await process.StandardInput.WriteAsync(input.AsMemory(), cancellationToken);
+                await process.StandardInput.WriteAsync(standardInput.AsMemory(), cancellationToken);
                 await process.StandardInput.FlushAsync(cancellationToken);
                 process.StandardInput.Close();
             }
 
             await process.WaitForExitAsync(cancellationToken);
+            await Task.WhenAll(outputTask, errorTask);
             return new ExternalToolResult(
                 process.ExitCode,
                 await outputTask,
-                await errorTask);
+                await errorTask,
+                mixedBuilder.ToString());
         }
         catch (OperationCanceledException)
         {
             TryKill(process);
             throw;
+        }
+    }
+
+    private static async Task<string> ReadStreamAsync(
+        StreamReader reader,
+        Action<string> onChunk,
+        CancellationToken cancellationToken)
+    {
+        var builder = new StringBuilder();
+        var buffer = new char[4096];
+        while (true)
+        {
+            var count = await reader.ReadAsync(
+                buffer.AsMemory(),
+                cancellationToken);
+            if (count == 0)
+            {
+                return builder.ToString();
+            }
+
+            var chunk = new string(buffer, 0, count);
+            builder.Append(chunk);
+            onChunk(chunk);
         }
     }
 
