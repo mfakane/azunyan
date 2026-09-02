@@ -5,6 +5,31 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:Azunyan.WinUI"
     xmlns:canvas="using:Microsoft.Graphics.Canvas.UI.Xaml">
+    <UserControl.Resources>
+        <MenuFlyout x:Name="EditorContextMenu" Opening="EditorContextMenu_Opening">
+            <MenuFlyoutItem
+                x:Name="CutContextMenuItem"
+                Text="Cut"
+                KeyboardAcceleratorTextOverride="Ctrl+X"
+                Click="CutContextMenuItem_Click" />
+            <MenuFlyoutItem
+                x:Name="CopyContextMenuItem"
+                Text="Copy"
+                KeyboardAcceleratorTextOverride="Ctrl+C"
+                Click="CopyContextMenuItem_Click" />
+            <MenuFlyoutItem
+                x:Name="PasteContextMenuItem"
+                Text="Paste"
+                KeyboardAcceleratorTextOverride="Ctrl+V"
+                Click="PasteContextMenuItem_Click" />
+            <MenuFlyoutSeparator />
+            <MenuFlyoutItem
+                x:Name="SelectAllContextMenuItem"
+                Text="Select All"
+                KeyboardAcceleratorTextOverride="Ctrl+A"
+                Click="SelectAllContextMenuItem_Click" />
+        </MenuFlyout>
+    </UserControl.Resources>
     <Grid x:Name="RootGrid" Background="Transparent">
         <Grid.ColumnDefinitions>
             <ColumnDefinition x:Name="GutterColumn" Width="0" />

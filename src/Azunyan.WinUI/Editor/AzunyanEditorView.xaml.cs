@@ -127,6 +127,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         EditorPointerSurface.PointerCaptureLost += OnInputPointerCaptureLost;
         EditorPointerSurface.PointerMoved += OnInputPointerMoved;
         EditorPointerSurface.PointerExited += OnInputPointerExited;
+        EditorPointerSurface.ContextRequested += OnEditorContextRequested;
+        InputWindow.NativeTextBoxControl.ContextFlyout = EditorContextMenu;
         CompletionList.ItemClick += OnCompletionItemClick;
         CompletionList.SelectionChanged += OnCompletionSelectionChanged;
         CompletionList.AddHandler(
@@ -158,6 +160,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         _pasteBatchRefreshTimer = null;
         InputWindow.NativeTextBoxControl.BeforeKeyDown -= OnInputKeyDown;
         InputWindow.NativeTextBoxControl.AfterKeyUp -= OnInputKeyUp;
+        InputWindow.NativeTextBoxControl.ContextFlyout = null;
+        EditorPointerSurface.ContextRequested -= OnEditorContextRequested;
         EditorPointerSurface.PointerReleased -= OnInputPointerReleased;
         EditorPointerSurface.PointerCanceled -= OnInputPointerCanceled;
         EditorPointerSurface.PointerCaptureLost -= OnInputPointerCaptureLost;
@@ -2565,6 +2569,88 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         return modifiers;
+    }
+
+    private void OnEditorContextRequested(UIElement sender, ContextRequestedEventArgs args)
+    {
+        if (_disposed || args.Handled)
+        {
+            return;
+        }
+
+        HideCompletionPopup();
+        HideTooltipPopup();
+        if (args.TryGetPosition(this, out var point))
+        {
+            EditorContextMenu.ShowAt(
+                this,
+                new FlyoutShowOptions
+                {
+                    Position = point,
+                    ShowMode = FlyoutShowMode.Standard
+                });
+        }
+        else
+        {
+            EditorContextMenu.ShowAt(this);
+        }
+
+        args.Handled = true;
+    }
+
+    private void EditorContextMenu_Opening(object sender, object e)
+    {
+        var canCopy = HasCopyableSelection();
+        CutContextMenuItem.IsEnabled = canCopy;
+        CopyContextMenuItem.IsEnabled = canCopy;
+        PasteContextMenuItem.IsEnabled = ClipboardContainsText();
+    }
+
+    private void CutContextMenuItem_Click(object sender, RoutedEventArgs e) =>
+        CutSelectionToClipboard();
+
+    private void CopyContextMenuItem_Click(object sender, RoutedEventArgs e) =>
+        CopySelectionToClipboard();
+
+    private void PasteContextMenuItem_Click(object sender, RoutedEventArgs e) =>
+        PasteFromClipboard();
+
+    private void SelectAllContextMenuItem_Click(object sender, RoutedEventArgs e) =>
+        SelectAll();
+
+    private bool HasCopyableSelection()
+    {
+        if (_blockSelection is not null)
+        {
+            return true;
+        }
+
+        if (Document.CaretSet.Count > 1)
+        {
+            foreach (var caret in Document.CaretSet)
+            {
+                if (caret.Selection.Length > 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        return Document.Selection.Length > 0;
+    }
+
+    private static bool ClipboardContainsText()
+    {
+        try
+        {
+            return Clipboard.GetContent().Contains(StandardDataFormats.Text);
+        }
+        catch (Exception)
+        {
+            return true;
+        }
     }
 
     private void OnInputPointerPressed(object sender, PointerRoutedEventArgs args)
