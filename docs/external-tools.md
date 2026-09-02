@@ -137,6 +137,9 @@ per = "line"
 stdin = "${input}\n"
 ```
 
+External-tool stdin, stdout, and stderr use UTF-8 without a BOM. Configure the
+external tool to read and write UTF-8 for Japanese and other non-ASCII text.
+
 When a document is dirty or untitled, Azunote writes the current text to a
 temporary execution file. `${file}` refers to that file, and it is removed
 after the tool finishes.

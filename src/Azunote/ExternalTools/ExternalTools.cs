@@ -889,7 +889,7 @@ internal sealed record ExternalToolLaunchPlan(
             QuoteCommandShellArgument(scriptPath)
         };
         commandParts.AddRange(arguments.Select(QuoteCommandShellArgument));
-        return string.Join(' ', commandParts);
+        return "chcp 65001 >nul & " + string.Join(' ', commandParts);
     }
 
     private static string QuoteCommandShellArgument(string value) =>
@@ -1219,6 +1219,10 @@ public sealed record ExternalToolResult(
 /// </summary>
 public sealed class ExternalToolRunner
 {
+    private static readonly UTF8Encoding StandardIoEncoding = new(
+        encoderShouldEmitUTF8Identifier: false,
+        throwOnInvalidBytes: false);
+
     public static async Task<ExternalToolResult> RunAsync(
         ExternalToolDefinition definition,
         ExternalToolContext context,
@@ -1298,6 +1302,9 @@ public sealed class ExternalToolRunner
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
+            StandardInputEncoding = StandardIoEncoding,
+            StandardOutputEncoding = StandardIoEncoding,
+            StandardErrorEncoding = StandardIoEncoding,
             WorkingDirectory = ResolveWorkingDirectory(
                 definition,
                 context,

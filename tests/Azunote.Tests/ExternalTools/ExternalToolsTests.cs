@@ -585,6 +585,42 @@ public sealed class ExternalToolsTests
     }
 
     [Fact]
+    public async Task Runner_round_trips_japanese_through_stdio_as_utf8()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            $"azunote external utf8 {Guid.NewGuid():N}");
+        var scriptPath = Path.Combine(root, "echo-stdin.cmd");
+        try
+        {
+            Directory.CreateDirectory(root);
+            await File.WriteAllTextAsync(scriptPath, "@echo off\r\nfindstr /r .*\r\n");
+
+            var result = await ExternalToolRunner.RunAsync(
+                new ExternalToolDefinition(
+                    scriptPath,
+                    inputMode: ExternalToolInputMode.Document,
+                    stdin: "${input}"),
+                new ExternalToolContext(null, "日本語の入力", string.Empty));
+
+            Assert.True(result.Succeeded, result.StandardError);
+            Assert.Equal("日本語の入力", result.StandardOutput.TrimEnd('\r', '\n'));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task Runner_does_not_send_input_without_stdin_configuration()
     {
         var isWindows = OperatingSystem.IsWindows();
