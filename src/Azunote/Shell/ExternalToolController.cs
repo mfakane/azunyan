@@ -71,44 +71,14 @@ public sealed class ExternalToolController
                 context,
                 cancellationToken);
             var output = ExternalToolOutputInterpreter.Interpret(definition, result);
-            if (!output.IsSuccess)
+            foreach (var action in output.Actions)
             {
-                await _prompt.ShowErrorAsync("External tool failed", output.Error!);
-                return result;
-            }
-
-            if (output.ReloadFile)
-            {
-                await ReloadOutputAsync(temporaryFilePath, filePath, cancellationToken);
-                return result;
-            }
-
-            if (output.ReplacementText is not null)
-            {
-                switch (definition.OutputMode)
-                {
-                    case ExternalToolOutputMode.ReplaceDocument:
-                        _editor.Replace(new TextRange(0, _editor.Text.Length), output.ReplacementText);
-                        _documents.Session.ObserveText(_editor.Text);
-                        break;
-                    case ExternalToolOutputMode.ReplaceSelection:
-                        if (selection.End > _editor.Text.Length)
-                        {
-                            await _prompt.ShowErrorAsync(
-                                "Could not apply external tool output",
-                                "The selection changed while the tool was running.");
-                        }
-                        else
-                        {
-                            _editor.Replace(selection.Range, output.ReplacementText);
-                            _documents.Session.ObserveText(_editor.Text);
-                        }
-
-                        break;
-                    case ExternalToolOutputMode.NewDocument:
-                        _documents.LoadUntitledText(output.ReplacementText);
-                        break;
-                }
+                await ApplyOutputActionAsync(
+                    action,
+                    selection,
+                    temporaryFilePath,
+                    filePath,
+                    cancellationToken);
             }
 
             return result;
@@ -121,6 +91,46 @@ public sealed class ExternalToolController
         finally
         {
             DeleteTemporaryFile(temporaryFilePath);
+        }
+    }
+
+    private async Task ApplyOutputActionAsync(
+        ExternalToolOutputAction action,
+        TextSelection selection,
+        string? temporaryFilePath,
+        string? filePath,
+        CancellationToken cancellationToken)
+    {
+        switch (action.Mode)
+        {
+            case ExternalToolOutputMode.Ignore:
+                return;
+            case ExternalToolOutputMode.ReplaceDocument:
+                _editor.Replace(new TextRange(0, _editor.Text.Length), action.Text);
+                _documents.Session.ObserveText(_editor.Text);
+                return;
+            case ExternalToolOutputMode.ReplaceSelection:
+                if (selection.End > _editor.Text.Length)
+                {
+                    await _prompt.ShowErrorAsync(
+                        "Could not apply external tool output",
+                        "The selection changed while the tool was running.");
+                }
+                else
+                {
+                    _editor.Replace(selection.Range, action.Text);
+                    _documents.Session.ObserveText(_editor.Text);
+                }
+
+                return;
+            case ExternalToolOutputMode.NewDocument:
+                _documents.LoadUntitledText(action.Text);
+                return;
+            case ExternalToolOutputMode.ReloadFile:
+                await ReloadOutputAsync(temporaryFilePath, filePath, cancellationToken);
+                return;
+            default:
+                throw new InvalidOperationException($"Unsupported external-tool output mode: {action.Mode}.");
         }
     }
 

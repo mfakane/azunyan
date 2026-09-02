@@ -449,36 +449,78 @@ public sealed class ExternalToolsTests
     }
 
     [Fact]
-    public void Output_interpreter_maps_success_and_failure_without_mutating_text()
+    public void Output_interpreter_selects_actions_for_the_mixed_and_individual_streams()
     {
         var replace = ExternalToolOutputInterpreter.Interpret(
             new ExternalToolDefinition(
                 "formatter",
-                outputMode: ExternalToolOutputMode.ReplaceSelection),
-            new ExternalToolResult(0, "formatted", string.Empty));
+                output: new ExternalToolOutputActions(
+                    ExternalToolOutputMode.ReplaceDocument,
+                    ExternalToolOutputMode.NewDocument),
+                stdout: new ExternalToolOutputActions(
+                    ExternalToolOutputMode.ReplaceSelection,
+                    ExternalToolOutputMode.Ignore)),
+            new ExternalToolResult(0, "formatted", "diagnostic", "mixed"));
         var failure = ExternalToolOutputInterpreter.Interpret(
-            new ExternalToolDefinition("formatter"),
-            new ExternalToolResult(2, string.Empty, "bad input"));
+            new ExternalToolDefinition(
+                "formatter",
+                stderr: new ExternalToolOutputActions(
+                    ExternalToolOutputMode.Ignore,
+                    ExternalToolOutputMode.NewDocument)),
+            new ExternalToolResult(2, "partial", "bad input", "partialbad input"));
 
-        Assert.True(replace.IsSuccess);
-        Assert.Equal("formatted", replace.ReplacementText);
-        Assert.False(replace.ReloadFile);
-        Assert.False(failure.IsSuccess);
-        Assert.Contains("bad input", failure.Error);
+        Assert.Equal(
+            [
+                new ExternalToolOutputAction(
+                    ExternalToolOutputChannel.Mixed,
+                    ExternalToolOutputMode.ReplaceDocument,
+                    "mixed"),
+                new ExternalToolOutputAction(
+                    ExternalToolOutputChannel.Stdout,
+                    ExternalToolOutputMode.ReplaceSelection,
+                    "formatted")
+            ],
+            replace.Actions);
+        var failureAction = Assert.Single(failure.Actions);
+        Assert.Equal(ExternalToolOutputChannel.Stderr, failureAction.Stream);
+        Assert.Equal(ExternalToolOutputMode.NewDocument, failureAction.Mode);
+        Assert.Equal("bad input", failureAction.Text);
     }
 
     [Fact]
-    public void Output_interpreter_can_request_reload_without_using_stdout()
+    public void A_single_output_action_applies_to_both_exit_statuses()
+    {
+        var definition = new ExternalToolDefinition(
+            "prettier",
+            output: new ExternalToolOutputActions(
+                ExternalToolOutputMode.ReloadFile,
+                ExternalToolOutputMode.ReloadFile));
+        var success = ExternalToolOutputInterpreter.Interpret(
+            definition,
+            new ExternalToolResult(0, "ignored", string.Empty, "mixed"));
+        var failure = ExternalToolOutputInterpreter.Interpret(
+            definition,
+            new ExternalToolResult(1, "ignored", string.Empty, "mixed"));
+
+        Assert.Equal(ExternalToolOutputMode.ReloadFile, Assert.Single(success.Actions).Mode);
+        Assert.Equal(ExternalToolOutputMode.ReloadFile, Assert.Single(failure.Actions).Mode);
+        Assert.Equal("mixed", Assert.Single(success.Actions).Text);
+    }
+
+    [Fact]
+    public void Output_interpreter_can_request_reload_without_using_stream_text()
     {
         var output = ExternalToolOutputInterpreter.Interpret(
             new ExternalToolDefinition(
                 "prettier",
-                outputMode: ExternalToolOutputMode.ReloadFile),
-            new ExternalToolResult(0, "ignored", string.Empty));
+                output: new ExternalToolOutputActions(
+                    ExternalToolOutputMode.ReloadFile,
+                    ExternalToolOutputMode.Ignore)),
+            new ExternalToolResult(0, "ignored", string.Empty, "mixed"));
 
-        Assert.True(output.IsSuccess);
-        Assert.True(output.ReloadFile);
-        Assert.Null(output.ReplacementText);
+        var action = Assert.Single(output.Actions);
+        Assert.Equal(ExternalToolOutputMode.ReloadFile, action.Mode);
+        Assert.Equal("mixed", action.Text);
     }
 
     [Fact]

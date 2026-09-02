@@ -1455,27 +1455,26 @@ public static class ExternalToolOutputInterpreter
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(result);
 
-        if (!result.Succeeded)
+        var actions = new[]
         {
-            var detail = string.IsNullOrWhiteSpace(result.StandardError)
-                ? $"External tool exited with code {result.ExitCode}."
-                : result.StandardError.Trim();
-            return new ExternalToolOutput(null, false, detail);
-        }
-
-        return definition.OutputMode switch
-        {
-            ExternalToolOutputMode.Ignore => new ExternalToolOutput(null, false, null),
-            ExternalToolOutputMode.ReplaceDocument =>
-                new ExternalToolOutput(result.StandardOutput, false, null),
-            ExternalToolOutputMode.ReplaceSelection =>
-                new ExternalToolOutput(result.StandardOutput, false, null),
-            ExternalToolOutputMode.NewDocument =>
-                new ExternalToolOutput(result.StandardOutput, false, null),
-            ExternalToolOutputMode.ReloadFile =>
-                new ExternalToolOutput(null, true, null),
-            _ => throw new ArgumentOutOfRangeException(nameof(definition), "Unsupported output mode.")
+            new ExternalToolOutputAction(
+                ExternalToolOutputChannel.Mixed,
+                definition.Output.Select(result.Succeeded),
+                result.MixedOutput),
+            new ExternalToolOutputAction(
+                ExternalToolOutputChannel.Stdout,
+                definition.Stdout.Select(result.Succeeded),
+                result.StandardOutput),
+            new ExternalToolOutputAction(
+                ExternalToolOutputChannel.Stderr,
+                definition.Stderr.Select(result.Succeeded),
+                result.StandardError)
         };
+
+        return new ExternalToolOutput(
+            actions
+                .Where(action => action.Mode != ExternalToolOutputMode.Ignore)
+                .ToArray());
     }
 }
 
