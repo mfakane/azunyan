@@ -86,6 +86,47 @@ public sealed class ExternalToolsTests
         Assert.Equal(
             "${fileName}|${selection}|${filePath}",
             context.Expand("${fileName}|${selection}|${filePath}"));
+        Assert.Equal("", context.Expand("${input}"));
+        Assert.Equal("per item", context.WithInput("per item").Expand("${input}"));
+    }
+
+    [Fact]
+    public void External_tool_definition_defaults_to_one_empty_stdin_run()
+    {
+        var definition = new ExternalToolDefinition("formatter");
+
+        Assert.Equal(ExternalToolInputMode.None, definition.InputMode);
+        Assert.Equal(ExternalToolPerMode.None, definition.Per.Mode);
+        Assert.Equal(string.Empty, definition.Stdin);
+        Assert.Equal(ExternalToolOutputActions.Ignore, definition.Output);
+        Assert.Equal(ExternalToolOutputActions.Ignore, definition.Stdout);
+        Assert.Equal(ExternalToolOutputActions.Ignore, definition.Stderr);
+    }
+
+    [Fact]
+    public void External_tool_per_line_splits_all_line_endings_and_preserves_empty_parts()
+    {
+        var per = ExternalToolPer.Parse("line");
+
+        Assert.Equal(
+            ["first", string.Empty, "third", string.Empty],
+            per.Split("first\r\n\nthird\r"));
+    }
+
+    [Fact]
+    public void External_tool_per_regex_preserves_empty_parts_and_capture_groups()
+    {
+        var per = ExternalToolPer.Parse("regex:(,)");
+
+        Assert.Equal(["a", ",", string.Empty, ",", "b"], per.Split("a,,b"));
+    }
+
+    [Fact]
+    public void External_tool_per_rejects_invalid_values()
+    {
+        Assert.Throws<ArgumentException>(() => ExternalToolPer.Parse("regex:"));
+        Assert.Throws<ArgumentException>(() => ExternalToolPer.Parse("regex:["));
+        Assert.Throws<ArgumentException>(() => ExternalToolPer.Parse("paragraph"));
     }
 
     [Fact]

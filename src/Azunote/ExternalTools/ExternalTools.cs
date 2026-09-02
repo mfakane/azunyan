@@ -15,6 +15,13 @@ public enum ExternalToolInputMode
     Selection
 }
 
+public enum ExternalToolPerMode
+{
+    None,
+    Line,
+    Regex
+}
+
 public enum ExternalToolOutputMode
 {
     Ignore,
@@ -22,6 +29,84 @@ public enum ExternalToolOutputMode
     ReplaceSelection,
     NewDocument,
     ReloadFile
+}
+
+public sealed record ExternalToolPer(
+    ExternalToolPerMode Mode,
+    string? Pattern = null)
+{
+    public static ExternalToolPer Parse(
+        string? value,
+        string propertyName = "per")
+    {
+        value = string.IsNullOrWhiteSpace(value) ? "none" : value.Trim();
+        if (string.Equals(value, "none", StringComparison.Ordinal))
+        {
+            return new ExternalToolPer(ExternalToolPerMode.None);
+        }
+
+        if (string.Equals(value, "line", StringComparison.Ordinal))
+        {
+            return new ExternalToolPer(ExternalToolPerMode.Line);
+        }
+
+        const string regexPrefix = "regex:";
+        if (value.StartsWith(regexPrefix, StringComparison.Ordinal))
+        {
+            var pattern = value[regexPrefix.Length..];
+            if (pattern.Length == 0)
+            {
+                throw new ArgumentException(
+                    $"The {propertyName} regex pattern must not be empty.",
+                    propertyName);
+            }
+
+            try
+            {
+                _ = new Regex(pattern, RegexOptions.CultureInvariant);
+            }
+            catch (ArgumentException exception)
+            {
+                throw new ArgumentException(
+                    $"The {propertyName} regex pattern is invalid: {exception.Message}",
+                    propertyName,
+                    exception);
+            }
+
+            return new ExternalToolPer(ExternalToolPerMode.Regex, pattern);
+        }
+
+        throw new ArgumentException(
+            $"Invalid {propertyName} value '{value}'. Expected none, line, or regex:<pattern>.",
+            propertyName);
+    }
+
+    public IReadOnlyList<string> Split(string input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+
+        return Mode switch
+        {
+            ExternalToolPerMode.None => [input],
+            ExternalToolPerMode.Line => Regex.Split(input, "\\r\\n|\\r|\\n"),
+            ExternalToolPerMode.Regex => Regex.Split(
+                input,
+                Pattern ?? throw new InvalidOperationException("A regex per mode requires a pattern."),
+                RegexOptions.CultureInvariant),
+            _ => throw new InvalidOperationException($"Unsupported per mode: {Mode}.")
+        };
+    }
+}
+
+public sealed record ExternalToolOutputActions(
+    ExternalToolOutputMode OnSuccess,
+    ExternalToolOutputMode OnFailure)
+{
+    public ExternalToolOutputMode Select(bool succeeded) =>
+        succeeded ? OnSuccess : OnFailure;
+
+    public static ExternalToolOutputActions Ignore { get; } =
+        new(ExternalToolOutputMode.Ignore, ExternalToolOutputMode.Ignore);
 }
 
 public sealed record ExternalToolShortcut(
@@ -1220,12 +1305,22 @@ public sealed class ExternalToolRunner
     }
 }
 
-public sealed record ExternalToolOutput(
-    string? ReplacementText,
-    bool ReloadFile,
-    string? Error)
+public enum ExternalToolOutputChannel
 {
-    public bool IsSuccess => Error is null;
+    Mixed,
+    Stdout,
+    Stderr
+}
+
+public sealed record ExternalToolOutputAction(
+    ExternalToolOutputChannel Stream,
+    ExternalToolOutputMode Mode,
+    string Text);
+
+public sealed record ExternalToolOutput(
+    IReadOnlyList<ExternalToolOutputAction> Actions)
+{
+    public bool IsEmpty => Actions.Count == 0;
 }
 
 public static class ExternalToolOutputInterpreter
