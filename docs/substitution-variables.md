@@ -17,8 +17,10 @@ Variables are expanded in the following fields:
   table.
 
 Expansion is performed before each external process invocation. With
-`per` enabled, `${input}` is the current partition for that invocation; it is
-otherwise the empty string unless an invocation context sets it explicitly.
+`per` enabled, `${input}` is the current partition for that invocation; for
+`per = regex:...`, `${input:1}` and `${input:groupname}` refer to numbered and
+named capture groups. It is otherwise the empty string unless an invocation
+context sets it explicitly.
 The expanded arguments remain separate arguments; they are not passed through a
 shell.
 
@@ -45,6 +47,8 @@ These variables follow the names used by VS Code's predefined variables.
 | `${columnNumber}` | The one-based column number of the caret. |
 | `${selectedText}` | The currently selected text. |
 | `${input}` | The selected external-tool input for the current `per` invocation. |
+| `${input:1}` | The first numbered capture group for the current regex `per` invocation. |
+| `${input:groupname}` | The named capture group `groupname` for the current regex `per` invocation. |
 | `${execPath}` | The path of the running Azunote executable. |
 | `${pathSeparator}` | The operating system's path separator. |
 | `${/}` | A shorthand for `${pathSeparator}`. |

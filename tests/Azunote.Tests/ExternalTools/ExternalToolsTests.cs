@@ -88,6 +88,17 @@ public sealed class ExternalToolsTests
             context.Expand("${fileName}|${selection}|${filePath}"));
         Assert.Equal("", context.Expand("${input}"));
         Assert.Equal("per item", context.WithInput("per item").Expand("${input}"));
+        Assert.Equal("|", context.Expand("${input:1}|${input:groupname}"));
+        Assert.Equal(
+            "whole|first|named",
+            context.WithInput(
+                "whole",
+                new Dictionary<string, string>
+                {
+                    ["1"] = "first",
+                    ["groupname"] = "named"
+                })
+                .Expand("${input}|${input:1}|${input:groupname}"));
     }
 
     [Fact]
@@ -114,11 +125,19 @@ public sealed class ExternalToolsTests
     }
 
     [Fact]
-    public void External_tool_per_regex_preserves_empty_parts_and_capture_groups()
+    public void External_tool_per_regex_creates_parts_with_numbered_and_named_captures()
     {
-        var per = ExternalToolPer.Parse("regex:(,)");
+        var per = ExternalToolPer.Parse("regex:(?<item>[a-z]+)");
 
-        Assert.Equal(["a", ",", string.Empty, ",", "b"], per.Split("a,,b"));
+        var parts = per.GetInputParts("a,,b");
+
+        Assert.Equal(["a", "b"], parts.Select(part => part.Value));
+        var firstCaptures = parts[0].Captures!;
+        var secondCaptures = parts[1].Captures!;
+        Assert.Equal("a", firstCaptures["0"]);
+        Assert.Equal("a", firstCaptures["1"]);
+        Assert.Equal("a", firstCaptures["item"]);
+        Assert.Equal("b", secondCaptures["item"]);
     }
 
     [Fact]
@@ -127,6 +146,20 @@ public sealed class ExternalToolsTests
         Assert.Throws<ArgumentException>(() => ExternalToolPer.Parse("regex:"));
         Assert.Throws<ArgumentException>(() => ExternalToolPer.Parse("regex:["));
         Assert.Throws<ArgumentException>(() => ExternalToolPer.Parse("paragraph"));
+    }
+
+    [Fact]
+    public void Output_interpreter_ignores_output_actions_when_regex_has_no_matches()
+    {
+        var output = ExternalToolOutputInterpreter.Interpret(
+            new ExternalToolDefinition(
+                "formatter",
+                output: new ExternalToolOutputActions(
+                    ExternalToolOutputMode.ReplaceDocument,
+                    ExternalToolOutputMode.ReplaceDocument)),
+            new ExternalToolResult(0, string.Empty, string.Empty, string.Empty, 0));
+
+        Assert.True(output.IsEmpty);
     }
 
     [Fact]
@@ -877,6 +910,49 @@ public sealed class ExternalToolsTests
             var csharp = Assert.Single(formatting.Children);
             Assert.Equal("CSharp", csharp.Name);
             Assert.Same(tool, Assert.Single(csharp.Children).Tool);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Runner_expands_regex_capture_groups_for_each_input_match()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            $"azunote external input captures {Guid.NewGuid():N}");
+        var scriptPath = Path.Combine(root, "echo input captures.cmd");
+        try
+        {
+            Directory.CreateDirectory(root);
+            await File.WriteAllTextAsync(
+                scriptPath,
+                "@echo off\r\n"
+                + "set /p VALUE=\r\n"
+                + "echo [%VALUE%]\r\n");
+
+            var result = await ExternalToolRunner.RunAsync(
+                new ExternalToolDefinition(
+                    scriptPath,
+                    inputMode: ExternalToolInputMode.Document,
+                    per: "regex:(?<key>[a-z])=(?<value>[0-9])",
+                    stdin: "${input};${input:key};${input:value}"),
+                new ExternalToolContext(null, "a=1 b=2", string.Empty));
+
+            Assert.True(result.Succeeded, result.StandardError);
+            Assert.Equal(
+                "[a=1;a;1]\r\n[b=2;b;2]\r\n",
+                result.StandardOutput);
         }
         finally
         {

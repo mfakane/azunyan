@@ -204,6 +204,24 @@ public sealed class AzunoteConfigurationCompletionProviderTests
     }
 
     [Fact]
+    public async Task Tool_schema_completes_regex_input_capture_placeholders_in_stdin()
+    {
+        const string text = "[launch]\nstdin = \"${input:";
+        var provider = new AzunoteConfigurationCompletionProvider(
+            [AzunoteSchemaCatalog.ExternalTool]);
+
+        var result = await provider.GetCompletionsAsync(
+            new EditorProviderContext(
+                new TextSnapshot(text),
+                text.Length,
+                TextSelection.Caret(text.Length)));
+
+        Assert.NotNull(result);
+        Assert.Contains(result!.Items, item => item.Label == "${input:1}");
+        Assert.Contains(result.Items, item => item.Label == "${input:groupname}");
+    }
+
+    [Fact]
     public async Task Tool_schema_completes_path_separator_shorthand()
     {
         const string text = "[launch]\nargs = [\"${/";

@@ -71,7 +71,7 @@ NODE_ENV = "development"
 | `args` | Optional array of strings | Arguments passed to the process. Defaults to an empty array. |
 | `workingDirectory` | Optional string | Working directory. Relative paths are resolved from the tool definition directory. If omitted, the current document's directory is used when available; otherwise the Azunote process directory is used. |
 | `input` | `none`, `filePath`, `document`, `selection` | Selects the value exposed as `${input}`. It is not written to standard input automatically. |
-| `per` | `none`, `line`, `regex:<pattern>` | Splits the input value and runs the tool once for each part. |
+| `per` | `none`, `line`, `regex:<pattern>` | Runs once for the input, each line, or each regex match. |
 | `stdin` | String | Text written to standard input after substitution expansion. Empty by default. |
 | `output` | Action or two-item array | Handles the mixed stdout/stderr stream. An array is `[zero, non-zero]`. |
 | `stdout` | Action or two-item array | Handles stdout only. An array is `[zero, non-zero]`. |
@@ -120,11 +120,13 @@ remains visible but is disabled in those cases.
 - `document`: expose the complete document text.
 - `selection`: expose the selected text.
 
-`per` controls how the selected input is split. `none` runs the tool once.
+`per` controls how the selected input is partitioned. `none` runs the tool once.
 `line` removes CRLF/LF/CR separators and preserves empty parts. `regex:<pattern>`
-uses .NET regular-expression splitting and preserves empty parts and captured
-groups. Runs are sequential, and all runs happen even when one exits with a
-non-zero code.
+uses .NET regular-expression matching and runs the tool once for each match.
+For a regex run, `${input}` is the complete match, while `${input:1}` and
+`${input:groupname}` refer to numbered and named capture groups. If the regex
+has no matches, the tool is not invoked. Runs are sequential, and all runs
+happen even when one exits with a non-zero code.
 
 `stdin` is expanded separately for each run and is the only configured value
 written to standard input. For example:

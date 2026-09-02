@@ -81,22 +81,54 @@ public sealed record ExternalToolPer(
             propertyName);
     }
 
-    public IReadOnlyList<string> Split(string input)
+    public IReadOnlyList<ExternalToolInputPart> GetInputParts(string input)
     {
         ArgumentNullException.ThrowIfNull(input);
 
         return Mode switch
         {
-            ExternalToolPerMode.None => [input],
-            ExternalToolPerMode.Line => Regex.Split(input, "\\r\\n|\\r|\\n"),
-            ExternalToolPerMode.Regex => Regex.Split(
+            ExternalToolPerMode.None => [new ExternalToolInputPart(input)],
+            ExternalToolPerMode.Line => Regex.Split(input, "\\r\\n|\\r|\\n")
+                .Select(part => new ExternalToolInputPart(part))
+                .ToArray(),
+            ExternalToolPerMode.Regex => GetRegexInputParts(
                 input,
-                Pattern ?? throw new InvalidOperationException("A regex per mode requires a pattern."),
-                RegexOptions.CultureInvariant),
+                Pattern ?? throw new InvalidOperationException("A regex per mode requires a pattern.")),
             _ => throw new InvalidOperationException($"Unsupported per mode: {Mode}.")
         };
     }
+
+    public IReadOnlyList<string> Split(string input) =>
+        GetInputParts(input)
+            .Select(part => part.Value)
+            .ToArray();
+
+    private static ExternalToolInputPart[] GetRegexInputParts(
+        string input,
+        string pattern)
+    {
+        var regex = new Regex(pattern, RegexOptions.CultureInvariant);
+        var groupNumbers = regex.GetGroupNumbers();
+        return regex.Matches(input)
+            .Select(match =>
+            {
+                var captures = new Dictionary<string, string>(StringComparer.Ordinal);
+                foreach (var number in groupNumbers)
+                {
+                    var value = match.Groups[number].Value;
+                    captures[number.ToString(System.Globalization.CultureInfo.InvariantCulture)] = value;
+                    captures[regex.GroupNameFromNumber(number)] = value;
+                }
+
+                return new ExternalToolInputPart(match.Value, captures);
+            })
+            .ToArray();
+    }
 }
+
+public sealed record ExternalToolInputPart(
+    string Value,
+    IReadOnlyDictionary<string, string>? Captures = null);
 
 public sealed record ExternalToolOutputActions(
     ExternalToolOutputMode OnSuccess,
@@ -408,6 +440,13 @@ public sealed partial record ExternalToolContext
     /// </summary>
     public string Input { get; init; } = string.Empty;
 
+    /// <summary>
+    /// Captured groups for the current regex <c>per</c> invocation. Numeric
+    /// group names, including group zero, are included alongside named groups.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> InputCaptures { get; init; } =
+        EmptyInputCaptures;
+
     public int LineNumber { get; }
 
     public int ColumnNumber { get; }
@@ -464,6 +503,14 @@ public sealed partial record ExternalToolContext
                 }
 
                 return Environment.GetEnvironmentVariable(name[4..]) ?? string.Empty;
+            }
+
+            if (name.StartsWith("input:", StringComparison.Ordinal))
+            {
+                var captureName = name[6..];
+                return InputCaptures.TryGetValue(captureName, out var capture)
+                    ? capture
+                    : string.Empty;
             }
 
             return name switch
@@ -534,11 +581,20 @@ public sealed partial record ExternalToolContext
         _ => throw new ArgumentOutOfRangeException(nameof(inputMode))
     };
 
-    public ExternalToolContext WithInput(string input)
+    public ExternalToolContext WithInput(
+        string input,
+        IReadOnlyDictionary<string, string>? captures = null)
     {
         ArgumentNullException.ThrowIfNull(input);
-        return this with { Input = input };
+        return this with
+        {
+            Input = input,
+            InputCaptures = captures ?? EmptyInputCaptures
+        };
     }
+
+    private static IReadOnlyDictionary<string, string> EmptyInputCaptures { get; } =
+        new Dictionary<string, string>(StringComparer.Ordinal);
 
     private string? GetRelativeWorkspacePath(string? path)
     {
@@ -1148,7 +1204,8 @@ public sealed record ExternalToolResult(
     int ExitCode,
     string StandardOutput,
     string StandardError,
-    string MixedOutput)
+    string MixedOutput,
+    int InvocationCount = 1)
 {
     public bool Succeeded => ExitCode == 0;
 }
@@ -1175,13 +1232,15 @@ public sealed class ExternalToolRunner
         var mixedOutput = new StringBuilder();
         var succeeded = true;
         var exitCode = 0;
+        var invocationCount = 0;
 
-        foreach (var input in definition.Per.Split(sourceInput))
+        foreach (var inputPart in definition.Per.GetInputParts(sourceInput))
         {
             cancellationToken.ThrowIfCancellationRequested();
+            invocationCount++;
             var result = await RunSingleAsync(
                 definition,
-                context.WithInput(input),
+                context.WithInput(inputPart.Value, inputPart.Captures),
                 cancellationToken);
             standardOutput.Append(result.StandardOutput);
             standardError.Append(result.StandardError);
@@ -1202,7 +1261,8 @@ public sealed class ExternalToolRunner
             succeeded ? 0 : exitCode,
             standardOutput.ToString(),
             standardError.ToString(),
-            mixedOutput.ToString());
+            mixedOutput.ToString(),
+            invocationCount);
     }
 
     private static async Task<ExternalToolResult> RunSingleAsync(
@@ -1392,6 +1452,17 @@ public sealed class ExternalToolRunner
                 StringComparison.Ordinal);
         }
 
+        foreach (var capture in context.InputCaptures.Values)
+        {
+            if (!string.IsNullOrEmpty(capture))
+            {
+                argument = argument.Replace(
+                    capture,
+                    "<input capture>",
+                    StringComparison.Ordinal);
+            }
+        }
+
         if (!string.IsNullOrEmpty(context.Input))
         {
             argument = argument.Replace(
@@ -1466,6 +1537,11 @@ public static class ExternalToolOutputInterpreter
     {
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(result);
+
+        if (result.InvocationCount == 0)
+        {
+            return new ExternalToolOutput([]);
+        }
 
         var actions = new[]
         {
