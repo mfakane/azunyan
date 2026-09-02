@@ -106,6 +106,24 @@ public sealed class AzunoteConfigurationCompletionProviderTests
     }
 
     [Fact]
+    public async Task Tool_schema_completes_output_actions_inside_a_string()
+    {
+        const string text = "[launch]\noutput = \"re";
+        var provider = new AzunoteConfigurationCompletionProvider(
+            [AzunoteSchemaCatalog.ExternalTool]);
+
+        var result = await provider.GetCompletionsAsync(
+            new EditorProviderContext(
+                new TextSnapshot(text),
+                text.Length,
+                TextSelection.Caret(text.Length)));
+
+        Assert.NotNull(result);
+        Assert.Contains(result!.Items, item => item.Label == "\"replaceDocument\"");
+        Assert.Contains(result.Items, item => item.Label == "\"replaceSelection\"");
+    }
+
+    [Fact]
     public async Task Mode_schema_completes_rule_enum_values_in_array_tables()
     {
         const string text = "[[rules]]\ntype = \"re";
@@ -166,6 +184,23 @@ public sealed class AzunoteConfigurationCompletionProviderTests
 
         Assert.NotNull(result);
         Assert.Contains(result!.Items, item => item.Label == "${document}");
+    }
+
+    [Fact]
+    public async Task Tool_schema_completes_input_placeholder_in_stdin()
+    {
+        const string text = "[launch]\nstdin = \"${in";
+        var provider = new AzunoteConfigurationCompletionProvider(
+            [AzunoteSchemaCatalog.ExternalTool]);
+
+        var result = await provider.GetCompletionsAsync(
+            new EditorProviderContext(
+                new TextSnapshot(text),
+                text.Length,
+                TextSelection.Caret(text.Length)));
+
+        Assert.NotNull(result);
+        Assert.Contains(result!.Items, item => item.Label == "${input}");
     }
 
     [Fact]

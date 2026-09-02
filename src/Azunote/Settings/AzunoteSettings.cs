@@ -85,7 +85,8 @@ public sealed class AzunoteDebugSettings
 
 [TomlSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
-    WriteIndented = true)]
+    WriteIndented = true,
+    Converters = [typeof(ExternalToolOutputActionsTomlConverter)])]
 [TomlSerializable(typeof(AzunoteSettings))]
 [TomlSerializable(typeof(AzunoteDebugSettings))]
 [TomlSerializable(typeof(AzunoteState))]
@@ -98,6 +99,83 @@ public sealed class AzunoteDebugSettings
 [TomlSerializable(typeof(CustomSyntaxRuleSettings))]
 internal sealed partial class AzunoteTomlSerializerContext : TomlSerializerContext
 {
+}
+
+public sealed class ExternalToolOutputActionsTomlConverter
+    : TomlConverter<ExternalToolOutputActions>
+{
+    public override ExternalToolOutputActions Read(TomlReader reader)
+    {
+        if (reader.TokenType == TomlTokenType.String)
+        {
+            return Parse([reader.GetString()], reader);
+        }
+
+        if (reader.TokenType != TomlTokenType.StartArray)
+        {
+            throw reader.CreateException(
+                "Expected an external-tool output action or a two-element action array.");
+        }
+
+        var values = new List<string>();
+        while (reader.Read() && reader.TokenType != TomlTokenType.EndArray)
+        {
+            if (reader.TokenType != TomlTokenType.String)
+            {
+                throw reader.CreateException(
+                    "External-tool output action arrays may contain only strings.");
+            }
+
+            values.Add(reader.GetString());
+        }
+
+        if (reader.TokenType != TomlTokenType.EndArray)
+        {
+            throw reader.CreateException("The external-tool output action array was not closed.");
+        }
+
+        var result = Parse(values, reader);
+        reader.Read();
+        return result;
+    }
+
+    public override void Write(
+        TomlWriter writer,
+        ExternalToolOutputActions value)
+    {
+        writer.WriteStartArray();
+        writer.WriteStringValue(ExternalToolEnumValues.ToTomlValue(value.OnSuccess));
+        writer.WriteStringValue(ExternalToolEnumValues.ToTomlValue(value.OnFailure));
+        writer.WriteEndArray();
+    }
+
+    private static ExternalToolOutputActions Parse(
+        List<string> values,
+        TomlReader reader)
+    {
+        if (values.Count is not (1 or 2))
+        {
+            throw reader.CreateException(
+                "External-tool output actions must contain one or two values.");
+        }
+
+        try
+        {
+            var success = ExternalToolEnumValues.Parse<ExternalToolOutputMode>(
+                values[0],
+                "external-tool output action");
+            var failure = values.Count == 1
+                ? success
+                : ExternalToolEnumValues.Parse<ExternalToolOutputMode>(
+                    values[1],
+                    "external-tool output action");
+            return new ExternalToolOutputActions(success, failure);
+        }
+        catch (SettingsFileException exception)
+        {
+            throw reader.CreateException(exception.Message);
+        }
+    }
 }
 
 public sealed class ShellCommandSettings
@@ -188,7 +266,18 @@ public sealed class ExternalToolLaunchSettings
 
     public string Input { get; set; } = ExternalToolEnumValues.ToTomlValue(ExternalToolInputMode.None);
 
-    public string Output { get; set; } = ExternalToolEnumValues.ToTomlValue(ExternalToolOutputMode.Ignore);
+    public string Per { get; set; } = "none";
+
+    public string Stdin { get; set; } = string.Empty;
+
+    [TomlConverter(typeof(ExternalToolOutputActionsTomlConverter))]
+    public ExternalToolOutputActions Output { get; set; } = ExternalToolOutputActions.Ignore;
+
+    [TomlConverter(typeof(ExternalToolOutputActionsTomlConverter))]
+    public ExternalToolOutputActions Stdout { get; set; } = ExternalToolOutputActions.Ignore;
+
+    [TomlConverter(typeof(ExternalToolOutputActionsTomlConverter))]
+    public ExternalToolOutputActions Stderr { get; set; } = ExternalToolOutputActions.Ignore;
 }
 
 public sealed class ExternalToolWhenSettings
@@ -245,7 +334,11 @@ public sealed class ExternalToolSettings
             Launch.Command,
             Launch.Arguments,
             ExternalToolEnumValues.Parse<ExternalToolInputMode>(Launch.Input, "launch.input"),
-            ExternalToolEnumValues.Parse<ExternalToolOutputMode>(Launch.Output, "launch.output"),
+            Launch.Per,
+            Launch.Stdin,
+            Launch.Output,
+            Launch.Stdout,
+            Launch.Stderr,
             Launch.WorkingDirectory,
             Environment,
             DefinitionDirectory);
@@ -255,6 +348,10 @@ public sealed class ExternalToolSettings
     {
         Launch ??= new();
         Launch.Arguments ??= [];
+        Launch.Stdin ??= string.Empty;
+        Launch.Output ??= ExternalToolOutputActions.Ignore;
+        Launch.Stdout ??= ExternalToolOutputActions.Ignore;
+        Launch.Stderr ??= ExternalToolOutputActions.Ignore;
         Environment ??= new(StringComparer.OrdinalIgnoreCase);
         When ??= new();
         When.Extensions ??= [];
@@ -273,7 +370,14 @@ public sealed class ExternalToolSettings
         }
 
         _ = ExternalToolEnumValues.Parse<ExternalToolInputMode>(Launch.Input, "launch.input");
-        _ = ExternalToolEnumValues.Parse<ExternalToolOutputMode>(Launch.Output, "launch.output");
+        try
+        {
+            _ = ExternalToolPer.Parse(Launch.Per, "launch.per");
+        }
+        catch (ArgumentException exception)
+        {
+            throw new SettingsFileException(exception.Message, exception);
+        }
         _ = ExternalToolEnumValues.Parse<ExternalToolVisibility>(Visibility, nameof(Visibility));
         _ = ExternalToolEnumValues.Parse<ExternalToolFileCondition>(When.File, "when.file");
         _ = ExternalToolEnumValues.Parse<ExternalToolSelectionCondition>(When.Selection, "when.selection");

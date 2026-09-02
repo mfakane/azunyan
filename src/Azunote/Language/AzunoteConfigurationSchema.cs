@@ -101,7 +101,11 @@ public static class AzunoteSchemaCatalog
                     Field("args", AzunoteSchemaValueKind.Array, "property", supportsPlaceholders: true),
                     Field("workingDirectory", AzunoteSchemaValueKind.String, "path", supportsPlaceholders: true),
                     EnumField("input", "none", "filePath", "document", "selection"),
-                    EnumField("output", "ignore", "replaceDocument", "replaceSelection", "newDocument", "reloadFile")
+                    Field("per", AzunoteSchemaValueKind.String, documentation: "none, line, or regex:<pattern>"),
+                    Field("stdin", AzunoteSchemaValueKind.String, supportsPlaceholders: true),
+                    OutputActionField("output"),
+                    OutputActionField("stdout"),
+                    OutputActionField("stderr")
                 ]),
             new AzunoteSchemaTable(
                 "when",
@@ -208,6 +212,13 @@ public static class AzunoteSchemaCatalog
             Documentation: documentation,
             SupportsPlaceholders: supportsPlaceholders);
 
+    private static AzunoteSchemaField OutputActionField(string name) =>
+        new(
+            name,
+            AzunoteSchemaValueKind.Enum,
+            AllowedValues: ["ignore", "replaceDocument", "replaceSelection", "newDocument", "reloadFile"],
+            Documentation: "An action or [zero-action, non-zero-action].");
+
     private static AzunoteSchemaField EnumField(
         string name,
         params string[] values) =>
@@ -240,6 +251,7 @@ internal static class AzunotePlaceholderCatalog
         new("lineNumber", "Placeholder", "One-based line number of the caret.", "${lineNumber} -> 42"),
         new("columnNumber", "Placeholder", "One-based column number of the caret.", "${columnNumber} -> 7"),
         new("selectedText", "Placeholder", "The currently selected text.", "${selectedText} -> selected text"),
+        new("input", "Placeholder", "The input payload for the current external-tool invocation.", "${input} -> selected text"),
         new("execPath", "Placeholder", "Path to the running Azunote executable.", "${execPath} -> C:\\Program Files\\Azunote\\Azunote.exe"),
         new("pathSeparator", "Placeholder", "Character used by the operating system to separate path components.", "${pathSeparator} -> <separator>"),
         new("/", "Placeholder", "Shorthand for pathSeparator.", "${/} -> <separator>"),

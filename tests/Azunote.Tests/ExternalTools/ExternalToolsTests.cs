@@ -847,7 +847,11 @@ public sealed class ExternalToolsTests
                 command = "prettier"
                 args = ["--write", "${file}"]
                 input = "filePath"
-                output = "reloadFile"
+                per = "line"
+                stdin = "${input}"
+                output = ["reloadFile", "ignore"]
+                stdout = "newDocument"
+                stderr = ["ignore", "newDocument"]
                 """);
 
             var settings = await SettingsFileService.LoadAsync(root);
@@ -858,7 +862,14 @@ public sealed class ExternalToolsTests
             Assert.Equal("prettier", definition.FileName);
             Assert.Equal(["--write", "${file}"], definition.Arguments);
             Assert.Equal(ExternalToolInputMode.FilePath, definition.InputMode);
-            Assert.Equal(ExternalToolOutputMode.ReloadFile, definition.OutputMode);
+            Assert.Equal(ExternalToolPerMode.Line, definition.Per.Mode);
+            Assert.Equal("${input}", definition.Stdin);
+            Assert.Equal(ExternalToolOutputMode.ReloadFile, definition.Output.OnSuccess);
+            Assert.Equal(ExternalToolOutputMode.Ignore, definition.Output.OnFailure);
+            Assert.Equal(ExternalToolOutputMode.NewDocument, definition.Stdout.OnSuccess);
+            Assert.Equal(ExternalToolOutputMode.NewDocument, definition.Stdout.OnFailure);
+            Assert.Equal(ExternalToolOutputMode.Ignore, definition.Stderr.OnSuccess);
+            Assert.Equal(ExternalToolOutputMode.NewDocument, definition.Stderr.OnFailure);
             Assert.Equal(Path.GetFullPath(toolPath), tool.DefinitionPath);
 
             var formatting = Assert.Single(settings.ExternalToolMenu);
