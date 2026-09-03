@@ -156,6 +156,39 @@ public sealed class AzunoteUiTests : IClassFixture<AzunoteUiFixture>
     }
 
     [AzunoteUiFact]
+    public void Undo_and_redo_keep_the_projected_editor_alive_after_value_update()
+    {
+        var editor = _fixture.Editor;
+        var window = _fixture.Window;
+        var valuePattern = AzunoteUiFixture.WaitForValuePattern(editor);
+        var original = valuePattern.Current.Value;
+        var replacement = original + "\nUndo/redo UI verification";
+
+        try
+        {
+            valuePattern.SetValue(replacement);
+            AzunoteUiFixture.WaitForValuePattern(
+                editor,
+                value => string.Equals(value, replacement, StringComparison.Ordinal));
+
+            AzunoteUiFixture.InvokeMenuItem(window, "Edit", "Undo");
+            AzunoteUiFixture.WaitForValuePattern(
+                editor,
+                value => string.Equals(value, original, StringComparison.Ordinal));
+
+            AzunoteUiFixture.InvokeMenuItem(window, "Edit", "Redo");
+            var restored = AzunoteUiFixture.WaitForValuePattern(
+                editor,
+                value => string.Equals(value, replacement, StringComparison.Ordinal));
+            Assert.Equal(replacement, restored.Current.Value);
+        }
+        finally
+        {
+            AzunoteUiFixture.WaitForValuePattern(editor).SetValue(original);
+        }
+    }
+
+    [AzunoteUiFact]
     public void Projected_range_remains_bound_to_old_snapshot_after_value_update()
     {
         var editor = _fixture.Editor;
@@ -568,7 +601,7 @@ public sealed class AzunoteUiFixture : IDisposable
             "tests",
             "Azunote.UiTests",
             "TestAssets",
-            "verification.txt");
+            "verification.toml");
         return File.Exists(path)
             ? path
             : throw new XunitException($"Verification document was not found: {path}");

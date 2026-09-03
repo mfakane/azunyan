@@ -1,0 +1,8 @@
+# Azunyan UI verification
+title = "Azunyan UI verification"
+message = "日本語の入力とカーソル位置を確認します。"
+emoji = "😀 👍🏽"
+combining = "é"
+arabic = "مرحبا بالعالم"
+hebrew = "שלום עולם"
+features = "completion folding inlay"

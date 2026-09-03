@@ -22,5 +22,6 @@
 
   <ItemGroup>
     <None Include="TestAssets\verification.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="TestAssets\verification.toml" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

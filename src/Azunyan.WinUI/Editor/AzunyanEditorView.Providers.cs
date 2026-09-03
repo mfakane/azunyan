@@ -93,20 +93,27 @@ public sealed partial class AzunyanEditorView
 
         DispatcherQueue.TryEnqueue(() =>
         {
-            if (!IsLoaded
-                || generation != _documentProviderGeneration
-                || !ReferenceEquals(result.Snapshot, Snapshot))
+            try
             {
-                return;
-            }
+                if (!IsLoaded
+                    || generation != _documentProviderGeneration
+                    || !ReferenceEquals(result.Snapshot, Snapshot))
+                {
+                    return;
+                }
 
-            var currentFrame = GetCurrentFrame();
-            PublishProviderFrame(new EditorProviderFrame(
-                result.Snapshot,
-                Document.Selection,
-                result,
-                currentFrame?.Viewport,
-                currentFrame?.Position));
+                var currentFrame = GetCurrentFrame();
+                PublishProviderFrame(new EditorProviderFrame(
+                    result.Snapshot,
+                    Document.Selection,
+                    result,
+                    currentFrame?.Viewport,
+                    currentFrame?.Position));
+            }
+            catch (Exception exception)
+            {
+                ReportDiagnosticException("DocumentProviderResult", exception);
+            }
         });
     }
 
@@ -131,20 +138,27 @@ public sealed partial class AzunyanEditorView
 
         DispatcherQueue.TryEnqueue(() =>
         {
-            if (!IsLoaded
-                || generation != _viewportProviderGeneration
-                || !ReferenceEquals(result.Context.Snapshot, Snapshot))
+            try
             {
-                return;
-            }
+                if (!IsLoaded
+                    || generation != _viewportProviderGeneration
+                    || !ReferenceEquals(result.Context.Snapshot, Snapshot))
+                {
+                    return;
+                }
 
-            var currentFrame = GetCurrentFrame();
-            PublishProviderFrame(new EditorProviderFrame(
-                result.Context.Snapshot,
-                Document.Selection,
-                currentFrame?.Document,
-                result,
-                currentFrame?.Position));
+                var currentFrame = GetCurrentFrame();
+                PublishProviderFrame(new EditorProviderFrame(
+                    result.Context.Snapshot,
+                    Document.Selection,
+                    currentFrame?.Document,
+                    result,
+                    currentFrame?.Position));
+            }
+            catch (Exception exception)
+            {
+                ReportDiagnosticException("ViewportProviderResult", exception);
+            }
         });
     }
 
@@ -169,20 +183,27 @@ public sealed partial class AzunyanEditorView
 
         DispatcherQueue.TryEnqueue(() =>
         {
-            if (!IsLoaded
-                || generation != _positionProviderGeneration
-                || !ReferenceEquals(result.Context.Snapshot, Snapshot))
+            try
             {
-                return;
-            }
+                if (!IsLoaded
+                    || generation != _positionProviderGeneration
+                    || !ReferenceEquals(result.Context.Snapshot, Snapshot))
+                {
+                    return;
+                }
 
-            var currentFrame = GetCurrentFrame();
-            PublishProviderFrame(new EditorProviderFrame(
-                result.Context.Snapshot,
-                Document.Selection,
-                currentFrame?.Document,
-                currentFrame?.Viewport,
-                result));
+                var currentFrame = GetCurrentFrame();
+                PublishProviderFrame(new EditorProviderFrame(
+                    result.Context.Snapshot,
+                    Document.Selection,
+                    currentFrame?.Document,
+                    currentFrame?.Viewport,
+                    result));
+            }
+            catch (Exception exception)
+            {
+                ReportDiagnosticException("PositionProviderResult", exception);
+            }
         });
     }
 

@@ -539,7 +539,17 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     private void SetTextCore(string text)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         var oldText = Snapshot.Text;
+        _providerScheduler.CancelAll();
+        InvalidateProviderGenerations();
+        _providerFrame = null;
+        _pendingProviderDocumentChange = null;
+        _pendingAutomationDocumentChange = null;
         _document.Changed -= OnInputDocumentChanged;
         _document.SelectionChanged -= OnDocumentSelectionChanged;
         _document.CaretSetChanged -= OnDocumentCaretSetChanged;
@@ -552,6 +562,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         SyncInputWindow();
         RenderViewport();
         _automationPeer?.NotifyTextChanged(oldText, Snapshot.Text);
+        RequestProviderResults(true, true, true);
     }
 
     public void SetDocumentSelection(TextSelection selection)
@@ -674,12 +685,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     {
         var hadBlockSelection = _blockSelection is not null;
         _blockSelection = null;
-        var result = _document.Undo();
-        if (result)
-        {
-            SyncInputWindow();
-        }
-        else if (hadBlockSelection)
+        var result = ApplyHistoryCommand(_document.Undo);
+        if (!result && hadBlockSelection)
         {
             RenderViewport();
         }
@@ -702,16 +709,20 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     {
         var hadBlockSelection = _blockSelection is not null;
         _blockSelection = null;
-        var result = _document.Redo();
-        if (result)
-        {
-            SyncInputWindow();
-        }
-        else if (hadBlockSelection)
+        var result = ApplyHistoryCommand(_document.Redo);
+        if (!result && hadBlockSelection)
         {
             RenderViewport();
         }
 
+        return result;
+    }
+
+    private bool ApplyHistoryCommand(Func<bool> command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        var result = false;
+        ApplyDocumentCommand(() => result = command());
         return result;
     }
 
