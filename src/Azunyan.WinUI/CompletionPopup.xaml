@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="Azunyan.WinUI.CompletionPopup"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Popup
+        x:Name="PopupHost"
+        IsLightDismissEnabled="False"
+        IsOpen="False">
+        <Border
+            x:Name="PopupBorder"
+            Width="640"
+            MaxHeight="240"
+            Background="Transparent"
+            BorderBrush="Transparent"
+            BorderThickness="1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="320" />
+                    <ColumnDefinition Width="320" />
+                </Grid.ColumnDefinitions>
+                <ListView
+                    x:Name="CompletionList"
+                    Grid.Column="0"
+                    MaxHeight="238"
+                    Background="Transparent"
+                    Foreground="Transparent"
+                    IsItemClickEnabled="True"
+                    SelectionMode="Single" />
+                <Border
+                    x:Name="CompletionDetailsBorder"
+                    Grid.Column="1"
+                    Padding="10,7"
+                    Background="Transparent"
+                    BorderBrush="Transparent"
+                    BorderThickness="1,0,0,0"
+                    Visibility="Collapsed">
+                    <ScrollViewer
+                        MaxHeight="238"
+                        VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <TextBlock
+                                x:Name="CompletionDetailsTitle"
+                                FontWeight="SemiBold"
+                                TextWrapping="Wrap" />
+                            <TextBlock
+                                x:Name="CompletionDetailsContent"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </Border>
+    </Popup>
+</UserControl>

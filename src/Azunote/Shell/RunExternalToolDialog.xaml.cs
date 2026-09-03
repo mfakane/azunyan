@@ -1,3 +1,5 @@
+using Azunyan.Core;
+using Azunyan.WinUI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
@@ -6,6 +8,7 @@ namespace Azunote;
 internal sealed partial class RunExternalToolDialog : ContentDialog
 {
     private readonly ExternalToolCommandSuggestionProvider _commandSuggestionProvider = new();
+    private readonly List<TextBoxCompletionController> _completionControllers = [];
 
     public RunExternalToolDialog()
     {
@@ -21,8 +24,22 @@ internal sealed partial class RunExternalToolDialog : ContentDialog
         ModeSelector.SelectedItem = ExecutableModeItem;
         ModeSelector.SelectionChanged += (_, _) => UpdateCommandModeFields();
         PerModeBox.SelectionChanged += (_, _) => UpdatePerFields();
-        CommandBox.TextChanged += CommandBox_TextChanged;
-        CommandBox.SuggestionChosen += CommandBox_SuggestionChosen;
+
+        _completionControllers.Add(new TextBoxCompletionController(
+            CommandBox,
+            CommandCompletionPopup,
+            DialogRoot,
+            GetCommandCompletions));
+        _completionControllers.Add(new TextBoxCompletionController(
+            ArgumentsBox,
+            ArgumentsCompletionPopup,
+            DialogRoot,
+            ExternalToolPlaceholderCompletionProvider.GetCompletions));
+        _completionControllers.Add(new TextBoxCompletionController(
+            StdinBox,
+            StdinCompletionPopup,
+            DialogRoot,
+            ExternalToolPlaceholderCompletionProvider.GetCompletions));
 
         UpdateCommandModeFields();
         UpdatePerFields();
@@ -33,44 +50,51 @@ internal sealed partial class RunExternalToolDialog : ContentDialog
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (await base.ShowAsync() != ContentDialogResult.Primary
-            || string.IsNullOrWhiteSpace(CommandBox.Text))
+        try
+        {
+            if (await base.ShowAsync() != ContentDialogResult.Primary
+                || string.IsNullOrWhiteSpace(CommandBox.Text))
+            {
+                return null;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            return CreateDefinition();
+        }
+        finally
+        {
+            DisposeCompletionControllers();
+        }
+    }
+
+    private CompletionResult? GetCommandCompletions(string text, int position)
+    {
+        var placeholderResult = ExternalToolPlaceholderCompletionProvider.GetCompletions(text, position);
+        if (placeholderResult is not null
+            || (position == text.Length
+                && (text.EndsWith('$')
+                    || text.Contains("${", StringComparison.Ordinal))))
+        {
+            return placeholderResult;
+        }
+
+        if (position != text.Length || string.IsNullOrWhiteSpace(text))
         {
             return null;
         }
 
-        cancellationToken.ThrowIfCancellationRequested();
-        return CreateDefinition();
-    }
-
-    private void CommandBox_TextChanged(
-        AutoSuggestBox sender,
-        AutoSuggestBoxTextChangedEventArgs args)
-    {
-        if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput)
-        {
-            return;
-        }
-
-        var suggestions = _commandSuggestionProvider.GetSuggestions(sender.Text);
-        sender.ItemsSource = suggestions;
-        sender.IsSuggestionListOpen = suggestions.Count > 0;
-    }
-
-    private static void CommandBox_SuggestionChosen(
-        AutoSuggestBox sender,
-        AutoSuggestBoxSuggestionChosenEventArgs args)
-    {
-        if (args.SelectedItem is string suggestion)
-        {
-            sender.Text = suggestion;
-            sender.IsSuggestionListOpen = false;
-        }
+        var items = _commandSuggestionProvider.GetSuggestions(text)
+            .Select(suggestion => new CompletionItem(suggestion))
+            .ToArray();
+        return new CompletionResult(
+            TextRange.FromBounds(0, text.Length),
+            items);
     }
 
     private void UpdateCommandModeFields()
     {
         var mode = ReadCommandMode();
+        ArgumentsCompletionPopup.Hide();
         CommandBox.PlaceholderText = mode switch
         {
             ExternalToolCommandMode.Cmd => "echo Hello",
@@ -124,4 +148,14 @@ internal sealed partial class RunExternalToolDialog : ContentDialog
             : ModeSelector.SelectedItem == PowerShellModeItem
                 ? ExternalToolCommandMode.Pwsh
                 : ExternalToolCommandMode.Executable;
+
+    private void DisposeCompletionControllers()
+    {
+        foreach (var controller in _completionControllers)
+        {
+            controller.Dispose();
+        }
+
+        _completionControllers.Clear();
+    }
 }

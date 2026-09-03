@@ -72,7 +72,6 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private bool _completionRequested;
     private bool _explicitCompletionRequested;
     private bool _applyingCompletion;
-    private IReadOnlyList<CompletionItem>? _displayedCompletionItems;
     private readonly List<MenuFlyoutItemBase> _additionalContextMenuItems = [];
     private MenuFlyoutSeparator? _additionalContextMenuSeparator;
     private string[] _completionTriggerCharacters = Array.Empty<string>();
@@ -131,12 +130,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         EditorPointerSurface.PointerExited += OnInputPointerExited;
         EditorPointerSurface.ContextRequested += OnEditorContextRequested;
         InputWindow.NativeTextBoxControl.ContextFlyout = EditorContextMenu;
-        CompletionList.ItemClick += OnCompletionItemClick;
-        CompletionList.SelectionChanged += OnCompletionSelectionChanged;
-        CompletionList.AddHandler(
-            UIElement.KeyDownEvent,
-            new KeyEventHandler(OnCompletionListKeyDown),
-            true);
+        CompletionPopup.Accepted += CompletionPopup_Accepted;
         ProjectedVerticalScrollBar.ValueChanged += OnProjectedVerticalScrollChanged;
         InputWindow.NativeTextBoxControl.AllowDrop = true;
         InputWindow.NativeTextBoxControl.IsSpellCheckEnabled = false;
@@ -162,6 +156,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         _pasteBatchRefreshTimer = null;
         InputWindow.NativeTextBoxControl.BeforeKeyDown -= OnInputKeyDown;
         InputWindow.NativeTextBoxControl.AfterKeyUp -= OnInputKeyUp;
+        CompletionPopup.Accepted -= CompletionPopup_Accepted;
         SetAdditionalContextMenuItems([]);
         InputWindow.NativeTextBoxControl.ContextFlyout = null;
         EditorPointerSurface.ContextRequested -= OnEditorContextRequested;
@@ -1926,11 +1921,11 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             switch (args.Key)
             {
                 case VirtualKey.Down:
-                    MoveCompletionSelection(1);
+                    CompletionPopup.MoveSelection(1);
                     args.Handled = true;
                     return;
                 case VirtualKey.Up:
-                    MoveCompletionSelection(-1);
+                    CompletionPopup.MoveSelection(-1);
                     args.Handled = true;
                     return;
                 case VirtualKey.Enter:
@@ -2553,48 +2548,6 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         _automationPeer?.NotifyFocusChanged();
-    }
-
-    private void OnCompletionListKeyDown(object sender, KeyRoutedEventArgs args)
-    {
-        if (!IsCompletionPopupOpen)
-        {
-            return;
-        }
-
-        switch (args.Key)
-        {
-            case VirtualKey.Down:
-                if (!args.Handled)
-                {
-                    MoveCompletionSelection(1);
-                }
-
-                args.Handled = true;
-                return;
-            case VirtualKey.Up:
-                if (!args.Handled)
-                {
-                    MoveCompletionSelection(-1);
-                }
-
-                args.Handled = true;
-                return;
-            case VirtualKey.Enter:
-            case VirtualKey.Tab when !IsKeyDown(VirtualKey.Shift):
-                if (TryAcceptSelectedCompletion())
-                {
-                    args.Handled = true;
-                }
-
-                return;
-            case VirtualKey.Escape:
-                HideCompletionPopup();
-                _completionRequested = false;
-                _explicitCompletionRequested = false;
-                args.Handled = true;
-                return;
-        }
     }
 
     private static bool IsKeyDown(VirtualKey key) =>
@@ -3445,13 +3398,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             new SolidColorBrush(_colorScheme.EditorBackground);
         GutterCanvas.Background = new SolidColorBrush(_colorScheme.GutterBackground);
 
-        CompletionBorder.Background = new SolidColorBrush(_colorScheme.PopupBackground);
-        CompletionBorder.BorderBrush = new SolidColorBrush(_colorScheme.PopupBorder);
-        CompletionList.Foreground = new SolidColorBrush(_colorScheme.PopupForeground);
-        CompletionDetailsBorder.Background = new SolidColorBrush(_colorScheme.PopupBackground);
-        CompletionDetailsBorder.BorderBrush = new SolidColorBrush(_colorScheme.PopupBorder);
-        CompletionDetailsTitle.Foreground = new SolidColorBrush(_colorScheme.PopupForeground);
-        CompletionDetailsContent.Foreground = new SolidColorBrush(_colorScheme.PopupForeground);
+        CompletionPopup.ColorScheme = _colorScheme;
 
         TooltipBorder.Background = new SolidColorBrush(_colorScheme.TooltipBackground);
         TooltipBorder.BorderBrush = new SolidColorBrush(_colorScheme.TooltipBorder);

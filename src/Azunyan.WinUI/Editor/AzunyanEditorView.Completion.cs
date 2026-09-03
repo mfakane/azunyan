@@ -1,6 +1,5 @@
 using Azunyan.Core;
 using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Windows.Foundation;
 
@@ -52,33 +51,12 @@ public sealed partial class AzunyanEditorView
             return;
         }
 
-        if (!ReferenceEquals(_displayedCompletionItems, completions.Items))
-        {
-            CompletionList.Items.Clear();
-            foreach (var item in completions.Items)
-            {
-                CompletionList.Items.Add(new TextBlock
-                {
-                    Text = item.Label,
-                    Padding = new Thickness(8, 4, 8, 4)
-                });
-            }
-
-            _displayedCompletionItems = completions.Items;
-            CompletionList.SelectedIndex = 0;
-        }
-        else if (CompletionList.SelectedIndex < 0)
-        {
-            CompletionList.SelectedIndex = 0;
-        }
-
-        UpdateCompletionDetails();
-
-        var inputOrigin = ProjectedSurfaceHost.TransformToVisual(RootGrid)
+        var inputOrigin = ProjectedSurfaceHost.TransformToVisual(EditorHost)
             .TransformPoint(new Point(0, 0));
-        CompletionPopup.HorizontalOffset = inputOrigin.X + caretRect.X;
-        CompletionPopup.VerticalOffset = inputOrigin.Y + caretRect.Y + caretRect.Height;
-        CompletionPopup.IsOpen = true;
+        CompletionPopup.Show(
+            completions,
+            inputOrigin.X + caretRect.X,
+            inputOrigin.Y + caretRect.Y + caretRect.Height);
     }
 
     private void RequestHoverProvider(int position)
@@ -139,86 +117,22 @@ public sealed partial class AzunyanEditorView
         TooltipPopup.IsOpen = true;
     }
 
-    private void MoveCompletionSelection(int direction)
-    {
-        var count = CompletionList.Items.Count;
-        if (count == 0)
-        {
-            return;
-        }
-
-        var index = CompletionList.SelectedIndex < 0 ? 0 : CompletionList.SelectedIndex;
-        CompletionList.SelectedIndex = (index + direction + count) % count;
-    }
-
-    private void OnCompletionSelectionChanged(
-        object sender,
-        SelectionChangedEventArgs args)
-    {
-        if (CompletionList.SelectedItem is { } selectedItem)
-        {
-            CompletionList.ScrollIntoView(selectedItem);
-        }
-
-        UpdateCompletionDetails();
-    }
-
-    private void UpdateCompletionDetails()
-    {
-        var selectedIndex = CompletionList.SelectedIndex;
-        if (_displayedCompletionItems is not { } items
-            || selectedIndex < 0
-            || selectedIndex >= items.Count)
-        {
-            CompletionDetailsBorder.Visibility = Visibility.Collapsed;
-            CompletionDetailsTitle.Text = string.Empty;
-            CompletionDetailsContent.Text = string.Empty;
-            return;
-        }
-
-        var item = items[selectedIndex];
-        CompletionDetailsTitle.Text = item.Detail ?? string.Empty;
-        CompletionDetailsTitle.Visibility = string.IsNullOrEmpty(item.Detail)
-            ? Visibility.Collapsed
-            : Visibility.Visible;
-        CompletionDetailsContent.Text = item.Documentation ?? string.Empty;
-        CompletionDetailsBorder.Visibility = string.IsNullOrEmpty(item.Detail)
-            && string.IsNullOrEmpty(item.Documentation)
-                ? Visibility.Collapsed
-                : Visibility.Visible;
-    }
-
-    private void OnCompletionItemClick(object sender, ItemClickEventArgs args)
-    {
-        for (var index = 0; index < CompletionList.Items.Count; index++)
-        {
-            if (ReferenceEquals(CompletionList.Items[index], args.ClickedItem))
-            {
-                CompletionList.SelectedIndex = index;
-                TryAcceptSelectedCompletion();
-                return;
-            }
-        }
-    }
-
     private bool TryAcceptSelectedCompletion()
     {
-        var selectedIndex = CompletionList.SelectedIndex;
-        if (GetCurrentFrame()?.Position?.Completions is not { } completions
-            || !ReferenceEquals(_displayedCompletionItems, completions.Items)
-            || selectedIndex < 0
-            || selectedIndex >= completions.Items.Count)
-        {
-            HideCompletionPopup();
-            _completionRequested = false;
-            _explicitCompletionRequested = false;
-            return false;
-        }
+        return CompletionPopup.TryAcceptSelected();
+    }
 
-        var item = completions.Items[selectedIndex];
+    private void CompletionPopup_Accepted(
+        object? sender,
+        CompletionAcceptedEventArgs args)
+    {
         var frame = GetCurrentFrame();
-        var range = completions.ReplacementRange;
+        var completions = frame?.Position?.Completions;
+        var range = args.ReplacementRange;
         if (frame is null
+            || frame.Position is null
+            || completions is null
+            || !ReferenceEquals(args.Result, completions)
             || frame.Position!.Context.Position != frame.Selection.CaretPosition
             || frame.Selection.CaretPosition < range.Start
             || frame.Selection.CaretPosition > range.End
@@ -226,10 +140,11 @@ public sealed partial class AzunyanEditorView
             || range.End > Snapshot.Length
             || (!_explicitCompletionRequested && !HasUsefulCompletion(completions)))
         {
-            HideCompletionPopup();
+            args.Cancel = true;
             _completionRequested = false;
             _explicitCompletionRequested = false;
-            return false;
+            HideCompletionPopup();
+            return;
         }
 
         _completionRequested = false;
@@ -238,7 +153,7 @@ public sealed partial class AzunyanEditorView
         _applyingCompletion = true;
         try
         {
-            ReplaceDocumentRange(range, item.InsertText);
+            ReplaceDocumentRange(range, args.Item.InsertText);
         }
         finally
         {
@@ -246,7 +161,6 @@ public sealed partial class AzunyanEditorView
         }
 
         Focus(FocusState.Programmatic);
-        return true;
     }
 
     private bool HasCompletionPrefix() => GetCompletionPrefix().Length > 0;
@@ -292,14 +206,7 @@ public sealed partial class AzunyanEditorView
     {
         _autoIndentOnEnter = true;
         _suppressVerticalCaretNavigation = false;
-        CompletionPopup.IsOpen = false;
-        CompletionList.Items.Clear();
-        _displayedCompletionItems = null;
-        CompletionList.SelectedIndex = -1;
-        CompletionDetailsTitle.Visibility = Visibility.Visible;
-        CompletionDetailsBorder.Visibility = Visibility.Collapsed;
-        CompletionDetailsTitle.Text = string.Empty;
-        CompletionDetailsContent.Text = string.Empty;
+        CompletionPopup.Hide();
     }
 
     private void StopCompletionSessionIfEmpty(
