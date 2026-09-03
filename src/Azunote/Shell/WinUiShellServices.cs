@@ -217,121 +217,16 @@ internal sealed class WinUiExternalToolDialog : IExternalToolDialog
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var commandBox = new TextBox
-        {
-            Header = "Command",
-            PlaceholderText = "clang-format, prettier, powershell..."
-        };
-        var argumentsBox = new TextBox
-        {
-            Header = "Arguments",
-            PlaceholderText = "Use ${file}, ${fileBasename}, or ${env:USERNAME}"
-        };
-        var inputModeBox = new ComboBox
-        {
-            Header = "Input",
-            ItemsSource = Enum.GetNames<ExternalToolInputMode>(),
-            SelectedIndex = 0
-        };
-        var perBox = new TextBox
-        {
-            Header = "Per",
-            Text = "none",
-            PlaceholderText = "none, line, or regex:<pattern>"
-        };
-        var stdinBox = new TextBox
-        {
-            Header = "Stdin",
-            AcceptsReturn = true,
-            TextWrapping = TextWrapping.Wrap,
-            PlaceholderText = "${input}"
-        };
-
-        static ComboBox CreateOutputActionBox(
-            string header,
-            ExternalToolOutputMode selected)
-        {
-            return new ComboBox
-            {
-                Header = header,
-                ItemsSource = Enum.GetNames<ExternalToolOutputMode>(),
-                SelectedItem = selected.ToString()
-            };
-        }
-
-        static ExternalToolOutputMode ReadOutputAction(ComboBox box) =>
-            Enum.Parse<ExternalToolOutputMode>(
-                box.SelectedItem?.ToString() ?? nameof(ExternalToolOutputMode.Ignore));
-
-        var outputSuccessBox = CreateOutputActionBox(
-            "Output (zero)",
-            ExternalToolOutputMode.Ignore);
-        var outputFailureBox = CreateOutputActionBox(
-            "Output (non-zero)",
-            ExternalToolOutputMode.Ignore);
-        var stdoutSuccessBox = CreateOutputActionBox(
-            "Stdout (zero)",
-            ExternalToolOutputMode.Ignore);
-        var stdoutFailureBox = CreateOutputActionBox(
-            "Stdout (non-zero)",
-            ExternalToolOutputMode.Ignore);
-        var stderrSuccessBox = CreateOutputActionBox(
-            "Stderr (zero)",
-            ExternalToolOutputMode.Ignore);
-        var stderrFailureBox = CreateOutputActionBox(
-            "Stderr (non-zero)",
-            ExternalToolOutputMode.Ignore);
-
-        var panel = new StackPanel { Spacing = 10 };
-        panel.Children.Add(commandBox);
-        panel.Children.Add(argumentsBox);
-        panel.Children.Add(inputModeBox);
-        panel.Children.Add(perBox);
-        panel.Children.Add(stdinBox);
-        panel.Children.Add(outputSuccessBox);
-        panel.Children.Add(outputFailureBox);
-        panel.Children.Add(stdoutSuccessBox);
-        panel.Children.Add(stdoutFailureBox);
-        panel.Children.Add(stderrSuccessBox);
-        panel.Children.Add(stderrFailureBox);
-
         var root = _xamlRoot();
         if (root is null)
         {
             return null;
         }
 
-        var dialog = new ContentDialog
+        var dialog = new RunExternalToolDialog
         {
-            Title = "Run External Tool",
-            Content = panel,
-            PrimaryButtonText = "Run",
-            CloseButtonText = "Cancel",
             XamlRoot = root
         };
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary
-            || string.IsNullOrWhiteSpace(commandBox.Text))
-        {
-            return null;
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        var inputMode = Enum.Parse<ExternalToolInputMode>(
-            inputModeBox.SelectedItem?.ToString() ?? nameof(ExternalToolInputMode.None));
-        return new ExternalToolDefinition(
-            commandBox.Text,
-            ExternalToolDefinition.ParseArguments(argumentsBox.Text),
-            inputMode,
-            perBox.Text,
-            stdinBox.Text,
-            new ExternalToolOutputActions(
-                ReadOutputAction(outputSuccessBox),
-                ReadOutputAction(outputFailureBox)),
-            new ExternalToolOutputActions(
-                ReadOutputAction(stdoutSuccessBox),
-                ReadOutputAction(stdoutFailureBox)),
-            new ExternalToolOutputActions(
-                ReadOutputAction(stderrSuccessBox),
-                ReadOutputAction(stderrFailureBox)));
+        return await dialog.ShowAndGetDefinitionAsync(cancellationToken);
     }
 }

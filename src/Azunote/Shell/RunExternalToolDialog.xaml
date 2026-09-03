@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentDialog
+    x:Class="Azunote.RunExternalToolDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Azunote"
+    Title="Run External Tool"
+    PrimaryButtonText="Run"
+    CloseButtonText="Cancel"
+>
+    <ContentDialog.Resources>
+        <Style
+            TargetType="local:RunExternalToolDialog"
+            BasedOn="{StaticResource DefaultContentDialogStyle}"
+        />
+    </ContentDialog.Resources>
+    <ScrollViewer MaxHeight="640">
+        <StackPanel Spacing="10">
+            <SelectorBar x:Name="ModeSelector">
+                <SelectorBarItem
+                    x:Name="ExecutableModeItem"
+                    Text="Executable"
+                />
+                <SelectorBarItem x:Name="CmdModeItem" Text="Cmd" />
+                <SelectorBarItem
+                    x:Name="PowerShellModeItem"
+                    Text="PowerShell"
+                />
+            </SelectorBar>
+            <AutoSuggestBox
+                x:Name="CommandBox"
+                Header="Command"
+                PlaceholderText="clang-format, prettier, powershell..."
+            />
+            <TextBox
+                x:Name="ArgumentsBox"
+                Header="Arguments"
+                PlaceholderText="Use ${file}, ${fileBasename}, or ${env:USERNAME}"
+            />
+            <ComboBox x:Name="InputModeBox" Header="Input" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <ComboBox x:Name="PerModeBox" Header="Per" />
+                <TextBox
+                    x:Name="PerRegexBox"
+                    MinWidth="260"
+                    VerticalAlignment="Bottom"
+                    PlaceholderText="Regex pattern"
+                    Visibility="Collapsed"
+                />
+            </StackPanel>
+            <TextBox
+                x:Name="StdinBox"
+                AcceptsReturn="True"
+                Header="Stdin"
+                TextWrapping="Wrap"
+                PlaceholderText="${input}"
+            />
+            <ComboBox x:Name="OutputBox" Header="Output" />
+        </StackPanel>
+    </ScrollViewer>
+</ContentDialog>
