@@ -342,8 +342,8 @@
                                       Click="StatusBarMenuItem_Click" />
             </MenuBarItem>
             <MenuBarItem x:Name="ToolsMenuItem" Title="Tools">
-                <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="Run External Tool..." Click="RunExternalToolMenuItem_Click" />
+                <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="Preferences..." Click="PreferencesMenuItem_Click" />
             </MenuBarItem>
             <MenuBarItem x:Name="WindowMenuItem" Title="Window">

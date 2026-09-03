@@ -662,26 +662,14 @@ internal sealed class MainWindowViewAdapter :
         ClearExternalToolMenuItems();
         ClearExternalToolContextMenuItems();
 
-        var visibleEntries = ExternalToolMenuBuilder.Build(
+        var visibleToolsEntries = ExternalToolMenuBuilder.Build(
             nodes,
             getState,
             ExternalToolMenuTarget.Tools);
-        var hasToolsTargets = ExternalToolMenuBuilder.EnumerateTools(nodes)
-            .Any(tool => tool.IsShownIn(ExternalToolMenuTarget.Tools));
-        if (visibleEntries.Count == 0 && hasToolsTargets)
-        {
-            var emptyItem = new MenuFlyoutItem
-            {
-                Text = "No tools available",
-                IsEnabled = false
-            };
-            _toolsMenu.Items.Insert(0, emptyItem);
-            _externalToolMenuItems.Add(emptyItem);
-        }
-        else
+        if (visibleToolsEntries.Count > 0)
         {
             var menuItems = CreateExternalToolMenuItems(
-                visibleEntries,
+                visibleToolsEntries,
                 onSelected,
                 onEditDefinition,
                 onShowInExplorer);
@@ -692,12 +680,12 @@ internal sealed class MainWindowViewAdapter :
             }
         }
 
-        var contextEntries = ExternalToolMenuBuilder.BuildFlat(
+        var visibleContextEntries = ExternalToolMenuBuilder.BuildFlat(
             nodes,
             getState,
             ExternalToolMenuTarget.Context);
         var contextMenuItems = CreateExternalToolContextMenuItems(
-            contextEntries,
+            visibleContextEntries,
             onSelected);
         _editor.SetAdditionalContextMenuItems(contextMenuItems);
         _externalToolContextMenuItems.AddRange(contextMenuItems);
