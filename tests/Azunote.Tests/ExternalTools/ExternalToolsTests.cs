@@ -154,7 +154,7 @@ public sealed class ExternalToolsTests
         var items = ExternalToolOutputInterpreter.CreateCompletionItems(
             " first\r\n\r\n   \nsecond\rthird\n");
 
-        Assert.Equal([" first", "second", "third"], items.Select(item => item.Label));
+        Assert.Equal(["first", "second", "third"], items.Select(item => item.Label));
         Assert.Equal(items.Select(item => item.Label), items.Select(item => item.InsertText));
     }
 

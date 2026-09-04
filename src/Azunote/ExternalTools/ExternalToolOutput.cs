@@ -21,15 +21,18 @@ public sealed record ExternalToolOutput(
     public bool IsEmpty => Actions.Count == 0;
 }
 
-public static class ExternalToolOutputInterpreter
+public static partial class ExternalToolOutputInterpreter
 {
     public static IReadOnlyList<CompletionItem> CreateCompletionItems(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
 
-        return Regex.Split(text, "\\r\\n|\\r|\\n")
+        // split by "  " to get label and documentation
+        // empty and whitespace lines are ignored
+        return LineEndingRegex().Split(text)
             .Where(line => !string.IsNullOrWhiteSpace(line))
-            .Select(line => new CompletionItem(line))
+            .Select(line => line.Trim().Split(["  "], 2, StringSplitOptions.TrimEntries))
+            .Select(line => new CompletionItem(line[0], documentation: line.ElementAtOrDefault(1)))
             .ToArray();
     }
 
@@ -66,4 +69,7 @@ public static class ExternalToolOutputInterpreter
                 .Where(action => action.Mode != ExternalToolOutputMode.Ignore)
                 .ToArray());
     }
+
+    [GeneratedRegex("\\r\\n|\\r|\\n")]
+    private static partial Regex LineEndingRegex();
 }
