@@ -35,9 +35,8 @@ internal sealed class DocumentStatusPresenter
             TextFileService.GetEncodingDisplayName(_session.State.Encoding),
             TextFileService.GetLineEndingDisplayName(
                 lineEnding ?? _session.State.LineEnding),
-            TextEditorCommands.GetIndentationSettings(
+            TextEditorCommands.GetDocumentIndentationSettings(
                 snapshot,
-                selectionStart,
                 _editor.IndentSize,
                 _editor.TabDisplaySize,
                 _editor.IndentationInputMode).DisplayName,

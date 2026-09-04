@@ -460,6 +460,20 @@ public sealed class DocumentTests
     }
 
     [Fact]
+    public void Document_indentation_settings_infer_from_lines_after_the_caret()
+    {
+        Assert.Equal(
+            new IndentationSettings(IndentationKind.Spaces, 2),
+            TextEditorCommands.GetDocumentIndentationSettings(
+                new TextSnapshot("value\n  child")));
+        Assert.Equal(
+            new IndentationSettings(IndentationKind.Tabs, 8),
+            TextEditorCommands.GetDocumentIndentationSettings(
+                new TextSnapshot("value\n\tchild"),
+                tabDisplaySize: 8));
+    }
+
+    [Fact]
     public void Grapheme_navigation_and_delete_keep_emoji_and_combining_sequences_together()
     {
         const string text = "a👩‍💻éb";

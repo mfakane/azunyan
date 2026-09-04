@@ -484,6 +484,26 @@ public static class TextEditorCommands
     }
 
     /// <summary>
+    /// Returns the indentation convention inferred from the entire document.
+    /// This is useful for document-level UI such as an indentation status
+    /// indicator, where the current caret line may not contain indentation.
+    /// </summary>
+    public static IndentationSettings GetDocumentIndentationSettings(
+        TextSnapshot snapshot,
+        int? indentSize = null,
+        int tabDisplaySize = DefaultTabSize,
+        IndentationInputMode inputMode = IndentationInputMode.Auto)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        return GetIndentationSettings(
+            snapshot,
+            snapshot.Length,
+            indentSize,
+            tabDisplaySize,
+            inputMode);
+    }
+
+    /// <summary>
     /// Returns the leading spaces and tabs of the line containing
     /// <paramref name="position"/>.
     /// </summary>

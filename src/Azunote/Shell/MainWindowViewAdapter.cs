@@ -473,9 +473,8 @@ internal sealed class MainWindowViewAdapter :
 
     public void ShowIndentationSizeMenu()
     {
-        var settings = TextEditorCommands.GetIndentationSettings(
+        var settings = TextEditorCommands.GetDocumentIndentationSettings(
             _editor.Snapshot,
-            _editorBuffer.CaretPosition,
             _editor.IndentSize,
             _editor.TabDisplaySize,
             _editor.IndentationInputMode);
