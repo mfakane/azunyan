@@ -128,6 +128,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         EditorPointerSurface.PointerCaptureLost += OnInputPointerCaptureLost;
         EditorPointerSurface.PointerMoved += OnInputPointerMoved;
         EditorPointerSurface.PointerExited += OnInputPointerExited;
+        RootGrid.PointerWheelChanged += OnInputPointerWheelChanged;
         EditorPointerSurface.ContextRequested += OnEditorContextRequested;
         InputWindow.NativeTextBoxControl.ContextFlyout = EditorContextMenu;
         CompletionPopup.Accepted += CompletionPopup_Accepted;
@@ -163,6 +164,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         EditorPointerSurface.PointerReleased -= OnInputPointerReleased;
         EditorPointerSurface.PointerCanceled -= OnInputPointerCanceled;
         EditorPointerSurface.PointerCaptureLost -= OnInputPointerCaptureLost;
+        RootGrid.PointerWheelChanged -= OnInputPointerWheelChanged;
         StopPointerSelection();
         _providerScheduler.Dispose();
         if (_renderer is IDisposable renderer
@@ -2828,6 +2830,51 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         EditorPointerSurface.ReleasePointerCaptures();
     }
 
+    private void OnInputPointerWheelChanged(
+        object sender,
+        PointerRoutedEventArgs args)
+    {
+        if (!IsProjectedTextSurface)
+        {
+            return;
+        }
+
+        var point = args.GetCurrentPoint(RootGrid);
+        if (point.Properties.IsHorizontalMouseWheel
+            || point.Properties.MouseWheelDelta == 0)
+        {
+            return;
+        }
+
+        const double WheelLinesPerNotch = 3;
+        var delta = -point.Properties.MouseWheelDelta
+            / 120d
+            * _lineHeight
+            * WheelLinesPerNotch;
+        ScrollProjectedBy(delta);
+        args.Handled = true;
+    }
+
+    private void ScrollProjectedForPointer(double pointerY)
+    {
+        if (!IsProjectedTextSurface
+            || !double.IsFinite(pointerY))
+        {
+            return;
+        }
+
+        var viewportHeight = Math.Max(1, EditorPointerSurface.ActualHeight);
+        var delta = pointerY < 0
+            ? -Math.Max(_lineHeight, -pointerY)
+            : pointerY > viewportHeight
+                ? Math.Max(_lineHeight, pointerY - viewportHeight)
+                : 0;
+        if (delta != 0)
+        {
+            ScrollProjectedBy(delta);
+        }
+    }
+
     private void UpdateBlockSelection(
         TextBlockSelection selection,
         int activeOffset)
@@ -2923,6 +2970,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 return;
             }
 
+            ScrollProjectedForPointer(point.Position.Y);
             if (_defaultRenderer.TextRenderer.TryHitTest(
                     point.Position.X,
                     point.Position.Y,
@@ -2961,6 +3009,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 return;
             }
 
+            ScrollProjectedForPointer(point.Position.Y);
             if (_defaultRenderer.TextRenderer.TryHitTest(
                     point.Position.X,
                     point.Position.Y,
@@ -3350,10 +3399,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 + _lineHeight;
         }
 
-        var maximum = Math.Max(
-            0,
-            _defaultRenderer.TextRenderer.ContentHeight
-                - Math.Max(1, EditorHost.ActualHeight));
+        var maximum = GetProjectedScrollMaximum(
+            Math.Max(1, ProjectedSurfaceHost.ActualHeight));
         targetOffset = Math.Clamp(targetOffset, 0, maximum);
         _synchronizingProjectedScroll = true;
         try
@@ -3423,6 +3470,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             GutterDrawingSurface.Visibility = Visibility.Collapsed;
             TextDrawingSurface.Visibility = Visibility.Collapsed;
             ProjectedVerticalScrollBar.Visibility = Visibility.Collapsed;
+            ProjectedScrollBarColumn.Width = new GridLength(0);
             _projectedVerticalOffset = 0;
             _completionRequested = false;
             HideCompletionPopup();
@@ -3448,6 +3496,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             ScrollViewer.SetHorizontalScrollBarVisibility(nativeTextBox, ScrollBarVisibility.Hidden);
             ScrollViewer.SetVerticalScrollBarVisibility(nativeTextBox, ScrollBarVisibility.Hidden);
             ProjectedVerticalScrollBar.Visibility = Visibility.Visible;
+            ProjectedScrollBarColumn.Width = new GridLength(18);
             return;
         }
 
@@ -3461,6 +3510,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         ScrollViewer.SetHorizontalScrollBarVisibility(fallbackTextBox, ScrollBarVisibility.Auto);
         ScrollViewer.SetVerticalScrollBarVisibility(fallbackTextBox, ScrollBarVisibility.Auto);
         ProjectedVerticalScrollBar.Visibility = Visibility.Collapsed;
+        ProjectedScrollBarColumn.Width = new GridLength(0);
         _projectedVerticalOffset = 0;
         _completionRequested = false;
         HideCompletionPopup();
@@ -3501,8 +3551,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             return;
         }
 
-        var contentHeight = _defaultRenderer.TextRenderer.ContentHeight;
-        var maximum = Math.Max(0, contentHeight - viewportHeight);
+        var maximum = GetProjectedScrollMaximum(viewportHeight);
         var offset = Math.Clamp(_projectedVerticalOffset, 0, maximum);
         _synchronizingProjectedScroll = true;
         try
@@ -3518,6 +3567,18 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         {
             _synchronizingProjectedScroll = false;
         }
+    }
+
+    private double GetProjectedScrollMaximum(double viewportHeight)
+    {
+        var padding = InputWindow.NativeTextBoxControl.Padding;
+        var contentHeight = _defaultRenderer.TextRenderer.ContentHeight;
+        return Math.Max(
+            0,
+            contentHeight
+                + Math.Max(0, padding.Top)
+                + Math.Max(0, padding.Bottom)
+                - Math.Max(1, viewportHeight));
     }
 
     private bool IsCompletionPopupOpen => CompletionPopup.IsOpen;

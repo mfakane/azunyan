@@ -48,12 +48,17 @@
             Grid.Column="1"
             HorizontalAlignment="Stretch"
             VerticalAlignment="Stretch">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition x:Name="ProjectedScrollBarColumn" Width="0" />
+            </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
             <Canvas
                 x:Name="InputWindowLayer"
                 Grid.Row="0"
+                Grid.Column="0"
                 IsHitTestVisible="False">
                 <local:AzunyanTextInputWindow
                     x:Name="InputWindow"
@@ -65,11 +70,13 @@
             <Border
                 x:Name="EditorPointerSurface"
                 Grid.Row="0"
+                Grid.Column="0"
                 Background="Transparent"
                 IsHitTestVisible="True" />
             <Grid
                 x:Name="ProjectedSurfaceHost"
                 Grid.Row="0"
+                Grid.Column="0"
                 HorizontalAlignment="Stretch"
                 VerticalAlignment="Stretch"
                 IsHitTestVisible="False">
@@ -95,11 +102,13 @@
             <ScrollBar
                 x:Name="ProjectedVerticalScrollBar"
                 Grid.Row="0"
+                Grid.Column="1"
                 Canvas.ZIndex="2"
                 Width="18"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Stretch"
                 Orientation="Vertical"
+                IndicatorMode="MouseIndicator"
                 Visibility="Collapsed"
                 IsTabStop="False" />
             <local:CompletionPopup
