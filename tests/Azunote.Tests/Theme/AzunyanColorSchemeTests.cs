@@ -44,6 +44,15 @@ public sealed class AzunyanColorSchemeTests
     }
 
     [Fact]
+    public void Default_scheme_uses_readable_selection_palette()
+    {
+        var colors = AzunyanColorScheme.Default;
+
+        Assert.Equal(Color.FromArgb(0xff, 0xff, 0xff, 0xff), colors.SelectionForeground);
+        Assert.Equal(byte.MaxValue, colors.SelectionBackground.A);
+    }
+
+    [Fact]
     public void Dark_system_scheme_uses_dark_editor_colors()
     {
         var light = AzunoteSystemColorScheme.Create(ElementTheme.Light);
@@ -52,5 +61,8 @@ public sealed class AzunyanColorSchemeTests
         Assert.NotEqual(light.EditorBackground, dark.EditorBackground);
         Assert.NotEqual(light.EditorForeground, dark.EditorForeground);
         Assert.NotEqual(light.KeywordForeground, dark.KeywordForeground);
+        Assert.Equal(byte.MaxValue, light.SelectionBackground.A);
+        Assert.Equal(byte.MaxValue, dark.SelectionBackground.A);
+        Assert.Equal(light.SelectionForeground, dark.SelectionForeground);
     }
 }

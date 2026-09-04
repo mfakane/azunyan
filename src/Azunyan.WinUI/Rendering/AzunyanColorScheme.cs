@@ -14,7 +14,8 @@ public sealed record AzunyanColorScheme
         EditorForeground = Color.FromArgb(0xff, 0x1a, 0x1a, 0x1a),
         GutterBackground = Color.FromArgb(0xff, 0xff, 0xff, 0xff),
         GutterForeground = Color.FromArgb(0xff, 0x60, 0x60, 0x60),
-        SelectionBackground = Color.FromArgb(0x66, 0x00, 0x66, 0xcc),
+        SelectionBackground = Color.FromArgb(0xff, 0x00, 0x66, 0xcc),
+        SelectionForeground = Color.FromArgb(0xff, 0xff, 0xff, 0xff),
         CaretForeground = Color.FromArgb(0xff, 0x1a, 0x1a, 0x1a),
         CompositionForeground = Color.FromArgb(0xff, 0x00, 0x66, 0xcc),
         FoldForeground = Color.FromArgb(0xff, 0x60, 0x60, 0x60),
@@ -44,6 +45,9 @@ public sealed record AzunyanColorScheme
     public Color GutterForeground { get; init; }
 
     public Color SelectionBackground { get; init; }
+
+    public Color SelectionForeground { get; init; } =
+        Color.FromArgb(0xff, 0xff, 0xff, 0xff);
 
     public Color CaretForeground { get; init; }
 

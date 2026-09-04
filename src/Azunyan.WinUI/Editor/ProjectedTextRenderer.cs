@@ -1602,6 +1602,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             _textLayouts.Add(row, textLayout);
         }
 
+        ResetTextForegrounds(textLayout, line.Runs, context.ColorScheme);
         DrawSelection(drawingSession, context, line, textLayout, top, row);
         textLayout.Draw(
             drawingSession,
@@ -1610,6 +1611,25 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             context.ColorScheme.EditorForeground);
         DrawComposition(drawingSession, context, line, textLayout, top);
         DrawCaret(drawingSession, context, line, textLayout, top);
+    }
+
+    private static void ResetTextForegrounds(
+        DirectWriteTextLayout textLayout,
+        IReadOnlyList<LayoutRun> runs,
+        AzunyanColorScheme colors)
+    {
+        foreach (var run in runs)
+        {
+            if (run.Text.Length == 0)
+            {
+                continue;
+            }
+
+            textLayout.SetForegroundColor(
+                run.VisualStart,
+                run.Text.Length,
+                GetForeground(colors, run));
+        }
     }
 
     private static void DrawComposition(
@@ -1786,6 +1806,10 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
 
         var startColumn = selectedStart - layout.VisualStart;
         var endColumn = selectedEnd - layout.VisualStart;
+        textLayout.SetForegroundColor(
+            startColumn,
+            endColumn - startColumn,
+            context.ColorScheme.SelectionForeground);
         var left = context.ContentLeft - context.HorizontalOffset;
         foreach (var bounds in textLayout.GetCharacterBounds(
             startColumn,
@@ -1816,6 +1840,10 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             return;
         }
 
+        textLayout.SetForegroundColor(
+            startColumn,
+            endColumn - startColumn,
+            context.ColorScheme.SelectionForeground);
         foreach (var bounds in textLayout.GetCharacterBounds(
             startColumn,
             endColumn - startColumn))

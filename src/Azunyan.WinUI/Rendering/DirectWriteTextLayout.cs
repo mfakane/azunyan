@@ -258,6 +258,21 @@ public sealed class DirectWriteTextLayout : IDisposable
         drawingSession.DrawTextLayout(_layout, x, y, fallbackColor);
     }
 
+    internal void SetForegroundColor(int characterIndex, int characterCount, Color color)
+    {
+        if (characterIndex < 0
+            || characterCount < 0
+            || characterIndex + characterCount > Text.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(characterIndex));
+        }
+
+        if (characterCount > 0)
+        {
+            _layout.SetColor(characterIndex, characterCount, color);
+        }
+    }
+
     public Vector2 GetCaretPosition(int characterIndex, bool trailingSideOfCharacter = false) =>
         _layout.GetCaretPosition(characterIndex, trailingSideOfCharacter);
 

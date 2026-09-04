@@ -34,6 +34,11 @@ internal static class AzunoteSystemColorScheme
         var selection = GetColor(
             "TextControlSelectionHighlightColor",
             Color.FromArgb(0x66, 0x00, 0x66, 0xcc));
+        var opaqueSelection = Color.FromArgb(
+            0xff,
+            selection.R,
+            selection.G,
+            selection.B);
         var popupBackground = GetColor(
             "SystemControlBackgroundChromeMediumLowBrush",
             isDark
@@ -51,7 +56,8 @@ internal static class AzunoteSystemColorScheme
             EditorForeground = foreground,
             GutterBackground = background,
             GutterForeground = mutedForeground,
-            SelectionBackground = selection,
+            SelectionBackground = opaqueSelection,
+            SelectionForeground = Color.FromArgb(0xff, 0xff, 0xff, 0xff),
             CaretForeground = foreground,
             CompositionForeground = accent,
             FoldForeground = mutedForeground,
