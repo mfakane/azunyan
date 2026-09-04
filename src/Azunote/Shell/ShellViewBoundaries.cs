@@ -132,7 +132,11 @@ internal interface IFindReplaceView
 
     string ReplaceText { get; set; }
 
+    FindReplaceOptions Options { get; }
+
     void Show(bool replace);
+
+    void ToggleMode();
 
     void Close();
 
@@ -140,7 +144,11 @@ internal interface IFindReplaceView
 
     void FocusEditor();
 
-    void SetResult(string message);
+    void SetResult(int current, int total);
+
+    void ShowNotification(string message);
+
+    void HideNotification();
 }
 
 internal interface ILanguageModeMenuView

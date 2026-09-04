@@ -194,22 +194,32 @@ internal sealed class FakeFindReplaceView : IFindReplaceView
 
     public bool IsFindBoxFocused { get; set; }
 
+    public bool IsReplaceMode { get; private set; }
+
     public string FindText { get; set; } = string.Empty;
 
     public string ReplaceText { get; set; } = string.Empty;
 
+    public FindReplaceOptions Options { get; set; }
+
     public string? Result { get; private set; }
+
+    public string? Notification { get; private set; }
 
     public void Show(bool replace)
     {
         IsVisible = true;
         IsFindBoxFocused = true;
+        IsReplaceMode = replace;
     }
+
+    public void ToggleMode() => IsReplaceMode = !IsReplaceMode;
 
     public void Close()
     {
         IsVisible = false;
         IsFindBoxFocused = false;
+        IsReplaceMode = false;
     }
 
     public void FocusFind() => IsFindBoxFocused = true;
@@ -217,6 +227,10 @@ internal sealed class FakeFindReplaceView : IFindReplaceView
     public void FocusEditor() => IsFindBoxFocused = false;
 
     public void SetResult(string message) => Result = message;
+
+    public void ShowNotification(string message) => Notification = message;
+
+    public void HideNotification() => Notification = null;
 }
 
 internal sealed class FakeLanguageModeMenuView : ILanguageModeMenuView

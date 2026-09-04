@@ -5,6 +5,7 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using WinRT.Interop;
 using Windows.Graphics;
@@ -26,9 +27,16 @@ internal sealed class MainWindowViewAdapter :
     private readonly AppWindow? _appWindow;
     private readonly Grid _rootGrid;
     private readonly Border _findPanel;
+    private readonly FontIcon _findReplaceChevronIcon;
     private readonly TextBox _findTextBox;
+    private readonly ToggleButton _matchCaseButton;
+    private readonly ToggleButton _matchWholeWordButton;
+    private readonly ToggleButton _regularExpressionButton;
+    private readonly Grid _replacePanel;
     private readonly TextBox _replaceTextBox;
     private readonly TextBlock _findResultText;
+    private readonly Flyout _findNotificationFlyout;
+    private readonly TextBlock _findNotificationText;
     private readonly MenuFlyoutSubItem _languageModeMenu;
     private readonly MenuFlyoutSubItem _openRecentMenu;
     private readonly MenuBarItem _windowMenu;
@@ -65,9 +73,15 @@ internal sealed class MainWindowViewAdapter :
         Grid rootGrid,
         Style auxiliarySplitMenuFlyoutItemStyle,
         Border findPanel,
+        FontIcon findReplaceChevronIcon,
         TextBox findTextBox,
+        ToggleButton matchCaseButton,
+        ToggleButton matchWholeWordButton,
+        ToggleButton regularExpressionButton,
+        Grid replacePanel,
         TextBox replaceTextBox,
         TextBlock findResultText,
+        Flyout findNotificationFlyout,
         MenuFlyoutSubItem languageModeMenu,
         MenuFlyoutSubItem openRecentMenu,
         MenuBarItem windowMenu,
@@ -109,9 +123,24 @@ internal sealed class MainWindowViewAdapter :
         _auxiliarySplitMenuFlyoutItemStyle = auxiliarySplitMenuFlyoutItemStyle
             ?? throw new ArgumentNullException(nameof(auxiliarySplitMenuFlyoutItemStyle));
         _findPanel = findPanel ?? throw new ArgumentNullException(nameof(findPanel));
+        _findReplaceChevronIcon = findReplaceChevronIcon
+            ?? throw new ArgumentNullException(nameof(findReplaceChevronIcon));
         _findTextBox = findTextBox ?? throw new ArgumentNullException(nameof(findTextBox));
+        _matchCaseButton = matchCaseButton
+            ?? throw new ArgumentNullException(nameof(matchCaseButton));
+        _matchWholeWordButton = matchWholeWordButton
+            ?? throw new ArgumentNullException(nameof(matchWholeWordButton));
+        _regularExpressionButton = regularExpressionButton
+            ?? throw new ArgumentNullException(nameof(regularExpressionButton));
+        _replacePanel = replacePanel ?? throw new ArgumentNullException(nameof(replacePanel));
         _replaceTextBox = replaceTextBox ?? throw new ArgumentNullException(nameof(replaceTextBox));
         _findResultText = findResultText ?? throw new ArgumentNullException(nameof(findResultText));
+        _findNotificationFlyout = findNotificationFlyout
+            ?? throw new ArgumentNullException(nameof(findNotificationFlyout));
+        _findNotificationText = findNotificationFlyout.Content as TextBlock
+            ?? throw new ArgumentException(
+                "The find notification flyout must contain a TextBlock.",
+                nameof(findNotificationFlyout));
         _languageModeMenu = languageModeMenu ?? throw new ArgumentNullException(nameof(languageModeMenu));
         _openRecentMenu = openRecentMenu ?? throw new ArgumentNullException(nameof(openRecentMenu));
         _windowMenu = windowMenu ?? throw new ArgumentNullException(nameof(windowMenu));
@@ -211,15 +240,20 @@ internal sealed class MainWindowViewAdapter :
 
     public string FindText
     {
-        get => _findTextBox.Text;
+        get => NormalizeFindReplaceText(_findTextBox.Text);
         set => _findTextBox.Text = value;
     }
 
     public string ReplaceText
     {
-        get => _replaceTextBox.Text;
+        get => NormalizeFindReplaceText(_replaceTextBox.Text);
         set => _replaceTextBox.Text = value;
     }
+
+    public FindReplaceOptions Options =>
+        (_matchCaseButton.IsChecked == true ? FindReplaceOptions.MatchCase : FindReplaceOptions.None)
+        | (_matchWholeWordButton.IsChecked == true ? FindReplaceOptions.MatchWholeWord : FindReplaceOptions.None)
+        | (_regularExpressionButton.IsChecked == true ? FindReplaceOptions.RegularExpression : FindReplaceOptions.None);
 
     public string Text => _editorBuffer.Text;
 
@@ -554,30 +588,48 @@ internal sealed class MainWindowViewAdapter :
     public void Show(bool replace)
     {
         _findPanel.Visibility = Visibility.Visible;
+        HideNotification();
+        SetResult(0, 0);
+        SetReplaceMode(replace);
         FocusFind();
         if (_editorBuffer.Selection.Length > 0 && !string.IsNullOrEmpty(_editor.SelectedText))
         {
             _findTextBox.Text = _editor.SelectedText;
             _findTextBox.SelectAll();
         }
-
-        if (!replace)
-        {
-            _replaceTextBox.Text = string.Empty;
-        }
     }
 
     public void Close()
     {
         _findPanel.Visibility = Visibility.Collapsed;
+        HideNotification();
+        SetReplaceMode(false);
         FocusEditor();
     }
+
+    public void ToggleMode() => SetReplaceMode(_replacePanel.Visibility != Visibility.Visible);
 
     public void FocusFind() => _findTextBox.Focus(FocusState.Programmatic);
 
     public void FocusEditor() => Focus();
 
-    public void SetResult(string message) => _findResultText.Text = message;
+    public void SetResult(int current, int total) => _findResultText.Text = $"{current}/{total}";
+
+    public void ShowNotification(string message)
+    {
+        _findNotificationText.Text = message;
+        _findNotificationFlyout.ShowAt(_replacePanel.Visibility == Visibility.Visible ? _replaceTextBox : _findTextBox);
+    }
+
+    public void HideNotification() => _findNotificationFlyout.Hide();
+
+    private static string NormalizeFindReplaceText(string text) => text.ReplaceLineEndings("\n");
+
+    private void SetReplaceMode(bool replace)
+    {
+        _replacePanel.Visibility = replace ? Visibility.Visible : Visibility.Collapsed;
+        _findReplaceChevronIcon.Glyph = replace ? "\uE70E" : "\uE70D";
+    }
 
     public void Render(
         IReadOnlyList<LanguageModeEntry> entries,

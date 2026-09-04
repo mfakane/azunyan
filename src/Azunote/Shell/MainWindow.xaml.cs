@@ -22,6 +22,8 @@ public sealed partial class MainWindow : Window, IDisposable
     private bool _allowClose;
     private bool _completionShortcutInvoked;
     private bool _matchingBracketShortcutInvoked;
+    private bool _findNextShortcutInvoked;
+    private bool _findPreviousShortcutInvoked;
     private bool _disposed;
 
     internal MainWindowRuntime Runtime => _runtime;
@@ -30,15 +32,23 @@ public sealed partial class MainWindow : Window, IDisposable
     {
         _application = application ?? throw new ArgumentNullException(nameof(application));
         InitializeComponent();
+        var findNotificationFlyout = RootGrid.Resources["FindNotificationFlyout"] as Flyout
+            ?? throw new InvalidOperationException("Find notification flyout is not configured.");
         _view = new MainWindowViewAdapter(
             this,
             Editor,
             RootGrid,
             AuxiliarySplitMenuFlyoutItemStyle,
-            FindPanel,
+            FindReplacePanel,
+            FindReplaceChevronIcon,
             FindTextBox,
+            MatchCaseButton,
+            MatchWholeWordButton,
+            RegularExpressionButton,
+            ReplacePanel,
             ReplaceTextBox,
             FindResultText,
+            findNotificationFlyout,
             LanguageModeMenuItem,
             OpenRecentMenuItem,
             WindowMenuItem,
@@ -117,6 +127,18 @@ public sealed partial class MainWindow : Window, IDisposable
         };
         goToMatchingBracket.Invoked += GoToMatchingBracketAccelerator_Invoked;
         RootGrid.KeyboardAccelerators.Add(goToMatchingBracket);
+
+        var findNext = new KeyboardAccelerator { Key = VirtualKey.F3 };
+        findNext.Invoked += FindNextAccelerator_Invoked;
+        RootGrid.KeyboardAccelerators.Add(findNext);
+
+        var findPrevious = new KeyboardAccelerator
+        {
+            Key = VirtualKey.F3,
+            Modifiers = VirtualKeyModifiers.Shift
+        };
+        findPrevious.Invoked += FindPreviousAccelerator_Invoked;
+        RootGrid.KeyboardAccelerators.Add(findPrevious);
     }
 
     private async void OpenButton_Click(object sender, RoutedEventArgs e) =>
@@ -246,16 +268,8 @@ public sealed partial class MainWindow : Window, IDisposable
     private void FindButton_Click(object sender, RoutedEventArgs e) =>
         _runtime.ShowFindPanel(replace: false);
 
-    private void ReplaceButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (!_runtime.IsFindPanelVisible)
-        {
-            _runtime.ShowFindPanel(replace: true);
-            return;
-        }
-
-        _runtime.ReplaceCurrent();
-    }
+    private void ReplaceButton_Click(object sender, RoutedEventArgs e) =>
+        _runtime.ShowFindPanel(replace: true);
 
     private void ShowCompletionMenuItem_Click(object sender, RoutedEventArgs e) =>
         _runtime.ShowCompletion();
@@ -279,6 +293,24 @@ public sealed partial class MainWindow : Window, IDisposable
         args.Handled = true;
         _matchingBracketShortcutInvoked = true;
         _runtime.MoveToMatchingBracket();
+    }
+
+    private void FindNextAccelerator_Invoked(
+        KeyboardAccelerator sender,
+        KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = true;
+        _findNextShortcutInvoked = true;
+        _runtime.FindNext();
+    }
+
+    private void FindPreviousAccelerator_Invoked(
+        KeyboardAccelerator sender,
+        KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = true;
+        _findPreviousShortcutInvoked = true;
+        _runtime.FindPrevious();
     }
 
     private void EscapeAccelerator_Invoked(
@@ -352,6 +384,11 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private void Editor_KeyDown(object sender, KeyRoutedEventArgs e)
     {
+        if (HandleFindNavigationKeyDown(e))
+        {
+            return;
+        }
+
         if (e.Key == OemOpenBracketKey
             && IsKeyDown(VirtualKey.Control)
             && !IsKeyDown(VirtualKey.Menu))
@@ -422,25 +459,25 @@ public sealed partial class MainWindow : Window, IDisposable
     private void FindTextBox_TextChanged(object sender, TextChangedEventArgs e) =>
         _runtime.OnFindTextChanged();
 
+    private void FindOptionsButton_Click(object sender, RoutedEventArgs e) =>
+        _runtime.OnFindOptionsChanged();
+
     private void CloseFindButton_Click(object sender, RoutedEventArgs e) =>
         _runtime.CloseFindPanel();
 
-    private void FindTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
+    private void FindReplaceModeButton_Click(object sender, RoutedEventArgs e) =>
+        _runtime.ToggleFindReplaceMode();
+
+    private void FindPreviousButton_Click(object sender, RoutedEventArgs e) => _runtime.FindPrevious();
+
+    private void FindTextBox_BeforeKeyDown(object sender, KeyRoutedEventArgs e)
     {
-        if (e.Key == VirtualKey.Enter)
-        {
-            _runtime.FindNext();
-            e.Handled = true;
-        }
+        HandleFindTextBoxKeyDown(FindTextBox, _runtime.FindNext, e);
     }
 
-    private void ReplaceTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
+    private void ReplaceTextBox_BeforeKeyDown(object sender, KeyRoutedEventArgs e)
     {
-        if (e.Key == VirtualKey.Enter)
-        {
-            _runtime.ReplaceCurrent();
-            e.Handled = true;
-        }
+        HandleFindTextBoxKeyDown(ReplaceTextBox, _runtime.ReplaceCurrent, e);
     }
 
     private void FindNextButton_Click(object sender, RoutedEventArgs e) => _runtime.FindNext();
@@ -448,6 +485,74 @@ public sealed partial class MainWindow : Window, IDisposable
     private void ReplaceAllButton_Click(object sender, RoutedEventArgs e) => _runtime.ReplaceAll();
 
     private void ReplaceCurrentButton_Click(object sender, RoutedEventArgs e) => _runtime.ReplaceCurrent();
+
+    private void HandleFindTextBoxKeyDown(
+        TextBox textBox,
+        Action submit,
+        KeyRoutedEventArgs args)
+    {
+        if (HandleFindNavigationKeyDown(args))
+        {
+            return;
+        }
+
+        if (args.Key != VirtualKey.Enter)
+        {
+            return;
+        }
+
+        args.Handled = true;
+        if (IsKeyDown(VirtualKey.Control) && !IsKeyDown(VirtualKey.Menu))
+        {
+            InsertFindTextNewLine(textBox);
+        }
+        else
+        {
+            submit();
+        }
+    }
+
+    private static void InsertFindTextNewLine(TextBox textBox)
+    {
+        var selectionStart = textBox.SelectionStart;
+        var selectionLength = textBox.SelectionLength;
+        // WinUI TextBox stores line breaks as a single CR character. Keep the
+        // insertion length aligned with SelectionStart for consecutive input;
+        // MainWindowViewAdapter normalizes it back to LF for searching.
+        textBox.Text = textBox.Text.Remove(selectionStart, selectionLength)
+            .Insert(selectionStart, "\r");
+        textBox.SelectionStart = selectionStart + 1;
+        textBox.SelectionLength = 0;
+    }
+
+    private bool HandleFindNavigationKeyDown(KeyRoutedEventArgs args)
+    {
+        if (args.Key != VirtualKey.F3)
+        {
+            return false;
+        }
+
+        var previous = IsKeyDown(VirtualKey.Shift);
+        var acceleratorInvoked = previous
+            ? _findPreviousShortcutInvoked
+            : _findNextShortcutInvoked;
+        _findNextShortcutInvoked = false;
+        _findPreviousShortcutInvoked = false;
+        args.Handled = true;
+        if (!acceleratorInvoked)
+        {
+            if (previous)
+            {
+                _runtime.FindPrevious();
+            }
+            else
+            {
+                _runtime.FindNext();
+            }
+        }
+
+        return true;
+    }
 
     public void Dispose()
     {

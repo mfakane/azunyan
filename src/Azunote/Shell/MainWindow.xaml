@@ -1,42 +1,64 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8" ?>
 <Window
     x:Class="Azunote.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="using:Azunyan.WinUI">
-    <Grid
-        x:Name="RootGrid"
-        KeyboardAcceleratorPlacementMode="Hidden">
+    xmlns:local="using:Azunyan.WinUI"
+>
+    <Grid x:Name="RootGrid" KeyboardAcceleratorPlacementMode="Hidden">
         <Grid.Resources>
-            <Style x:Name="AuxiliarySplitMenuFlyoutItemStyle"
-                   TargetType="SplitMenuFlyoutItem"
-                   BasedOn="{StaticResource DefaultSplitMenuFlyoutItemStyle}">
+            <Style
+                x:Name="AuxiliarySplitMenuFlyoutItemStyle"
+                TargetType="SplitMenuFlyoutItem"
+                BasedOn="{StaticResource DefaultSplitMenuFlyoutItemStyle}"
+            >
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="SplitMenuFlyoutItem">
-                            <Grid x:Name="RootGrid"
-                                  BorderBrush="{TemplateBinding BorderBrush}"
-                                  BorderThickness="{TemplateBinding BorderThickness}"
-                                  Margin="{StaticResource MenuFlyoutItemMargin}"
-                                  CornerRadius="{TemplateBinding CornerRadius}">
+                            <Grid
+                                x:Name="RootGrid"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Margin="{StaticResource MenuFlyoutItemMargin}"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                            >
                                 <Grid.Resources>
                                     <Style TargetType="Button">
-                                        <Setter Property="Background" Value="Transparent" />
-                                        <Setter Property="BorderThickness" Value="0" />
-                                        <Setter Property="UseSystemFocusVisuals" Value="{StaticResource UseSystemFocusVisuals}" />
-                                        <Setter Property="FocusVisualMargin" Value="-3" />
-                                        <Setter Property="CornerRadius" Value="{ThemeResource ControlCornerRadius}" />
+                                        <Setter
+                                            Property="Background"
+                                            Value="Transparent"
+                                        />
+                                        <Setter
+                                            Property="BorderThickness"
+                                            Value="0"
+                                        />
+                                        <Setter
+                                            Property="UseSystemFocusVisuals"
+                                            Value="{StaticResource UseSystemFocusVisuals}"
+                                        />
+                                        <Setter
+                                            Property="FocusVisualMargin"
+                                            Value="-3"
+                                        />
+                                        <Setter
+                                            Property="CornerRadius"
+                                            Value="{ThemeResource ControlCornerRadius}"
+                                        />
                                         <Setter Property="Template">
                                             <Setter.Value>
-                                                <ControlTemplate TargetType="Button">
-                                                    <ContentPresenter x:Name="ContentPresenter"
-                                                                      Background="{TemplateBinding Background}"
-                                                                      Content="{TemplateBinding Content}"
-                                                                      ContentTransitions="{TemplateBinding ContentTransitions}"
-                                                                      ContentTemplate="{TemplateBinding ContentTemplate}"
-                                                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                                                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
-                                                                      AutomationProperties.AccessibilityView="Raw" />
+                                                <ControlTemplate
+                                                    TargetType="Button"
+                                                >
+                                                    <ContentPresenter
+                                                        x:Name="ContentPresenter"
+                                                        Background="{TemplateBinding Background}"
+                                                        Content="{TemplateBinding Content}"
+                                                        ContentTransitions="{TemplateBinding ContentTransitions}"
+                                                        ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                        HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                        VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                        AutomationProperties.AccessibilityView="Raw"
+                                                    />
                                                 </ControlTemplate>
                                             </Setter.Value>
                                         </Setter>
@@ -45,75 +67,160 @@
                                 <VisualStateManager.VisualStateGroups>
                                     <VisualStateGroup x:Name="CommonStates">
                                         <VisualState x:Name="Normal" />
-                                        <VisualState x:Name="PrimaryPointerOver">
+                                        <VisualState
+                                            x:Name="PrimaryPointerOver"
+                                        >
                                             <VisualState.Setters>
-                                                <Setter Target="PrimaryButton.Background" Value="{ThemeResource MenuFlyoutItemBackgroundPointerOver}" />
-                                                <Setter Target="TextBlock.Foreground" Value="{ThemeResource MenuFlyoutItemForegroundPointerOver}" />
-                                                <Setter Target="IconContent.Foreground" Value="{ThemeResource MenuFlyoutItemForegroundPointerOver}" />
+                                                <Setter
+                                                    Target="PrimaryButton.Background"
+                                                    Value="{ThemeResource MenuFlyoutItemBackgroundPointerOver}"
+                                                />
+                                                <Setter
+                                                    Target="TextBlock.Foreground"
+                                                    Value="{ThemeResource MenuFlyoutItemForegroundPointerOver}"
+                                                />
+                                                <Setter
+                                                    Target="IconContent.Foreground"
+                                                    Value="{ThemeResource MenuFlyoutItemForegroundPointerOver}"
+                                                />
                                             </VisualState.Setters>
                                         </VisualState>
                                         <VisualState x:Name="PrimaryPressed">
                                             <VisualState.Setters>
-                                                <Setter Target="PrimaryButton.Background" Value="{ThemeResource MenuFlyoutItemBackgroundPressed}" />
-                                                <Setter Target="TextBlock.Foreground" Value="{ThemeResource MenuFlyoutItemForegroundPressed}" />
-                                                <Setter Target="IconContent.Foreground" Value="{ThemeResource MenuFlyoutItemForegroundPressed}" />
+                                                <Setter
+                                                    Target="PrimaryButton.Background"
+                                                    Value="{ThemeResource MenuFlyoutItemBackgroundPressed}"
+                                                />
+                                                <Setter
+                                                    Target="TextBlock.Foreground"
+                                                    Value="{ThemeResource MenuFlyoutItemForegroundPressed}"
+                                                />
+                                                <Setter
+                                                    Target="IconContent.Foreground"
+                                                    Value="{ThemeResource MenuFlyoutItemForegroundPressed}"
+                                                />
                                             </VisualState.Setters>
                                         </VisualState>
-                                        <VisualState x:Name="SecondaryPointerOver">
+                                        <VisualState
+                                            x:Name="SecondaryPointerOver"
+                                        >
                                             <VisualState.Setters>
-                                                <Setter Target="SecondaryButton.Background" Value="{ThemeResource MenuFlyoutItemBackgroundPointerOver}" />
-                                                <Setter Target="FlyoutButtonChevron.Foreground" Value="{ThemeResource MenuFlyoutSubItemChevronPointerOver}" />
+                                                <Setter
+                                                    Target="SecondaryButton.Background"
+                                                    Value="{ThemeResource MenuFlyoutItemBackgroundPointerOver}"
+                                                />
+                                                <Setter
+                                                    Target="FlyoutButtonChevron.Foreground"
+                                                    Value="{ThemeResource MenuFlyoutSubItemChevronPointerOver}"
+                                                />
                                             </VisualState.Setters>
                                         </VisualState>
                                         <VisualState x:Name="SecondaryPressed">
                                             <VisualState.Setters>
-                                                <Setter Target="SecondaryButton.Background" Value="{ThemeResource MenuFlyoutItemBackgroundPressed}" />
-                                                <Setter Target="FlyoutButtonChevron.Foreground" Value="{ThemeResource MenuFlyoutSubItemChevronPressed}" />
+                                                <Setter
+                                                    Target="SecondaryButton.Background"
+                                                    Value="{ThemeResource MenuFlyoutItemBackgroundPressed}"
+                                                />
+                                                <Setter
+                                                    Target="FlyoutButtonChevron.Foreground"
+                                                    Value="{ThemeResource MenuFlyoutSubItemChevronPressed}"
+                                                />
                                             </VisualState.Setters>
                                         </VisualState>
                                         <VisualState x:Name="SubMenuOpened">
                                             <VisualState.Setters>
-                                                <Setter Target="SecondaryButton.Background" Value="{ThemeResource MenuFlyoutSubItemBackgroundSubMenuOpened}" />
-                                                <Setter Target="FlyoutButtonChevron.Foreground" Value="{ThemeResource MenuFlyoutSubItemChevronSubMenuOpened}" />
+                                                <Setter
+                                                    Target="SecondaryButton.Background"
+                                                    Value="{ThemeResource MenuFlyoutSubItemBackgroundSubMenuOpened}"
+                                                />
+                                                <Setter
+                                                    Target="FlyoutButtonChevron.Foreground"
+                                                    Value="{ThemeResource MenuFlyoutSubItemChevronSubMenuOpened}"
+                                                />
                                             </VisualState.Setters>
                                         </VisualState>
                                         <VisualState x:Name="Disabled">
                                             <VisualState.Setters>
-                                                <Setter Target="PrimaryButton.Background" Value="{ThemeResource MenuFlyoutItemBackgroundDisabled}" />
-                                                <Setter Target="SecondaryButton.Background" Value="{ThemeResource MenuFlyoutItemBackgroundDisabled}" />
-                                                <Setter Target="TextBlock.Foreground" Value="{ThemeResource MenuFlyoutItemForegroundDisabled}" />
-                                                <Setter Target="FlyoutButtonChevron.Foreground" Value="{ThemeResource MenuFlyoutSubItemChevronDisabled}" />
-                                                <Setter Target="IconContent.Foreground" Value="{ThemeResource MenuFlyoutItemForegroundDisabled}" />
+                                                <Setter
+                                                    Target="PrimaryButton.Background"
+                                                    Value="{ThemeResource MenuFlyoutItemBackgroundDisabled}"
+                                                />
+                                                <Setter
+                                                    Target="SecondaryButton.Background"
+                                                    Value="{ThemeResource MenuFlyoutItemBackgroundDisabled}"
+                                                />
+                                                <Setter
+                                                    Target="TextBlock.Foreground"
+                                                    Value="{ThemeResource MenuFlyoutItemForegroundDisabled}"
+                                                />
+                                                <Setter
+                                                    Target="FlyoutButtonChevron.Foreground"
+                                                    Value="{ThemeResource MenuFlyoutSubItemChevronDisabled}"
+                                                />
+                                                <Setter
+                                                    Target="IconContent.Foreground"
+                                                    Value="{ThemeResource MenuFlyoutItemForegroundDisabled}"
+                                                />
                                             </VisualState.Setters>
                                         </VisualState>
                                     </VisualStateGroup>
-                                    <VisualStateGroup x:Name="CheckPlaceholderStates">
+                                    <VisualStateGroup
+                                        x:Name="CheckPlaceholderStates"
+                                    >
                                         <VisualState x:Name="NoPlaceholder" />
                                         <VisualState x:Name="CheckPlaceholder">
                                             <VisualState.Setters>
-                                                <Setter Target="TextBlock.Margin" Value="{ThemeResource MenuFlyoutItemPlaceholderThemeThickness}" />
+                                                <Setter
+                                                    Target="TextBlock.Margin"
+                                                    Value="{ThemeResource MenuFlyoutItemPlaceholderThemeThickness}"
+                                                />
                                             </VisualState.Setters>
                                         </VisualState>
                                         <VisualState x:Name="IconPlaceholder">
                                             <VisualState.Setters>
-                                                <Setter Target="TextBlock.Margin" Value="{ThemeResource MenuFlyoutItemPlaceholderThemeThickness}" />
-                                                <Setter Target="IconRoot.Visibility" Value="Visible" />
+                                                <Setter
+                                                    Target="TextBlock.Margin"
+                                                    Value="{ThemeResource MenuFlyoutItemPlaceholderThemeThickness}"
+                                                />
+                                                <Setter
+                                                    Target="IconRoot.Visibility"
+                                                    Value="Visible"
+                                                />
                                             </VisualState.Setters>
                                         </VisualState>
-                                        <VisualState x:Name="CheckAndIconPlaceholder">
+                                        <VisualState
+                                            x:Name="CheckAndIconPlaceholder"
+                                        >
                                             <VisualState.Setters>
-                                                <Setter Target="TextBlock.Margin" Value="{ThemeResource MenuFlyoutItemDoublePlaceholderThemeThickness}" />
-                                                <Setter Target="IconRoot.Margin" Value="{ThemeResource MenuFlyoutItemPlaceholderThemeThickness}" />
-                                                <Setter Target="IconRoot.Visibility" Value="Visible" />
+                                                <Setter
+                                                    Target="TextBlock.Margin"
+                                                    Value="{ThemeResource MenuFlyoutItemDoublePlaceholderThemeThickness}"
+                                                />
+                                                <Setter
+                                                    Target="IconRoot.Margin"
+                                                    Value="{ThemeResource MenuFlyoutItemPlaceholderThemeThickness}"
+                                                />
+                                                <Setter
+                                                    Target="IconRoot.Visibility"
+                                                    Value="Visible"
+                                                />
                                             </VisualState.Setters>
                                         </VisualState>
                                     </VisualStateGroup>
-                                    <VisualStateGroup x:Name="PaddingSizeStates">
+                                    <VisualStateGroup
+                                        x:Name="PaddingSizeStates"
+                                    >
                                         <VisualState x:Name="DefaultPadding" />
                                         <VisualState x:Name="NarrowPadding">
                                             <Storyboard>
-                                                <ObjectAnimationUsingKeyFrames Storyboard.TargetName="LayoutGrid" Storyboard.TargetProperty="Padding">
-                                                    <DiscreteObjectKeyFrame KeyTime="0" Value="{StaticResource MenuFlyoutItemThemePaddingNarrow}" />
+                                                <ObjectAnimationUsingKeyFrames
+                                                    Storyboard.TargetName="LayoutGrid"
+                                                    Storyboard.TargetProperty="Padding"
+                                                >
+                                                    <DiscreteObjectKeyFrame
+                                                        KeyTime="0"
+                                                        Value="{StaticResource MenuFlyoutItemThemePaddingNarrow}"
+                                                    />
                                                 </ObjectAnimationUsingKeyFrames>
                                             </Storyboard>
                                         </VisualState>
@@ -125,63 +232,80 @@
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <Button x:Name="PrimaryButton"
-                                            Grid.Column="0"
-                                            Grid.ColumnSpan="2"
-                                            Background="{TemplateBinding Background}"
-                                            HorizontalAlignment="Stretch"
-                                            VerticalAlignment="Stretch" />
-                                    <Border x:Name="SeparatorGrid"
-                                            Grid.Column="1"
-                                            Width="1"
-                                            Height="{StaticResource SplitMenuFlyoutItemSeparatorHeight}"
-                                            Background="{ThemeResource SplitMenuFlyoutItemButtonDividerBrush}" />
-                                    <Button x:Name="SecondaryButton"
-                                            Grid.Column="2"
-                                            Background="{TemplateBinding Background}"
-                                            Width="{StaticResource SplitMenuFlyoutItemChevronButtonWidth}"
-                                            CornerRadius="0,4,4,0"
-                                            HorizontalAlignment="Stretch"
-                                            VerticalAlignment="Stretch" />
+                                    <Button
+                                        x:Name="PrimaryButton"
+                                        Grid.Column="0"
+                                        Grid.ColumnSpan="2"
+                                        Background="{TemplateBinding Background}"
+                                        HorizontalAlignment="Stretch"
+                                        VerticalAlignment="Stretch"
+                                    />
+                                    <Border
+                                        x:Name="SeparatorGrid"
+                                        Grid.Column="1"
+                                        Width="1"
+                                        Height="{StaticResource SplitMenuFlyoutItemSeparatorHeight}"
+                                        Background="{ThemeResource SplitMenuFlyoutItemButtonDividerBrush}"
+                                    />
+                                    <Button
+                                        x:Name="SecondaryButton"
+                                        Grid.Column="2"
+                                        Background="{TemplateBinding Background}"
+                                        Width="{StaticResource SplitMenuFlyoutItemChevronButtonWidth}"
+                                        CornerRadius="0,4,4,0"
+                                        HorizontalAlignment="Stretch"
+                                        VerticalAlignment="Stretch"
+                                    />
                                 </Grid>
-                                <Grid x:Name="LayoutGrid" Padding="{TemplateBinding Padding}">
+                                <Grid
+                                    x:Name="LayoutGrid"
+                                    Padding="{TemplateBinding Padding}"
+                                >
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <Viewbox x:Name="IconRoot"
-                                                 Grid.Column="0"
-                                                 HorizontalAlignment="Left"
-                                                 VerticalAlignment="Center"
-                                                 Width="16"
-                                                 Height="16"
-                                                 Visibility="Collapsed">
-                                            <ContentPresenter x:Name="IconContent"
-                                                              Content="{TemplateBinding Icon}"
-                                                              Foreground="{TemplateBinding Foreground}" />
+                                        <Viewbox
+                                            x:Name="IconRoot"
+                                            Grid.Column="0"
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Center"
+                                            Width="16"
+                                            Height="16"
+                                            Visibility="Collapsed"
+                                        >
+                                            <ContentPresenter
+                                                x:Name="IconContent"
+                                                Content="{TemplateBinding Icon}"
+                                                Foreground="{TemplateBinding Foreground}"
+                                            />
                                         </Viewbox>
-                                        <TextBlock x:Name="TextBlock"
-                                                   Grid.Column="0"
-                                                   Foreground="{TemplateBinding Foreground}"
-                                                   Text="{TemplateBinding Text}"
-                                                   TextTrimming="{ThemeResource MenuFlyoutItemTextTrimming}"
-                                                   FontFamily="{TemplateBinding FontFamily}"
-                                                   FontSize="{TemplateBinding FontSize}"
-                                                   FontWeight="{TemplateBinding FontWeight}"
-                                                   HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                                   VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
-                                                   IsHitTestVisible="False" />
-                                        <FontIcon x:Name="FlyoutButtonChevron"
-                                                  Grid.Column="1"
-                                                  Glyph="&#xE712;"
-                                                  FontFamily="{ThemeResource SymbolThemeFontFamily}"
-                                                  FontSize="12"
-                                                  AutomationProperties.AccessibilityView="Raw"
-                                                  Foreground="{ThemeResource MenuFlyoutSubItemChevron}"
-                                                  Margin="{StaticResource MenuFlyoutItemChevronMargin}"
-                                                  IsHitTestVisible="False"
-                                                  MirroredWhenRightToLeft="True" />
+                                        <TextBlock
+                                            x:Name="TextBlock"
+                                            Grid.Column="0"
+                                            Foreground="{TemplateBinding Foreground}"
+                                            Text="{TemplateBinding Text}"
+                                            TextTrimming="{ThemeResource MenuFlyoutItemTextTrimming}"
+                                            FontFamily="{TemplateBinding FontFamily}"
+                                            FontSize="{TemplateBinding FontSize}"
+                                            FontWeight="{TemplateBinding FontWeight}"
+                                            HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                            VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                            IsHitTestVisible="False"
+                                        />
+                                        <FontIcon
+                                            x:Name="FlyoutButtonChevron"
+                                            Grid.Column="1"
+                                            Glyph="&#xE712;"
+                                            FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                                            FontSize="12"
+                                            AutomationProperties.AccessibilityView="Raw"
+                                            Foreground="{ThemeResource MenuFlyoutSubItemChevron}"
+                                            Margin="{StaticResource MenuFlyoutItemChevronMargin}"
+                                            IsHitTestVisible="False"
+                                            MirroredWhenRightToLeft="True"
+                                        />
                                     </Grid>
                                 </Grid>
                             </Grid>
@@ -189,21 +313,73 @@
                     </Setter.Value>
                 </Setter>
             </Style>
+            <Flyout x:Key="FindNotificationFlyout" Placement="Bottom">
+                <TextBlock Padding="12,8" MaxWidth="360" TextWrapping="Wrap" />
+            </Flyout>
             <MenuFlyout x:Name="StatusTabDisplaySizeMenu">
-                <RadioMenuFlyoutItem Text="2" Tag="2" GroupName="StatusTabDisplaySize" Click="TabDisplaySizeMenuItem_Click" />
-                <RadioMenuFlyoutItem Text="4" Tag="4" IsChecked="True" GroupName="StatusTabDisplaySize" Click="TabDisplaySizeMenuItem_Click" />
-                <RadioMenuFlyoutItem Text="8" Tag="8" GroupName="StatusTabDisplaySize" Click="TabDisplaySizeMenuItem_Click" />
+                <RadioMenuFlyoutItem
+                    Text="2"
+                    Tag="2"
+                    GroupName="StatusTabDisplaySize"
+                    Click="TabDisplaySizeMenuItem_Click"
+                />
+                <RadioMenuFlyoutItem
+                    Text="4"
+                    Tag="4"
+                    IsChecked="True"
+                    GroupName="StatusTabDisplaySize"
+                    Click="TabDisplaySizeMenuItem_Click"
+                />
+                <RadioMenuFlyoutItem
+                    Text="8"
+                    Tag="8"
+                    GroupName="StatusTabDisplaySize"
+                    Click="TabDisplaySizeMenuItem_Click"
+                />
             </MenuFlyout>
             <MenuFlyout x:Name="StatusIndentSizeMenu">
-                <RadioMenuFlyoutItem Text="Auto" Tag="auto" IsChecked="True" GroupName="StatusIndentSize" Click="IndentSizeMenuItem_Click" />
-                <RadioMenuFlyoutItem Text="2" Tag="2" GroupName="StatusIndentSize" Click="IndentSizeMenuItem_Click" />
-                <RadioMenuFlyoutItem Text="4" Tag="4" GroupName="StatusIndentSize" Click="IndentSizeMenuItem_Click" />
-                <RadioMenuFlyoutItem Text="8" Tag="8" GroupName="StatusIndentSize" Click="IndentSizeMenuItem_Click" />
+                <RadioMenuFlyoutItem
+                    Text="Auto"
+                    Tag="auto"
+                    IsChecked="True"
+                    GroupName="StatusIndentSize"
+                    Click="IndentSizeMenuItem_Click"
+                />
+                <RadioMenuFlyoutItem
+                    Text="2"
+                    Tag="2"
+                    GroupName="StatusIndentSize"
+                    Click="IndentSizeMenuItem_Click"
+                />
+                <RadioMenuFlyoutItem
+                    Text="4"
+                    Tag="4"
+                    GroupName="StatusIndentSize"
+                    Click="IndentSizeMenuItem_Click"
+                />
+                <RadioMenuFlyoutItem
+                    Text="8"
+                    Tag="8"
+                    GroupName="StatusIndentSize"
+                    Click="IndentSizeMenuItem_Click"
+                />
             </MenuFlyout>
             <MenuFlyout x:Name="StatusFilePathMenu">
-                <MenuFlyoutItem Text="Copy File Path" Tag="copy-file-path" Click="CopyFilePathMenuItem_Click" />
-                <MenuFlyoutItem Text="Show in Explorer" Tag="show-in-explorer" Click="ShowFileInExplorerMenuItem_Click" />
-                <MenuFlyoutItem Text="Open Folder in Terminal" Tag="open-folder-in-terminal" Click="OpenFolderInTerminalMenuItem_Click" />
+                <MenuFlyoutItem
+                    Text="Copy File Path"
+                    Tag="copy-file-path"
+                    Click="CopyFilePathMenuItem_Click"
+                />
+                <MenuFlyoutItem
+                    Text="Show in Explorer"
+                    Tag="show-in-explorer"
+                    Click="ShowFileInExplorerMenuItem_Click"
+                />
+                <MenuFlyoutItem
+                    Text="Open Folder in Terminal"
+                    Tag="open-folder-in-terminal"
+                    Click="OpenFolderInTerminalMenuItem_Click"
+                />
             </MenuFlyout>
         </Grid.Resources>
         <Grid.RowDefinitions>
@@ -224,7 +400,10 @@
                         <KeyboardAccelerator Key="O" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutSubItem x:Name="OpenRecentMenuItem" Text="Open Recent" />
+                <MenuFlyoutSubItem
+                    x:Name="OpenRecentMenuItem"
+                    Text="Open Recent"
+                />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="Save" Click="SaveButton_Click">
                     <MenuFlyoutItem.KeyboardAccelerators>
@@ -233,7 +412,10 @@
                 </MenuFlyoutItem>
                 <MenuFlyoutItem Text="Save As..." Click="SaveAsButton_Click">
                     <MenuFlyoutItem.KeyboardAccelerators>
-                        <KeyboardAccelerator Key="S" Modifiers="Control,Shift" />
+                        <KeyboardAccelerator
+                            Key="S"
+                            Modifiers="Control,Shift"
+                        />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
                 <MenuFlyoutSeparator />
@@ -277,7 +459,10 @@
                         <KeyboardAccelerator Key="H" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Go to Line..." Click="GoToLineMenuItem_Click">
+                <MenuFlyoutItem
+                    Text="Go to Line..."
+                    Click="GoToLineMenuItem_Click"
+                >
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="G" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
@@ -286,9 +471,13 @@
                     x:Name="GoToMatchingBracketMenuItem"
                     Text="Go to Matching Bracket"
                     KeyboardAcceleratorTextOverride="Ctrl+["
-                    Click="GoToMatchingBracketMenuItem_Click" />
+                    Click="GoToMatchingBracketMenuItem_Click"
+                />
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Select All" Click="SelectAllMenuItem_Click">
+                <MenuFlyoutItem
+                    Text="Select All"
+                    Click="SelectAllMenuItem_Click"
+                >
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="A" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
@@ -296,7 +485,8 @@
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem
                     Text="Show Completions"
-                    Click="ShowCompletionMenuItem_Click">
+                    Click="ShowCompletionMenuItem_Click"
+                >
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <!-- Keep the shortcut attached to the command; the
                              editor host provides a fallback when native text
@@ -304,91 +494,355 @@
                         <KeyboardAccelerator
                             Key="Space"
                             Modifiers="Control"
-                            Invoked="ShowCompletionAccelerator_Invoked" />
+                            Invoked="ShowCompletionAccelerator_Invoked"
+                        />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
             </MenuBarItem>
             <MenuBarItem Title="View">
-                <MenuFlyoutSubItem x:Name="LanguageModeMenuItem"
-                                    Text="Language Mode" />
+                <MenuFlyoutSubItem
+                    x:Name="LanguageModeMenuItem"
+                    Text="Language Mode"
+                />
                 <MenuFlyoutSeparator />
-                <MenuFlyoutSubItem x:Name="TabDisplaySizeMenuItem"
-                                   Text="Tab Display Size">
-                    <RadioMenuFlyoutItem x:Name="TabDisplaySize2MenuItem" Text="2" Tag="2" GroupName="TabDisplaySize" Click="TabDisplaySizeMenuItem_Click" />
-                    <RadioMenuFlyoutItem x:Name="TabDisplaySize4MenuItem" Text="4" Tag="4" GroupName="TabDisplaySize" Click="TabDisplaySizeMenuItem_Click" />
-                    <RadioMenuFlyoutItem x:Name="TabDisplaySize8MenuItem" Text="8" Tag="8" GroupName="TabDisplaySize" Click="TabDisplaySizeMenuItem_Click" />
+                <MenuFlyoutSubItem
+                    x:Name="TabDisplaySizeMenuItem"
+                    Text="Tab Display Size"
+                >
+                    <RadioMenuFlyoutItem
+                        x:Name="TabDisplaySize2MenuItem"
+                        Text="2"
+                        Tag="2"
+                        GroupName="TabDisplaySize"
+                        Click="TabDisplaySizeMenuItem_Click"
+                    />
+                    <RadioMenuFlyoutItem
+                        x:Name="TabDisplaySize4MenuItem"
+                        Text="4"
+                        Tag="4"
+                        GroupName="TabDisplaySize"
+                        Click="TabDisplaySizeMenuItem_Click"
+                    />
+                    <RadioMenuFlyoutItem
+                        x:Name="TabDisplaySize8MenuItem"
+                        Text="8"
+                        Tag="8"
+                        GroupName="TabDisplaySize"
+                        Click="TabDisplaySizeMenuItem_Click"
+                    />
                 </MenuFlyoutSubItem>
-                <MenuFlyoutSubItem x:Name="IndentSizeMenuItem"
-                                   Text="Indent Size">
-                    <RadioMenuFlyoutItem x:Name="IndentSizeAutoMenuItem" Text="Auto" Tag="auto" GroupName="IndentSize" Click="IndentSizeMenuItem_Click" />
-                    <RadioMenuFlyoutItem x:Name="IndentSize2MenuItem" Text="2" Tag="2" GroupName="IndentSize" Click="IndentSizeMenuItem_Click" />
-                    <RadioMenuFlyoutItem x:Name="IndentSize4MenuItem" Text="4" Tag="4" GroupName="IndentSize" Click="IndentSizeMenuItem_Click" />
-                    <RadioMenuFlyoutItem x:Name="IndentSize8MenuItem" Text="8" Tag="8" GroupName="IndentSize" Click="IndentSizeMenuItem_Click" />
+                <MenuFlyoutSubItem
+                    x:Name="IndentSizeMenuItem"
+                    Text="Indent Size"
+                >
+                    <RadioMenuFlyoutItem
+                        x:Name="IndentSizeAutoMenuItem"
+                        Text="Auto"
+                        Tag="auto"
+                        GroupName="IndentSize"
+                        Click="IndentSizeMenuItem_Click"
+                    />
+                    <RadioMenuFlyoutItem
+                        x:Name="IndentSize2MenuItem"
+                        Text="2"
+                        Tag="2"
+                        GroupName="IndentSize"
+                        Click="IndentSizeMenuItem_Click"
+                    />
+                    <RadioMenuFlyoutItem
+                        x:Name="IndentSize4MenuItem"
+                        Text="4"
+                        Tag="4"
+                        GroupName="IndentSize"
+                        Click="IndentSizeMenuItem_Click"
+                    />
+                    <RadioMenuFlyoutItem
+                        x:Name="IndentSize8MenuItem"
+                        Text="8"
+                        Tag="8"
+                        GroupName="IndentSize"
+                        Click="IndentSizeMenuItem_Click"
+                    />
                 </MenuFlyoutSubItem>
-                <MenuFlyoutSubItem x:Name="TabInputModeMenuItem"
-                                   Text="Indentation Mode">
-                    <RadioMenuFlyoutItem x:Name="TabInputModeAutoMenuItem" Text="Auto" Tag="auto" GroupName="TabInputMode"
-                                          Click="TabInputModeMenuItem_Click" />
-                    <RadioMenuFlyoutItem x:Name="TabInputModeTabMenuItem" Text="Tab" Tag="tab" GroupName="TabInputMode"
-                                          Click="TabInputModeMenuItem_Click" />
-                    <RadioMenuFlyoutItem x:Name="TabInputModeSpacesMenuItem" Text="Spaces" Tag="spaces" GroupName="TabInputMode"
-                                          Click="TabInputModeMenuItem_Click" />
+                <MenuFlyoutSubItem
+                    x:Name="TabInputModeMenuItem"
+                    Text="Indentation Mode"
+                >
+                    <RadioMenuFlyoutItem
+                        x:Name="TabInputModeAutoMenuItem"
+                        Text="Auto"
+                        Tag="auto"
+                        GroupName="TabInputMode"
+                        Click="TabInputModeMenuItem_Click"
+                    />
+                    <RadioMenuFlyoutItem
+                        x:Name="TabInputModeTabMenuItem"
+                        Text="Tab"
+                        Tag="tab"
+                        GroupName="TabInputMode"
+                        Click="TabInputModeMenuItem_Click"
+                    />
+                    <RadioMenuFlyoutItem
+                        x:Name="TabInputModeSpacesMenuItem"
+                        Text="Spaces"
+                        Tag="spaces"
+                        GroupName="TabInputMode"
+                        Click="TabInputModeMenuItem_Click"
+                    />
                 </MenuFlyoutSubItem>
                 <MenuFlyoutSeparator />
-                <ToggleMenuFlyoutItem x:Name="WordWrapMenuItem" Text="Word Wrap" Click="WordWrapMenuItem_Click" />
-                <ToggleMenuFlyoutItem x:Name="StatusBarMenuItem"
-                                      Text="Status Bar"
-                                      IsChecked="True"
-                                      Click="StatusBarMenuItem_Click" />
+                <ToggleMenuFlyoutItem
+                    x:Name="WordWrapMenuItem"
+                    Text="Word Wrap"
+                    Click="WordWrapMenuItem_Click"
+                />
+                <ToggleMenuFlyoutItem
+                    x:Name="StatusBarMenuItem"
+                    Text="Status Bar"
+                    IsChecked="True"
+                    Click="StatusBarMenuItem_Click"
+                />
             </MenuBarItem>
             <MenuBarItem x:Name="ToolsMenuItem" Title="Tools">
-                <MenuFlyoutItem Text="Run External Tool..." Click="RunExternalToolMenuItem_Click" />
+                <MenuFlyoutItem
+                    Text="Run External Tool..."
+                    Click="RunExternalToolMenuItem_Click"
+                />
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Preferences..." Click="PreferencesMenuItem_Click" />
+                <MenuFlyoutItem
+                    Text="Preferences..."
+                    Click="PreferencesMenuItem_Click"
+                />
             </MenuBarItem>
             <MenuBarItem x:Name="WindowMenuItem" Title="Window">
                 <ToggleMenuFlyoutItem
                     x:Name="AlwaysOnTopMenuItem"
                     Text="Always on Top"
-                    Click="AlwaysOnTopMenuItem_Click" />
+                    Click="AlwaysOnTopMenuItem_Click"
+                />
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Show All Windows" Click="ShowAllWindowsMenuItem_Click" />
-                <MenuFlyoutItem Text="Minimize All Windows" Click="MinimizeAllWindowsMenuItem_Click" />
+                <MenuFlyoutItem
+                    Text="Show All Windows"
+                    Click="ShowAllWindowsMenuItem_Click"
+                />
+                <MenuFlyoutItem
+                    Text="Minimize All Windows"
+                    Click="MinimizeAllWindowsMenuItem_Click"
+                />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem
                     Text="Next Window"
                     Click="NextWindowMenuItem_Click"
-                    KeyboardAcceleratorTextOverride="Ctrl+Tab" />
+                    KeyboardAcceleratorTextOverride="Ctrl+Tab"
+                />
                 <MenuFlyoutItem
                     Text="Previous Window"
                     Click="PreviousWindowMenuItem_Click"
-                    KeyboardAcceleratorTextOverride="Ctrl+Shift+Tab" />
+                    KeyboardAcceleratorTextOverride="Ctrl+Shift+Tab"
+                />
                 <MenuFlyoutSeparator />
             </MenuBarItem>
             <MenuBarItem Title="Help">
-                <MenuFlyoutItem Text="About Azunote" Click="AboutMenuItem_Click" />
+                <MenuFlyoutItem
+                    Text="About Azunote"
+                    Click="AboutMenuItem_Click"
+                />
             </MenuBarItem>
         </MenuBar>
-        <Border x:Name="FindPanel" Grid.Row="1" Padding="12,8" BorderThickness="0,0,0,1" Visibility="Collapsed">
-            <Grid ColumnSpacing="8">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="220" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="220" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="Find" VerticalAlignment="Center" />
-                <TextBox x:Name="FindTextBox" Grid.Column="1" PlaceholderText="Search text" TextChanged="FindTextBox_TextChanged" KeyDown="FindTextBox_KeyDown" />
-                <Button Grid.Column="2" Content="Next" Click="FindNextButton_Click" />
-                <TextBox x:Name="ReplaceTextBox" Grid.Column="3" PlaceholderText="Replace with" KeyDown="ReplaceTextBox_KeyDown" />
-                <Button Grid.Column="4" Content="Replace" Click="ReplaceCurrentButton_Click" />
-                <Button Grid.Column="5" Content="Replace all" Click="ReplaceAllButton_Click" />
-                <TextBlock x:Name="FindResultText" Grid.Column="6" VerticalAlignment="Center" />
-                <Button Grid.Column="7" Content="Close" HorizontalAlignment="Right" Click="CloseFindButton_Click" />
+        <Border
+            x:Name="FindReplacePanel"
+            Grid.Row="1"
+            HorizontalAlignment="Center"
+            Padding="8,0,0,0"
+            BorderThickness="0,0,0,1"
+            Visibility="Collapsed"
+        >
+            <Grid RowSpacing="8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid Grid.Row="0" ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="32" />
+                        <ColumnDefinition Width="320" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Button
+                        x:Name="FindReplaceModeButton"
+                        Grid.Column="0"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Top"
+                        Height="32"
+                        Padding="0,1,0,0"
+                        Style="{StaticResource SubtleButtonStyle}"
+                        Click="FindReplaceModeButton_Click"
+                        AutomationProperties.Name="Toggle Replace fields"
+                    >
+                        <FontIcon
+                            x:Name="FindReplaceChevronIcon"
+                            Glyph="&#xE70D;"
+                            FontSize="16"
+                        />
+                    </Button>
+                    <Grid Grid.Column="1">
+                        <local:CompletionTextBox
+                            x:Name="FindTextBox"
+                            Padding="10,6,72,6"
+                            PlaceholderText="Search text"
+                            AcceptsReturn="True"
+                            TextWrapping="Wrap"
+                            AutomationProperties.Name="Find text"
+                            TextChanged="FindTextBox_TextChanged"
+                            BeforeKeyDown="FindTextBox_BeforeKeyDown"
+                        />
+                        <StackPanel
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Orientation="Horizontal"
+                            Height="24"
+                            Margin="0,4,4,4"
+                            Spacing="2"
+                        >
+                            <ToggleButton
+                                x:Name="MatchCaseButton"
+                                VerticalAlignment="Stretch"
+                                Width="22"
+                                Padding="0"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Click="FindOptionsButton_Click"
+                                ToolTipService.ToolTip="Match Case"
+                                AutomationProperties.Name="Match Case"
+                            >
+                                <TextBlock
+                                    Text="Aa"
+                                    FontSize="12"
+                                    FontWeight="SemiBold"
+                                />
+                            </ToggleButton>
+                            <ToggleButton
+                                x:Name="MatchWholeWordButton"
+                                VerticalAlignment="Stretch"
+                                Width="22"
+                                Padding="0"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Click="FindOptionsButton_Click"
+                                ToolTipService.ToolTip="Match Whole Word"
+                                AutomationProperties.Name="Match Whole Word"
+                            >
+                                <TextBlock
+                                    Text="ab"
+                                    FontSize="12"
+                                    FontWeight="SemiBold"
+                                />
+                            </ToggleButton>
+                            <ToggleButton
+                                x:Name="RegularExpressionButton"
+                                VerticalAlignment="Stretch"
+                                Width="22"
+                                Padding="0"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Click="FindOptionsButton_Click"
+                                ToolTipService.ToolTip="Regular Expression"
+                                AutomationProperties.Name="Regular Expression"
+                            >
+                                <TextBlock
+                                    Text=".*"
+                                    FontFamily="Consolas"
+                                    FontSize="12"
+                                    FontWeight="SemiBold"
+                                />
+                            </ToggleButton>
+                        </StackPanel>
+                    </Grid>
+                    <StackPanel
+                        Grid.Column="2"
+                        Height="32"
+                        Spacing="8"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Top"
+                    >
+                        <Button
+                            VerticalAlignment="Stretch"
+                            Width="32"
+                            Padding="1,1,0,0"
+                            ToolTipService.ToolTip="Previous"
+                            Click="FindPreviousButton_Click"
+                        >
+                            <FontIcon Glyph="&#xE74A;" FontSize="16" />
+                        </Button>
+                        <Button
+                            VerticalAlignment="Stretch"
+                            Width="32"
+                            Padding="1,1,0,0"
+                            ToolTipService.ToolTip="Next"
+                            Click="FindNextButton_Click"
+                        >
+                            <FontIcon Glyph="&#xE74B;" FontSize="16" />
+                        </Button>
+                        <TextBlock
+                            x:Name="FindResultText"
+                            MinWidth="48"
+                            HorizontalTextAlignment="Center"
+                            VerticalAlignment="Center"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="0/0"
+                        />
+                        <Button
+                            VerticalAlignment="Stretch"
+                            Padding="1,1,0,0"
+                            Width="32"
+                            ToolTipService.ToolTip="Close"
+                            Style="{StaticResource SubtleButtonStyle}"
+                            Click="CloseFindButton_Click"
+                        >
+                            <FontIcon Glyph="&#xE711;" FontSize="16" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+                <Grid
+                    x:Name="ReplacePanel"
+                    Grid.Row="1"
+                    ColumnSpacing="8"
+                    Visibility="Collapsed"
+                >
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="32" />
+                        <ColumnDefinition Width="320" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <local:CompletionTextBox
+                        x:Name="ReplaceTextBox"
+                        Grid.Column="1"
+                        Grid.RowSpan="2"
+                        PlaceholderText="Replace with"
+                        AcceptsReturn="True"
+                        TextWrapping="Wrap"
+                        AutomationProperties.Name="Replace text"
+                        BeforeKeyDown="ReplaceTextBox_BeforeKeyDown"
+                    />
+                    <StackPanel
+                        Grid.Column="2"
+                        Height="32"
+                        Spacing="8"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Top"
+                    >
+                        <Button
+                            VerticalAlignment="Stretch"
+                            Content="Replace"
+                            Click="ReplaceCurrentButton_Click"
+                        />
+                        <Button
+                            VerticalAlignment="Stretch"
+                            Content="Replace all"
+                            Click="ReplaceAllButton_Click"
+                        />
+                    </StackPanel>
+                </Grid>
             </Grid>
         </Border>
         <local:AzunyanEditorView
@@ -404,8 +858,14 @@
             TextChanged="Editor_TextChanged"
             DragOver="Editor_DragOver"
             Drop="Editor_Drop"
-            AutomationProperties.Name="Document editor" />
-        <Border x:Name="StatusBarPanel" Grid.Row="3" BorderThickness="0,1,0,0" Padding="12,6">
+            AutomationProperties.Name="Document editor"
+        />
+        <Border
+            x:Name="StatusBarPanel"
+            Grid.Row="3"
+            BorderThickness="0,1,0,0"
+            Padding="12,6"
+        >
             <Grid ColumnSpacing="18">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -415,17 +875,41 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <TextBlock x:Name="PositionStatus"
-                           Grid.Column="0"
-                           Text="Ln 1, Col 1"
-                           Tapped="PositionStatus_Tapped" />
-                <TextBlock x:Name="EncodingStatus" Grid.Column="1" Text="UTF-8" />
-                <TextBlock x:Name="LineEndingStatus" Grid.Column="2" Text="LF" />
-                <TextBlock x:Name="IndentationStatus" Grid.Column="3" Text="Spaces: 2"
-                           Tapped="IndentationStatus_Tapped" />
-                <TextBlock x:Name="LanguageModeStatus" Grid.Column="4" Text="Plain Text" />
-                <TextBlock x:Name="FilePathStatus" Grid.Column="5" HorizontalAlignment="Right" Text="Untitled" TextTrimming="CharacterEllipsis"
-                           Tapped="FilePathStatus_Tapped" />
+                <TextBlock
+                    x:Name="PositionStatus"
+                    Grid.Column="0"
+                    Text="Ln 1, Col 1"
+                    Tapped="PositionStatus_Tapped"
+                />
+                <TextBlock
+                    x:Name="EncodingStatus"
+                    Grid.Column="1"
+                    Text="UTF-8"
+                />
+                <TextBlock
+                    x:Name="LineEndingStatus"
+                    Grid.Column="2"
+                    Text="LF"
+                />
+                <TextBlock
+                    x:Name="IndentationStatus"
+                    Grid.Column="3"
+                    Text="Spaces: 2"
+                    Tapped="IndentationStatus_Tapped"
+                />
+                <TextBlock
+                    x:Name="LanguageModeStatus"
+                    Grid.Column="4"
+                    Text="Plain Text"
+                />
+                <TextBlock
+                    x:Name="FilePathStatus"
+                    Grid.Column="5"
+                    HorizontalAlignment="Right"
+                    Text="Untitled"
+                    TextTrimming="CharacterEllipsis"
+                    Tapped="FilePathStatus_Tapped"
+                />
             </Grid>
         </Border>
 

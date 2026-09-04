@@ -316,11 +316,17 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public void ShowFindPanel(bool replace) => _findReplace.Show(replace);
 
+    public void ToggleFindReplaceMode() => _findReplace.ToggleMode();
+
     public void CloseFindPanel() => _findReplace.Close();
 
     public void OnFindTextChanged() => _findReplace.OnFindTextChanged();
 
+    public void OnFindOptionsChanged() => _findReplace.OnFindOptionsChanged();
+
     public void FindNext() => _findReplace.FindNext();
+
+    public void FindPrevious() => _findReplace.FindPrevious();
 
     public void ReplaceCurrent() => _findReplace.ReplaceCurrent();
 
