@@ -68,6 +68,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private readonly HashSet<string> _collapsedFoldIds = new(StringComparer.Ordinal);
     private double _projectedVerticalOffset;
     private bool _synchronizingProjectedScroll;
+    private bool _projectedScrollInteraction;
     private bool _preservingViewport;
     private bool _completionRequested;
     private bool _explicitCompletionRequested;
@@ -2448,7 +2449,17 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         var offset = Math.Clamp(
             _projectedVerticalOffset + delta,
             0,
-            ProjectedVerticalScrollBar.Maximum);
+            GetProjectedScrollMaximum(
+                Math.Max(1, ProjectedSurfaceHost.ActualHeight)));
+        // Pointer capture continues to report moves while the cursor is
+        // outside the editor. At either scroll boundary, avoid re-rendering
+        // with an unchanged offset so a queued layout pass cannot pull the
+        // viewport away from the boundary.
+        if (Math.Abs(offset - _projectedVerticalOffset) <= 0.5)
+        {
+            return;
+        }
+
         _synchronizingProjectedScroll = true;
         try
         {
@@ -2460,7 +2471,16 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             _synchronizingProjectedScroll = false;
         }
 
-        RenderViewport();
+        _projectedScrollInteraction = true;
+        try
+        {
+            RenderViewport();
+        }
+        finally
+        {
+            _projectedScrollInteraction = false;
+        }
+
         RequestProviderResults(false, true, false);
     }
 
@@ -3413,7 +3433,16 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             _synchronizingProjectedScroll = false;
         }
 
-        RenderViewport();
+        _projectedScrollInteraction = true;
+        try
+        {
+            RenderViewport();
+        }
+        finally
+        {
+            _projectedScrollInteraction = false;
+        }
+
         return true;
     }
 
@@ -3540,7 +3569,16 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
         _projectedVerticalOffset = args.NewValue;
 
-        RenderViewport();
+        _projectedScrollInteraction = true;
+        try
+        {
+            RenderViewport();
+        }
+        finally
+        {
+            _projectedScrollInteraction = false;
+        }
+
         RequestProviderResults(false, true, false);
     }
 

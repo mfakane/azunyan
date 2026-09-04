@@ -26,17 +26,24 @@ public sealed partial class AzunyanEditorView
         var lineIndex = Snapshot.Lines;
         var lineCount = lineIndex.LineCount;
         var verticalOffset = GetVerticalOffset();
+        var viewportWidth = Math.Max(1, ProjectedSurfaceHost.ActualWidth);
+        var viewportHeight = Math.Max(1, ProjectedSurfaceHost.ActualHeight);
+        var previousScrollMaximum = GetProjectedScrollMaximum(viewportHeight);
+        var wasAtBottom = IsProjectedTextSurface
+            && previousScrollMaximum > 0.5
+            && verticalOffset >= previousScrollMaximum - 0.5;
         var viewportAnchor = DocumentAnchor.Before(0);
         var offsetWithinRow = 0d;
-        var preserveViewport = IsProjectedTextSurface
+        var preserveViewport = !_projectedScrollInteraction
+            && _selectionPointerId is null
+            && !wasAtBottom
+            && IsProjectedTextSurface
             && _defaultRenderer.TextRenderer.TryGetViewportAnchor(
                 Snapshot,
                 verticalOffset,
                 out viewportAnchor,
                 out offsetWithinRow);
         var horizontalOffset = GetHorizontalOffset();
-        var viewportWidth = Math.Max(1, ProjectedSurfaceHost.ActualWidth);
-        var viewportHeight = Math.Max(1, ProjectedSurfaceHost.ActualHeight);
         var firstVisibleLine = Math.Clamp(
             (int)Math.Floor(verticalOffset / _lineHeight) - 1,
             0,
@@ -118,6 +125,24 @@ public sealed partial class AzunyanEditorView
             DispatcherQueue.TryEnqueue(ReconcileInputWindowCaret);
         }
         CreateProjectedAutomationChildren();
+        if (wasAtBottom
+            && !_preservingViewport
+            && GetProjectedScrollMaximum(viewportHeight) > GetVerticalOffset() + 0.5)
+        {
+            _projectedVerticalOffset = GetProjectedScrollMaximum(viewportHeight);
+            _preservingViewport = true;
+            try
+            {
+                RenderViewport();
+            }
+            finally
+            {
+                _preservingViewport = false;
+            }
+
+            return;
+        }
+
         if (preserveViewport
             && !_preservingViewport
             && _defaultRenderer.TextRenderer.TryGetViewportOffset(

@@ -2058,6 +2058,29 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         var firstRow = layout.Heights.FindLine(startOffset);
         var lastRow = layout.Heights.FindLine(endOffset);
         var projection = layout.Rows.Projection;
+
+        // The estimated row count is good enough for virtualization while the
+        // user is moving through the document, but it cannot describe the
+        // true end of a wrapped document. Once the estimated viewport reaches
+        // the end, resolve every remaining line so the scrollbar gets the
+        // final extent and the last visual row can be reached.
+        var reachesEstimatedEnd = context.VerticalOffset + context.ViewportHeight
+            >= layout.Heights.TotalHeight - context.LineHeight;
+        if (reachesEstimatedEnd)
+        {
+            for (var visualLine = 0; visualLine < projection.Lines.Count; visualLine++)
+            {
+                MeasureWrapBreaksForLine(
+                    context,
+                    projection.Lines[visualLine],
+                    visualLine,
+                    measuredBreaks,
+                    wrapWidth);
+            }
+
+            return measuredBreaks;
+        }
+
         for (var rowIndex = firstRow; rowIndex <= lastRow; rowIndex++)
         {
             var row = layout.Rows.Rows[rowIndex];
@@ -2068,23 +2091,43 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
                 continue;
             }
 
-            measuredBreaks[visualLine] = DirectWriteTextLayout.MeasureWrapBreaks(
-                _textSurface,
-                row.TextLine.Inlines
-                    .Select(inline => new DirectWriteTextRun(
-                        GetProjectedInlineText(context.Snapshot, inline),
-                        context.ColorScheme.EditorForeground,
-                        inline is InlineAdornment))
-                    .ToArray(),
-                context.FontFamily.Source,
-                (float)context.FontSize,
-                (float)wrapWidth,
-                (float)context.LineHeight,
-                Math.Min((float)context.LineHeight * 0.8f, (float)context.LineHeight),
-                (float)(context.CharacterWidth * context.TabDisplaySize));
+            MeasureWrapBreaksForLine(
+                context,
+                row.TextLine,
+                visualLine,
+                measuredBreaks,
+                wrapWidth);
         }
 
         return measuredBreaks;
+    }
+
+    private void MeasureWrapBreaksForLine(
+        AzunyanEditorRenderContext context,
+        ProjectedLine line,
+        int visualLine,
+        Dictionary<int, IReadOnlyList<int>> measuredBreaks,
+        double wrapWidth)
+    {
+        if (measuredBreaks.ContainsKey(visualLine))
+        {
+            return;
+        }
+
+        measuredBreaks[visualLine] = DirectWriteTextLayout.MeasureWrapBreaks(
+            _textSurface,
+            line.Inlines
+                .Select(inline => new DirectWriteTextRun(
+                    GetProjectedInlineText(context.Snapshot, inline),
+                    context.ColorScheme.EditorForeground,
+                    inline is InlineAdornment))
+                .ToArray(),
+            context.FontFamily.Source,
+            (float)context.FontSize,
+            (float)wrapWidth,
+            (float)context.LineHeight,
+            Math.Min((float)context.LineHeight * 0.8f, (float)context.LineHeight),
+            (float)(context.CharacterWidth * context.TabDisplaySize));
     }
 
     private static string GetProjectedInlineText(
@@ -2117,7 +2160,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
 
         return Math.Max(
             context.CharacterWidth,
-            context.ViewportWidth - context.ContentLeft - 18);
+            context.ViewportWidth - context.ContentLeft);
     }
 
     private static bool ContainsCaret(
