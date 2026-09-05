@@ -155,9 +155,6 @@ internal sealed class FakeStatusBarView : IStatusBarView
 
     public void Apply(StatusBarState state) => State = state;
 
-    public void ShowFilePathMenu()
-    {
-    }
 }
 
 internal sealed class FakeWindowChromeView : IWindowChromeView
@@ -188,7 +185,7 @@ internal sealed class FakeWindowChromeView : IWindowChromeView
         IndentationInputMode = mode;
 }
 
-internal sealed class FakeFindReplaceView : IFindReplaceView
+internal sealed class FakeFindReplaceView : IFindReplaceState, IFindReplaceHost
 {
     public bool IsVisible { get; private set; }
 
@@ -200,21 +197,20 @@ internal sealed class FakeFindReplaceView : IFindReplaceView
 
     public string? Result { get; private set; }
 
-    public void Show(bool replace)
-    {
-        IsVisible = true;
-        IsFindBoxFocused = true;
-    }
+    public bool IsFindTextSelected { get; private set; }
+
+    public void Show() => IsVisible = true;
 
     public void Close()
     {
         IsVisible = false;
-        IsFindBoxFocused = false;
     }
 
     public void FocusFind() => IsFindBoxFocused = true;
 
     public void FocusEditor() => IsFindBoxFocused = false;
+
+    public void SelectFindText() => IsFindTextSelected = true;
 
     public void SetResult(string message) => Result = message;
 }

@@ -18,6 +18,7 @@ public sealed class FindReplaceControllerTests
         var controller = new FindReplaceController(
             editor,
             view,
+            view,
             () => { },
             () => observed++);
 
@@ -43,6 +44,7 @@ public sealed class FindReplaceControllerTests
         var observed = 0;
         var controller = new FindReplaceController(
             editor,
+            view,
             view,
             () => refreshes++,
             () => observed++);

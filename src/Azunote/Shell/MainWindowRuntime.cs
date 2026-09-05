@@ -5,6 +5,7 @@ namespace Azunote;
 internal sealed class MainWindowRuntime : IDisposable
 {
     private readonly MainWindowViewAdapter _view;
+    private readonly MainWindowViewModel _viewModel;
     private readonly DocumentSession _session;
     private readonly WinUiUserPrompt _prompt;
     private readonly DispatcherQueueUiDispatcher _dispatcher;
@@ -26,6 +27,7 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public MainWindowRuntime(
         MainWindowViewAdapter view,
+        MainWindowViewModel viewModel,
         Func<Task> createNewWindow,
         Func<string, Task> openFileInNewWindow,
         Action refreshWindowMenus,
@@ -37,6 +39,7 @@ internal sealed class MainWindowRuntime : IDisposable
         Document? document = null)
     {
         _view = view ?? throw new ArgumentNullException(nameof(view));
+        _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _refreshWindowMenus = refreshWindowMenus ?? throw new ArgumentNullException(nameof(refreshWindowMenus));
         _filePathActions = filePathActions ?? throw new ArgumentNullException(nameof(filePathActions));
         _recordRecentFile = recordRecentFile ?? throw new ArgumentNullException(nameof(recordRecentFile));
@@ -97,18 +100,19 @@ internal sealed class MainWindowRuntime : IDisposable
             OpenDefinitionAsync,
             ShowFileInExplorerAsync,
             ApplySettings);
-        _editorCommands = new EditorCommandController(_view, _view);
-        _view.SetTabDisplaySizeLabel(_view.TabDisplaySize);
-        _view.SetIndentSizeLabel(_view.IndentSize);
-        _view.SetIndentationInputModeLabel(_view.IndentationInputMode);
+        _editorCommands = new EditorCommandController(_view, _viewModel);
+        _viewModel.TabDisplaySize = _view.TabDisplaySize;
+        _viewModel.IndentSize = _view.IndentSize;
+        _viewModel.IndentationInputMode = _view.IndentationInputMode;
         _status = new DocumentStatusPresenter(
             _view,
             _session,
-            _view,
-            _view,
+            _viewModel,
+            _viewModel,
             () => _languageModes.CurrentModeDisplayName);
         _findReplace = new FindReplaceController(
             _view,
+            _viewModel,
             _view,
             RefreshDocumentView,
             ObserveTextChanged);
@@ -124,7 +128,7 @@ internal sealed class MainWindowRuntime : IDisposable
         RefreshDocumentView();
     }
 
-    public bool IsFindPanelVisible => _view.IsVisible;
+    public bool IsFindPanelVisible => _viewModel.IsFindPanelVisible;
 
     public bool IsFindBoxFocused => _view.IsFindBoxFocused;
 
@@ -442,9 +446,9 @@ internal sealed class MainWindowRuntime : IDisposable
             _languageModes.DocumentOpened(path);
         }
 
-        _view.SetTabDisplaySizeLabel(_view.TabDisplaySize);
-        _view.SetIndentSizeLabel(_view.IndentSize);
-        _view.SetIndentationInputModeLabel(_view.IndentationInputMode);
+        _viewModel.TabDisplaySize = _view.TabDisplaySize;
+        _viewModel.IndentSize = _view.IndentSize;
+        _viewModel.IndentationInputMode = _view.IndentationInputMode;
         _status.Refresh(args.LineEnding);
         _status.RefreshTitle();
         RefreshExternalToolsMenu();

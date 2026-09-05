@@ -13,10 +13,8 @@ namespace Azunote;
 
 internal sealed class MainWindowViewAdapter :
     IEditorView,
-    IStatusBarView,
-    IWindowChromeView,
     IWindowMenuView,
-    IFindReplaceView,
+    IFindReplaceHost,
     ILanguageModeMenuView,
     IExternalToolMenuView
 {
@@ -147,23 +145,7 @@ internal sealed class MainWindowViewAdapter :
     private void ApplyTheme() =>
         _editor.ColorScheme = AzunoteSystemColorScheme.Create(_rootGrid.ActualTheme);
 
-    public bool IsStatusBarVisible => _viewModel.IsStatusBarVisible;
-
-    public bool IsVisible => _viewModel.IsFindPanelVisible;
-
     public bool IsFindBoxFocused => _findTextBox.FocusState != FocusState.Unfocused;
-
-    public string FindText
-    {
-        get => _viewModel.FindText;
-        set => _viewModel.FindText = value;
-    }
-
-    public string ReplaceText
-    {
-        get => _viewModel.ReplaceText;
-        set => _viewModel.ReplaceText = value;
-    }
 
     public string Text => _editorBuffer.Text;
 
@@ -299,17 +281,6 @@ internal sealed class MainWindowViewAdapter :
         SetPosition(new LineColumn(zeroBasedLine, zeroBasedColumn));
     }
 
-    public void Apply(StatusBarState state)
-    {
-        _viewModel.ApplyStatus(state);
-        SetFilePathMenuState(state.HasFilePath);
-    }
-
-    public void SetTitle(string title)
-    {
-        _viewModel.Title = title;
-    }
-
     public void ToggleAlwaysOnTop()
     {
         if (_appWindow?.Presenter is OverlappedPresenter presenter)
@@ -359,28 +330,6 @@ internal sealed class MainWindowViewAdapter :
             _windowMenu.Items.Add(menuItem);
             _windowMenuItems.Add(menuItem);
         }
-    }
-
-    public void SetStatusBarVisible(bool visible)
-    {
-        _viewModel.IsStatusBarVisible = visible;
-    }
-
-    public void SetWordWrapLabel(bool enabled) => _viewModel.IsWordWrapEnabled = enabled;
-
-    public void SetTabDisplaySizeLabel(int size)
-    {
-        _viewModel.TabDisplaySize = size;
-    }
-
-    public void SetIndentSizeLabel(int? size)
-    {
-        _viewModel.IndentSize = size;
-    }
-
-    public void SetIndentationInputModeLabel(IndentationInputMode mode)
-    {
-        _viewModel.IndentationInputMode = mode;
     }
 
     public void ShowIndentationSizeMenu()
@@ -474,33 +423,11 @@ internal sealed class MainWindowViewAdapter :
 
     public void ShowFilePathMenu() => _statusFilePathMenu.ShowAt(_filePathStatus);
 
-    public void Show(bool replace)
-    {
-        _viewModel.IsFindPanelVisible = true;
-        FocusFind();
-        if (_editorBuffer.Selection.Length > 0 && !string.IsNullOrEmpty(_editor.SelectedText))
-        {
-            _viewModel.FindText = _editor.SelectedText;
-            _findTextBox.SelectAll();
-        }
-
-        if (!replace)
-        {
-            _viewModel.ReplaceText = string.Empty;
-        }
-    }
-
-    public void Close()
-    {
-        _viewModel.IsFindPanelVisible = false;
-        FocusEditor();
-    }
-
     public void FocusFind() => _findTextBox.Focus(FocusState.Programmatic);
 
     public void FocusEditor() => Focus();
 
-    public void SetResult(string message) => _viewModel.FindResult = message;
+    public void SelectFindText() => _findTextBox.SelectAll();
 
     public void Render(
         IReadOnlyList<LanguageModeEntry> entries,
@@ -695,19 +622,6 @@ internal sealed class MainWindowViewAdapter :
             if (item is RadioMenuFlyoutItem radioItem)
             {
                 yield return radioItem;
-            }
-        }
-    }
-
-    private void SetFilePathMenuState(bool hasFilePath)
-    {
-        foreach (var item in _statusFilePathMenu.Items)
-        {
-            if (item is MenuFlyoutItem menuItem
-                && (string.Equals(menuItem.Tag as string, "show-in-explorer", StringComparison.Ordinal)
-                    || string.Equals(menuItem.Tag as string, "open-folder-in-terminal", StringComparison.Ordinal)))
-            {
-                menuItem.IsEnabled = hasFilePath;
             }
         }
     }

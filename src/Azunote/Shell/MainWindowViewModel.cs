@@ -7,7 +7,11 @@ using Microsoft.UI.Xaml.Input;
 
 namespace Azunote;
 
-internal sealed class MainWindowViewModel : INotifyPropertyChanged
+internal sealed class MainWindowViewModel :
+    INotifyPropertyChanged,
+    IStatusBarView,
+    IWindowChromeView,
+    IFindReplaceState
 {
     private readonly IMainWindowCommandFactory _commandFactory;
     private IMainWindowActions? _actions;
@@ -203,6 +207,29 @@ internal sealed class MainWindowViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(FilePathStatus));
         OnPropertyChanged(nameof(HasFilePath));
     }
+
+    void IStatusBarView.Apply(StatusBarState state) => ApplyStatus(state);
+
+    void IWindowChromeView.SetTitle(string title) => Title = title;
+
+    void IWindowChromeView.SetStatusBarVisible(bool visible) => IsStatusBarVisible = visible;
+
+    void IWindowChromeView.SetWordWrapLabel(bool enabled) => IsWordWrapEnabled = enabled;
+
+    void IWindowChromeView.SetTabDisplaySizeLabel(int size) => TabDisplaySize = size;
+
+    void IWindowChromeView.SetIndentSizeLabel(int? size) => IndentSize = size;
+
+    void IWindowChromeView.SetIndentationInputModeLabel(IndentationInputMode mode) =>
+        IndentationInputMode = mode;
+
+    bool IFindReplaceState.IsVisible => IsFindPanelVisible;
+
+    void IFindReplaceState.Show() => IsFindPanelVisible = true;
+
+    void IFindReplaceState.Close() => IsFindPanelVisible = false;
+
+    void IFindReplaceState.SetResult(string message) => FindResult = message;
 
     public void SetWindowItems(
         IReadOnlyList<WindowMenuEntry> entries,

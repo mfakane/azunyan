@@ -78,8 +78,6 @@ internal interface IEditorView : IEditorBuffer
 internal interface IStatusBarView
 {
     void Apply(StatusBarState state);
-
-    void ShowFilePathMenu();
 }
 
 internal interface IFilePathActions
@@ -122,25 +120,30 @@ internal interface IWindowMenuView
         Action<string> onSelected);
 }
 
-internal interface IFindReplaceView
+internal interface IFindReplaceState
 {
     bool IsVisible { get; }
-
-    bool IsFindBoxFocused { get; }
 
     string FindText { get; set; }
 
     string ReplaceText { get; set; }
 
-    void Show(bool replace);
+    void Show();
 
     void Close();
+
+    void SetResult(string message);
+}
+
+internal interface IFindReplaceHost
+{
+    bool IsFindBoxFocused { get; }
 
     void FocusFind();
 
     void FocusEditor();
 
-    void SetResult(string message);
+    void SelectFindText();
 }
 
 internal interface ILanguageModeMenuView

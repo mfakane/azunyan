@@ -53,6 +53,7 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         _view.ConfigureTheme();
         _runtime = new MainWindowRuntime(
             _view,
+            ViewModel,
             application.CreateNewDocumentWindowAsync,
             application.OpenFileInNewWindowAsync,
             application.RefreshWindowMenus,

@@ -3,40 +3,61 @@ namespace Azunote;
 internal sealed class FindReplaceController
 {
     private readonly IEditorView _editor;
-    private readonly IFindReplaceView _view;
+    private readonly IFindReplaceState _state;
+    private readonly IFindReplaceHost _host;
     private readonly Action _refreshDocumentView;
     private readonly Action _observeText;
 
     public FindReplaceController(
         IEditorView editor,
-        IFindReplaceView view,
+        IFindReplaceState state,
+        IFindReplaceHost host,
         Action refreshDocumentView,
         Action observeText)
     {
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
-        _view = view ?? throw new ArgumentNullException(nameof(view));
+        _state = state ?? throw new ArgumentNullException(nameof(state));
+        _host = host ?? throw new ArgumentNullException(nameof(host));
         _refreshDocumentView = refreshDocumentView ?? throw new ArgumentNullException(nameof(refreshDocumentView));
         _observeText = observeText ?? throw new ArgumentNullException(nameof(observeText));
     }
 
-    public void Show(bool replace) => _view.Show(replace);
+    public void Show(bool replace)
+    {
+        _state.Show();
+        _host.FocusFind();
+        if (_editor.Selection.Length > 0 && !string.IsNullOrEmpty(_editor.SelectedText))
+        {
+            _state.FindText = _editor.SelectedText;
+            _host.SelectFindText();
+        }
 
-    public void Close() => _view.Close();
+        if (!replace)
+        {
+            _state.ReplaceText = string.Empty;
+        }
+    }
+
+    public void Close()
+    {
+        _state.Close();
+        _host.FocusEditor();
+    }
 
     public void OnFindTextChanged()
     {
-        if (_view.IsVisible)
+        if (_state.IsVisible)
         {
-            _view.SetResult(string.Empty);
+            _state.SetResult(string.Empty);
         }
     }
 
     public void FindNext()
     {
-        var query = _view.FindText;
+        var query = _state.FindText;
         if (string.IsNullOrEmpty(query))
         {
-            _view.SetResult("Enter search text");
+            _state.SetResult("Enter search text");
             return;
         }
 
@@ -47,7 +68,7 @@ internal sealed class FindReplaceController
             selection.Start + selection.Length);
         if (match is not { } found)
         {
-            _view.SetResult("Not found");
+            _state.SetResult("Not found");
             return;
         }
 
@@ -55,15 +76,15 @@ internal sealed class FindReplaceController
         _editor.SetSelection(new Azunyan.Core.TextSelection(
             found.Start,
             found.Start + found.Length));
-        _view.SetResult("Found");
+        _state.SetResult("Found");
     }
 
     public void ReplaceCurrent()
     {
-        var query = _view.FindText;
+        var query = _state.FindText;
         if (string.IsNullOrEmpty(query))
         {
-            _view.SetResult("Enter search text");
+            _state.SetResult("Enter search text");
             return;
         }
 
@@ -71,7 +92,7 @@ internal sealed class FindReplaceController
         if (!selection.IsEmpty
             && FindReplaceService.IsMatch(_editor.SelectedText, query))
         {
-            var replacement = _view.ReplaceText;
+            var replacement = _state.ReplaceText;
             _editor.Replace(selection.Range, replacement);
             _editor.SetSelection(new Azunyan.Core.TextSelection(
                 selection.Start,
@@ -87,10 +108,10 @@ internal sealed class FindReplaceController
 
     public void ReplaceAll()
     {
-        var query = _view.FindText;
+        var query = _state.FindText;
         if (string.IsNullOrEmpty(query))
         {
-            _view.SetResult("Enter search text");
+            _state.SetResult("Enter search text");
             return;
         }
 
@@ -100,11 +121,11 @@ internal sealed class FindReplaceController
             _editor.SetText(FindReplaceService.ReplaceAll(
                 _editor.Text,
                 query,
-                _view.ReplaceText));
+                _state.ReplaceText));
             _observeText();
             _refreshDocumentView();
         }
 
-        _view.SetResult($"{count} replaced");
+        _state.SetResult($"{count} replaced");
     }
 }

@@ -203,8 +203,8 @@
             </MenuFlyout>
             <MenuFlyout x:Name="StatusFilePathMenu">
                 <MenuFlyoutItem Text="Copy File Path" Command="{x:Bind ViewModel.CopyFilePathCommand}" />
-                <MenuFlyoutItem Text="Show in Explorer" Command="{x:Bind ViewModel.ShowFileInExplorerCommand}" />
-                <MenuFlyoutItem Text="Open Folder in Terminal" Command="{x:Bind ViewModel.OpenFolderInTerminalCommand}" />
+                <MenuFlyoutItem Text="Show in Explorer" Command="{x:Bind ViewModel.ShowFileInExplorerCommand}" IsEnabled="{x:Bind ViewModel.HasFilePath, Mode=OneWay}" />
+                <MenuFlyoutItem Text="Open Folder in Terminal" Command="{x:Bind ViewModel.OpenFolderInTerminalCommand}" IsEnabled="{x:Bind ViewModel.HasFilePath, Mode=OneWay}" />
             </MenuFlyout>
         </Grid.Resources>
         <Grid.RowDefinitions>
