@@ -22,6 +22,11 @@ internal sealed class MainWindowViewModel : INotifyPropertyChanged
     private string _findText = string.Empty;
     private string _replaceText = string.Empty;
     private string _findResult = string.Empty;
+    private IReadOnlyList<WindowMenuItemViewModel> _windowItems = [];
+    private IReadOnlyList<LanguageModeMenuItemViewModel> _languageModeItems = [];
+    private IReadOnlyList<RecentFileMenuItemViewModel> _recentFileItems = [];
+    private IReadOnlyList<ExternalToolMenuItemViewModel> _externalToolItems = [];
+    private IReadOnlyList<ExternalToolMenuItemViewModel> _externalToolContextItems = [];
 
     public MainWindowViewModel()
     {
@@ -123,6 +128,11 @@ internal sealed class MainWindowViewModel : INotifyPropertyChanged
     }
     public string ReplaceText { get => _replaceText; set => SetProperty(ref _replaceText, value); }
     public string FindResult { get => _findResult; set => SetProperty(ref _findResult, value); }
+    public IReadOnlyList<WindowMenuItemViewModel> WindowItems => _windowItems;
+    public IReadOnlyList<LanguageModeMenuItemViewModel> LanguageModeItems => _languageModeItems;
+    public IReadOnlyList<RecentFileMenuItemViewModel> RecentFileItems => _recentFileItems;
+    public IReadOnlyList<ExternalToolMenuItemViewModel> ExternalToolItems => _externalToolItems;
+    public IReadOnlyList<ExternalToolMenuItemViewModel> ExternalToolContextItems => _externalToolContextItems;
     public ICommand OpenCommand { get; }
     public ICommand NewCommand { get; }
     public ICommand SaveCommand { get; }
@@ -185,6 +195,83 @@ internal sealed class MainWindowViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(FilePathStatus));
         OnPropertyChanged(nameof(HasFilePath));
     }
+
+    public void SetWindowItems(
+        IReadOnlyList<WindowMenuEntry> entries,
+        Action<string> onSelected)
+    {
+        _windowItems = entries.Select(entry => new WindowMenuItemViewModel(
+            entry.Id,
+            entry.DocumentName,
+            entry.IsCurrent,
+            Command(() => onSelected(entry.Id)))).ToArray();
+        OnPropertyChanged(nameof(WindowItems));
+    }
+
+    public void SetLanguageModeItems(
+        IReadOnlyList<LanguageModeEntry> entries,
+        Action<string> onSelected,
+        Func<string, Task> onEditDefinition,
+        Func<string, Task> onShowInExplorer)
+    {
+        _languageModeItems = entries.Select(entry => new LanguageModeMenuItemViewModel(
+            entry,
+            Command(() => onSelected(entry.Id)),
+            entry.DefinitionPath is { } path ? Async(() => onEditDefinition(path)) : null,
+            entry.DefinitionPath is { } definitionPath ? Async(() => onShowInExplorer(definitionPath)) : null))
+            .ToArray();
+        OnPropertyChanged(nameof(LanguageModeItems));
+    }
+
+    public void SetRecentFileItems(
+        IReadOnlyList<string> paths,
+        Func<string, Task> onSelected,
+        Action<string> onCopyFilePath,
+        Func<string, Task> onShowInExplorer,
+        Action<string> onRemoved)
+    {
+        _recentFileItems = paths.Select(path => new RecentFileMenuItemViewModel(
+            path,
+            Path.GetFileName(path) is { Length: > 0 } name ? name : path,
+            Async(() => onSelected(path)),
+            Command(() => onCopyFilePath(path)),
+            Async(() => onShowInExplorer(path)),
+            Command(() => onRemoved(path)))).ToArray();
+        OnPropertyChanged(nameof(RecentFileItems));
+    }
+
+    public void SetExternalToolItems(
+        IReadOnlyList<ExternalToolMenuNode> nodes,
+        Func<ExternalToolSettings, ExternalToolMenuState> getState,
+        Func<ExternalToolSettings, Task> onSelected,
+        Func<string, Task> onEditDefinition,
+        Func<string, Task> onShowInExplorer)
+    {
+        _externalToolItems = ExternalToolMenuBuilder.Build(nodes, getState)
+            .Select(entry => CreateExternalToolItem(entry, onSelected, onEditDefinition, onShowInExplorer))
+            .ToArray();
+        _externalToolContextItems = ExternalToolMenuBuilder.BuildFlat(
+                nodes, getState, ExternalToolMenuTarget.Context)
+            .Select(entry => CreateExternalToolItem(entry, onSelected, onEditDefinition, onShowInExplorer))
+            .ToArray();
+        OnPropertyChanged(nameof(ExternalToolItems));
+        OnPropertyChanged(nameof(ExternalToolContextItems));
+    }
+
+    private static ExternalToolMenuItemViewModel CreateExternalToolItem(
+        ExternalToolMenuEntry entry,
+        Func<ExternalToolSettings, Task> onSelected,
+        Func<string, Task> onEditDefinition,
+        Func<string, Task> onShowInExplorer) =>
+        new(
+            entry.Name,
+            entry.Tool,
+            entry.State,
+            entry.Tool is { } tool ? Async(() => onSelected(tool)) : null,
+            entry.Tool?.DefinitionPath is { } path ? Async(() => onEditDefinition(path)) : null,
+            entry.Tool?.DefinitionPath is { } definitionPath ? Async(() => onShowInExplorer(definitionPath)) : null,
+            entry.Children.Select(child => CreateExternalToolItem(
+                child, onSelected, onEditDefinition, onShowInExplorer)).ToArray());
 
     private IMainWindowActions Actions => _actions
         ?? throw new InvalidOperationException("The main window view model is not attached.");
@@ -343,3 +430,32 @@ internal sealed class MainWindowAsyncCommand(Func<Task> execute) : ICommand
         }
     }
 }
+
+internal sealed record WindowMenuItemViewModel(
+    string Id,
+    string Text,
+    bool IsCurrent,
+    ICommand SelectCommand);
+
+internal sealed record LanguageModeMenuItemViewModel(
+    LanguageModeEntry Entry,
+    ICommand SelectCommand,
+    ICommand? EditDefinitionCommand,
+    ICommand? ShowInExplorerCommand);
+
+internal sealed record RecentFileMenuItemViewModel(
+    string Path,
+    string Text,
+    ICommand OpenCommand,
+    ICommand CopyFilePathCommand,
+    ICommand ShowInExplorerCommand,
+    ICommand RemoveCommand);
+
+internal sealed record ExternalToolMenuItemViewModel(
+    string Text,
+    ExternalToolSettings? Tool,
+    ExternalToolMenuState? State,
+    ICommand? RunCommand,
+    ICommand? EditDefinitionCommand,
+    ICommand? ShowInExplorerCommand,
+    IReadOnlyList<ExternalToolMenuItemViewModel> Children);

@@ -25,29 +25,15 @@ internal sealed class MainWindowViewAdapter :
     private readonly IntPtr _windowHandle;
     private readonly AppWindow? _appWindow;
     private readonly Grid _rootGrid;
-    private readonly Border _findPanel;
     private readonly TextBox _findTextBox;
-    private readonly TextBox _replaceTextBox;
-    private readonly TextBlock _findResultText;
     private readonly MenuFlyoutSubItem _languageModeMenu;
     private readonly MenuFlyoutSubItem _openRecentMenu;
     private readonly MenuBarItem _windowMenu;
-    private readonly ToggleMenuFlyoutItem _alwaysOnTopMenuItem;
     private readonly MenuBarItem _toolsMenu;
-    private readonly ToggleMenuFlyoutItem _wordWrapMenuItem;
-    private readonly ToggleMenuFlyoutItem _statusBarMenuItem;
-    private readonly IReadOnlyDictionary<int, RadioMenuFlyoutItem> _tabDisplaySizeMenuItems;
     private readonly MenuFlyout _statusTabDisplaySizeMenu;
-    private readonly IReadOnlyList<(int? Size, RadioMenuFlyoutItem Item)> _indentSizeMenuItems;
     private readonly MenuFlyout _statusIndentSizeMenu;
-    private readonly IReadOnlyList<(IndentationInputMode Mode, RadioMenuFlyoutItem Item)> _indentationInputModeMenuItems;
     private readonly MenuFlyout _statusFilePathMenu;
-    private readonly Border _statusBarPanel;
-    private readonly TextBlock _positionStatus;
-    private readonly TextBlock _encodingStatus;
-    private readonly TextBlock _lineEndingStatus;
     private readonly TextBlock _indentationStatus;
-    private readonly TextBlock _languageModeStatus;
     private readonly TextBlock _filePathStatus;
     private readonly List<KeyboardAccelerator> _externalToolAccelerators = [];
     private readonly List<MenuFlyoutItemBase> _externalToolMenuItems = [];
@@ -71,36 +57,15 @@ internal sealed class MainWindowViewAdapter :
         AzunyanEditorView editor,
         Grid rootGrid,
         Style auxiliarySplitMenuFlyoutItemStyle,
-        Border findPanel,
         TextBox findTextBox,
-        TextBox replaceTextBox,
-        TextBlock findResultText,
         MenuFlyoutSubItem languageModeMenu,
         MenuFlyoutSubItem openRecentMenu,
         MenuBarItem windowMenu,
-        ToggleMenuFlyoutItem alwaysOnTopMenuItem,
         MenuBarItem toolsMenu,
-        ToggleMenuFlyoutItem wordWrapMenuItem,
-        ToggleMenuFlyoutItem statusBarMenuItem,
-        RadioMenuFlyoutItem tabDisplaySize2MenuItem,
-        RadioMenuFlyoutItem tabDisplaySize4MenuItem,
-        RadioMenuFlyoutItem tabDisplaySize8MenuItem,
         MenuFlyout statusTabDisplaySizeMenu,
-        RadioMenuFlyoutItem indentSizeAutoMenuItem,
-        RadioMenuFlyoutItem indentSize2MenuItem,
-        RadioMenuFlyoutItem indentSize4MenuItem,
-        RadioMenuFlyoutItem indentSize8MenuItem,
         MenuFlyout statusIndentSizeMenu,
-        RadioMenuFlyoutItem indentationInputModeAutoMenuItem,
-        RadioMenuFlyoutItem indentationInputModeTabMenuItem,
-        RadioMenuFlyoutItem indentationInputModeSpacesMenuItem,
         MenuFlyout statusFilePathMenu,
-        Border statusBarPanel,
-        TextBlock positionStatus,
-        TextBlock encodingStatus,
-        TextBlock lineEndingStatus,
         TextBlock indentationStatus,
-        TextBlock languageModeStatus,
         TextBlock filePathStatus)
     {
         ArgumentNullException.ThrowIfNull(window);
@@ -117,48 +82,18 @@ internal sealed class MainWindowViewAdapter :
         _rootGrid = rootGrid ?? throw new ArgumentNullException(nameof(rootGrid));
         _auxiliarySplitMenuFlyoutItemStyle = auxiliarySplitMenuFlyoutItemStyle
             ?? throw new ArgumentNullException(nameof(auxiliarySplitMenuFlyoutItemStyle));
-        _findPanel = findPanel ?? throw new ArgumentNullException(nameof(findPanel));
         _findTextBox = findTextBox ?? throw new ArgumentNullException(nameof(findTextBox));
-        _replaceTextBox = replaceTextBox ?? throw new ArgumentNullException(nameof(replaceTextBox));
-        _findResultText = findResultText ?? throw new ArgumentNullException(nameof(findResultText));
         _languageModeMenu = languageModeMenu ?? throw new ArgumentNullException(nameof(languageModeMenu));
         _openRecentMenu = openRecentMenu ?? throw new ArgumentNullException(nameof(openRecentMenu));
         _windowMenu = windowMenu ?? throw new ArgumentNullException(nameof(windowMenu));
-        _alwaysOnTopMenuItem = alwaysOnTopMenuItem ?? throw new ArgumentNullException(nameof(alwaysOnTopMenuItem));
         _toolsMenu = toolsMenu ?? throw new ArgumentNullException(nameof(toolsMenu));
-        _wordWrapMenuItem = wordWrapMenuItem ?? throw new ArgumentNullException(nameof(wordWrapMenuItem));
-        _statusBarMenuItem = statusBarMenuItem ?? throw new ArgumentNullException(nameof(statusBarMenuItem));
-        _tabDisplaySizeMenuItems = new Dictionary<int, RadioMenuFlyoutItem>
-        {
-            [2] = tabDisplaySize2MenuItem ?? throw new ArgumentNullException(nameof(tabDisplaySize2MenuItem)),
-            [4] = tabDisplaySize4MenuItem ?? throw new ArgumentNullException(nameof(tabDisplaySize4MenuItem)),
-            [8] = tabDisplaySize8MenuItem ?? throw new ArgumentNullException(nameof(tabDisplaySize8MenuItem))
-        };
         _statusTabDisplaySizeMenu = statusTabDisplaySizeMenu
             ?? throw new ArgumentNullException(nameof(statusTabDisplaySizeMenu));
-        _indentSizeMenuItems =
-        [
-            (null, indentSizeAutoMenuItem ?? throw new ArgumentNullException(nameof(indentSizeAutoMenuItem))),
-            (2, indentSize2MenuItem ?? throw new ArgumentNullException(nameof(indentSize2MenuItem))),
-            (4, indentSize4MenuItem ?? throw new ArgumentNullException(nameof(indentSize4MenuItem))),
-            (8, indentSize8MenuItem ?? throw new ArgumentNullException(nameof(indentSize8MenuItem)))
-        ];
         _statusIndentSizeMenu = statusIndentSizeMenu
             ?? throw new ArgumentNullException(nameof(statusIndentSizeMenu));
-        _indentationInputModeMenuItems =
-        [
-            (IndentationInputMode.Auto, indentationInputModeAutoMenuItem ?? throw new ArgumentNullException(nameof(indentationInputModeAutoMenuItem))),
-            (IndentationInputMode.Tab, indentationInputModeTabMenuItem ?? throw new ArgumentNullException(nameof(indentationInputModeTabMenuItem))),
-            (IndentationInputMode.Spaces, indentationInputModeSpacesMenuItem ?? throw new ArgumentNullException(nameof(indentationInputModeSpacesMenuItem)))
-        ];
         _statusFilePathMenu = statusFilePathMenu
             ?? throw new ArgumentNullException(nameof(statusFilePathMenu));
-        _statusBarPanel = statusBarPanel ?? throw new ArgumentNullException(nameof(statusBarPanel));
-        _positionStatus = positionStatus ?? throw new ArgumentNullException(nameof(positionStatus));
-        _encodingStatus = encodingStatus ?? throw new ArgumentNullException(nameof(encodingStatus));
-        _lineEndingStatus = lineEndingStatus ?? throw new ArgumentNullException(nameof(lineEndingStatus));
         _indentationStatus = indentationStatus ?? throw new ArgumentNullException(nameof(indentationStatus));
-        _languageModeStatus = languageModeStatus ?? throw new ArgumentNullException(nameof(languageModeStatus));
         _filePathStatus = filePathStatus ?? throw new ArgumentNullException(nameof(filePathStatus));
 
         _windowHandle = WindowNative.GetWindowHandle(window);
@@ -408,18 +343,19 @@ internal sealed class MainWindowViewAdapter :
         ArgumentNullException.ThrowIfNull(entries);
         ArgumentNullException.ThrowIfNull(onSelected);
 
+        _viewModel.SetWindowItems(entries, onSelected);
         ClearWindowMenuItems();
         _viewModel.IsAlwaysOnTop = isAlwaysOnTop;
-        foreach (var entry in entries)
+        foreach (var entry in _viewModel.WindowItems)
         {
             var menuItem = new RadioMenuFlyoutItem
             {
-                Text = entry.DocumentName,
+                Text = entry.Text,
                 GroupName = _radioGroups.OpenWindows,
                 IsChecked = entry.IsCurrent,
-                Tag = entry.Id
+                Tag = entry.Id,
+                Command = entry.SelectCommand
             };
-            menuItem.Click += (_, _) => onSelected(entry.Id);
             _windowMenu.Items.Add(menuItem);
             _windowMenuItems.Add(menuItem);
         }
@@ -486,8 +422,10 @@ internal sealed class MainWindowViewAdapter :
         ArgumentNullException.ThrowIfNull(onShowInExplorer);
         ArgumentNullException.ThrowIfNull(onRemoved);
 
+        _viewModel.SetRecentFileItems(
+            paths, onSelected, onCopyFilePath, onShowInExplorer, onRemoved);
         ClearRecentFileMenuItems();
-        if (paths.Count == 0)
+        if (_viewModel.RecentFileItems.Count == 0)
         {
             var emptyItem = new MenuFlyoutItem
             {
@@ -499,27 +437,36 @@ internal sealed class MainWindowViewAdapter :
             return;
         }
 
-        foreach (var path in paths)
+        foreach (var entry in _viewModel.RecentFileItems)
         {
             var menuItem = new SplitMenuFlyoutItem
             {
-                Text = GetRecentFileDisplayName(path),
-                Tag = path,
+                Text = entry.Text,
+                Tag = entry.Path,
+                Command = entry.OpenCommand,
                 Style = _auxiliarySplitMenuFlyoutItemStyle
             };
-            AutomationProperties.SetHelpText(menuItem, path);
-            ToolTipService.SetToolTip(menuItem, path);
-            var copyFilePathItem = new MenuFlyoutItem { Text = "Copy File Path" };
-            copyFilePathItem.Click += (_, _) => onCopyFilePath(path);
-            var showInExplorerItem = new MenuFlyoutItem { Text = "Show in Explorer" };
-            showInExplorerItem.Click += (_, _) => _ = onShowInExplorer(path);
-            var removeItem = new MenuFlyoutItem { Text = "Remove from list" };
-            removeItem.Click += (_, _) => onRemoved(path);
+            AutomationProperties.SetHelpText(menuItem, entry.Path);
+            ToolTipService.SetToolTip(menuItem, entry.Path);
+            var copyFilePathItem = new MenuFlyoutItem
+            {
+                Text = "Copy File Path",
+                Command = entry.CopyFilePathCommand
+            };
+            var showInExplorerItem = new MenuFlyoutItem
+            {
+                Text = "Show in Explorer",
+                Command = entry.ShowInExplorerCommand
+            };
+            var removeItem = new MenuFlyoutItem
+            {
+                Text = "Remove from list",
+                Command = entry.RemoveCommand
+            };
             menuItem.Items.Add(copyFilePathItem);
             menuItem.Items.Add(showInExplorerItem);
             menuItem.Items.Add(new MenuFlyoutSeparator());
             menuItem.Items.Add(removeItem);
-            menuItem.Click += (_, _) => _ = onSelected(path);
             _openRecentMenu.Items.Add(menuItem);
             _recentFileMenuItems.Add(menuItem);
         }
@@ -566,6 +513,8 @@ internal sealed class MainWindowViewAdapter :
         ArgumentNullException.ThrowIfNull(onSelected);
         ArgumentNullException.ThrowIfNull(onEditDefinition);
         ArgumentNullException.ThrowIfNull(onShowInExplorer);
+        _viewModel.SetLanguageModeItems(
+            entries, onSelected, onEditDefinition, onShowInExplorer);
         _languageModeMenu.Items.Clear();
         _languageModeItems.Clear();
         for (var index = 0; index < entries.Count; index++)
@@ -575,34 +524,31 @@ internal sealed class MainWindowViewAdapter :
                 _languageModeMenu.Items.Add(new MenuFlyoutSeparator());
             }
 
-            var mode = entries[index];
+            var mode = _viewModel.LanguageModeItems[index];
             MenuFlyoutItemBase item;
-            if (mode.DefinitionPath is { } definitionPath)
+            if (mode.Entry.DefinitionPath is { } definitionPath)
             {
                 var splitItem = new SplitMenuFlyoutItem
                 {
-                    Text = mode.DisplayName,
-                    Tag = mode.Id,
+                    Text = mode.Entry.DisplayName,
+                    Tag = mode.Entry.Id,
+                    Command = mode.SelectCommand,
                     Style = _auxiliarySplitMenuFlyoutItemStyle
                 };
-                AddDefinitionActions(
-                    splitItem,
-                    definitionPath,
-                    onEditDefinition,
-                    onShowInExplorer);
-                splitItem.Click += (_, _) => onSelected(mode.Id);
+                AddDefinitionActions(splitItem, definitionPath,
+                    mode.EditDefinitionCommand!, mode.ShowInExplorerCommand!);
                 item = splitItem;
             }
             else
             {
                 var radioItem = new RadioMenuFlyoutItem
                 {
-                    Text = mode.DisplayName,
+                    Text = mode.Entry.DisplayName,
                     GroupName = _radioGroups.LanguageModes,
-                    Tag = mode.Id
+                    Tag = mode.Entry.Id,
+                    Command = mode.SelectCommand
                 };
-                radioItem.Click += (_, _) => onSelected(mode.Id);
-                _languageModeItems[mode.Id] = radioItem;
+                _languageModeItems[mode.Entry.Id] = radioItem;
                 item = radioItem;
             }
 
@@ -636,18 +582,11 @@ internal sealed class MainWindowViewAdapter :
         ClearExternalToolAccelerators();
         ClearExternalToolMenuItems();
         ClearExternalToolContextMenuItems();
-
-        var visibleToolsEntries = ExternalToolMenuBuilder.Build(
-            nodes,
-            getState,
-            ExternalToolMenuTarget.Tools);
-        if (visibleToolsEntries.Count > 0)
+        _viewModel.SetExternalToolItems(
+            nodes, getState, onSelected, onEditDefinition, onShowInExplorer);
+        if (_viewModel.ExternalToolItems.Count > 0)
         {
-            var menuItems = CreateExternalToolMenuItems(
-                visibleToolsEntries,
-                onSelected,
-                onEditDefinition,
-                onShowInExplorer);
+            var menuItems = CreateExternalToolMenuItems(_viewModel.ExternalToolItems);
             for (var index = 0; index < menuItems.Count; index++)
             {
                 _toolsMenu.Items.Insert(index, menuItems[index]);
@@ -655,13 +594,8 @@ internal sealed class MainWindowViewAdapter :
             }
         }
 
-        var visibleContextEntries = ExternalToolMenuBuilder.BuildFlat(
-            nodes,
-            getState,
-            ExternalToolMenuTarget.Context);
         var contextMenuItems = CreateExternalToolContextMenuItems(
-            visibleContextEntries,
-            onSelected);
+            _viewModel.ExternalToolContextItems);
         _editor.SetAdditionalContextMenuItems(contextMenuItems);
         _externalToolContextMenuItems.AddRange(contextMenuItems);
 
@@ -765,12 +699,6 @@ internal sealed class MainWindowViewAdapter :
         }
     }
 
-    private static string GetRecentFileDisplayName(string path)
-    {
-        var fileName = Path.GetFileName(path);
-        return string.IsNullOrWhiteSpace(fileName) ? path : fileName;
-    }
-
     private void SetFilePathMenuState(bool hasFilePath)
     {
         foreach (var item in _statusFilePathMenu.Items)
@@ -785,10 +713,7 @@ internal sealed class MainWindowViewAdapter :
     }
 
     private List<MenuFlyoutItemBase> CreateExternalToolMenuItems(
-        IReadOnlyList<ExternalToolMenuEntry> nodes,
-        Func<ExternalToolSettings, Task> onSelected,
-        Func<string, Task> onEditDefinition,
-        Func<string, Task> onShowInExplorer)
+        IReadOnlyList<ExternalToolMenuItemViewModel> nodes)
     {
         var items = new List<MenuFlyoutItemBase>(nodes.Count);
         foreach (var node in nodes)
@@ -800,26 +725,23 @@ internal sealed class MainWindowViewAdapter :
                 {
                     var splitItem = new SplitMenuFlyoutItem
                     {
-                        Text = node.Name,
+                        Text = node.Text,
                         IsEnabled = node.State!.IsEnabled,
+                        Command = node.RunCommand,
                         Style = _auxiliarySplitMenuFlyoutItemStyle
                     };
-                    AddDefinitionActions(
-                        splitItem,
-                        definitionPath,
-                        onEditDefinition,
-                        onShowInExplorer);
-                    splitItem.Click += (_, _) => _ = onSelected(tool);
+                    AddDefinitionActions(splitItem, definitionPath,
+                        node.EditDefinitionCommand!, node.ShowInExplorerCommand!);
                     menuItem = splitItem;
                 }
                 else
                 {
                     var regularItem = new MenuFlyoutItem
                     {
-                        Text = node.Name,
-                        IsEnabled = node.State!.IsEnabled
+                        Text = node.Text,
+                        IsEnabled = node.State!.IsEnabled,
+                        Command = node.RunCommand
                     };
-                    regularItem.Click += (_, _) => _ = onSelected(tool);
                     menuItem = regularItem;
                 }
 
@@ -842,12 +764,8 @@ internal sealed class MainWindowViewAdapter :
                 continue;
             }
 
-            var subMenu = new MenuFlyoutSubItem { Text = node.Name };
-            foreach (var child in CreateExternalToolMenuItems(
-                         node.Children,
-                         onSelected,
-                         onEditDefinition,
-                         onShowInExplorer))
+            var subMenu = new MenuFlyoutSubItem { Text = node.Text };
+            foreach (var child in CreateExternalToolMenuItems(node.Children))
             {
                 subMenu.Items.Add(child);
             }
@@ -859,17 +777,16 @@ internal sealed class MainWindowViewAdapter :
     }
 
     private static List<MenuFlyoutItemBase> CreateExternalToolContextMenuItems(
-        IReadOnlyList<ExternalToolMenuEntry> entries,
-        Func<ExternalToolSettings, Task> onSelected)
+        IReadOnlyList<ExternalToolMenuItemViewModel> entries)
     {
         var items = new List<MenuFlyoutItemBase>(entries.Count);
         foreach (var entry in entries)
         {
-            var tool = entry.Tool!;
             var item = new MenuFlyoutItem
             {
-                Text = entry.Name,
-                IsEnabled = entry.State!.IsEnabled
+                Text = entry.Text,
+                IsEnabled = entry.State!.IsEnabled,
+                Command = entry.RunCommand
             };
             AutomationProperties.SetHelpText(
                 item,
@@ -879,7 +796,6 @@ internal sealed class MainWindowViewAdapter :
                 ToolTipService.SetToolTip(item, reason);
             }
 
-            item.Click += (_, _) => _ = onSelected(tool);
             items.Add(item);
         }
 
@@ -889,16 +805,22 @@ internal sealed class MainWindowViewAdapter :
     private static void AddDefinitionActions(
         SplitMenuFlyoutItem menuItem,
         string definitionPath,
-        Func<string, Task> onEditDefinition,
-        Func<string, Task> onShowInExplorer)
+        System.Windows.Input.ICommand editDefinitionCommand,
+        System.Windows.Input.ICommand showInExplorerCommand)
     {
         AutomationProperties.SetHelpText(menuItem, definitionPath);
         ToolTipService.SetToolTip(menuItem, definitionPath);
 
-        var editItem = new MenuFlyoutItem { Text = "Edit..." };
-        editItem.Click += (_, _) => _ = onEditDefinition(definitionPath);
-        var showInExplorerItem = new MenuFlyoutItem { Text = "Show in Explorer" };
-        showInExplorerItem.Click += (_, _) => _ = onShowInExplorer(definitionPath);
+        var editItem = new MenuFlyoutItem
+        {
+            Text = "Edit...",
+            Command = editDefinitionCommand
+        };
+        var showInExplorerItem = new MenuFlyoutItem
+        {
+            Text = "Show in Explorer",
+            Command = showInExplorerCommand
+        };
         menuItem.Items.Add(editItem);
         menuItem.Items.Add(showInExplorerItem);
     }

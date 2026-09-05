@@ -57,6 +57,42 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.HasFilePath);
     }
 
+    [Fact]
+    public void Window_items_own_their_selection_commands()
+    {
+        var viewModel = new MainWindowViewModel();
+        string? selected = null;
+        viewModel.SetWindowItems(
+            [new WindowMenuEntry("window-2", "notes.txt", true)],
+            id => selected = id);
+
+        var item = Assert.Single(viewModel.WindowItems);
+        item.SelectCommand.Execute(null);
+
+        Assert.Equal("notes.txt", item.Text);
+        Assert.True(item.IsCurrent);
+        Assert.Equal("window-2", selected);
+    }
+
+    [Fact]
+    public void Recent_file_items_include_display_text_and_commands()
+    {
+        var viewModel = new MainWindowViewModel();
+        string? copied = null;
+        viewModel.SetRecentFileItems(
+            [Path.Combine("folder", "notes.txt")],
+            _ => Task.CompletedTask,
+            path => copied = path,
+            _ => Task.CompletedTask,
+            _ => { });
+
+        var item = Assert.Single(viewModel.RecentFileItems);
+        item.CopyFilePathCommand.Execute(null);
+
+        Assert.Equal("notes.txt", item.Text);
+        Assert.Equal(item.Path, copied);
+    }
+
     private static string[] GetGroupNames(MainWindowViewModel viewModel) =>
     [
         viewModel.Groups.StatusTabDisplaySize,
