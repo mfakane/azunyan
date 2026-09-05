@@ -73,11 +73,11 @@ public sealed partial class MainWindow
         _appWindow?.Presenter is OverlappedPresenter presenter
             && presenter.IsAlwaysOnTop;
 
-    public int TabDisplaySize => _editor.TabDisplaySize;
+    private int TabDisplaySize => _editor.TabDisplaySize;
 
-    public int? IndentSize => _editor.IndentSize;
+    private int? IndentSize => _editor.IndentSize;
 
-    public IndentationInputMode IndentationInputMode => _editor.IndentationInputMode;
+    private IndentationInputMode IndentationInputMode => _editor.IndentationInputMode;
 
     internal XamlRoot? XamlRoot => _rootGrid.XamlRoot;
 
@@ -100,45 +100,45 @@ public sealed partial class MainWindow
     private void ApplyTheme() =>
         _editor.ColorScheme = AzunoteSystemColorScheme.Create(_rootGrid.ActualTheme);
 
-    public bool IsFindBoxFocused => _findTextBox.FocusState != FocusState.Unfocused;
+    private bool IsFindBoxFocused => _findTextBox.FocusState != FocusState.Unfocused;
 
-    public string Text => _editorBuffer.Text;
+    private string Text => _editorBuffer.Text;
 
-    public string SelectedText => _editorBuffer.SelectedText;
+    private string SelectedText => _editorBuffer.SelectedText;
 
-    public TextSnapshot Snapshot => _editorBuffer.Snapshot;
+    private TextSnapshot Snapshot => _editorBuffer.Snapshot;
 
-    public TextSelection Selection => _editorBuffer.Selection;
+    private TextSelection Selection => _editorBuffer.Selection;
 
-    public int CaretPosition => _editorBuffer.CaretPosition;
+    private int CaretPosition => _editorBuffer.CaretPosition;
 
-    public void SetText(string text) => _editorBuffer.SetText(text);
+    private void SetText(string text) => _editorBuffer.SetText(text);
 
-    public void SetSelection(TextSelection selection) => _editorBuffer.SetSelection(selection);
+    private void SetSelection(TextSelection selection) => _editorBuffer.SetSelection(selection);
 
-    public void Replace(TextRange range, string replacement) => _editorBuffer.Replace(range, replacement);
+    private void Replace(TextRange range, string replacement) => _editorBuffer.Replace(range, replacement);
 
-    public void Focus() => _editor.Focus(FocusState.Programmatic);
+    private void Focus() => _editor.Focus(FocusState.Programmatic);
 
-    public void Undo() => _editor.UndoDocument();
+    private void Undo() => _editor.UndoDocument();
 
-    public void Redo() => _editor.RedoDocument();
+    private void Redo() => _editor.RedoDocument();
 
-    public void Cut() => _editor.CutSelectionToClipboard();
+    private void Cut() => _editor.CutSelectionToClipboard();
 
-    public void Copy() => _editor.CopySelectionToClipboard();
+    private void Copy() => _editor.CopySelectionToClipboard();
 
-    public void Paste() => _editor.PasteFromClipboard();
+    private void Paste() => _editor.PasteFromClipboard();
 
-    public void SelectAll() => _editor.SelectAll();
+    private void SelectAll() => _editor.SelectAll();
 
-    public void MoveToMatchingBracket() => _editor.MoveToMatchingBracket();
+    private void MoveToMatchingBracket() => _editor.MoveToMatchingBracket();
 
-    public void Select(TextRange range) => _editor.Select(range.Start, range.Length);
+    private void Select(TextRange range) => _editor.Select(range.Start, range.Length);
 
-    public void RequestCompletion() => _editor.RequestCompletion();
+    private void RequestCompletion() => _editor.RequestCompletion();
 
-    public void ShowCompletion(CompletionResult completions) => _editor.ShowCompletion(completions);
+    private void ShowCompletion(CompletionResult completions) => _editor.ShowCompletion(completions);
 
     private void ApplyLanguage(EditorLanguageConfiguration configuration)
     {
@@ -153,9 +153,9 @@ public sealed partial class MainWindow
         _editor.Providers.BlockAdornment = null;
     }
 
-    public void SetFontFamily(string fontFamily) => _editor.SetFontFamily(fontFamily);
+    private void SetFontFamily(string fontFamily) => _editor.SetFontFamily(fontFamily);
 
-    public void SetFontSize(double fontSize) => _editor.SetFontSize(fontSize);
+    private void SetFontSize(double fontSize) => _editor.SetFontSize(fontSize);
 
     internal void SetDiagnosticLogging(IReadOnlyList<string> logging)
     {
@@ -176,23 +176,23 @@ public sealed partial class MainWindow
         _editor.DiagnosticCategories = categories;
     }
 
-    public void RefreshProviders() => _editor.RefreshProviders();
+    private void RefreshProviders() => _editor.RefreshProviders();
 
-    public void SetWordWrap(bool enabled)
+    private void SetWordWrap(bool enabled)
     {
         _editor.TextWrapping = enabled
             ? TextWrapping.Wrap
             : TextWrapping.NoWrap;
     }
 
-    public void SetTabDisplaySize(int size) => _editor.TabDisplaySize = size;
+    private void SetTabDisplaySize(int size) => _editor.TabDisplaySize = size;
 
-    public void SetIndentSize(int? size) => _editor.IndentSize = size;
+    private void SetIndentSize(int? size) => _editor.IndentSize = size;
 
-    public void SetIndentationInputMode(IndentationInputMode mode) =>
+    private void SetIndentationInputMode(IndentationInputMode mode) =>
         _editor.IndentationInputMode = mode;
 
-    public void ApplyEditorConfig(EditorConfigSettings settings)
+    private void ApplyEditorConfig(EditorConfigSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
         _editor.TabDisplaySize = settings.GetEffectiveTabWidth();
@@ -208,7 +208,7 @@ public sealed partial class MainWindow
         });
     }
 
-    public void SetPosition(LineColumn position)
+    private void SetPosition(LineColumn position)
     {
         var snapshot = _editor.Snapshot;
         var zeroBasedLine = Math.Clamp(
@@ -224,7 +224,7 @@ public sealed partial class MainWindow
         _editor.ScrollSelectionIntoView();
     }
 
-    public void SetStartupPosition(int? line, int? column)
+    private void SetStartupPosition(int? line, int? column)
     {
         if (line is null && column is null)
         {
@@ -236,7 +236,7 @@ public sealed partial class MainWindow
         SetPosition(new LineColumn(zeroBasedLine, zeroBasedColumn));
     }
 
-    public void ToggleAlwaysOnTop()
+    internal void ToggleAlwaysOnTop()
     {
         if (_appWindow?.Presenter is OverlappedPresenter presenter)
         {
@@ -378,11 +378,11 @@ public sealed partial class MainWindow
 
     internal void ShowFilePathMenu() => _statusFilePathMenu.ShowAt(_filePathStatus);
 
-    public void FocusFind() => _findTextBox.Focus(FocusState.Programmatic);
+    private void FocusFind() => _findTextBox.Focus(FocusState.Programmatic);
 
     private void FocusEditorView() => Focus();
 
-    public void SelectFindText() => _findTextBox.SelectAll();
+    private void SelectFindText() => _findTextBox.SelectAll();
 
     private void RenderLanguageModes(
         IReadOnlyList<LanguageModeEntry> entries,
