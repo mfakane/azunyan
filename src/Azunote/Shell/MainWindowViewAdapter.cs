@@ -54,7 +54,7 @@ internal sealed class MainWindowViewAdapter :
     private readonly List<MenuFlyoutItemBase> _externalToolContextMenuItems = [];
     private readonly List<MenuFlyoutItemBase> _recentFileMenuItems = [];
     private readonly List<MenuFlyoutItemBase> _windowMenuItems = [];
-    private readonly string _windowMenuGroupName = $"OpenWindows-{Guid.NewGuid():N}";
+    private readonly MainWindowRadioGroupNames _radioGroups;
     private readonly Dictionary<string, RadioMenuFlyoutItem> _languageModeItems =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Style _auxiliarySplitMenuFlyoutItemStyle;
@@ -66,6 +66,7 @@ internal sealed class MainWindowViewAdapter :
 
     public MainWindowViewAdapter(
         MainWindow window,
+        MainWindowRadioGroupNames radioGroups,
         AzunyanEditorView editor,
         Grid rootGrid,
         Style auxiliarySplitMenuFlyoutItemStyle,
@@ -102,6 +103,7 @@ internal sealed class MainWindowViewAdapter :
         TextBlock filePathStatus)
     {
         ArgumentNullException.ThrowIfNull(window);
+        _radioGroups = radioGroups ?? throw new ArgumentNullException(nameof(radioGroups));
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
         _editor.DiagnosticSink = (category, message) => ErrorReporter.LogMessage(
             $"Editor diagnostic/{AzunyanDiagnosticCategories.GetName(category)}",
@@ -419,7 +421,7 @@ internal sealed class MainWindowViewAdapter :
             var menuItem = new RadioMenuFlyoutItem
             {
                 Text = entry.DocumentName,
-                GroupName = _windowMenuGroupName,
+                GroupName = _radioGroups.OpenWindows,
                 IsChecked = entry.IsCurrent,
                 Tag = entry.Id
             };
@@ -627,7 +629,7 @@ internal sealed class MainWindowViewAdapter :
                 var radioItem = new RadioMenuFlyoutItem
                 {
                     Text = mode.DisplayName,
-                    GroupName = "LanguageModes",
+                    GroupName = _radioGroups.LanguageModes,
                     Tag = mode.Id
                 };
                 radioItem.Click += (_, _) => onSelected(mode.Id);

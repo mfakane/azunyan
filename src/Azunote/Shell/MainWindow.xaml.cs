@@ -11,7 +11,7 @@ using Windows.UI.Core;
 
 namespace Azunote;
 
-public sealed partial class MainWindow : Window, IDisposable
+public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
 {
     private const VirtualKey OemOpenBracketKey = (VirtualKey)0xdb;
 
@@ -25,6 +25,7 @@ public sealed partial class MainWindow : Window, IDisposable
     private bool _disposed;
 
     internal MainWindowRuntime Runtime => _runtime;
+    internal MainWindowViewModel ViewModel { get; } = new();
 
     internal MainWindow(
         ApplicationCoordinator application,
@@ -35,6 +36,7 @@ public sealed partial class MainWindow : Window, IDisposable
         InitializeComponent();
         _view = new MainWindowViewAdapter(
             this,
+            ViewModel.Groups,
             Editor,
             RootGrid,
             AuxiliarySplitMenuFlyoutItemStyle,
@@ -81,6 +83,7 @@ public sealed partial class MainWindow : Window, IDisposable
             application.RecordStatusBarVisible,
             session,
             document);
+        ViewModel.Attach(this);
         RegisterKeyboardAccelerators();
 
         _appWindow = _view.AppWindow;
@@ -124,83 +127,6 @@ public sealed partial class MainWindow : Window, IDisposable
         RootGrid.KeyboardAccelerators.Add(goToMatchingBracket);
     }
 
-    private async void OpenButton_Click(object sender, RoutedEventArgs e) =>
-        await _runtime.OpenFileAsync();
-
-    private async void NewMenuItem_Click(object sender, RoutedEventArgs e) =>
-        await _runtime.NewDocumentAsync();
-
-    private async void SaveButton_Click(object sender, RoutedEventArgs e) =>
-        await _runtime.SaveAsync();
-
-    private async void SaveAsButton_Click(object sender, RoutedEventArgs e) =>
-        await _runtime.SaveAsAsync();
-
-    private void ExitMenuItem_Click(object sender, RoutedEventArgs e) => Close();
-
-    private void UndoMenuItem_Click(object sender, RoutedEventArgs e) => _runtime.Undo();
-
-    private void RedoMenuItem_Click(object sender, RoutedEventArgs e) => _runtime.Redo();
-
-    private void CutMenuItem_Click(object sender, RoutedEventArgs e) => _runtime.Cut();
-
-    private void CopyMenuItem_Click(object sender, RoutedEventArgs e) => _runtime.Copy();
-
-    private void PasteMenuItem_Click(object sender, RoutedEventArgs e) => _runtime.Paste();
-
-    private void SelectAllMenuItem_Click(object sender, RoutedEventArgs e) => _runtime.SelectAll();
-
-    private void GoToMatchingBracketMenuItem_Click(object sender, RoutedEventArgs e) =>
-        _runtime.MoveToMatchingBracket();
-
-    private void WordWrapMenuItem_Click(object sender, RoutedEventArgs e) => _runtime.ToggleWordWrap();
-
-    private void TabDisplaySizeMenuItem_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is RadioMenuFlyoutItem { Tag: string tag }
-            && int.TryParse(tag, out var size))
-        {
-            _runtime.SetTabDisplaySize(size);
-        }
-    }
-
-    private void IndentSizeMenuItem_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is not RadioMenuFlyoutItem { Tag: string tag })
-        {
-            return;
-        }
-
-        if (string.Equals(tag, "auto", StringComparison.Ordinal))
-        {
-            _runtime.SetIndentSize(null);
-        }
-        else if (int.TryParse(tag, out var size))
-        {
-            _runtime.SetIndentSize(size);
-        }
-    }
-
-    private void TabInputModeMenuItem_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is not RadioMenuFlyoutItem { Tag: string tag })
-        {
-            return;
-        }
-
-        var mode = tag switch
-        {
-            "auto" => IndentationInputMode.Auto,
-            "tab" => IndentationInputMode.Tab,
-            "spaces" => IndentationInputMode.Spaces,
-            _ => (IndentationInputMode?)null
-        };
-        if (mode is { } selectedMode)
-        {
-            _runtime.SetIndentationInputMode(selectedMode);
-        }
-    }
-
     private void IndentationStatus_Tapped(object sender, TappedRoutedEventArgs e) =>
         _runtime.ShowIndentationSizeMenu();
 
@@ -208,67 +134,6 @@ public sealed partial class MainWindow : Window, IDisposable
         _runtime.ShowFilePathMenu();
 
     private async void PositionStatus_Tapped(object sender, TappedRoutedEventArgs e) =>
-        await _runtime.ShowGoToLineAsync();
-
-    private void CopyFilePathMenuItem_Click(object sender, RoutedEventArgs e) =>
-        _runtime.CopyFilePath();
-
-    private async void ShowFileInExplorerMenuItem_Click(object sender, RoutedEventArgs e) =>
-        await _runtime.ShowFileInExplorerAsync();
-
-    private async void OpenFolderInTerminalMenuItem_Click(object sender, RoutedEventArgs e) =>
-        await _runtime.OpenFolderInTerminalAsync();
-
-    private void StatusBarMenuItem_Click(object sender, RoutedEventArgs e) => _runtime.ToggleStatusBar();
-
-    private void DuplicateWindowMenuItem_Click(object sender, RoutedEventArgs e) =>
-        _application.DuplicateWindow(this);
-
-    private void NextWindowMenuItem_Click(object sender, RoutedEventArgs e) =>
-        _application.CycleWindow(this, direction: 1);
-
-    private void PreviousWindowMenuItem_Click(object sender, RoutedEventArgs e) =>
-        _application.CycleWindow(this, direction: -1);
-
-    private void ShowAllWindowsMenuItem_Click(object sender, RoutedEventArgs e) =>
-        _application.ShowAllWindows();
-
-    private void MinimizeAllWindowsMenuItem_Click(object sender, RoutedEventArgs e) =>
-        _application.MinimizeAllWindows();
-
-    private void AlwaysOnTopMenuItem_Click(object sender, RoutedEventArgs e)
-    {
-        _runtime.ToggleAlwaysOnTop();
-        _application.RefreshWindowMenus();
-    }
-
-    private async void AboutMenuItem_Click(object sender, RoutedEventArgs e) =>
-        await _runtime.ShowAboutAsync();
-
-    private async void RunExternalToolMenuItem_Click(object sender, RoutedEventArgs e) =>
-        await _runtime.ShowExternalToolDialogAsync();
-
-    private async void PreferencesMenuItem_Click(object sender, RoutedEventArgs e) =>
-        await _runtime.OpenPreferencesAsync();
-
-    private void FindButton_Click(object sender, RoutedEventArgs e) =>
-        _runtime.ShowFindPanel(replace: false);
-
-    private void ReplaceButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (!_runtime.IsFindPanelVisible)
-        {
-            _runtime.ShowFindPanel(replace: true);
-            return;
-        }
-
-        _runtime.ReplaceCurrent();
-    }
-
-    private void ShowCompletionMenuItem_Click(object sender, RoutedEventArgs e) =>
-        _runtime.ShowCompletion();
-
-    private async void GoToLineMenuItem_Click(object sender, RoutedEventArgs e) =>
         await _runtime.ShowGoToLineAsync();
 
     private void ShowCompletionAccelerator_Invoked(
@@ -430,9 +295,6 @@ public sealed partial class MainWindow : Window, IDisposable
     private void FindTextBox_TextChanged(object sender, TextChangedEventArgs e) =>
         _runtime.OnFindTextChanged();
 
-    private void CloseFindButton_Click(object sender, RoutedEventArgs e) =>
-        _runtime.CloseFindPanel();
-
     private void FindTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
     {
         if (e.Key == VirtualKey.Enter)
@@ -451,11 +313,94 @@ public sealed partial class MainWindow : Window, IDisposable
         }
     }
 
-    private void FindNextButton_Click(object sender, RoutedEventArgs e) => _runtime.FindNext();
+    Task IMainWindowActions.OpenFileAsync() => _runtime.OpenFileAsync();
 
-    private void ReplaceAllButton_Click(object sender, RoutedEventArgs e) => _runtime.ReplaceAll();
+    Task IMainWindowActions.NewDocumentAsync() => _runtime.NewDocumentAsync();
 
-    private void ReplaceCurrentButton_Click(object sender, RoutedEventArgs e) => _runtime.ReplaceCurrent();
+    async Task IMainWindowActions.SaveAsync() => await _runtime.SaveAsync();
+
+    async Task IMainWindowActions.SaveAsAsync() => await _runtime.SaveAsAsync();
+
+    void IMainWindowActions.Exit() => Close();
+
+    void IMainWindowActions.Undo() => _runtime.Undo();
+
+    void IMainWindowActions.Redo() => _runtime.Redo();
+
+    void IMainWindowActions.Cut() => _runtime.Cut();
+
+    void IMainWindowActions.Copy() => _runtime.Copy();
+
+    void IMainWindowActions.Paste() => _runtime.Paste();
+
+    void IMainWindowActions.SelectAll() => _runtime.SelectAll();
+
+    void IMainWindowActions.GoToMatchingBracket() => _runtime.MoveToMatchingBracket();
+
+    void IMainWindowActions.ShowFind() => _runtime.ShowFindPanel(replace: false);
+
+    void IMainWindowActions.ShowReplace()
+    {
+        if (_runtime.IsFindPanelVisible)
+        {
+            _runtime.ReplaceCurrent();
+        }
+        else
+        {
+            _runtime.ShowFindPanel(replace: true);
+        }
+    }
+
+    void IMainWindowActions.ShowCompletion() => _runtime.ShowCompletion();
+
+    Task IMainWindowActions.GoToLineAsync() => _runtime.ShowGoToLineAsync();
+
+    void IMainWindowActions.ToggleWordWrap() => _runtime.ToggleWordWrap();
+
+    void IMainWindowActions.SetTabDisplaySize(int size) => _runtime.SetTabDisplaySize(size);
+
+    void IMainWindowActions.SetIndentSize(int? size) => _runtime.SetIndentSize(size);
+
+    void IMainWindowActions.SetIndentationInputMode(IndentationInputMode mode) =>
+        _runtime.SetIndentationInputMode(mode);
+
+    void IMainWindowActions.ToggleStatusBar() => _runtime.ToggleStatusBar();
+
+    void IMainWindowActions.CopyFilePath() => _runtime.CopyFilePath();
+
+    Task IMainWindowActions.ShowFileInExplorerAsync() => _runtime.ShowFileInExplorerAsync();
+
+    Task IMainWindowActions.OpenFolderInTerminalAsync() => _runtime.OpenFolderInTerminalAsync();
+
+    Task IMainWindowActions.RunExternalToolAsync() => _runtime.ShowExternalToolDialogAsync();
+
+    Task IMainWindowActions.OpenPreferencesAsync() => _runtime.OpenPreferencesAsync();
+
+    void IMainWindowActions.ToggleAlwaysOnTop()
+    {
+        _runtime.ToggleAlwaysOnTop();
+        _application.RefreshWindowMenus();
+    }
+
+    void IMainWindowActions.DuplicateWindow() => _application.DuplicateWindow(this);
+
+    void IMainWindowActions.ShowAllWindows() => _application.ShowAllWindows();
+
+    void IMainWindowActions.MinimizeAllWindows() => _application.MinimizeAllWindows();
+
+    void IMainWindowActions.NextWindow() => _application.CycleWindow(this, direction: 1);
+
+    void IMainWindowActions.PreviousWindow() => _application.CycleWindow(this, direction: -1);
+
+    Task IMainWindowActions.ShowAboutAsync() => _runtime.ShowAboutAsync();
+
+    void IMainWindowActions.FindNext() => _runtime.FindNext();
+
+    void IMainWindowActions.ReplaceCurrent() => _runtime.ReplaceCurrent();
+
+    void IMainWindowActions.ReplaceAll() => _runtime.ReplaceAll();
+
+    void IMainWindowActions.CloseFind() => _runtime.CloseFindPanel();
 
     public void Dispose()
     {

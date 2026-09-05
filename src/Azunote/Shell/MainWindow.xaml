@@ -190,20 +190,20 @@
                 </Setter>
             </Style>
             <MenuFlyout x:Name="StatusTabDisplaySizeMenu">
-                <RadioMenuFlyoutItem Text="2" Tag="2" GroupName="StatusTabDisplaySize" Click="TabDisplaySizeMenuItem_Click" />
-                <RadioMenuFlyoutItem Text="4" Tag="4" IsChecked="True" GroupName="StatusTabDisplaySize" Click="TabDisplaySizeMenuItem_Click" />
-                <RadioMenuFlyoutItem Text="8" Tag="8" GroupName="StatusTabDisplaySize" Click="TabDisplaySizeMenuItem_Click" />
+                <RadioMenuFlyoutItem Text="2" Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}" CommandParameter="2" GroupName="{x:Bind ViewModel.Groups.StatusTabDisplaySize}" />
+                <RadioMenuFlyoutItem Text="4" Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}" CommandParameter="4" IsChecked="True" GroupName="{x:Bind ViewModel.Groups.StatusTabDisplaySize}" />
+                <RadioMenuFlyoutItem Text="8" Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}" CommandParameter="8" GroupName="{x:Bind ViewModel.Groups.StatusTabDisplaySize}" />
             </MenuFlyout>
             <MenuFlyout x:Name="StatusIndentSizeMenu">
-                <RadioMenuFlyoutItem Text="Auto" Tag="auto" IsChecked="True" GroupName="StatusIndentSize" Click="IndentSizeMenuItem_Click" />
-                <RadioMenuFlyoutItem Text="2" Tag="2" GroupName="StatusIndentSize" Click="IndentSizeMenuItem_Click" />
-                <RadioMenuFlyoutItem Text="4" Tag="4" GroupName="StatusIndentSize" Click="IndentSizeMenuItem_Click" />
-                <RadioMenuFlyoutItem Text="8" Tag="8" GroupName="StatusIndentSize" Click="IndentSizeMenuItem_Click" />
+                <RadioMenuFlyoutItem Text="Auto" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="auto" IsChecked="True" GroupName="{x:Bind ViewModel.Groups.StatusIndentSize}" />
+                <RadioMenuFlyoutItem Text="2" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="2" GroupName="{x:Bind ViewModel.Groups.StatusIndentSize}" />
+                <RadioMenuFlyoutItem Text="4" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="4" GroupName="{x:Bind ViewModel.Groups.StatusIndentSize}" />
+                <RadioMenuFlyoutItem Text="8" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="8" GroupName="{x:Bind ViewModel.Groups.StatusIndentSize}" />
             </MenuFlyout>
             <MenuFlyout x:Name="StatusFilePathMenu">
-                <MenuFlyoutItem Text="Copy File Path" Tag="copy-file-path" Click="CopyFilePathMenuItem_Click" />
-                <MenuFlyoutItem Text="Show in Explorer" Tag="show-in-explorer" Click="ShowFileInExplorerMenuItem_Click" />
-                <MenuFlyoutItem Text="Open Folder in Terminal" Tag="open-folder-in-terminal" Click="OpenFolderInTerminalMenuItem_Click" />
+                <MenuFlyoutItem Text="Copy File Path" Command="{x:Bind ViewModel.CopyFilePathCommand}" />
+                <MenuFlyoutItem Text="Show in Explorer" Command="{x:Bind ViewModel.ShowFileInExplorerCommand}" />
+                <MenuFlyoutItem Text="Open Folder in Terminal" Command="{x:Bind ViewModel.OpenFolderInTerminalCommand}" />
             </MenuFlyout>
         </Grid.Resources>
         <Grid.RowDefinitions>
@@ -214,70 +214,70 @@
         </Grid.RowDefinitions>
         <MenuBar Grid.Row="0">
             <MenuBarItem Title="File">
-                <MenuFlyoutItem Text="New" Click="NewMenuItem_Click">
+                <MenuFlyoutItem Text="New" Command="{x:Bind ViewModel.NewCommand}">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="N" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Open..." Click="OpenButton_Click">
+                <MenuFlyoutItem Text="Open..." Command="{x:Bind ViewModel.OpenCommand}">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="O" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
                 <MenuFlyoutSubItem x:Name="OpenRecentMenuItem" Text="Open Recent" />
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Save" Click="SaveButton_Click">
+                <MenuFlyoutItem Text="Save" Command="{x:Bind ViewModel.SaveCommand}">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="S" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Save As..." Click="SaveAsButton_Click">
+                <MenuFlyoutItem Text="Save As..." Command="{x:Bind ViewModel.SaveAsCommand}">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="S" Modifiers="Control,Shift" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Exit" Click="ExitMenuItem_Click" />
+                <MenuFlyoutItem Text="Exit" Command="{x:Bind ViewModel.ExitCommand}" />
             </MenuBarItem>
             <MenuBarItem Title="Edit">
-                <MenuFlyoutItem Text="Undo" Click="UndoMenuItem_Click">
+                <MenuFlyoutItem Text="Undo" Command="{x:Bind ViewModel.UndoCommand}">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="Z" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Redo" Click="RedoMenuItem_Click">
+                <MenuFlyoutItem Text="Redo" Command="{x:Bind ViewModel.RedoCommand}">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="Y" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Cut" Click="CutMenuItem_Click">
+                <MenuFlyoutItem Text="Cut" Command="{x:Bind ViewModel.CutCommand}">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="X" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Copy" Click="CopyMenuItem_Click">
+                <MenuFlyoutItem Text="Copy" Command="{x:Bind ViewModel.CopyCommand}">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="C" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Paste" Click="PasteMenuItem_Click">
+                <MenuFlyoutItem Text="Paste" Command="{x:Bind ViewModel.PasteCommand}">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="V" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Find..." Click="FindButton_Click">
+                <MenuFlyoutItem Text="Find..." Command="{x:Bind ViewModel.ShowFindCommand}">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="F" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Replace..." Click="ReplaceButton_Click">
+                <MenuFlyoutItem Text="Replace..." Command="{x:Bind ViewModel.ShowReplaceCommand}">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="H" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Go to Line..." Click="GoToLineMenuItem_Click">
+                <MenuFlyoutItem Text="Go to Line..." Command="{x:Bind ViewModel.GoToLineCommand}">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="G" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
@@ -286,9 +286,9 @@
                     x:Name="GoToMatchingBracketMenuItem"
                     Text="Go to Matching Bracket"
                     KeyboardAcceleratorTextOverride="Ctrl+["
-                    Click="GoToMatchingBracketMenuItem_Click" />
+                    Command="{x:Bind ViewModel.GoToMatchingBracketCommand}" />
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Select All" Click="SelectAllMenuItem_Click">
+                <MenuFlyoutItem Text="Select All" Command="{x:Bind ViewModel.SelectAllCommand}">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="A" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
@@ -296,7 +296,7 @@
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem
                     Text="Show Completions"
-                    Click="ShowCompletionMenuItem_Click">
+                    Command="{x:Bind ViewModel.ShowCompletionCommand}">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <!-- Keep the shortcut attached to the command; the
                              editor host provides a fallback when native text
@@ -314,62 +314,59 @@
                 <MenuFlyoutSeparator />
                 <MenuFlyoutSubItem x:Name="TabDisplaySizeMenuItem"
                                    Text="Tab Display Size">
-                    <RadioMenuFlyoutItem x:Name="TabDisplaySize2MenuItem" Text="2" Tag="2" GroupName="TabDisplaySize" Click="TabDisplaySizeMenuItem_Click" />
-                    <RadioMenuFlyoutItem x:Name="TabDisplaySize4MenuItem" Text="4" Tag="4" GroupName="TabDisplaySize" Click="TabDisplaySizeMenuItem_Click" />
-                    <RadioMenuFlyoutItem x:Name="TabDisplaySize8MenuItem" Text="8" Tag="8" GroupName="TabDisplaySize" Click="TabDisplaySizeMenuItem_Click" />
+                    <RadioMenuFlyoutItem x:Name="TabDisplaySize2MenuItem" Text="2" Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}" CommandParameter="2" GroupName="{x:Bind ViewModel.Groups.TabDisplaySize}" />
+                    <RadioMenuFlyoutItem x:Name="TabDisplaySize4MenuItem" Text="4" Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}" CommandParameter="4" GroupName="{x:Bind ViewModel.Groups.TabDisplaySize}" />
+                    <RadioMenuFlyoutItem x:Name="TabDisplaySize8MenuItem" Text="8" Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}" CommandParameter="8" GroupName="{x:Bind ViewModel.Groups.TabDisplaySize}" />
                 </MenuFlyoutSubItem>
                 <MenuFlyoutSubItem x:Name="IndentSizeMenuItem"
                                    Text="Indent Size">
-                    <RadioMenuFlyoutItem x:Name="IndentSizeAutoMenuItem" Text="Auto" Tag="auto" GroupName="IndentSize" Click="IndentSizeMenuItem_Click" />
-                    <RadioMenuFlyoutItem x:Name="IndentSize2MenuItem" Text="2" Tag="2" GroupName="IndentSize" Click="IndentSizeMenuItem_Click" />
-                    <RadioMenuFlyoutItem x:Name="IndentSize4MenuItem" Text="4" Tag="4" GroupName="IndentSize" Click="IndentSizeMenuItem_Click" />
-                    <RadioMenuFlyoutItem x:Name="IndentSize8MenuItem" Text="8" Tag="8" GroupName="IndentSize" Click="IndentSizeMenuItem_Click" />
+                    <RadioMenuFlyoutItem x:Name="IndentSizeAutoMenuItem" Text="Auto" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="auto" GroupName="{x:Bind ViewModel.Groups.IndentSize}" />
+                    <RadioMenuFlyoutItem x:Name="IndentSize2MenuItem" Text="2" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="2" GroupName="{x:Bind ViewModel.Groups.IndentSize}" />
+                    <RadioMenuFlyoutItem x:Name="IndentSize4MenuItem" Text="4" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="4" GroupName="{x:Bind ViewModel.Groups.IndentSize}" />
+                    <RadioMenuFlyoutItem x:Name="IndentSize8MenuItem" Text="8" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="8" GroupName="{x:Bind ViewModel.Groups.IndentSize}" />
                 </MenuFlyoutSubItem>
                 <MenuFlyoutSubItem x:Name="TabInputModeMenuItem"
                                    Text="Indentation Mode">
-                    <RadioMenuFlyoutItem x:Name="TabInputModeAutoMenuItem" Text="Auto" Tag="auto" GroupName="TabInputMode"
-                                          Click="TabInputModeMenuItem_Click" />
-                    <RadioMenuFlyoutItem x:Name="TabInputModeTabMenuItem" Text="Tab" Tag="tab" GroupName="TabInputMode"
-                                          Click="TabInputModeMenuItem_Click" />
-                    <RadioMenuFlyoutItem x:Name="TabInputModeSpacesMenuItem" Text="Spaces" Tag="spaces" GroupName="TabInputMode"
-                                          Click="TabInputModeMenuItem_Click" />
+                    <RadioMenuFlyoutItem x:Name="TabInputModeAutoMenuItem" Text="Auto" Command="{x:Bind ViewModel.SetIndentationInputModeCommand}" CommandParameter="auto" GroupName="{x:Bind ViewModel.Groups.IndentationInputMode}" />
+                    <RadioMenuFlyoutItem x:Name="TabInputModeTabMenuItem" Text="Tab" Command="{x:Bind ViewModel.SetIndentationInputModeCommand}" CommandParameter="tab" GroupName="{x:Bind ViewModel.Groups.IndentationInputMode}" />
+                    <RadioMenuFlyoutItem x:Name="TabInputModeSpacesMenuItem" Text="Spaces" Command="{x:Bind ViewModel.SetIndentationInputModeCommand}" CommandParameter="spaces" GroupName="{x:Bind ViewModel.Groups.IndentationInputMode}" />
                 </MenuFlyoutSubItem>
                 <MenuFlyoutSeparator />
-                <ToggleMenuFlyoutItem x:Name="WordWrapMenuItem" Text="Word Wrap" Click="WordWrapMenuItem_Click" />
+                <ToggleMenuFlyoutItem x:Name="WordWrapMenuItem" Text="Word Wrap" Command="{x:Bind ViewModel.ToggleWordWrapCommand}" />
                 <ToggleMenuFlyoutItem x:Name="StatusBarMenuItem"
                                       Text="Status Bar"
                                       IsChecked="True"
-                                      Click="StatusBarMenuItem_Click" />
+                                      Command="{x:Bind ViewModel.ToggleStatusBarCommand}" />
             </MenuBarItem>
             <MenuBarItem x:Name="ToolsMenuItem" Title="Tools">
-                <MenuFlyoutItem Text="Run External Tool..." Click="RunExternalToolMenuItem_Click" />
+                <MenuFlyoutItem Text="Run External Tool..." Command="{x:Bind ViewModel.RunExternalToolCommand}" />
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Preferences..." Click="PreferencesMenuItem_Click" />
+                <MenuFlyoutItem Text="Preferences..." Command="{x:Bind ViewModel.OpenPreferencesCommand}" />
             </MenuBarItem>
             <MenuBarItem x:Name="WindowMenuItem" Title="Window">
                 <ToggleMenuFlyoutItem
                     x:Name="AlwaysOnTopMenuItem"
                     Text="Always on Top"
-                    Click="AlwaysOnTopMenuItem_Click" />
+                    Command="{x:Bind ViewModel.ToggleAlwaysOnTopCommand}" />
                 <MenuFlyoutItem
                     Text="Duplicate Window"
-                    Click="DuplicateWindowMenuItem_Click" />
+                    Command="{x:Bind ViewModel.DuplicateWindowCommand}" />
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Show All Windows" Click="ShowAllWindowsMenuItem_Click" />
-                <MenuFlyoutItem Text="Minimize All Windows" Click="MinimizeAllWindowsMenuItem_Click" />
+                <MenuFlyoutItem Text="Show All Windows" Command="{x:Bind ViewModel.ShowAllWindowsCommand}" />
+                <MenuFlyoutItem Text="Minimize All Windows" Command="{x:Bind ViewModel.MinimizeAllWindowsCommand}" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem
                     Text="Next Window"
-                    Click="NextWindowMenuItem_Click"
+                    Command="{x:Bind ViewModel.NextWindowCommand}"
                     KeyboardAcceleratorTextOverride="Ctrl+Tab" />
                 <MenuFlyoutItem
                     Text="Previous Window"
-                    Click="PreviousWindowMenuItem_Click"
+                    Command="{x:Bind ViewModel.PreviousWindowCommand}"
                     KeyboardAcceleratorTextOverride="Ctrl+Shift+Tab" />
                 <MenuFlyoutSeparator />
             </MenuBarItem>
             <MenuBarItem Title="Help">
-                <MenuFlyoutItem Text="About Azunote" Click="AboutMenuItem_Click" />
+                <MenuFlyoutItem Text="About Azunote" Command="{x:Bind ViewModel.ShowAboutCommand}" />
             </MenuBarItem>
         </MenuBar>
         <Border x:Name="FindPanel" Grid.Row="1" Padding="12,8" BorderThickness="0,0,0,1" Visibility="Collapsed">
@@ -386,12 +383,12 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="Find" VerticalAlignment="Center" />
                 <TextBox x:Name="FindTextBox" Grid.Column="1" PlaceholderText="Search text" TextChanged="FindTextBox_TextChanged" KeyDown="FindTextBox_KeyDown" />
-                <Button Grid.Column="2" Content="Next" Click="FindNextButton_Click" />
+                <Button Grid.Column="2" Content="Next" Command="{x:Bind ViewModel.FindNextCommand}" />
                 <TextBox x:Name="ReplaceTextBox" Grid.Column="3" PlaceholderText="Replace with" KeyDown="ReplaceTextBox_KeyDown" />
-                <Button Grid.Column="4" Content="Replace" Click="ReplaceCurrentButton_Click" />
-                <Button Grid.Column="5" Content="Replace all" Click="ReplaceAllButton_Click" />
+                <Button Grid.Column="4" Content="Replace" Command="{x:Bind ViewModel.ReplaceCurrentCommand}" />
+                <Button Grid.Column="5" Content="Replace all" Command="{x:Bind ViewModel.ReplaceAllCommand}" />
                 <TextBlock x:Name="FindResultText" Grid.Column="6" VerticalAlignment="Center" />
-                <Button Grid.Column="7" Content="Close" HorizontalAlignment="Right" Click="CloseFindButton_Click" />
+                <Button Grid.Column="7" Content="Close" HorizontalAlignment="Right" Command="{x:Bind ViewModel.CloseFindCommand}" />
             </Grid>
         </Border>
         <local:AzunyanEditorView
