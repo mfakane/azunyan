@@ -407,11 +407,11 @@
                         <Button VerticalAlignment="Stretch" Width="32" Padding="1,1,0,0" ToolTipService.ToolTip="Previous" Click="FindPreviousButton_Click">
                             <FontIcon Glyph="&#xE74A;" FontSize="16" />
                         </Button>
-                        <Button VerticalAlignment="Stretch" Width="32" Padding="1,1,0,0" ToolTipService.ToolTip="Next" Command="{x:Bind ViewModel.FindNextCommand}">
+                        <Button VerticalAlignment="Stretch" Width="32" Padding="1,1,0,0" ToolTipService.ToolTip="Next" Click="FindNextButton_Click">
                             <FontIcon Glyph="&#xE74B;" FontSize="16" />
                         </Button>
                         <TextBlock MinWidth="48" HorizontalTextAlignment="Center" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind ViewModel.FindResult, Mode=OneWay}" />
-                        <Button VerticalAlignment="Stretch" Padding="1,1,0,0" Width="32" ToolTipService.ToolTip="Close" Style="{StaticResource SubtleButtonStyle}" Command="{x:Bind ViewModel.CloseFindCommand}">
+                        <Button VerticalAlignment="Stretch" Padding="1,1,0,0" Width="32" ToolTipService.ToolTip="Close" Style="{StaticResource SubtleButtonStyle}" Click="CloseFindButton_Click">
                             <FontIcon Glyph="&#xE711;" FontSize="16" />
                         </Button>
                     </StackPanel>

@@ -298,6 +298,12 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     private void FindPreviousButton_Click(object sender, RoutedEventArgs e) =>
         _runtime.FindPrevious();
 
+    private void FindNextButton_Click(object sender, RoutedEventArgs e) =>
+        _runtime.FindNext();
+
+    private void CloseFindButton_Click(object sender, RoutedEventArgs e) =>
+        _runtime.CloseFindPanel();
+
     private void FindTextBox_BeforeKeyDown(object sender, KeyRoutedEventArgs e)
     {
         HandleFindTextBoxKeyDown(FindTextBox, _runtime.FindNext, e);
