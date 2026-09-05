@@ -21,6 +21,8 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     private bool _allowClose;
     private bool _completionShortcutInvoked;
     private bool _matchingBracketShortcutInvoked;
+    private bool _findNextShortcutInvoked;
+    private bool _findPreviousShortcutInvoked;
     private bool _disposed;
 
     internal MainWindowRuntime Runtime => _runtime;
@@ -88,6 +90,18 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         };
         goToMatchingBracket.Invoked += GoToMatchingBracketAccelerator_Invoked;
         RootGrid.KeyboardAccelerators.Add(goToMatchingBracket);
+
+        var findNext = new KeyboardAccelerator { Key = VirtualKey.F3 };
+        findNext.Invoked += FindNextAccelerator_Invoked;
+        RootGrid.KeyboardAccelerators.Add(findNext);
+
+        var findPrevious = new KeyboardAccelerator
+        {
+            Key = VirtualKey.F3,
+            Modifiers = VirtualKeyModifiers.Shift
+        };
+        findPrevious.Invoked += FindPreviousAccelerator_Invoked;
+        RootGrid.KeyboardAccelerators.Add(findPrevious);
     }
 
     private void IndentationStatus_Tapped(object sender, TappedRoutedEventArgs e) =>
@@ -115,6 +129,24 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         args.Handled = true;
         _matchingBracketShortcutInvoked = true;
         _runtime.MoveToMatchingBracket();
+    }
+
+    private void FindNextAccelerator_Invoked(
+        KeyboardAccelerator sender,
+        KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = true;
+        _findNextShortcutInvoked = true;
+        _runtime.FindNext();
+    }
+
+    private void FindPreviousAccelerator_Invoked(
+        KeyboardAccelerator sender,
+        KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = true;
+        _findPreviousShortcutInvoked = true;
+        _runtime.FindPrevious();
     }
 
     private void EscapeAccelerator_Invoked(
@@ -188,6 +220,11 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
 
     private void Editor_KeyDown(object sender, KeyRoutedEventArgs e)
     {
+        if (HandleFindNavigationKeyDown(e))
+        {
+            return;
+        }
+
         if (e.Key == OemOpenBracketKey
             && IsKeyDown(VirtualKey.Control)
             && !IsKeyDown(VirtualKey.Menu))
@@ -255,22 +292,70 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         }
     }
 
-    private void FindTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
+    private void FindReplaceModeButton_Click(object sender, RoutedEventArgs e) =>
+        _runtime.ToggleFindReplaceMode();
+
+    private void FindPreviousButton_Click(object sender, RoutedEventArgs e) =>
+        _runtime.FindPrevious();
+
+    private void FindTextBox_BeforeKeyDown(object sender, KeyRoutedEventArgs e)
     {
-        if (e.Key == VirtualKey.Enter)
+        HandleFindTextBoxKeyDown(FindTextBox, _runtime.FindNext, e);
+    }
+
+    private void ReplaceTextBox_BeforeKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        HandleFindTextBoxKeyDown(ReplaceTextBox, _runtime.ReplaceCurrent, e);
+    }
+
+    private void HandleFindTextBoxKeyDown(
+        TextBox textBox,
+        Action submit,
+        KeyRoutedEventArgs args)
+    {
+        if (HandleFindNavigationKeyDown(args))
         {
-            _runtime.FindNext();
-            e.Handled = true;
+            return;
+        }
+
+        if (args.Key != VirtualKey.Enter) return;
+        args.Handled = true;
+        if (IsKeyDown(VirtualKey.Control) && !IsKeyDown(VirtualKey.Menu))
+        {
+            InsertFindTextNewLine(textBox);
+        }
+        else
+        {
+            submit();
         }
     }
 
-    private void ReplaceTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
+    private static void InsertFindTextNewLine(TextBox textBox)
     {
-        if (e.Key == VirtualKey.Enter)
+        var selectionStart = textBox.SelectionStart;
+        var selectionLength = textBox.SelectionLength;
+        textBox.Text = textBox.Text.Remove(selectionStart, selectionLength)
+            .Insert(selectionStart, "\r");
+        textBox.SelectionStart = selectionStart + 1;
+        textBox.SelectionLength = 0;
+    }
+
+    private bool HandleFindNavigationKeyDown(KeyRoutedEventArgs args)
+    {
+        if (args.Key != VirtualKey.F3) return false;
+        var previous = IsKeyDown(VirtualKey.Shift);
+        var acceleratorInvoked = previous
+            ? _findPreviousShortcutInvoked
+            : _findNextShortcutInvoked;
+        _findNextShortcutInvoked = false;
+        _findPreviousShortcutInvoked = false;
+        args.Handled = true;
+        if (!acceleratorInvoked)
         {
-            _runtime.ReplaceCurrent();
-            e.Handled = true;
+            if (previous) _runtime.FindPrevious();
+            else _runtime.FindNext();
         }
+        return true;
     }
 
     Task IMainWindowActions.OpenFileAsync() => _runtime.OpenFileAsync();
@@ -299,17 +384,7 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
 
     void IMainWindowActions.ShowFind() => _runtime.ShowFindPanel(replace: false);
 
-    void IMainWindowActions.ShowReplace()
-    {
-        if (_runtime.IsFindPanelVisible)
-        {
-            _runtime.ReplaceCurrent();
-        }
-        else
-        {
-            _runtime.ShowFindPanel(replace: true);
-        }
-    }
+    void IMainWindowActions.ShowReplace() => _runtime.ShowFindPanel(replace: true);
 
     void IMainWindowActions.ShowCompletion() => _runtime.ShowCompletion();
 
@@ -357,6 +432,8 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     void IMainWindowActions.FindNext() => _runtime.FindNext();
 
     void IMainWindowActions.FindTextChanged() => _runtime.OnFindTextChanged();
+
+    void IMainWindowActions.FindOptionsChanged() => _runtime.OnFindOptionsChanged();
 
     void IMainWindowActions.ReplaceCurrent() => _runtime.ReplaceCurrent();
 

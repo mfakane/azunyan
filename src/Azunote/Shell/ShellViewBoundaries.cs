@@ -128,11 +128,17 @@ internal interface IFindReplaceState
 
     string ReplaceText { get; set; }
 
-    void Show();
+    FindReplaceOptions Options { get; }
+
+    bool IsReplaceMode { get; }
+
+    void Show(bool replace);
+
+    void ToggleMode();
 
     void Close();
 
-    void SetResult(string message);
+    void SetResult(int current, int total);
 }
 
 internal interface IFindReplaceHost
@@ -144,6 +150,10 @@ internal interface IFindReplaceHost
     void FocusEditor();
 
     void SelectFindText();
+
+    void ShowNotification(string message, bool replaceMode);
+
+    void HideNotification();
 }
 
 internal interface ILanguageModeMenuView

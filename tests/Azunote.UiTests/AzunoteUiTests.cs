@@ -78,6 +78,83 @@ public sealed class AzunoteUiTests : IClassFixture<AzunoteUiFixture>
     }
 
     [AzunoteUiFact]
+    public void Find_and_replace_modes_are_exposed()
+    {
+        var window = _fixture.Window;
+        var editor = _fixture.Editor;
+        var editorValue = AzunoteUiFixture.WaitForValuePattern(editor);
+        var original = editorValue.Current.Value;
+
+        try
+        {
+            editorValue.SetValue("one two ONE");
+            var textPattern = AzunoteUiFixture.WaitForTextPattern(editor);
+            AzunoteUiFixture.WaitForDocumentText(
+                textPattern,
+                text => string.Equals(text, "one two ONE", StringComparison.Ordinal));
+
+            var first = textPattern.DocumentRange.FindText("one", false, false);
+            Assert.NotNull(first);
+            first!.Select();
+
+            AzunoteUiFixture.InvokeMenuItem(window, "Edit", "Find...");
+            var modeButton = AzunoteUiFixture.WaitForElement(
+                window,
+                AutomationElement.NameProperty,
+                "Toggle Replace fields");
+
+            var findText = AzunoteUiFixture.WaitForElement(
+                window,
+                AutomationElement.NameProperty,
+                "Find text");
+            ((ValuePattern)findText.GetCurrentPattern(ValuePattern.Pattern)).SetValue("one");
+
+            var matchCase = AzunoteUiFixture.WaitForElement(
+                window,
+                AutomationElement.NameProperty,
+                "Match Case");
+            AzunoteUiFixture.WaitForElement(
+                window,
+                AutomationElement.NameProperty,
+                "Match Whole Word");
+            AzunoteUiFixture.WaitForElement(
+                window,
+                AutomationElement.NameProperty,
+                "Regular Expression");
+            var matchCaseToggle = (TogglePattern)matchCase.GetCurrentPattern(TogglePattern.Pattern);
+            Assert.Equal(ToggleState.Off, matchCaseToggle.Current.ToggleState);
+            matchCaseToggle.Toggle();
+            AzunoteUiFixture.WaitForToggleState(matchCase, ToggleState.On);
+            matchCaseToggle.Toggle();
+            AzunoteUiFixture.WaitForToggleState(matchCase, ToggleState.Off);
+
+            var modeButtonInvoke = (InvokePattern)modeButton.GetCurrentPattern(InvokePattern.Pattern);
+            modeButtonInvoke.Invoke();
+            AzunoteUiFixture.WaitForElement(
+                window,
+                AutomationElement.NameProperty,
+                "Replace text");
+
+            modeButtonInvoke.Invoke();
+            AzunoteUiFixture.WaitForElementHidden(
+                window,
+                AutomationElement.NameProperty,
+                "Replace text");
+
+            AzunoteUiFixture.InvokeMenuItem(window, "Edit", "Replace...");
+            AzunoteUiFixture.WaitForElement(
+                window,
+                AutomationElement.NameProperty,
+                "Replace text");
+        }
+        finally
+        {
+            AzunoteUiFixture.WaitForValuePattern(editor).SetValue(original);
+            AzunoteUiFixture.TryCloseFindReplace(window);
+        }
+    }
+
+    [AzunoteUiFact]
     public void Projected_editor_exposes_read_write_value_and_empty_range_geometry()
     {
         var editor = _fixture.Editor;
@@ -571,6 +648,81 @@ public sealed class AzunoteUiFixture : IDisposable
         ?? throw new XunitException(
             $"Could not find UI Automation element {property.ProgrammaticName}={value}.");
 
+    internal static AutomationElement WaitForElement(
+        AutomationElement root,
+        AutomationProperty property,
+        string value) =>
+        WaitFor(
+            () => root.FindFirst(
+                TreeScope.Descendants,
+                new PropertyCondition(property, value)),
+            $"Could not find UI Automation element {property.ProgrammaticName}={value}.");
+
+    internal static void WaitForElementHidden(
+        AutomationElement root,
+        AutomationProperty property,
+        string value)
+    {
+        WaitFor(
+            () =>
+            {
+                var element = root.FindFirst(
+                    TreeScope.Descendants,
+                    new PropertyCondition(property, value));
+                if (element is null)
+                {
+                    return root;
+                }
+
+                try
+                {
+                    return element.Current.IsOffscreen
+                        ? root
+                        : null;
+                }
+                catch (ElementNotAvailableException)
+                {
+                    return root;
+                }
+            },
+            $"UI Automation element {property.ProgrammaticName}={value} remained visible.");
+    }
+
+    internal static void WaitForToggleState(
+        AutomationElement element,
+        ToggleState expected)
+    {
+        WaitFor(
+            () =>
+            {
+                try
+                {
+                    var pattern = (TogglePattern)element.GetCurrentPattern(TogglePattern.Pattern);
+                    return pattern.Current.ToggleState == expected
+                        ? element
+                        : null;
+                }
+                catch (ElementNotAvailableException)
+                {
+                    return null;
+                }
+            },
+            $"The toggle did not reach state {expected}.");
+    }
+
+    internal static void TryCloseFindReplace(AutomationElement window)
+    {
+        var close = window.FindFirst(
+            TreeScope.Descendants,
+            new PropertyCondition(AutomationElement.NameProperty, "Close"));
+        if (close is not null
+            && close.TryGetCurrentPattern(InvokePattern.Pattern, out var invoke)
+            && invoke is InvokePattern invokePattern)
+        {
+            invokePattern.Invoke();
+        }
+    }
+
     private static void Invoke(AutomationElement element)
     {
         if (element.TryGetCurrentPattern(InvokePattern.Pattern, out var invoke)
@@ -681,6 +833,7 @@ public sealed class AzunoteUiFixture : IDisposable
 
         throw new XunitException(message);
     }
+
 }
 
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]

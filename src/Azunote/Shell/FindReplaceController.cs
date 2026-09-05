@@ -1,5 +1,11 @@
 namespace Azunote;
 
+internal enum SearchDirection
+{
+    Forward,
+    Backward
+}
+
 internal sealed class FindReplaceController
 {
     private readonly IEditorView _editor;
@@ -24,108 +30,175 @@ internal sealed class FindReplaceController
 
     public void Show(bool replace)
     {
-        _state.Show();
+        _state.Show(replace);
+        _host.HideNotification();
+        _state.SetResult(0, 0);
         _host.FocusFind();
         if (_editor.Selection.Length > 0 && !string.IsNullOrEmpty(_editor.SelectedText))
         {
             _state.FindText = _editor.SelectedText;
             _host.SelectFindText();
         }
-
-        if (!replace)
-        {
-            _state.ReplaceText = string.Empty;
-        }
     }
+
+    public void ToggleMode() => _state.ToggleMode();
 
     public void Close()
     {
         _state.Close();
+        _host.HideNotification();
         _host.FocusEditor();
     }
 
     public void OnFindTextChanged()
     {
+        _host.HideNotification();
         if (_state.IsVisible)
         {
-            _state.SetResult(string.Empty);
+            _state.SetResult(0, 0);
         }
     }
 
+    public void OnFindOptionsChanged() => OnFindTextChanged();
+
     public void FindNext()
+        => Find(SearchDirection.Forward);
+
+    public void FindPrevious()
+        => Find(SearchDirection.Backward);
+
+    private void Find(SearchDirection direction)
     {
-        var query = _state.FindText;
+        _host.HideNotification();
+        _state.SetResult(0, 0);
+        var query = NormalizeLineEndingsForDocument(_state.FindText);
         if (string.IsNullOrEmpty(query))
         {
-            _state.SetResult("Enter search text");
+            return;
+        }
+
+        if (!FindReplaceService.IsValidQuery(query, _state.Options))
+        {
+            _host.ShowNotification("Invalid regular expression", _state.IsReplaceMode);
             return;
         }
 
         var selection = _editor.Selection;
-        var match = FindReplaceService.FindNext(
-            _editor.Text,
-            query,
-            selection.Start + selection.Length);
-        if (match is not { } found)
+        var result = direction == SearchDirection.Forward
+            ? FindReplaceService.FindNextResult(
+                _editor.Text,
+                query,
+                selection.Start + selection.Length,
+                _state.Options)
+            : FindReplaceService.FindPreviousResult(
+                _editor.Text,
+                query,
+                selection.Start,
+                _state.Options);
+        if (result is not { } foundResult)
         {
-            _state.SetResult("Not found");
+            _state.SetResult(0, 0);
             return;
         }
 
+        var totalMatches = FindReplaceService.Count(
+            _editor.Text,
+            query,
+            _state.Options);
+        var matchNumber = FindReplaceService.CountBefore(
+            _editor.Text,
+            query,
+            foundResult.Match.Start,
+            _state.Options) + 1;
         _editor.Focus();
         _editor.SetSelection(new Azunyan.Core.TextSelection(
-            found.Start,
-            found.Start + found.Length));
-        _state.SetResult("Found");
+            foundResult.Match.Start,
+            foundResult.Match.End));
+        _state.SetResult(matchNumber, totalMatches);
+        if (foundResult.Wrapped)
+        {
+            _host.ShowNotification(direction == SearchDirection.Forward
+                ? "Search wrapped to the beginning"
+                : "Search wrapped to the end", _state.IsReplaceMode);
+        }
     }
 
     public void ReplaceCurrent()
     {
-        var query = _state.FindText;
+        _host.HideNotification();
+        _state.SetResult(0, 0);
+        var query = NormalizeLineEndingsForDocument(_state.FindText);
         if (string.IsNullOrEmpty(query))
         {
-            _state.SetResult("Enter search text");
+            return;
+        }
+
+        if (!FindReplaceService.IsValidQuery(query, _state.Options))
+        {
+            _host.ShowNotification("Invalid regular expression", _state.IsReplaceMode);
             return;
         }
 
         var selection = _editor.Selection;
         if (!selection.IsEmpty
-            && FindReplaceService.IsMatch(_editor.SelectedText, query))
+            && FindReplaceService.IsMatch(_editor.SelectedText, query, _state.Options))
         {
-            var replacement = _state.ReplaceText;
-            _editor.Replace(selection.Range, replacement);
+            var replacement = NormalizeLineEndingsForDocument(_state.ReplaceText);
+            var replacedText = FindReplaceService.ReplaceMatch(
+                _editor.SelectedText,
+                query,
+                replacement,
+                _state.Options);
+            _editor.Replace(selection.Range, replacedText);
             _editor.SetSelection(new Azunyan.Core.TextSelection(
                 selection.Start,
-                selection.Start + replacement.Length));
+                selection.Start + replacedText.Length));
             _observeText();
             _refreshDocumentView();
-            FindNext();
+            Find(SearchDirection.Forward);
             return;
         }
 
-        FindNext();
+        Find(SearchDirection.Forward);
     }
 
     public void ReplaceAll()
     {
-        var query = _state.FindText;
+        _host.HideNotification();
+        _state.SetResult(0, 0);
+        var query = NormalizeLineEndingsForDocument(_state.FindText);
         if (string.IsNullOrEmpty(query))
         {
-            _state.SetResult("Enter search text");
             return;
         }
 
-        var count = FindReplaceService.Count(_editor.Text, query);
+        if (!FindReplaceService.IsValidQuery(query, _state.Options))
+        {
+            _host.ShowNotification("Invalid regular expression", _state.IsReplaceMode);
+            return;
+        }
+
+        var count = FindReplaceService.Count(_editor.Text, query, _state.Options);
         if (count > 0)
         {
             _editor.SetText(FindReplaceService.ReplaceAll(
                 _editor.Text,
                 query,
-                _state.ReplaceText));
+                NormalizeLineEndingsForDocument(_state.ReplaceText),
+                _state.Options));
             _observeText();
             _refreshDocumentView();
         }
 
-        _state.SetResult($"{count} replaced");
+        _state.SetResult(0, count);
+    }
+
+    private string NormalizeLineEndingsForDocument(string text)
+    {
+        var documentText = _editor.Text;
+        var lineEnding = documentText.Contains("\r\n", StringComparison.Ordinal)
+            ? "\r\n"
+            : documentText.Contains('\r') ? "\r" : "\n";
+        return text.ReplaceLineEndings(lineEnding);
     }
 }

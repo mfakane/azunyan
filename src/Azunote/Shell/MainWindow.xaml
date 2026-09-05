@@ -190,6 +190,9 @@
                     </Setter.Value>
                 </Setter>
             </Style>
+            <Flyout x:Key="FindNotificationFlyout" Placement="Bottom">
+                <TextBlock Padding="12,8" MaxWidth="360" TextWrapping="Wrap" />
+            </Flyout>
             <MenuFlyout x:Name="StatusTabDisplaySizeMenu">
                 <RadioMenuFlyoutItem Text="2" Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}" CommandParameter="2" IsChecked="{x:Bind ViewModel.IsTabDisplaySize2, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.StatusTabDisplaySize}" />
                 <RadioMenuFlyoutItem Text="4" Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}" CommandParameter="4" IsChecked="{x:Bind ViewModel.IsTabDisplaySize4, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.StatusTabDisplaySize}" />
@@ -371,26 +374,60 @@
                 <MenuFlyoutItem Text="About Azunote" Command="{x:Bind ViewModel.ShowAboutCommand}" />
             </MenuBarItem>
         </MenuBar>
-        <Border x:Name="FindPanel" Grid.Row="1" Padding="12,8" BorderThickness="0,0,0,1" Visibility="{x:Bind ViewModel.FindPanelVisibility, Mode=OneWay}">
-            <Grid ColumnSpacing="8">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="220" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="220" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="Find" VerticalAlignment="Center" />
-                <TextBox x:Name="FindTextBox" Grid.Column="1" PlaceholderText="Search text" Text="{x:Bind ViewModel.FindText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" KeyDown="FindTextBox_KeyDown" />
-                <Button Grid.Column="2" Content="Next" Command="{x:Bind ViewModel.FindNextCommand}" />
-                <TextBox x:Name="ReplaceTextBox" Grid.Column="3" PlaceholderText="Replace with" Text="{x:Bind ViewModel.ReplaceText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" KeyDown="ReplaceTextBox_KeyDown" />
-                <Button Grid.Column="4" Content="Replace" Command="{x:Bind ViewModel.ReplaceCurrentCommand}" />
-                <Button Grid.Column="5" Content="Replace all" Command="{x:Bind ViewModel.ReplaceAllCommand}" />
-                <TextBlock x:Name="FindResultText" Grid.Column="6" VerticalAlignment="Center" Text="{x:Bind ViewModel.FindResult, Mode=OneWay}" />
-                <Button Grid.Column="7" Content="Close" HorizontalAlignment="Right" Command="{x:Bind ViewModel.CloseFindCommand}" />
+        <Border x:Name="FindReplacePanel" Grid.Row="1" HorizontalAlignment="Center" Padding="8,0,0,0" BorderThickness="0,0,0,1" Visibility="{x:Bind ViewModel.FindPanelVisibility, Mode=OneWay}">
+            <Grid RowSpacing="8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid Grid.Row="0" ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="32" />
+                        <ColumnDefinition Width="320" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="FindReplaceModeButton" Grid.Column="0" HorizontalAlignment="Stretch" VerticalAlignment="Top" Height="32" Padding="0,1,0,0" Style="{StaticResource SubtleButtonStyle}" Click="FindReplaceModeButton_Click" AutomationProperties.Name="Toggle Replace fields">
+                        <FontIcon Glyph="{x:Bind ViewModel.FindReplaceChevronGlyph, Mode=OneWay}" FontSize="16" />
+                    </Button>
+                    <Grid Grid.Column="1">
+                        <local:CompletionTextBox x:Name="FindTextBox" Padding="10,6,72,6" PlaceholderText="Search text" AcceptsReturn="True" TextWrapping="Wrap" AutomationProperties.Name="Find text" Text="{x:Bind ViewModel.FindText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" BeforeKeyDown="FindTextBox_BeforeKeyDown" />
+                        <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top" Orientation="Horizontal" Height="24" Margin="0,4,4,4" Spacing="2">
+                            <ToggleButton VerticalAlignment="Stretch" Width="22" Padding="0" Background="Transparent" BorderThickness="0" IsChecked="{x:Bind ViewModel.IsMatchCase, Mode=TwoWay}" ToolTipService.ToolTip="Match Case" AutomationProperties.Name="Match Case">
+                                <TextBlock Text="Aa" FontSize="12" FontWeight="SemiBold" />
+                            </ToggleButton>
+                            <ToggleButton VerticalAlignment="Stretch" Width="22" Padding="0" Background="Transparent" BorderThickness="0" IsChecked="{x:Bind ViewModel.IsMatchWholeWord, Mode=TwoWay}" ToolTipService.ToolTip="Match Whole Word" AutomationProperties.Name="Match Whole Word">
+                                <TextBlock Text="ab" FontSize="12" FontWeight="SemiBold" />
+                            </ToggleButton>
+                            <ToggleButton VerticalAlignment="Stretch" Width="22" Padding="0" Background="Transparent" BorderThickness="0" IsChecked="{x:Bind ViewModel.IsRegularExpression, Mode=TwoWay}" ToolTipService.ToolTip="Regular Expression" AutomationProperties.Name="Regular Expression">
+                                <TextBlock Text=".*" FontFamily="Consolas" FontSize="12" FontWeight="SemiBold" />
+                            </ToggleButton>
+                        </StackPanel>
+                    </Grid>
+                    <StackPanel Grid.Column="2" Height="32" Spacing="8" Orientation="Horizontal" VerticalAlignment="Top">
+                        <Button VerticalAlignment="Stretch" Width="32" Padding="1,1,0,0" ToolTipService.ToolTip="Previous" Click="FindPreviousButton_Click">
+                            <FontIcon Glyph="&#xE74A;" FontSize="16" />
+                        </Button>
+                        <Button VerticalAlignment="Stretch" Width="32" Padding="1,1,0,0" ToolTipService.ToolTip="Next" Command="{x:Bind ViewModel.FindNextCommand}">
+                            <FontIcon Glyph="&#xE74B;" FontSize="16" />
+                        </Button>
+                        <TextBlock MinWidth="48" HorizontalTextAlignment="Center" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind ViewModel.FindResult, Mode=OneWay}" />
+                        <Button VerticalAlignment="Stretch" Padding="1,1,0,0" Width="32" ToolTipService.ToolTip="Close" Style="{StaticResource SubtleButtonStyle}" Command="{x:Bind ViewModel.CloseFindCommand}">
+                            <FontIcon Glyph="&#xE711;" FontSize="16" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+                <Grid x:Name="ReplacePanel" Grid.Row="1" ColumnSpacing="8" Visibility="{x:Bind ViewModel.ReplacePanelVisibility, Mode=OneWay}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="32" />
+                        <ColumnDefinition Width="320" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <local:CompletionTextBox x:Name="ReplaceTextBox" Grid.Column="1" Grid.RowSpan="2" PlaceholderText="Replace with" AcceptsReturn="True" TextWrapping="Wrap" AutomationProperties.Name="Replace text" Text="{x:Bind ViewModel.ReplaceText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" BeforeKeyDown="ReplaceTextBox_BeforeKeyDown" />
+                    <StackPanel Grid.Column="2" Height="32" Spacing="8" Orientation="Horizontal" VerticalAlignment="Top">
+                        <Button VerticalAlignment="Stretch" Content="Replace" Command="{x:Bind ViewModel.ReplaceCurrentCommand}" />
+                        <Button VerticalAlignment="Stretch" Content="Replace all" Command="{x:Bind ViewModel.ReplaceAllCommand}" />
+                    </StackPanel>
+                </Grid>
             </Grid>
         </Border>
         <local:AzunyanEditorView

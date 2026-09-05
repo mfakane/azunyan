@@ -5,6 +5,7 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using WinRT.Interop;
 using Windows.Graphics;
@@ -16,6 +17,7 @@ public sealed partial class MainWindow
     private AzunyanEditorView _editor => Editor;
     private Grid _rootGrid => RootGrid;
     private TextBox _findTextBox => FindTextBox;
+    private TextBox _replaceTextBox => ReplaceTextBox;
     private MenuFlyoutSubItem _languageModeMenu => LanguageModeMenuItem;
     private MenuFlyoutSubItem _openRecentMenu => OpenRecentMenuItem;
     private MenuBarItem _windowMenu => WindowMenuItem;
@@ -39,6 +41,8 @@ public sealed partial class MainWindow
     private readonly Dictionary<string, RadioMenuFlyoutItem> _languageModeItems =
         new(StringComparer.OrdinalIgnoreCase);
     private bool _themeConfigured;
+    private Flyout _findNotificationFlyout = null!;
+    private TextBlock _findNotificationText = null!;
 
     internal Document Document => _editor.Document;
 
@@ -53,6 +57,10 @@ public sealed partial class MainWindow
             $"Editor exception/{source}",
             exception);
         _editorBuffer = new AzunyanEditorBuffer(Editor);
+        _findNotificationFlyout = RootGrid.Resources["FindNotificationFlyout"] as Flyout
+            ?? throw new InvalidOperationException("Find notification flyout is not configured.");
+        _findNotificationText = _findNotificationFlyout.Content as TextBlock
+            ?? throw new InvalidOperationException("Find notification flyout must contain a TextBlock.");
 
         _windowHandle = WindowNative.GetWindowHandle(this);
         var windowId = Win32Interop.GetWindowIdFromWindow(_windowHandle);
@@ -383,6 +391,14 @@ public sealed partial class MainWindow
     private void FocusEditorView() => Focus();
 
     private void SelectFindText() => _findTextBox.SelectAll();
+
+    private void ShowFindNotification(string message, bool replaceMode)
+    {
+        _findNotificationText.Text = message;
+        _findNotificationFlyout.ShowAt(replaceMode ? _replaceTextBox : _findTextBox);
+    }
+
+    private void HideFindNotification() => _findNotificationFlyout.Hide();
 
     private void RenderLanguageModes(
         IReadOnlyList<LanguageModeEntry> entries,
@@ -762,6 +778,9 @@ public sealed partial class MainWindow
         public void FocusFind() => _window.FocusFind();
         public void FocusEditor() => _window.FocusEditorView();
         public void SelectFindText() => _window.SelectFindText();
+        public void ShowNotification(string message, bool replaceMode) =>
+            _window.ShowFindNotification(message, replaceMode);
+        public void HideNotification() => _window.HideFindNotification();
 
         public void Render(
             IReadOnlyList<LanguageModeEntry> entries,

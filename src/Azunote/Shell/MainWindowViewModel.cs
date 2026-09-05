@@ -28,6 +28,10 @@ internal sealed class MainWindowViewModel :
     private string _findText = string.Empty;
     private string _replaceText = string.Empty;
     private string _findResult = string.Empty;
+    private bool _isReplaceMode;
+    private bool _isMatchCase;
+    private bool _isMatchWholeWord;
+    private bool _isRegularExpression;
     private IReadOnlyList<WindowMenuItemViewModel> _windowItems = [];
     private IReadOnlyList<LanguageModeMenuItemViewModel> _languageModeItems = [];
     private IReadOnlyList<RecentFileMenuItemViewModel> _recentFileItems = [];
@@ -140,6 +144,29 @@ internal sealed class MainWindowViewModel :
     }
     public string ReplaceText { get => _replaceText; set => SetProperty(ref _replaceText, value); }
     public string FindResult { get => _findResult; set => SetProperty(ref _findResult, value); }
+    public bool IsReplaceMode
+    {
+        get => _isReplaceMode;
+        set => SetProperty(ref _isReplaceMode, value, dependentProperties:
+            [nameof(ReplacePanelVisibility), nameof(FindReplaceChevronGlyph)]);
+    }
+    public Visibility ReplacePanelVisibility => IsReplaceMode ? Visibility.Visible : Visibility.Collapsed;
+    public string FindReplaceChevronGlyph => IsReplaceMode ? "\uE70E" : "\uE70D";
+    public bool IsMatchCase
+    {
+        get => _isMatchCase;
+        set => SetFindOption(ref _isMatchCase, value);
+    }
+    public bool IsMatchWholeWord
+    {
+        get => _isMatchWholeWord;
+        set => SetFindOption(ref _isMatchWholeWord, value);
+    }
+    public bool IsRegularExpression
+    {
+        get => _isRegularExpression;
+        set => SetFindOption(ref _isRegularExpression, value);
+    }
     public IReadOnlyList<WindowMenuItemViewModel> WindowItems => _windowItems;
     public IReadOnlyList<LanguageModeMenuItemViewModel> LanguageModeItems => _languageModeItems;
     public IReadOnlyList<RecentFileMenuItemViewModel> RecentFileItems => _recentFileItems;
@@ -225,11 +252,28 @@ internal sealed class MainWindowViewModel :
 
     bool IFindReplaceState.IsVisible => IsFindPanelVisible;
 
-    void IFindReplaceState.Show() => IsFindPanelVisible = true;
+    FindReplaceOptions IFindReplaceState.Options =>
+        (IsMatchCase ? FindReplaceOptions.MatchCase : FindReplaceOptions.None)
+        | (IsMatchWholeWord ? FindReplaceOptions.MatchWholeWord : FindReplaceOptions.None)
+        | (IsRegularExpression ? FindReplaceOptions.RegularExpression : FindReplaceOptions.None);
 
-    void IFindReplaceState.Close() => IsFindPanelVisible = false;
+    bool IFindReplaceState.IsReplaceMode => IsReplaceMode;
 
-    void IFindReplaceState.SetResult(string message) => FindResult = message;
+    void IFindReplaceState.Show(bool replace)
+    {
+        IsFindPanelVisible = true;
+        IsReplaceMode = replace;
+    }
+
+    void IFindReplaceState.ToggleMode() => IsReplaceMode = !IsReplaceMode;
+
+    void IFindReplaceState.Close()
+    {
+        IsFindPanelVisible = false;
+        IsReplaceMode = false;
+    }
+
+    void IFindReplaceState.SetResult(int current, int total) => FindResult = $"{current}/{total}";
 
     public void SetWindowItems(
         IReadOnlyList<WindowMenuEntry> entries,
@@ -349,6 +393,12 @@ internal sealed class MainWindowViewModel :
     private static bool TryGetInt(object? parameter, out int value) =>
         int.TryParse(parameter?.ToString(), out value);
 
+    private void SetFindOption(ref bool field, bool value, [CallerMemberName] string? propertyName = null)
+    {
+        if (!SetProperty(ref field, value, propertyName)) return;
+        _actions?.FindOptionsChanged();
+    }
+
     private ICommand Command(Action execute) =>
         _commandFactory.Create(_ => execute());
 
@@ -361,19 +411,20 @@ internal sealed class MainWindowViewModel :
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
-    private void SetProperty<T>(
+    private bool SetProperty<T>(
         ref T field,
         T value,
         [CallerMemberName] string? propertyName = null,
         params string[] dependentProperties)
     {
-        if (EqualityComparer<T>.Default.Equals(field, value)) return;
+        if (EqualityComparer<T>.Default.Equals(field, value)) return false;
         field = value;
         OnPropertyChanged(propertyName);
         foreach (var dependentProperty in dependentProperties)
         {
             OnPropertyChanged(dependentProperty);
         }
+        return true;
     }
 }
 
@@ -467,6 +518,7 @@ internal interface IMainWindowActions
     Task ShowAboutAsync();
     void FindNext();
     void FindTextChanged();
+    void FindOptionsChanged();
     void ReplaceCurrent();
     void ReplaceAll();
     void CloseFind();
