@@ -7,33 +7,56 @@ namespace Azunyan.Core;
 /// </summary>
 public sealed class Document
 {
-    private readonly int _undoLimit;
-    private readonly List<EditRecord> _undo = new();
-    private readonly List<EditRecord> _redo = new();
-    private TextTree _tree;
-    private TextSnapshot _snapshot;
+    private readonly SharedBuffer _buffer;
     private TextCaretSet _caretSet;
+    private bool _disposed;
 
     public Document(string text = "", int undoLimit = 1000)
     {
         ArgumentNullException.ThrowIfNull(text);
         ArgumentOutOfRangeException.ThrowIfNegative(undoLimit);
 
-        _undoLimit = undoLimit;
-        _tree = new TextTree(text);
-        _snapshot = new TextSnapshot(_tree);
+        _buffer = new SharedBuffer(text, undoLimit);
         _caretSet = new TextCaretSet(new[] {
             new TextCaretState(TextSelection.Caret(0), 0)
         });
+        _buffer.Changed += OnBufferChanged;
     }
 
-    public TextSnapshot Snapshot => _snapshot;
+    private Document(SharedBuffer buffer)
+    {
+        _buffer = buffer;
+        _caretSet = new TextCaretSet(new[] {
+            new TextCaretState(TextSelection.Caret(0), 0)
+        });
+        _buffer.Changed += OnBufferChanged;
+    }
 
-    public TextSnapshot CurrentSnapshot => _snapshot;
+    /// <summary>
+    /// Creates another editing view over the same text buffer and undo history.
+    /// Selection and caret state remain local to each view.
+    /// </summary>
+    public Document CreateView()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return new(_buffer);
+    }
 
-    public string Text => _snapshot.Text;
+    /// <summary>Releases this view from its shared buffer.</summary>
+    public void CloseView()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        _buffer.Changed -= OnBufferChanged;
+    }
 
-    public int Length => _snapshot.Length;
+    public TextSnapshot Snapshot => _buffer.Snapshot;
+
+    public TextSnapshot CurrentSnapshot => _buffer.Snapshot;
+
+    public string Text => Snapshot.Text;
+
+    public int Length => Snapshot.Length;
 
     /// <summary>
     /// The primary selection. Assigning it intentionally collapses a
@@ -61,9 +84,9 @@ public sealed class Document
         set => SetCaret(value);
     }
 
-    public bool CanUndo => _undo.Count > 0;
+    public bool CanUndo => _buffer.CanUndo;
 
-    public bool CanRedo => _redo.Count > 0;
+    public bool CanRedo => _buffer.CanRedo;
 
     public event EventHandler<DocumentChangedEventArgs>? Changed;
 
@@ -158,68 +181,27 @@ public sealed class Document
 
     public bool Undo()
     {
-        if (_undo.Count == 0)
-        {
-            return false;
-        }
-
-        var record = RemoveLast(_undo);
-        _redo.Add(record);
-
-        var oldSnapshot = _snapshot;
-        var oldSelection = Selection;
-        var oldCaretSet = _caretSet;
-        _tree = record.OldTree;
-        _snapshot = new TextSnapshot(_tree);
-        _caretSet = record.OldCaretSet;
-
-        Changed?.Invoke(
-            this,
-            new DocumentChangedEventArgs(
-                oldSnapshot,
-                _snapshot,
-                record.Change.Inverse(),
-                oldSelection,
-                Selection,
-                DocumentChangeKind.Undo));
-        RaiseCaretEvents(oldCaretSet, _caretSet, oldSelection);
-        return true;
+        return _buffer.Undo(this);
     }
 
     public bool Redo()
     {
-        if (_redo.Count == 0)
-        {
-            return false;
-        }
-
-        var record = RemoveLast(_redo);
-        _undo.Add(record);
-
-        var oldSnapshot = _snapshot;
-        var oldSelection = Selection;
-        var oldCaretSet = _caretSet;
-        _tree = record.NewTree;
-        _snapshot = new TextSnapshot(_tree);
-        _caretSet = record.NewCaretSet;
-
-        Changed?.Invoke(
-            this,
-            new DocumentChangedEventArgs(
-                oldSnapshot,
-                _snapshot,
-                record.Change,
-                oldSelection,
-                Selection,
-                DocumentChangeKind.Redo));
-        RaiseCaretEvents(oldCaretSet, _caretSet, oldSelection);
-        return true;
+        return _buffer.Redo(this);
     }
 
     public void ClearHistory()
     {
-        _undo.Clear();
-        _redo.Clear();
+        _buffer.ClearHistory();
+    }
+
+    /// <summary>Replaces the shared contents and clears its undo history.</summary>
+    public void Reset(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        var caret = new TextCaretSet(new[] {
+            new TextCaretState(TextSelection.Caret(0), 0)
+        });
+        _buffer.Reset(text, this, caret);
     }
 
     private TextChange ApplyEdit(
@@ -235,10 +217,8 @@ public sealed class Document
             throw new ArgumentException("A selection and a caret set cannot both be supplied.");
         }
 
-        var oldText = _snapshot.GetText(range);
+        var oldText = Snapshot.GetText(range);
         var change = new TextChange(range, oldText, newText);
-        var oldSnapshot = _snapshot;
-        var oldSelection = Selection;
         var oldCaretSet = _caretSet;
         var newSelection = requestedSelection
             ?? TextSelection.Caret(checked(range.Start + newText.Length));
@@ -258,26 +238,7 @@ public sealed class Document
             return change;
         }
 
-        var oldTree = _tree;
-        var newTree = _tree.Replace(range, newText);
-        _tree = newTree;
-        _snapshot = new TextSnapshot(_tree);
-        _caretSet = newCaretSet;
-
-        var record = new EditRecord(change, oldTree, newTree, oldCaretSet, newCaretSet);
-        AddUndo(record);
-        _redo.Clear();
-
-        Changed?.Invoke(
-            this,
-            new DocumentChangedEventArgs(
-                oldSnapshot,
-                _snapshot,
-                change,
-                oldSelection,
-                Selection,
-                DocumentChangeKind.Edit));
-        RaiseCaretEvents(oldCaretSet, newCaretSet, oldSelection);
+        _buffer.Apply(change, this, oldCaretSet, newCaretSet);
         return change;
     }
 
@@ -309,20 +270,6 @@ public sealed class Document
         }
     }
 
-    private void AddUndo(EditRecord record)
-    {
-        if (_undoLimit == 0)
-        {
-            return;
-        }
-
-        _undo.Add(record);
-        if (_undo.Count > _undoLimit)
-        {
-            _undo.RemoveAt(0);
-        }
-    }
-
     private void ValidatePosition(int position)
     {
         if (position < 0 || position > Length)
@@ -350,25 +297,17 @@ public sealed class Document
         }
     }
 
-    private static EditRecord RemoveLast(List<EditRecord> records)
-    {
-        var lastIndex = records.Count - 1;
-        var record = records[lastIndex];
-        records.RemoveAt(lastIndex);
-        return record;
-    }
-
     private int GetDisplayColumn(int position, int? length = null)
     {
         var bounded = Math.Clamp(position, 0, Math.Min(length ?? Length, Length));
-        var line = _snapshot.Lines.GetLine(bounded);
-        var lineStart = _snapshot.Lines.GetLineStart(line);
-        var lineEnd = _snapshot.Lines.GetLineEnd(line);
+        var line = Snapshot.Lines.GetLine(bounded);
+        var lineStart = Snapshot.Lines.GetLineStart(line);
+        var lineEnd = Snapshot.Lines.GetLineEnd(line);
         var local = Math.Clamp(bounded - lineStart, 0, lineEnd - lineStart);
         var column = 0;
         for (var index = 0; index < local; index++)
         {
-            column = _snapshot.Text[lineStart + index] == '\t'
+            column = Snapshot.Text[lineStart + index] == '\t'
                 ? column + 4 - (column % 4)
                 : column + 1;
         }
@@ -376,10 +315,173 @@ public sealed class Document
         return column;
     }
 
+    private void OnBufferChanged(object? sender, BufferChangedEventArgs args)
+    {
+        var oldCaretSet = _caretSet;
+        var oldSelection = Selection;
+        _caretSet = ReferenceEquals(args.Initiator, this) && args.InitiatorCaretSet is not null
+            ? args.InitiatorCaretSet
+            : MapCaretSet(oldCaretSet, args.Change);
+
+        Changed?.Invoke(this, new DocumentChangedEventArgs(
+            args.OldSnapshot,
+            args.NewSnapshot,
+            args.Change,
+            oldSelection,
+            Selection,
+            args.Kind));
+        RaiseCaretEvents(oldCaretSet, _caretSet, oldSelection);
+    }
+
+    private TextCaretSet MapCaretSet(TextCaretSet caretSet, TextChange change) =>
+        new(caretSet.Select(caret =>
+        {
+            var selection = new TextSelection(
+                MapPosition(caret.Selection.Anchor, change),
+                MapPosition(caret.Selection.Active, change));
+            return new TextCaretState(
+                selection,
+                GetDisplayColumn(selection.CaretPosition));
+        }));
+
+    private static int MapPosition(int position, TextChange change)
+    {
+        if (position <= change.OldRange.Start)
+        {
+            return position;
+        }
+
+        if (position >= change.OldRange.End)
+        {
+            return checked(position + change.NewText.Length - change.OldText.Length);
+        }
+
+        return change.NewRange.End;
+    }
+
+    private sealed class SharedBuffer
+    {
+        private readonly int _undoLimit;
+        private readonly List<EditRecord> _undo = [];
+        private readonly List<EditRecord> _redo = [];
+        private TextTree _tree;
+
+        public SharedBuffer(string text, int undoLimit)
+        {
+            _undoLimit = undoLimit;
+            _tree = new TextTree(text);
+            Snapshot = new TextSnapshot(_tree);
+        }
+
+        public TextSnapshot Snapshot { get; private set; }
+        public bool CanUndo => _undo.Count > 0;
+        public bool CanRedo => _redo.Count > 0;
+        public event EventHandler<BufferChangedEventArgs>? Changed;
+
+        public void Apply(TextChange change, Document initiator, TextCaretSet oldCarets, TextCaretSet newCarets)
+        {
+            var oldTree = _tree;
+            var newTree = _tree.Replace(change.OldRange, change.NewText);
+            var record = new EditRecord(change, oldTree, newTree, initiator, oldCarets, newCarets);
+            _tree = newTree;
+            if (_undoLimit > 0)
+            {
+                _undo.Add(record);
+                if (_undo.Count > _undoLimit)
+                {
+                    _undo.RemoveAt(0);
+                }
+            }
+            _redo.Clear();
+            Publish(initiator, newCarets, DocumentChangeKind.Edit, change);
+        }
+
+        public bool Undo(Document initiator)
+        {
+            if (_undo.Count == 0) return false;
+            var record = RemoveLast(_undo);
+            _redo.Add(record);
+            _tree = record.OldTree;
+            Publish(initiator,
+                ReferenceEquals(record.Origin, initiator) ? record.OldCaretSet : null,
+                DocumentChangeKind.Undo, record.Change.Inverse());
+            return true;
+        }
+
+        public bool Redo(Document initiator)
+        {
+            if (_redo.Count == 0) return false;
+            var record = RemoveLast(_redo);
+            _undo.Add(record);
+            _tree = record.NewTree;
+            Publish(initiator,
+                ReferenceEquals(record.Origin, initiator) ? record.NewCaretSet : null,
+                DocumentChangeKind.Redo, record.Change);
+            return true;
+        }
+
+        public void Reset(string text, Document initiator, TextCaretSet caretSet)
+        {
+            var oldSnapshot = Snapshot;
+            var change = new TextChange(new TextRange(0, oldSnapshot.Length), oldSnapshot.Text, text);
+            _tree = new TextTree(text);
+            Snapshot = new TextSnapshot(_tree);
+            _undo.Clear();
+            _redo.Clear();
+            Changed?.Invoke(this, new BufferChangedEventArgs(
+                oldSnapshot, Snapshot, change, initiator, caretSet, DocumentChangeKind.Edit));
+        }
+
+        public void ClearHistory() { _undo.Clear(); _redo.Clear(); }
+
+        private void Publish(Document initiator, TextCaretSet? carets, DocumentChangeKind kind, TextChange change)
+        {
+            var oldSnapshot = Snapshot;
+            Snapshot = new TextSnapshot(_tree);
+            Changed?.Invoke(this, new BufferChangedEventArgs(
+                oldSnapshot, Snapshot, change, initiator, carets, kind));
+        }
+
+        private static EditRecord RemoveLast(List<EditRecord> records)
+        {
+            var index = records.Count - 1;
+            var record = records[index];
+            records.RemoveAt(index);
+            return record;
+        }
+    }
+
+    private sealed class BufferChangedEventArgs : EventArgs
+    {
+        public BufferChangedEventArgs(
+            TextSnapshot oldSnapshot,
+            TextSnapshot newSnapshot,
+            TextChange change,
+            Document initiator,
+            TextCaretSet? initiatorCaretSet,
+            DocumentChangeKind kind)
+        {
+            OldSnapshot = oldSnapshot;
+            NewSnapshot = newSnapshot;
+            Change = change;
+            Initiator = initiator;
+            InitiatorCaretSet = initiatorCaretSet;
+            Kind = kind;
+        }
+
+        public TextSnapshot OldSnapshot { get; }
+        public TextSnapshot NewSnapshot { get; }
+        public TextChange Change { get; }
+        public Document Initiator { get; }
+        public TextCaretSet? InitiatorCaretSet { get; }
+        public DocumentChangeKind Kind { get; }
+    }
+
     private sealed record EditRecord(
         TextChange Change,
         TextTree OldTree,
         TextTree NewTree,
+        Document Origin,
         TextCaretSet OldCaretSet,
         TextCaretSet NewCaretSet)
     {

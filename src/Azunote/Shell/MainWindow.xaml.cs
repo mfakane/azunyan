@@ -26,7 +26,10 @@ public sealed partial class MainWindow : Window, IDisposable
 
     internal MainWindowRuntime Runtime => _runtime;
 
-    internal MainWindow(ApplicationCoordinator application)
+    internal MainWindow(
+        ApplicationCoordinator application,
+        DocumentSession? session = null,
+        Document? document = null)
     {
         _application = application ?? throw new ArgumentNullException(nameof(application));
         InitializeComponent();
@@ -75,7 +78,9 @@ public sealed partial class MainWindow : Window, IDisposable
             new WinUiFilePathActions(),
             application.RecordRecentFile,
             application.RecordWordWrap,
-            application.RecordStatusBarVisible);
+            application.RecordStatusBarVisible,
+            session,
+            document);
         RegisterKeyboardAccelerators();
 
         _appWindow = _view.AppWindow;
@@ -216,6 +221,9 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private void StatusBarMenuItem_Click(object sender, RoutedEventArgs e) => _runtime.ToggleStatusBar();
 
+    private void DuplicateWindowMenuItem_Click(object sender, RoutedEventArgs e) =>
+        _application.DuplicateWindow(this);
+
     private void NextWindowMenuItem_Click(object sender, RoutedEventArgs e) =>
         _application.CycleWindow(this, direction: 1);
 
@@ -310,7 +318,7 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private async void AppWindow_Closing(AppWindow sender, AppWindowClosingEventArgs args)
     {
-        if (_allowClose || !_runtime.IsDirty)
+        if (_allowClose || !_runtime.IsDirty || _application.HasOtherView(this))
         {
             return;
         }

@@ -351,6 +351,9 @@
                     x:Name="AlwaysOnTopMenuItem"
                     Text="Always on Top"
                     Click="AlwaysOnTopMenuItem_Click" />
+                <MenuFlyoutItem
+                    Text="Duplicate Window"
+                    Click="DuplicateWindowMenuItem_Click" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="Show All Windows" Click="ShowAllWindowsMenuItem_Click" />
                 <MenuFlyoutItem Text="Minimize All Windows" Click="MinimizeAllWindowsMenuItem_Click" />

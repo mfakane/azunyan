@@ -240,6 +240,35 @@ public sealed class AzunoteUiTests : IClassFixture<AzunoteUiFixture>
                 : null,
             "The Window menu did not list the new Untitled window.");
     }
+
+    [AzunoteUiFact]
+    public void Duplicate_window_keeps_one_current_window_checked_in_its_window_menu()
+    {
+        var window = _fixture.Window;
+        var originalCount = _fixture.WaitForWindows(_ => true).Length;
+        AzunoteUiFixture.InvokeMenuItem(window, "Window", "Duplicate Window");
+        _fixture.WaitForWindows(current => current.Length > originalCount);
+
+        window.SetFocus();
+        AzunoteUiFixture.OpenMenu(window, "Window");
+        AzunoteUiFixture.WaitFor(
+            () =>
+            {
+                var selectedItems = window.FindAll(
+                        TreeScope.Descendants,
+                        new PropertyCondition(
+                            AutomationElement.ControlTypeProperty,
+                            ControlType.MenuItem))
+                    .Cast<AutomationElement>()
+                    .Count(item => item.TryGetCurrentPattern(
+                            SelectionItemPattern.Pattern,
+                            out var pattern)
+                        && pattern is SelectionItemPattern selection
+                        && selection.Current.IsSelected);
+                return selectedItems == 1 ? window : null;
+            },
+            "The active window did not have exactly one checked document in the Window menu.");
+    }
 }
 
 public sealed class AzunoteUiFixture : IDisposable

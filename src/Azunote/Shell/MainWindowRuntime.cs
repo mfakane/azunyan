@@ -32,7 +32,9 @@ internal sealed class MainWindowRuntime : IDisposable
         IFilePathActions filePathActions,
         Action<string> recordRecentFile,
         Action<bool> recordWordWrap,
-        Action<bool> recordStatusBarVisible)
+        Action<bool> recordStatusBarVisible,
+        DocumentSession? session = null,
+        Document? document = null)
     {
         _view = view ?? throw new ArgumentNullException(nameof(view));
         _refreshWindowMenus = refreshWindowMenus ?? throw new ArgumentNullException(nameof(refreshWindowMenus));
@@ -40,7 +42,11 @@ internal sealed class MainWindowRuntime : IDisposable
         _recordRecentFile = recordRecentFile ?? throw new ArgumentNullException(nameof(recordRecentFile));
         _recordWordWrap = recordWordWrap ?? throw new ArgumentNullException(nameof(recordWordWrap));
         _recordStatusBarVisible = recordStatusBarVisible ?? throw new ArgumentNullException(nameof(recordStatusBarVisible));
-        _session = new DocumentSession();
+        _session = session ?? new DocumentSession();
+        if (document is not null)
+        {
+            _view.SetDocument(document);
+        }
         _prompt = new WinUiUserPrompt(() => _view.XamlRoot);
         _dispatcher = new DispatcherQueueUiDispatcher(_view.DispatcherQueue);
         var files = new TextFileStore();
@@ -53,6 +59,10 @@ internal sealed class MainWindowRuntime : IDisposable
             OpenDefinitionAsync,
             ShowFileInExplorerAsync);
         _languageModes.Initialize();
+        if (_session.State.FilePath is { } existingPath)
+        {
+            _languageModes.DocumentOpened(existingPath);
+        }
 
         var externalTools = new ExternalToolController(
             _view,
@@ -110,6 +120,7 @@ internal sealed class MainWindowRuntime : IDisposable
 
         _documents.Changed += Documents_Changed;
         _languageModes.Changed += LanguageModes_Changed;
+        _session.StateChanged += Session_StateChanged;
         RefreshDocumentView();
     }
 
@@ -118,6 +129,14 @@ internal sealed class MainWindowRuntime : IDisposable
     public bool IsFindBoxFocused => _view.IsFindBoxFocused;
 
     public bool IsDirty => _documents.IsDirty;
+
+    internal DocumentSession Session => _session;
+
+    internal Document CreateDocumentView() => _view.Document.CreateView();
+
+    internal void EnsureFileWatcher() => _documents.EnsureFileWatcher();
+
+    internal bool IsFileWatcherActive => _documents.IsFileWatcherActive;
 
     internal string DocumentName => _documents.CurrentDocumentName;
 
@@ -356,6 +375,7 @@ internal sealed class MainWindowRuntime : IDisposable
         }
 
         _disposed = true;
+        _session.StateChanged -= Session_StateChanged;
         _languageModes.Changed -= LanguageModes_Changed;
         _documents.Changed -= Documents_Changed;
         _documents.Dispose();
@@ -435,6 +455,17 @@ internal sealed class MainWindowRuntime : IDisposable
     {
         _status.Refresh();
         RefreshExternalToolsMenu();
+    }
+
+    private void Session_StateChanged(object? sender, EventArgs args)
+    {
+        _documents.StopFileWatcherIfPathChanged();
+        if (_session.State.FilePath is { } path)
+        {
+            _languageModes.SelectForPath(path);
+        }
+
+        RefreshDocumentView();
     }
 
     private ExternalToolMenuState GetExternalToolMenuState(ExternalToolSettings tool)

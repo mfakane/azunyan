@@ -54,10 +54,15 @@ internal sealed class MainWindowViewAdapter :
     private readonly List<MenuFlyoutItemBase> _externalToolContextMenuItems = [];
     private readonly List<MenuFlyoutItemBase> _recentFileMenuItems = [];
     private readonly List<MenuFlyoutItemBase> _windowMenuItems = [];
+    private readonly string _windowMenuGroupName = $"OpenWindows-{Guid.NewGuid():N}";
     private readonly Dictionary<string, RadioMenuFlyoutItem> _languageModeItems =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Style _auxiliarySplitMenuFlyoutItemStyle;
     private bool _themeConfigured;
+
+    internal Document Document => _editor.Document;
+
+    internal void SetDocument(Document document) => _editor.SetDocument(document);
 
     public MainWindowViewAdapter(
         MainWindow window,
@@ -414,7 +419,7 @@ internal sealed class MainWindowViewAdapter :
             var menuItem = new RadioMenuFlyoutItem
             {
                 Text = entry.DocumentName,
-                GroupName = "OpenWindows",
+                GroupName = _windowMenuGroupName,
                 IsChecked = entry.IsCurrent,
                 Tag = entry.Id
             };

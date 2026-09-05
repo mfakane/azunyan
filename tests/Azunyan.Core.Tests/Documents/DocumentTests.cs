@@ -6,6 +6,38 @@ namespace Azunyan.Core.Tests;
 public sealed class DocumentTests
 {
     [Fact]
+    public void Views_share_text_but_keep_selection_independent()
+    {
+        var first = new Document("alpha beta");
+        var second = first.CreateView();
+        first.SetCaret(5);
+        second.SetSelection(new TextSelection(6, 10));
+
+        first.Insert(5, "!");
+
+        Assert.Equal("alpha! beta", second.Text);
+        Assert.Equal(TextSelection.Caret(6), first.Selection);
+        Assert.Equal(new TextSelection(7, 11), second.Selection);
+    }
+
+    [Fact]
+    public void Undo_history_is_shared_between_views_without_sharing_carets()
+    {
+        var first = new Document("abc");
+        var second = first.CreateView();
+        second.SetCaret(0);
+        first.SetCaret(3);
+        first.Insert("d");
+
+        Assert.True(second.Undo());
+
+        Assert.Equal("abc", first.Text);
+        Assert.Equal("abc", second.Text);
+        Assert.Equal(3, first.CaretPosition);
+        Assert.Equal(0, second.CaretPosition);
+    }
+
+    [Fact]
     public void Edits_return_coarse_changes_and_keep_snapshots_immutable()
     {
         var document = new Document("0123456789");

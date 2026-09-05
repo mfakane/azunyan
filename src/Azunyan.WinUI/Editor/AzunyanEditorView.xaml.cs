@@ -167,6 +167,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         EditorPointerSurface.PointerCaptureLost -= OnInputPointerCaptureLost;
         RootGrid.PointerWheelChanged -= OnInputPointerWheelChanged;
         StopPointerSelection();
+        DetachDocument();
+        _document.CloseView();
         _providerScheduler.Dispose();
         if (_renderer is IDisposable renderer
             && !ReferenceEquals(_renderer, _defaultRenderer))
@@ -548,19 +550,54 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         _providerFrame = null;
         _pendingProviderDocumentChange = null;
         _pendingAutomationDocumentChange = null;
-        _document.Changed -= OnInputDocumentChanged;
-        _document.SelectionChanged -= OnDocumentSelectionChanged;
-        _document.CaretSetChanged -= OnDocumentCaretSetChanged;
         _compositionRange = null;
         _blockSelection = null;
-        _document = new Document(text);
-        _document.Changed += OnInputDocumentChanged;
-        _document.SelectionChanged += OnDocumentSelectionChanged;
-        _document.CaretSetChanged += OnDocumentCaretSetChanged;
+        _document.Reset(text);
         SyncInputWindow();
         RenderViewport();
         _automationPeer?.NotifyTextChanged(oldText, Snapshot.Text);
         RequestProviderResults(true, true, true);
+    }
+
+    /// <summary>
+    /// Attaches this editor to an independent view of a document buffer.
+    /// The supplied document owns this editor's caret and selection state.
+    /// </summary>
+    public void SetDocument(Document document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        if (ReferenceEquals(_document, document)) return;
+
+        var oldText = Snapshot.Text;
+        _providerScheduler.CancelAll();
+        InvalidateProviderGenerations();
+        _providerFrame = null;
+        _pendingProviderDocumentChange = null;
+        _pendingAutomationDocumentChange = null;
+        DetachDocument();
+        _document.CloseView();
+        _document = document;
+        AttachDocument();
+        _compositionRange = null;
+        _blockSelection = null;
+        SyncInputWindow();
+        RenderViewport();
+        _automationPeer?.NotifyTextChanged(oldText, Snapshot.Text);
+        RequestProviderResults(true, true, true);
+    }
+
+    private void AttachDocument()
+    {
+        _document.Changed += OnInputDocumentChanged;
+        _document.SelectionChanged += OnDocumentSelectionChanged;
+        _document.CaretSetChanged += OnDocumentCaretSetChanged;
+    }
+
+    private void DetachDocument()
+    {
+        _document.Changed -= OnInputDocumentChanged;
+        _document.SelectionChanged -= OnDocumentSelectionChanged;
+        _document.CaretSetChanged -= OnDocumentCaretSetChanged;
     }
 
     public void SetDocumentSelection(TextSelection selection)
@@ -1508,6 +1545,16 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 _explicitCompletionRequested = false;
                 _completionRequested = false;
             }
+        }
+
+        // A shared buffer may be edited by another editor view. Local edit
+        // paths perform this refresh in their command/input transaction; an
+        // external change has no such transaction and must refresh here.
+        if (!_applyingDocumentCommand && !_applyingInputChange)
+        {
+            SyncInputWindow();
+            RenderViewport();
+            RequestProviderResults(true, true, true);
         }
     }
 

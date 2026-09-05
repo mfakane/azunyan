@@ -33,6 +33,7 @@ internal sealed class DocumentWorkflow : IDisposable
     private readonly IEditorConfigResolver _editorConfigResolver;
     private EditorConfigSettings _editorConfig = EditorConfigSettings.Empty;
     private IFileChangeMonitor? _fileMonitor;
+    private string? _monitoredPath;
     private bool _isApplying;
     private bool _externalChangeDialogOpen;
     private bool _allowClose;
@@ -83,6 +84,23 @@ internal sealed class DocumentWorkflow : IDisposable
     public LineEndingKind CurrentLineEnding => State.LineEnding;
 
     public bool IsApplying => _isApplying;
+
+    public bool IsFileWatcherActive => _fileMonitor is not null;
+
+    public void EnsureFileWatcher() => StartFileWatcher();
+
+    public void StopFileWatcherIfPathChanged()
+    {
+        if (_monitoredPath is not null
+            && (CurrentFilePath is null
+                || !string.Equals(
+                    _monitoredPath,
+                    Path.GetFullPath(CurrentFilePath),
+                    StringComparison.OrdinalIgnoreCase)))
+        {
+            StopFileWatcher();
+        }
+    }
 
     public async Task OpenFileAsync()
     {
@@ -412,6 +430,7 @@ internal sealed class DocumentWorkflow : IDisposable
         }
 
         _fileMonitor = _monitorFactory.Create(path, includeSubdirectories: false);
+        _monitoredPath = Path.GetFullPath(path);
         _fileMonitor.Changed += FileMonitor_Changed;
     }
 
@@ -425,6 +444,7 @@ internal sealed class DocumentWorkflow : IDisposable
         _fileMonitor.Changed -= FileMonitor_Changed;
         _fileMonitor.Dispose();
         _fileMonitor = null;
+        _monitoredPath = null;
     }
 
     private void FileMonitor_Changed(

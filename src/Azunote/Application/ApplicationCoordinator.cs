@@ -141,6 +141,25 @@ internal sealed class ApplicationCoordinator : IDisposable
         await window.Runtime.OpenStartupDocumentAsync(path);
     }
 
+    internal void DuplicateWindow(MainWindow source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        var registration = FindRegistration(source);
+        if (registration is null) return;
+
+        CreateWindowRegistration(
+            source.Runtime.Session,
+            source.Runtime.CreateDocumentView());
+    }
+
+    internal bool HasOtherView(MainWindow source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        return _windows.Windows.Any(registration =>
+            !ReferenceEquals(registration.Window, source)
+            && ReferenceEquals(registration.Window.Runtime.Session, source.Runtime.Session));
+    }
+
     internal void CycleWindow(MainWindow source, int direction)
     {
         ArgumentNullException.ThrowIfNull(source);
@@ -195,8 +214,15 @@ internal sealed class ApplicationCoordinator : IDisposable
             _state.RecordWindowSize(windowSize);
         }
 
+        var session = window.Runtime.Session;
         _windows.Unregister(registration);
         registration.MarkClosed();
+        var remainingViews = _windows.Windows.Where(candidate =>
+            ReferenceEquals(candidate.Window.Runtime.Session, session)).ToArray();
+        if (!remainingViews.Any(candidate => candidate.Window.Runtime.IsFileWatcherActive))
+        {
+            remainingViews.FirstOrDefault()?.Window.Runtime.EnsureFileWatcher();
+        }
         RefreshWindowMenus();
     }
 
@@ -284,11 +310,13 @@ internal sealed class ApplicationCoordinator : IDisposable
         _state.Dispose();
     }
 
-    private WindowRegistration CreateWindowRegistration()
+    private WindowRegistration CreateWindowRegistration(
+        DocumentSession? session = null,
+        Azunyan.Core.Document? document = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, nameof(ApplicationCoordinator));
 
-        var window = new MainWindow(this);
+        var window = new MainWindow(this, session, document);
         if (_state.IsInitialized)
         {
             var state = _state.Current;
@@ -298,6 +326,7 @@ internal sealed class ApplicationCoordinator : IDisposable
 
         var registration = new WindowRegistration(window);
         _windows.Register(registration);
+        _windows.MarkActive(registration);
         window.Activate();
         window.FocusEditor();
         _ = window.Runtime.InitializeSettingsAsync();
