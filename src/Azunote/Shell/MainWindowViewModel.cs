@@ -3,11 +3,13 @@ using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using Azunyan.Core;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Input;
 
 namespace Azunote;
 
 internal sealed class MainWindowViewModel : INotifyPropertyChanged
 {
+    private readonly IMainWindowCommandFactory _commandFactory;
     private IMainWindowActions? _actions;
     private string _title = "Azunote";
     private bool _isWordWrapEnabled;
@@ -29,7 +31,13 @@ internal sealed class MainWindowViewModel : INotifyPropertyChanged
     private IReadOnlyList<ExternalToolMenuItemViewModel> _externalToolContextItems = [];
 
     public MainWindowViewModel()
+        : this(new XamlMainWindowCommandFactory())
     {
+    }
+
+    internal MainWindowViewModel(IMainWindowCommandFactory commandFactory)
+    {
+        _commandFactory = commandFactory ?? throw new ArgumentNullException(nameof(commandFactory));
         Groups = new MainWindowRadioGroupNames();
         OpenCommand = Async(() => Actions.OpenFileAsync());
         NewCommand = Async(() => Actions.NewDocumentAsync());
@@ -258,7 +266,7 @@ internal sealed class MainWindowViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(ExternalToolContextItems));
     }
 
-    private static ExternalToolMenuItemViewModel CreateExternalToolItem(
+    private ExternalToolMenuItemViewModel CreateExternalToolItem(
         ExternalToolMenuEntry entry,
         Func<ExternalToolSettings, Task> onSelected,
         Func<string, Task> onEditDefinition,
@@ -314,14 +322,14 @@ internal sealed class MainWindowViewModel : INotifyPropertyChanged
     private static bool TryGetInt(object? parameter, out int value) =>
         int.TryParse(parameter?.ToString(), out value);
 
-    private static MainWindowCommand Command(Action execute) =>
-        new MainWindowCommand(_ => execute());
+    private ICommand Command(Action execute) =>
+        _commandFactory.Create(_ => execute());
 
-    private static MainWindowCommand Command(Action<object?> execute) =>
-        new MainWindowCommand(execute);
+    private ICommand Command(Action<object?> execute) =>
+        _commandFactory.Create(execute);
 
-    private static MainWindowAsyncCommand Async(Func<Task> execute) =>
-        new MainWindowAsyncCommand(execute);
+    private ICommand Async(Func<Task> execute) =>
+        _commandFactory.CreateAsync(execute);
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
@@ -339,6 +347,46 @@ internal sealed class MainWindowViewModel : INotifyPropertyChanged
         {
             OnPropertyChanged(dependentProperty);
         }
+    }
+}
+
+internal interface IMainWindowCommandFactory
+{
+    ICommand Create(Action<object?> execute);
+    ICommand CreateAsync(Func<Task> execute);
+}
+
+internal sealed class XamlMainWindowCommandFactory : IMainWindowCommandFactory
+{
+    public ICommand Create(Action<object?> execute)
+    {
+        var command = new XamlUICommand();
+        command.ExecuteRequested += (_, args) => execute(args.Parameter);
+        return command;
+    }
+
+    public ICommand CreateAsync(Func<Task> execute)
+    {
+        var command = new XamlUICommand();
+        var isExecuting = false;
+        command.ExecuteRequested += async (_, _) =>
+        {
+            if (isExecuting) return;
+            isExecuting = true;
+            try
+            {
+                await execute();
+            }
+            catch (Exception exception)
+            {
+                ErrorReporter.LogException("Main window command", exception);
+            }
+            finally
+            {
+                isExecuting = false;
+            }
+        };
+        return command;
     }
 }
 
@@ -395,40 +443,6 @@ internal interface IMainWindowActions
     void ReplaceCurrent();
     void ReplaceAll();
     void CloseFind();
-}
-
-internal sealed class MainWindowCommand(Action<object?> execute) : ICommand
-{
-    public event EventHandler? CanExecuteChanged { add { } remove { } }
-    public bool CanExecute(object? parameter) => true;
-    public void Execute(object? parameter) => execute(parameter);
-}
-
-internal sealed class MainWindowAsyncCommand(Func<Task> execute) : ICommand
-{
-    private bool _isExecuting;
-    public event EventHandler? CanExecuteChanged;
-    public bool CanExecute(object? parameter) => !_isExecuting;
-
-    public async void Execute(object? parameter)
-    {
-        if (_isExecuting) return;
-        _isExecuting = true;
-        CanExecuteChanged?.Invoke(this, EventArgs.Empty);
-        try
-        {
-            await execute();
-        }
-        catch (Exception exception)
-        {
-            ErrorReporter.LogException("Main window command", exception);
-        }
-        finally
-        {
-            _isExecuting = false;
-            CanExecuteChanged?.Invoke(this, EventArgs.Empty);
-        }
-    }
 }
 
 internal sealed record WindowMenuItemViewModel(

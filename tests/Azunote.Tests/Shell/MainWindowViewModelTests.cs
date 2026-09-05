@@ -1,4 +1,5 @@
 using Xunit;
+using System.Windows.Input;
 
 namespace Azunote.Tests.Shell;
 
@@ -7,28 +8,29 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void Radio_group_names_are_unique_within_and_between_windows()
     {
-        var first = GetGroupNames(new MainWindowViewModel());
-        var second = GetGroupNames(new MainWindowViewModel());
+        var first = GetGroupNames(CreateViewModel());
+        var second = GetGroupNames(CreateViewModel());
 
         Assert.Equal(7, first.Distinct(StringComparer.Ordinal).Count());
         Assert.Empty(first.Intersect(second, StringComparer.Ordinal));
     }
 
     [Fact]
-    public void Synchronous_command_forwards_its_parameter()
+    public void Bound_commands_are_created_by_the_supplied_factory()
     {
-        object? received = null;
-        var command = new MainWindowCommand(parameter => received = parameter);
+        var factory = new TestCommandFactory();
+        var viewModel = new MainWindowViewModel(factory);
 
-        command.Execute("value");
-
-        Assert.Equal("value", received);
+        Assert.IsType<TestCommand>(viewModel.OpenCommand);
+        Assert.IsType<TestCommand>(viewModel.DuplicateWindowCommand);
+        Assert.IsType<TestCommand>(viewModel.SetIndentSizeCommand);
+        Assert.True(factory.CreatedCount > 30);
     }
 
     [Fact]
     public void Selection_properties_notify_their_derived_radio_states()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = CreateViewModel();
         var changed = new List<string?>();
         viewModel.PropertyChanged += (_, args) => changed.Add(args.PropertyName);
 
@@ -47,7 +49,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void Applying_status_updates_bound_status_values()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = CreateViewModel();
 
         viewModel.ApplyStatus(new StatusBarState(
             "Ln 3, Col 5", "UTF-16 LE", "CRLF", "Tabs: 4", "C#", "file.cs", true));
@@ -60,7 +62,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void Window_items_own_their_selection_commands()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = CreateViewModel();
         string? selected = null;
         viewModel.SetWindowItems(
             [new WindowMenuEntry("window-2", "notes.txt", true)],
@@ -77,7 +79,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void Recent_file_items_include_display_text_and_commands()
     {
-        var viewModel = new MainWindowViewModel();
+        var viewModel = CreateViewModel();
         string? copied = null;
         viewModel.SetRecentFileItems(
             [Path.Combine("folder", "notes.txt")],
@@ -103,4 +105,31 @@ public sealed class MainWindowViewModelTests
         viewModel.Groups.LanguageModes,
         viewModel.Groups.OpenWindows
     ];
+
+    private static MainWindowViewModel CreateViewModel() =>
+        new(new TestCommandFactory());
+
+    private sealed class TestCommandFactory : IMainWindowCommandFactory
+    {
+        public int CreatedCount { get; private set; }
+
+        public ICommand Create(Action<object?> execute)
+        {
+            CreatedCount++;
+            return new TestCommand(execute);
+        }
+
+        public ICommand CreateAsync(Func<Task> execute)
+        {
+            CreatedCount++;
+            return new TestCommand(_ => execute().GetAwaiter().GetResult());
+        }
+    }
+
+    private sealed class TestCommand(Action<object?> execute) : ICommand
+    {
+        public event EventHandler? CanExecuteChanged { add { } remove { } }
+        public bool CanExecute(object? parameter) => true;
+        public void Execute(object? parameter) => execute(parameter);
+    }
 }
