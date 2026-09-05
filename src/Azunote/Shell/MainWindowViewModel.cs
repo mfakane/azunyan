@@ -2,12 +2,26 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using Azunyan.Core;
+using Microsoft.UI.Xaml;
 
 namespace Azunote;
 
 internal sealed class MainWindowViewModel : INotifyPropertyChanged
 {
     private IMainWindowActions? _actions;
+    private string _title = "Azunote";
+    private bool _isWordWrapEnabled;
+    private bool _isStatusBarVisible = true;
+    private bool _isAlwaysOnTop;
+    private int _tabDisplaySize = 4;
+    private int? _indentSize;
+    private IndentationInputMode _indentationInputMode;
+    private StatusBarState _status = new(
+        "Ln 1, Col 1", "UTF-8", "LF", "Spaces: 2", "Plain Text", "Untitled");
+    private bool _isFindPanelVisible;
+    private string _findText = string.Empty;
+    private string _replaceText = string.Empty;
+    private string _findResult = string.Empty;
 
     public MainWindowViewModel()
     {
@@ -54,6 +68,61 @@ internal sealed class MainWindowViewModel : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public MainWindowRadioGroupNames Groups { get; }
+    public string Title { get => _title; set => SetProperty(ref _title, value); }
+    public bool IsWordWrapEnabled { get => _isWordWrapEnabled; set => SetProperty(ref _isWordWrapEnabled, value); }
+    public bool IsStatusBarVisible { get => _isStatusBarVisible; set => SetProperty(ref _isStatusBarVisible, value, dependentProperties: [nameof(StatusBarVisibility)]); }
+    public Visibility StatusBarVisibility => IsStatusBarVisible ? Visibility.Visible : Visibility.Collapsed;
+    public bool IsAlwaysOnTop { get => _isAlwaysOnTop; set => SetProperty(ref _isAlwaysOnTop, value); }
+    public int TabDisplaySize
+    {
+        get => _tabDisplaySize;
+        set => SetProperty(ref _tabDisplaySize, value, dependentProperties:
+            [nameof(IsTabDisplaySize2), nameof(IsTabDisplaySize4), nameof(IsTabDisplaySize8)]);
+    }
+    public bool IsTabDisplaySize2 => TabDisplaySize == 2;
+    public bool IsTabDisplaySize4 => TabDisplaySize == 4;
+    public bool IsTabDisplaySize8 => TabDisplaySize == 8;
+    public int? IndentSize
+    {
+        get => _indentSize;
+        set => SetProperty(ref _indentSize, value, dependentProperties:
+            [nameof(IsIndentSizeAuto), nameof(IsIndentSize2), nameof(IsIndentSize4), nameof(IsIndentSize8)]);
+    }
+    public bool IsIndentSizeAuto => IndentSize is null;
+    public bool IsIndentSize2 => IndentSize == 2;
+    public bool IsIndentSize4 => IndentSize == 4;
+    public bool IsIndentSize8 => IndentSize == 8;
+    public IndentationInputMode IndentationInputMode
+    {
+        get => _indentationInputMode;
+        set => SetProperty(ref _indentationInputMode, value, dependentProperties:
+            [nameof(IsIndentationModeAuto), nameof(IsIndentationModeTab), nameof(IsIndentationModeSpaces)]);
+    }
+    public bool IsIndentationModeAuto => IndentationInputMode == IndentationInputMode.Auto;
+    public bool IsIndentationModeTab => IndentationInputMode == IndentationInputMode.Tab;
+    public bool IsIndentationModeSpaces => IndentationInputMode == IndentationInputMode.Spaces;
+    public string PositionStatus => _status.Position;
+    public string EncodingStatus => _status.Encoding;
+    public string LineEndingStatus => _status.LineEnding;
+    public string IndentationStatus => _status.Indentation;
+    public string LanguageModeStatus => _status.LanguageMode;
+    public string FilePathStatus => _status.FilePath;
+    public bool HasFilePath => _status.HasFilePath;
+    public bool IsFindPanelVisible { get => _isFindPanelVisible; set => SetProperty(ref _isFindPanelVisible, value, dependentProperties: [nameof(FindPanelVisibility)]); }
+    public Visibility FindPanelVisibility => IsFindPanelVisible ? Visibility.Visible : Visibility.Collapsed;
+    public string FindText
+    {
+        get => _findText;
+        set
+        {
+            if (string.Equals(_findText, value, StringComparison.Ordinal)) return;
+            _findText = value;
+            OnPropertyChanged();
+            _actions?.FindTextChanged();
+        }
+    }
+    public string ReplaceText { get => _replaceText; set => SetProperty(ref _replaceText, value); }
+    public string FindResult { get => _findResult; set => SetProperty(ref _findResult, value); }
     public ICommand OpenCommand { get; }
     public ICommand NewCommand { get; }
     public ICommand SaveCommand { get; }
@@ -101,6 +170,20 @@ internal sealed class MainWindowViewModel : INotifyPropertyChanged
         }
 
         _actions = actions;
+    }
+
+    public void ApplyStatus(StatusBarState status)
+    {
+        ArgumentNullException.ThrowIfNull(status);
+        if (_status == status) return;
+        _status = status;
+        OnPropertyChanged(nameof(PositionStatus));
+        OnPropertyChanged(nameof(EncodingStatus));
+        OnPropertyChanged(nameof(LineEndingStatus));
+        OnPropertyChanged(nameof(IndentationStatus));
+        OnPropertyChanged(nameof(LanguageModeStatus));
+        OnPropertyChanged(nameof(FilePathStatus));
+        OnPropertyChanged(nameof(HasFilePath));
     }
 
     private IMainWindowActions Actions => _actions
@@ -155,6 +238,21 @@ internal sealed class MainWindowViewModel : INotifyPropertyChanged
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+    private void SetProperty<T>(
+        ref T field,
+        T value,
+        [CallerMemberName] string? propertyName = null,
+        params string[] dependentProperties)
+    {
+        if (EqualityComparer<T>.Default.Equals(field, value)) return;
+        field = value;
+        OnPropertyChanged(propertyName);
+        foreach (var dependentProperty in dependentProperties)
+        {
+            OnPropertyChanged(dependentProperty);
+        }
+    }
 }
 
 internal sealed class MainWindowRadioGroupNames
@@ -206,6 +304,7 @@ internal interface IMainWindowActions
     void PreviousWindow();
     Task ShowAboutAsync();
     void FindNext();
+    void FindTextChanged();
     void ReplaceCurrent();
     void ReplaceAll();
     void CloseFind();

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Window
     x:Class="Azunote.MainWindow"
+    Title="{x:Bind ViewModel.Title, Mode=OneWay}"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:Azunyan.WinUI">
@@ -190,15 +191,15 @@
                 </Setter>
             </Style>
             <MenuFlyout x:Name="StatusTabDisplaySizeMenu">
-                <RadioMenuFlyoutItem Text="2" Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}" CommandParameter="2" GroupName="{x:Bind ViewModel.Groups.StatusTabDisplaySize}" />
-                <RadioMenuFlyoutItem Text="4" Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}" CommandParameter="4" IsChecked="True" GroupName="{x:Bind ViewModel.Groups.StatusTabDisplaySize}" />
-                <RadioMenuFlyoutItem Text="8" Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}" CommandParameter="8" GroupName="{x:Bind ViewModel.Groups.StatusTabDisplaySize}" />
+                <RadioMenuFlyoutItem Text="2" Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}" CommandParameter="2" IsChecked="{x:Bind ViewModel.IsTabDisplaySize2, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.StatusTabDisplaySize}" />
+                <RadioMenuFlyoutItem Text="4" Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}" CommandParameter="4" IsChecked="{x:Bind ViewModel.IsTabDisplaySize4, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.StatusTabDisplaySize}" />
+                <RadioMenuFlyoutItem Text="8" Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}" CommandParameter="8" IsChecked="{x:Bind ViewModel.IsTabDisplaySize8, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.StatusTabDisplaySize}" />
             </MenuFlyout>
             <MenuFlyout x:Name="StatusIndentSizeMenu">
-                <RadioMenuFlyoutItem Text="Auto" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="auto" IsChecked="True" GroupName="{x:Bind ViewModel.Groups.StatusIndentSize}" />
-                <RadioMenuFlyoutItem Text="2" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="2" GroupName="{x:Bind ViewModel.Groups.StatusIndentSize}" />
-                <RadioMenuFlyoutItem Text="4" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="4" GroupName="{x:Bind ViewModel.Groups.StatusIndentSize}" />
-                <RadioMenuFlyoutItem Text="8" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="8" GroupName="{x:Bind ViewModel.Groups.StatusIndentSize}" />
+                <RadioMenuFlyoutItem Text="Auto" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="auto" IsChecked="{x:Bind ViewModel.IsIndentSizeAuto, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.StatusIndentSize}" />
+                <RadioMenuFlyoutItem Text="2" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="2" IsChecked="{x:Bind ViewModel.IsIndentSize2, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.StatusIndentSize}" />
+                <RadioMenuFlyoutItem Text="4" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="4" IsChecked="{x:Bind ViewModel.IsIndentSize4, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.StatusIndentSize}" />
+                <RadioMenuFlyoutItem Text="8" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="8" IsChecked="{x:Bind ViewModel.IsIndentSize8, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.StatusIndentSize}" />
             </MenuFlyout>
             <MenuFlyout x:Name="StatusFilePathMenu">
                 <MenuFlyoutItem Text="Copy File Path" Command="{x:Bind ViewModel.CopyFilePathCommand}" />
@@ -314,28 +315,28 @@
                 <MenuFlyoutSeparator />
                 <MenuFlyoutSubItem x:Name="TabDisplaySizeMenuItem"
                                    Text="Tab Display Size">
-                    <RadioMenuFlyoutItem x:Name="TabDisplaySize2MenuItem" Text="2" Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}" CommandParameter="2" GroupName="{x:Bind ViewModel.Groups.TabDisplaySize}" />
-                    <RadioMenuFlyoutItem x:Name="TabDisplaySize4MenuItem" Text="4" Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}" CommandParameter="4" GroupName="{x:Bind ViewModel.Groups.TabDisplaySize}" />
-                    <RadioMenuFlyoutItem x:Name="TabDisplaySize8MenuItem" Text="8" Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}" CommandParameter="8" GroupName="{x:Bind ViewModel.Groups.TabDisplaySize}" />
+                    <RadioMenuFlyoutItem x:Name="TabDisplaySize2MenuItem" Text="2" Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}" CommandParameter="2" IsChecked="{x:Bind ViewModel.IsTabDisplaySize2, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.TabDisplaySize}" />
+                    <RadioMenuFlyoutItem x:Name="TabDisplaySize4MenuItem" Text="4" Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}" CommandParameter="4" IsChecked="{x:Bind ViewModel.IsTabDisplaySize4, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.TabDisplaySize}" />
+                    <RadioMenuFlyoutItem x:Name="TabDisplaySize8MenuItem" Text="8" Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}" CommandParameter="8" IsChecked="{x:Bind ViewModel.IsTabDisplaySize8, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.TabDisplaySize}" />
                 </MenuFlyoutSubItem>
                 <MenuFlyoutSubItem x:Name="IndentSizeMenuItem"
                                    Text="Indent Size">
-                    <RadioMenuFlyoutItem x:Name="IndentSizeAutoMenuItem" Text="Auto" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="auto" GroupName="{x:Bind ViewModel.Groups.IndentSize}" />
-                    <RadioMenuFlyoutItem x:Name="IndentSize2MenuItem" Text="2" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="2" GroupName="{x:Bind ViewModel.Groups.IndentSize}" />
-                    <RadioMenuFlyoutItem x:Name="IndentSize4MenuItem" Text="4" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="4" GroupName="{x:Bind ViewModel.Groups.IndentSize}" />
-                    <RadioMenuFlyoutItem x:Name="IndentSize8MenuItem" Text="8" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="8" GroupName="{x:Bind ViewModel.Groups.IndentSize}" />
+                    <RadioMenuFlyoutItem x:Name="IndentSizeAutoMenuItem" Text="Auto" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="auto" IsChecked="{x:Bind ViewModel.IsIndentSizeAuto, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.IndentSize}" />
+                    <RadioMenuFlyoutItem x:Name="IndentSize2MenuItem" Text="2" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="2" IsChecked="{x:Bind ViewModel.IsIndentSize2, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.IndentSize}" />
+                    <RadioMenuFlyoutItem x:Name="IndentSize4MenuItem" Text="4" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="4" IsChecked="{x:Bind ViewModel.IsIndentSize4, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.IndentSize}" />
+                    <RadioMenuFlyoutItem x:Name="IndentSize8MenuItem" Text="8" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="8" IsChecked="{x:Bind ViewModel.IsIndentSize8, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.IndentSize}" />
                 </MenuFlyoutSubItem>
                 <MenuFlyoutSubItem x:Name="TabInputModeMenuItem"
                                    Text="Indentation Mode">
-                    <RadioMenuFlyoutItem x:Name="TabInputModeAutoMenuItem" Text="Auto" Command="{x:Bind ViewModel.SetIndentationInputModeCommand}" CommandParameter="auto" GroupName="{x:Bind ViewModel.Groups.IndentationInputMode}" />
-                    <RadioMenuFlyoutItem x:Name="TabInputModeTabMenuItem" Text="Tab" Command="{x:Bind ViewModel.SetIndentationInputModeCommand}" CommandParameter="tab" GroupName="{x:Bind ViewModel.Groups.IndentationInputMode}" />
-                    <RadioMenuFlyoutItem x:Name="TabInputModeSpacesMenuItem" Text="Spaces" Command="{x:Bind ViewModel.SetIndentationInputModeCommand}" CommandParameter="spaces" GroupName="{x:Bind ViewModel.Groups.IndentationInputMode}" />
+                    <RadioMenuFlyoutItem x:Name="TabInputModeAutoMenuItem" Text="Auto" Command="{x:Bind ViewModel.SetIndentationInputModeCommand}" CommandParameter="auto" IsChecked="{x:Bind ViewModel.IsIndentationModeAuto, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.IndentationInputMode}" />
+                    <RadioMenuFlyoutItem x:Name="TabInputModeTabMenuItem" Text="Tab" Command="{x:Bind ViewModel.SetIndentationInputModeCommand}" CommandParameter="tab" IsChecked="{x:Bind ViewModel.IsIndentationModeTab, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.IndentationInputMode}" />
+                    <RadioMenuFlyoutItem x:Name="TabInputModeSpacesMenuItem" Text="Spaces" Command="{x:Bind ViewModel.SetIndentationInputModeCommand}" CommandParameter="spaces" IsChecked="{x:Bind ViewModel.IsIndentationModeSpaces, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.IndentationInputMode}" />
                 </MenuFlyoutSubItem>
                 <MenuFlyoutSeparator />
-                <ToggleMenuFlyoutItem x:Name="WordWrapMenuItem" Text="Word Wrap" Command="{x:Bind ViewModel.ToggleWordWrapCommand}" />
+                <ToggleMenuFlyoutItem x:Name="WordWrapMenuItem" Text="Word Wrap" IsChecked="{x:Bind ViewModel.IsWordWrapEnabled, Mode=OneWay}" Command="{x:Bind ViewModel.ToggleWordWrapCommand}" />
                 <ToggleMenuFlyoutItem x:Name="StatusBarMenuItem"
                                       Text="Status Bar"
-                                      IsChecked="True"
+                                      IsChecked="{x:Bind ViewModel.IsStatusBarVisible, Mode=OneWay}"
                                       Command="{x:Bind ViewModel.ToggleStatusBarCommand}" />
             </MenuBarItem>
             <MenuBarItem x:Name="ToolsMenuItem" Title="Tools">
@@ -347,6 +348,7 @@
                 <ToggleMenuFlyoutItem
                     x:Name="AlwaysOnTopMenuItem"
                     Text="Always on Top"
+                    IsChecked="{x:Bind ViewModel.IsAlwaysOnTop, Mode=OneWay}"
                     Command="{x:Bind ViewModel.ToggleAlwaysOnTopCommand}" />
                 <MenuFlyoutItem
                     Text="Duplicate Window"
@@ -369,7 +371,7 @@
                 <MenuFlyoutItem Text="About Azunote" Command="{x:Bind ViewModel.ShowAboutCommand}" />
             </MenuBarItem>
         </MenuBar>
-        <Border x:Name="FindPanel" Grid.Row="1" Padding="12,8" BorderThickness="0,0,0,1" Visibility="Collapsed">
+        <Border x:Name="FindPanel" Grid.Row="1" Padding="12,8" BorderThickness="0,0,0,1" Visibility="{x:Bind ViewModel.FindPanelVisibility, Mode=OneWay}">
             <Grid ColumnSpacing="8">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -382,12 +384,12 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="Find" VerticalAlignment="Center" />
-                <TextBox x:Name="FindTextBox" Grid.Column="1" PlaceholderText="Search text" TextChanged="FindTextBox_TextChanged" KeyDown="FindTextBox_KeyDown" />
+                <TextBox x:Name="FindTextBox" Grid.Column="1" PlaceholderText="Search text" Text="{x:Bind ViewModel.FindText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" KeyDown="FindTextBox_KeyDown" />
                 <Button Grid.Column="2" Content="Next" Command="{x:Bind ViewModel.FindNextCommand}" />
-                <TextBox x:Name="ReplaceTextBox" Grid.Column="3" PlaceholderText="Replace with" KeyDown="ReplaceTextBox_KeyDown" />
+                <TextBox x:Name="ReplaceTextBox" Grid.Column="3" PlaceholderText="Replace with" Text="{x:Bind ViewModel.ReplaceText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" KeyDown="ReplaceTextBox_KeyDown" />
                 <Button Grid.Column="4" Content="Replace" Command="{x:Bind ViewModel.ReplaceCurrentCommand}" />
                 <Button Grid.Column="5" Content="Replace all" Command="{x:Bind ViewModel.ReplaceAllCommand}" />
-                <TextBlock x:Name="FindResultText" Grid.Column="6" VerticalAlignment="Center" />
+                <TextBlock x:Name="FindResultText" Grid.Column="6" VerticalAlignment="Center" Text="{x:Bind ViewModel.FindResult, Mode=OneWay}" />
                 <Button Grid.Column="7" Content="Close" HorizontalAlignment="Right" Command="{x:Bind ViewModel.CloseFindCommand}" />
             </Grid>
         </Border>
@@ -405,7 +407,7 @@
             DragOver="Editor_DragOver"
             Drop="Editor_Drop"
             AutomationProperties.Name="Document editor" />
-        <Border x:Name="StatusBarPanel" Grid.Row="3" BorderThickness="0,1,0,0" Padding="12,6">
+        <Border x:Name="StatusBarPanel" Grid.Row="3" BorderThickness="0,1,0,0" Padding="12,6" Visibility="{x:Bind ViewModel.StatusBarVisibility, Mode=OneWay}">
             <Grid ColumnSpacing="18">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -417,14 +419,14 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="PositionStatus"
                            Grid.Column="0"
-                           Text="Ln 1, Col 1"
+                           Text="{x:Bind ViewModel.PositionStatus, Mode=OneWay}"
                            Tapped="PositionStatus_Tapped" />
-                <TextBlock x:Name="EncodingStatus" Grid.Column="1" Text="UTF-8" />
-                <TextBlock x:Name="LineEndingStatus" Grid.Column="2" Text="LF" />
-                <TextBlock x:Name="IndentationStatus" Grid.Column="3" Text="Spaces: 2"
+                <TextBlock x:Name="EncodingStatus" Grid.Column="1" Text="{x:Bind ViewModel.EncodingStatus, Mode=OneWay}" />
+                <TextBlock x:Name="LineEndingStatus" Grid.Column="2" Text="{x:Bind ViewModel.LineEndingStatus, Mode=OneWay}" />
+                <TextBlock x:Name="IndentationStatus" Grid.Column="3" Text="{x:Bind ViewModel.IndentationStatus, Mode=OneWay}"
                            Tapped="IndentationStatus_Tapped" />
-                <TextBlock x:Name="LanguageModeStatus" Grid.Column="4" Text="Plain Text" />
-                <TextBlock x:Name="FilePathStatus" Grid.Column="5" HorizontalAlignment="Right" Text="Untitled" TextTrimming="CharacterEllipsis"
+                <TextBlock x:Name="LanguageModeStatus" Grid.Column="4" Text="{x:Bind ViewModel.LanguageModeStatus, Mode=OneWay}" />
+                <TextBlock x:Name="FilePathStatus" Grid.Column="5" HorizontalAlignment="Right" Text="{x:Bind ViewModel.FilePathStatus, Mode=OneWay}" TextTrimming="CharacterEllipsis"
                            Tapped="FilePathStatus_Tapped" />
             </Grid>
         </Border>

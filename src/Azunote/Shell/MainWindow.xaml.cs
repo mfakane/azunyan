@@ -36,7 +36,7 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         InitializeComponent();
         _view = new MainWindowViewAdapter(
             this,
-            ViewModel.Groups,
+            ViewModel,
             Editor,
             RootGrid,
             AuxiliarySplitMenuFlyoutItemStyle,
@@ -292,9 +292,6 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         }
     }
 
-    private void FindTextBox_TextChanged(object sender, TextChangedEventArgs e) =>
-        _runtime.OnFindTextChanged();
-
     private void FindTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
     {
         if (e.Key == VirtualKey.Enter)
@@ -395,6 +392,8 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     Task IMainWindowActions.ShowAboutAsync() => _runtime.ShowAboutAsync();
 
     void IMainWindowActions.FindNext() => _runtime.FindNext();
+
+    void IMainWindowActions.FindTextChanged() => _runtime.OnFindTextChanged();
 
     void IMainWindowActions.ReplaceCurrent() => _runtime.ReplaceCurrent();
 

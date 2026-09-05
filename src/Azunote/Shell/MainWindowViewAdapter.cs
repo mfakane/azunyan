@@ -55,6 +55,7 @@ internal sealed class MainWindowViewAdapter :
     private readonly List<MenuFlyoutItemBase> _recentFileMenuItems = [];
     private readonly List<MenuFlyoutItemBase> _windowMenuItems = [];
     private readonly MainWindowRadioGroupNames _radioGroups;
+    private readonly MainWindowViewModel _viewModel;
     private readonly Dictionary<string, RadioMenuFlyoutItem> _languageModeItems =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Style _auxiliarySplitMenuFlyoutItemStyle;
@@ -66,7 +67,7 @@ internal sealed class MainWindowViewAdapter :
 
     public MainWindowViewAdapter(
         MainWindow window,
-        MainWindowRadioGroupNames radioGroups,
+        MainWindowViewModel viewModel,
         AzunyanEditorView editor,
         Grid rootGrid,
         Style auxiliarySplitMenuFlyoutItemStyle,
@@ -103,7 +104,8 @@ internal sealed class MainWindowViewAdapter :
         TextBlock filePathStatus)
     {
         ArgumentNullException.ThrowIfNull(window);
-        _radioGroups = radioGroups ?? throw new ArgumentNullException(nameof(radioGroups));
+        _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
+        _radioGroups = viewModel.Groups;
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
         _editor.DiagnosticSink = (category, message) => ErrorReporter.LogMessage(
             $"Editor diagnostic/{AzunyanDiagnosticCategories.GetName(category)}",
@@ -210,22 +212,22 @@ internal sealed class MainWindowViewAdapter :
     private void ApplyTheme() =>
         _editor.ColorScheme = AzunoteSystemColorScheme.Create(_rootGrid.ActualTheme);
 
-    public bool IsStatusBarVisible => _statusBarPanel.Visibility == Visibility.Visible;
+    public bool IsStatusBarVisible => _viewModel.IsStatusBarVisible;
 
-    public bool IsVisible => _findPanel.Visibility == Visibility.Visible;
+    public bool IsVisible => _viewModel.IsFindPanelVisible;
 
     public bool IsFindBoxFocused => _findTextBox.FocusState != FocusState.Unfocused;
 
     public string FindText
     {
-        get => _findTextBox.Text;
-        set => _findTextBox.Text = value;
+        get => _viewModel.FindText;
+        set => _viewModel.FindText = value;
     }
 
     public string ReplaceText
     {
-        get => _replaceTextBox.Text;
-        set => _replaceTextBox.Text = value;
+        get => _viewModel.ReplaceText;
+        set => _viewModel.ReplaceText = value;
     }
 
     public string Text => _editorBuffer.Text;
@@ -364,21 +366,13 @@ internal sealed class MainWindowViewAdapter :
 
     public void Apply(StatusBarState state)
     {
-        _positionStatus.Text = state.Position;
-        _encodingStatus.Text = state.Encoding;
-        _lineEndingStatus.Text = state.LineEnding;
-        _indentationStatus.Text = state.Indentation;
-        _languageModeStatus.Text = state.LanguageMode;
-        _filePathStatus.Text = state.FilePath;
+        _viewModel.ApplyStatus(state);
         SetFilePathMenuState(state.HasFilePath);
     }
 
     public void SetTitle(string title)
     {
-        if (_appWindow is not null)
-        {
-            _appWindow.Title = title;
-        }
+        _viewModel.Title = title;
     }
 
     public void ToggleAlwaysOnTop()
@@ -415,7 +409,7 @@ internal sealed class MainWindowViewAdapter :
         ArgumentNullException.ThrowIfNull(onSelected);
 
         ClearWindowMenuItems();
-        _alwaysOnTopMenuItem.IsChecked = isAlwaysOnTop;
+        _viewModel.IsAlwaysOnTop = isAlwaysOnTop;
         foreach (var entry in entries)
         {
             var menuItem = new RadioMenuFlyoutItem
@@ -433,49 +427,24 @@ internal sealed class MainWindowViewAdapter :
 
     public void SetStatusBarVisible(bool visible)
     {
-        _statusBarPanel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-        _statusBarMenuItem.IsChecked = visible;
+        _viewModel.IsStatusBarVisible = visible;
     }
 
-    public void SetWordWrapLabel(bool enabled) => _wordWrapMenuItem.IsChecked = enabled;
+    public void SetWordWrapLabel(bool enabled) => _viewModel.IsWordWrapEnabled = enabled;
 
     public void SetTabDisplaySizeLabel(int size)
     {
-        foreach (var item in _tabDisplaySizeMenuItems)
-        {
-            item.Value.IsChecked = item.Key == size;
-        }
-
-        foreach (var item in GetRadioMenuItems(_statusTabDisplaySizeMenu))
-        {
-            item.IsChecked = item.Tag is string tag
-                && int.TryParse(tag, out var itemSize)
-                && itemSize == size;
-        }
+        _viewModel.TabDisplaySize = size;
     }
 
     public void SetIndentSizeLabel(int? size)
     {
-        foreach (var item in _indentSizeMenuItems)
-        {
-            item.Item.IsChecked = item.Size == size;
-        }
-
-        foreach (var item in GetRadioMenuItems(_statusIndentSizeMenu))
-        {
-            item.IsChecked = item.Tag is string tag
-                && (string.Equals(tag, "auto", StringComparison.Ordinal)
-                    ? size is null
-                    : int.TryParse(tag, out var itemSize) && itemSize == size);
-        }
+        _viewModel.IndentSize = size;
     }
 
     public void SetIndentationInputModeLabel(IndentationInputMode mode)
     {
-        foreach (var item in _indentationInputModeMenuItems)
-        {
-            item.Item.IsChecked = item.Mode == mode;
-        }
+        _viewModel.IndentationInputMode = mode;
     }
 
     public void ShowIndentationSizeMenu()
@@ -560,23 +529,23 @@ internal sealed class MainWindowViewAdapter :
 
     public void Show(bool replace)
     {
-        _findPanel.Visibility = Visibility.Visible;
+        _viewModel.IsFindPanelVisible = true;
         FocusFind();
         if (_editorBuffer.Selection.Length > 0 && !string.IsNullOrEmpty(_editor.SelectedText))
         {
-            _findTextBox.Text = _editor.SelectedText;
+            _viewModel.FindText = _editor.SelectedText;
             _findTextBox.SelectAll();
         }
 
         if (!replace)
         {
-            _replaceTextBox.Text = string.Empty;
+            _viewModel.ReplaceText = string.Empty;
         }
     }
 
     public void Close()
     {
-        _findPanel.Visibility = Visibility.Collapsed;
+        _viewModel.IsFindPanelVisible = false;
         FocusEditor();
     }
 
@@ -584,7 +553,7 @@ internal sealed class MainWindowViewAdapter :
 
     public void FocusEditor() => Focus();
 
-    public void SetResult(string message) => _findResultText.Text = message;
+    public void SetResult(string message) => _viewModel.FindResult = message;
 
     public void Render(
         IReadOnlyList<LanguageModeEntry> entries,
