@@ -4,7 +4,8 @@ namespace Azunote;
 
 internal sealed class MainWindowRuntime : IDisposable
 {
-    private readonly MainWindowViewAdapter _view;
+    private readonly MainWindow _window;
+    private readonly MainWindow.ViewBoundary _view;
     private readonly MainWindowViewModel _viewModel;
     private readonly DocumentSession _session;
     private readonly WinUiUserPrompt _prompt;
@@ -26,7 +27,7 @@ internal sealed class MainWindowRuntime : IDisposable
     private bool _disposed;
 
     public MainWindowRuntime(
-        MainWindowViewAdapter view,
+        MainWindow window,
         MainWindowViewModel viewModel,
         Func<Task> createNewWindow,
         Func<string, Task> openFileInNewWindow,
@@ -38,7 +39,8 @@ internal sealed class MainWindowRuntime : IDisposable
         DocumentSession? session = null,
         Document? document = null)
     {
-        _view = view ?? throw new ArgumentNullException(nameof(view));
+        _window = window ?? throw new ArgumentNullException(nameof(window));
+        _view = new MainWindow.ViewBoundary(window);
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _refreshWindowMenus = refreshWindowMenus ?? throw new ArgumentNullException(nameof(refreshWindowMenus));
         _filePathActions = filePathActions ?? throw new ArgumentNullException(nameof(filePathActions));
@@ -255,9 +257,9 @@ internal sealed class MainWindowRuntime : IDisposable
         _status.Refresh();
     }
 
-    public void ShowIndentationSizeMenu() => _view.ShowIndentationSizeMenu();
+    public void ShowIndentationSizeMenu() => _window.ShowIndentationSizeMenu();
 
-    public void ShowFilePathMenu() => _view.ShowFilePathMenu();
+    public void ShowFilePathMenu() => _window.ShowFilePathMenu();
 
     public void CopyFilePath() =>
         _filePathActions.CopyFilePath(_session.State.FilePath ?? "Untitled");
@@ -331,7 +333,7 @@ internal sealed class MainWindowRuntime : IDisposable
         _recordStatusBarVisible(_editorCommands.ToggleStatusBar());
     }
 
-    public void ToggleAlwaysOnTop() => _view.ToggleAlwaysOnTop();
+    public void ToggleAlwaysOnTop() => _window.ToggleAlwaysOnTop();
 
     public void ShowCompletion() => _editorCommands.ShowCompletion();
 
@@ -364,7 +366,7 @@ internal sealed class MainWindowRuntime : IDisposable
     public void RenderRecentFiles(
         IReadOnlyList<string> paths,
         Action<string> removeRecentFile) =>
-        _view.RenderRecentFiles(
+        _window.RenderRecentFiles(
             paths,
             OpenRecentFileAsync,
             _filePathActions.CopyFilePath,
@@ -384,7 +386,6 @@ internal sealed class MainWindowRuntime : IDisposable
         _documents.Changed -= Documents_Changed;
         _documents.Dispose();
         _settings.Dispose();
-        _view.DisposeEditor();
     }
 
     private async Task RunExternalToolDialogAsync()

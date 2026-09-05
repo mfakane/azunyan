@@ -11,99 +11,57 @@ using Windows.Graphics;
 
 namespace Azunote;
 
-internal sealed class MainWindowViewAdapter :
-    IEditorView,
-    IWindowMenuView,
-    IFindReplaceHost,
-    ILanguageModeMenuView,
-    IExternalToolMenuView
+public sealed partial class MainWindow
 {
-    private readonly AzunyanEditorView _editor;
-    private readonly AzunyanEditorBuffer _editorBuffer;
-    private readonly IntPtr _windowHandle;
-    private readonly AppWindow? _appWindow;
-    private readonly Grid _rootGrid;
-    private readonly TextBox _findTextBox;
-    private readonly MenuFlyoutSubItem _languageModeMenu;
-    private readonly MenuFlyoutSubItem _openRecentMenu;
-    private readonly MenuBarItem _windowMenu;
-    private readonly MenuBarItem _toolsMenu;
-    private readonly MenuFlyout _statusTabDisplaySizeMenu;
-    private readonly MenuFlyout _statusIndentSizeMenu;
-    private readonly MenuFlyout _statusFilePathMenu;
-    private readonly TextBlock _indentationStatus;
-    private readonly TextBlock _filePathStatus;
+    private AzunyanEditorView _editor => Editor;
+    private Grid _rootGrid => RootGrid;
+    private TextBox _findTextBox => FindTextBox;
+    private MenuFlyoutSubItem _languageModeMenu => LanguageModeMenuItem;
+    private MenuFlyoutSubItem _openRecentMenu => OpenRecentMenuItem;
+    private MenuBarItem _windowMenu => WindowMenuItem;
+    private MenuBarItem _toolsMenu => ToolsMenuItem;
+    private MenuFlyout _statusTabDisplaySizeMenu => StatusTabDisplaySizeMenu;
+    private MenuFlyout _statusIndentSizeMenu => StatusIndentSizeMenu;
+    private MenuFlyout _statusFilePathMenu => StatusFilePathMenu;
+    private TextBlock _indentationStatus => IndentationStatus;
+    private TextBlock _filePathStatus => FilePathStatus;
+    private MainWindowRadioGroupNames _radioGroups => ViewModel.Groups;
+    private MainWindowViewModel _viewModel => ViewModel;
+    private Style _auxiliarySplitMenuFlyoutItemStyle => AuxiliarySplitMenuFlyoutItemStyle;
+
+    private AzunyanEditorBuffer _editorBuffer = null!;
+    private IntPtr _windowHandle;
     private readonly List<KeyboardAccelerator> _externalToolAccelerators = [];
     private readonly List<MenuFlyoutItemBase> _externalToolMenuItems = [];
     private readonly List<MenuFlyoutItemBase> _externalToolContextMenuItems = [];
     private readonly List<MenuFlyoutItemBase> _recentFileMenuItems = [];
     private readonly List<MenuFlyoutItemBase> _windowMenuItems = [];
-    private readonly MainWindowRadioGroupNames _radioGroups;
-    private readonly MainWindowViewModel _viewModel;
     private readonly Dictionary<string, RadioMenuFlyoutItem> _languageModeItems =
         new(StringComparer.OrdinalIgnoreCase);
-    private readonly Style _auxiliarySplitMenuFlyoutItemStyle;
     private bool _themeConfigured;
 
     internal Document Document => _editor.Document;
 
     internal void SetDocument(Document document) => _editor.SetDocument(document);
 
-    public MainWindowViewAdapter(
-        MainWindow window,
-        MainWindowViewModel viewModel,
-        AzunyanEditorView editor,
-        Grid rootGrid,
-        Style auxiliarySplitMenuFlyoutItemStyle,
-        TextBox findTextBox,
-        MenuFlyoutSubItem languageModeMenu,
-        MenuFlyoutSubItem openRecentMenu,
-        MenuBarItem windowMenu,
-        MenuBarItem toolsMenu,
-        MenuFlyout statusTabDisplaySizeMenu,
-        MenuFlyout statusIndentSizeMenu,
-        MenuFlyout statusFilePathMenu,
-        TextBlock indentationStatus,
-        TextBlock filePathStatus)
+    private void InitializeView()
     {
-        ArgumentNullException.ThrowIfNull(window);
-        _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
-        _radioGroups = viewModel.Groups;
-        _editor = editor ?? throw new ArgumentNullException(nameof(editor));
-        _editor.DiagnosticSink = (category, message) => ErrorReporter.LogMessage(
+        Editor.DiagnosticSink = (category, message) => ErrorReporter.LogMessage(
             $"Editor diagnostic/{AzunyanDiagnosticCategories.GetName(category)}",
             message);
-        _editor.DiagnosticExceptionSink = (source, exception) => ErrorReporter.LogException(
+        Editor.DiagnosticExceptionSink = (source, exception) => ErrorReporter.LogException(
             $"Editor exception/{source}",
             exception);
-        _editorBuffer = new AzunyanEditorBuffer(editor);
-        _rootGrid = rootGrid ?? throw new ArgumentNullException(nameof(rootGrid));
-        _auxiliarySplitMenuFlyoutItemStyle = auxiliarySplitMenuFlyoutItemStyle
-            ?? throw new ArgumentNullException(nameof(auxiliarySplitMenuFlyoutItemStyle));
-        _findTextBox = findTextBox ?? throw new ArgumentNullException(nameof(findTextBox));
-        _languageModeMenu = languageModeMenu ?? throw new ArgumentNullException(nameof(languageModeMenu));
-        _openRecentMenu = openRecentMenu ?? throw new ArgumentNullException(nameof(openRecentMenu));
-        _windowMenu = windowMenu ?? throw new ArgumentNullException(nameof(windowMenu));
-        _toolsMenu = toolsMenu ?? throw new ArgumentNullException(nameof(toolsMenu));
-        _statusTabDisplaySizeMenu = statusTabDisplaySizeMenu
-            ?? throw new ArgumentNullException(nameof(statusTabDisplaySizeMenu));
-        _statusIndentSizeMenu = statusIndentSizeMenu
-            ?? throw new ArgumentNullException(nameof(statusIndentSizeMenu));
-        _statusFilePathMenu = statusFilePathMenu
-            ?? throw new ArgumentNullException(nameof(statusFilePathMenu));
-        _indentationStatus = indentationStatus ?? throw new ArgumentNullException(nameof(indentationStatus));
-        _filePathStatus = filePathStatus ?? throw new ArgumentNullException(nameof(filePathStatus));
+        _editorBuffer = new AzunyanEditorBuffer(Editor);
 
-        _windowHandle = WindowNative.GetWindowHandle(window);
+        _windowHandle = WindowNative.GetWindowHandle(this);
         var windowId = Win32Interop.GetWindowIdFromWindow(_windowHandle);
         _appWindow = AppWindow.GetFromWindowId(windowId);
     }
 
-    public IntPtr WindowHandle => _windowHandle;
+    internal IntPtr WindowHandle => _windowHandle;
 
-    public AppWindow? AppWindow => _appWindow;
-
-    public WindowLayoutState? WindowSize => _appWindow is { } appWindow
+    private WindowLayoutState? WindowSizeView => _appWindow is { } appWindow
         ? new WindowLayoutState
         {
             Width = appWindow.Size.Width,
@@ -111,7 +69,7 @@ internal sealed class MainWindowViewAdapter :
         }
         : null;
 
-    public bool IsAlwaysOnTop =>
+    private bool IsAlwaysOnTopView =>
         _appWindow?.Presenter is OverlappedPresenter presenter
             && presenter.IsAlwaysOnTop;
 
@@ -121,12 +79,9 @@ internal sealed class MainWindowViewAdapter :
 
     public IndentationInputMode IndentationInputMode => _editor.IndentationInputMode;
 
-    public Microsoft.UI.Dispatching.DispatcherQueue DispatcherQueue =>
-        _rootGrid.DispatcherQueue;
+    internal XamlRoot? XamlRoot => _rootGrid.XamlRoot;
 
-    public XamlRoot? XamlRoot => _rootGrid.XamlRoot;
-
-    public void ConfigureTheme()
+    private void ConfigureTheme()
     {
         if (!_themeConfigured)
         {
@@ -185,7 +140,7 @@ internal sealed class MainWindowViewAdapter :
 
     public void ShowCompletion(CompletionResult completions) => _editor.ShowCompletion(completions);
 
-    public void ApplyLanguage(EditorLanguageConfiguration configuration)
+    private void ApplyLanguage(EditorLanguageConfiguration configuration)
     {
         _editor.CompletionTriggerCharacters = configuration.CompletionTriggers;
         _editor.Providers.Syntax = configuration.Syntax;
@@ -289,7 +244,7 @@ internal sealed class MainWindowViewAdapter :
         }
     }
 
-    public void Minimize()
+    private void MinimizeView()
     {
         if (_appWindow?.Presenter is OverlappedPresenter presenter)
         {
@@ -297,7 +252,7 @@ internal sealed class MainWindowViewAdapter :
         }
     }
 
-    public void RestoreIfMinimized()
+    private void RestoreIfMinimizedView()
     {
         if (_appWindow?.Presenter is OverlappedPresenter presenter
             && presenter.State == OverlappedPresenterState.Minimized)
@@ -306,7 +261,7 @@ internal sealed class MainWindowViewAdapter :
         }
     }
 
-    public void RenderWindowMenu(
+    private void RenderWindowMenuCore(
         IReadOnlyList<WindowMenuEntry> entries,
         bool isAlwaysOnTop,
         Action<string> onSelected)
@@ -332,7 +287,7 @@ internal sealed class MainWindowViewAdapter :
         }
     }
 
-    public void ShowIndentationSizeMenu()
+    internal void ShowIndentationSizeMenu()
     {
         var settings = TextEditorCommands.GetDocumentIndentationSettings(
             _editor.Snapshot,
@@ -345,7 +300,7 @@ internal sealed class MainWindowViewAdapter :
         menu.ShowAt(_indentationStatus);
     }
 
-    public void ApplyWindowSize(WindowLayoutState size)
+    private void ApplyWindowSizeView(WindowLayoutState size)
     {
         ArgumentNullException.ThrowIfNull(size);
         if (_appWindow is not { } appWindow)
@@ -358,7 +313,7 @@ internal sealed class MainWindowViewAdapter :
         appWindow.Resize(new SizeInt32(normalized.Width, normalized.Height));
     }
 
-    public void RenderRecentFiles(
+    internal void RenderRecentFiles(
         IReadOnlyList<string> paths,
         Func<string, Task> onSelected,
         Action<string> onCopyFilePath,
@@ -421,15 +376,15 @@ internal sealed class MainWindowViewAdapter :
         }
     }
 
-    public void ShowFilePathMenu() => _statusFilePathMenu.ShowAt(_filePathStatus);
+    internal void ShowFilePathMenu() => _statusFilePathMenu.ShowAt(_filePathStatus);
 
     public void FocusFind() => _findTextBox.Focus(FocusState.Programmatic);
 
-    public void FocusEditor() => Focus();
+    private void FocusEditorView() => Focus();
 
     public void SelectFindText() => _findTextBox.SelectAll();
 
-    public void Render(
+    private void RenderLanguageModes(
         IReadOnlyList<LanguageModeEntry> entries,
         int customModeStartIndex,
         Action<string> onSelected,
@@ -483,7 +438,7 @@ internal sealed class MainWindowViewAdapter :
         }
     }
 
-    public void Select(string id)
+    private void SelectLanguageMode(string id)
     {
         foreach (var pair in _languageModeItems)
         {
@@ -494,7 +449,7 @@ internal sealed class MainWindowViewAdapter :
         }
     }
 
-    public void Render(
+    private void RenderExternalTools(
         IReadOnlyList<ExternalToolMenuNode> nodes,
         Func<ExternalToolSettings, ExternalToolMenuState> getState,
         Func<ExternalToolSettings, Task> onSelected,
@@ -529,7 +484,7 @@ internal sealed class MainWindowViewAdapter :
         RegisterExternalToolAccelerators(nodes, getState, onSelected);
     }
 
-    public void DisposeEditor()
+    private void DisposeView()
     {
         if (_themeConfigured)
         {
@@ -737,6 +692,96 @@ internal sealed class MainWindowViewAdapter :
         };
         menuItem.Items.Add(editItem);
         menuItem.Items.Add(showInExplorerItem);
+    }
+
+    internal sealed class ViewBoundary :
+        IEditorView,
+        IWindowMenuView,
+        IFindReplaceHost,
+        ILanguageModeMenuView,
+        IExternalToolMenuView
+    {
+        private readonly MainWindow _window;
+
+        public ViewBoundary(MainWindow window) =>
+            _window = window ?? throw new ArgumentNullException(nameof(window));
+
+        internal Document Document => _window.Document;
+        internal IntPtr WindowHandle => _window.WindowHandle;
+        internal Microsoft.UI.Dispatching.DispatcherQueue DispatcherQueue => _window.DispatcherQueue;
+        internal XamlRoot? XamlRoot => _window.XamlRoot;
+        internal void SetDocument(Document document) => _window.SetDocument(document);
+        internal void SetDiagnosticLogging(IReadOnlyList<string> logging) =>
+            _window.SetDiagnosticLogging(logging);
+
+        public int TabDisplaySize => _window.TabDisplaySize;
+        public int? IndentSize => _window.IndentSize;
+        public IndentationInputMode IndentationInputMode => _window.IndentationInputMode;
+        public bool IsFindBoxFocused => _window.IsFindBoxFocused;
+        public string Text => _window.Text;
+        public string SelectedText => _window.SelectedText;
+        public TextSnapshot Snapshot => _window.Snapshot;
+        public TextSelection Selection => _window.Selection;
+        public int CaretPosition => _window.CaretPosition;
+
+        public void SetText(string text) => _window.SetText(text);
+        public void SetSelection(TextSelection selection) => _window.SetSelection(selection);
+        public void Replace(TextRange range, string replacement) => _window.Replace(range, replacement);
+        public void Focus() => _window.Focus();
+        public void Undo() => _window.Undo();
+        public void Redo() => _window.Redo();
+        public void Cut() => _window.Cut();
+        public void Copy() => _window.Copy();
+        public void Paste() => _window.Paste();
+        public void SelectAll() => _window.SelectAll();
+        public void MoveToMatchingBracket() => _window.MoveToMatchingBracket();
+        public void Select(TextRange range) => _window.Select(range);
+        public void RequestCompletion() => _window.RequestCompletion();
+        public void ShowCompletion(CompletionResult completions) => _window.ShowCompletion(completions);
+        public void ApplyLanguage(EditorLanguageConfiguration configuration) =>
+            _window.ApplyLanguage(configuration);
+        public void SetFontFamily(string fontFamily) => _window.SetFontFamily(fontFamily);
+        public void SetFontSize(double fontSize) => _window.SetFontSize(fontSize);
+        public void RefreshProviders() => _window.RefreshProviders();
+        public void SetWordWrap(bool enabled) => _window.SetWordWrap(enabled);
+        public void SetTabDisplaySize(int size) => _window.SetTabDisplaySize(size);
+        public void SetIndentSize(int? size) => _window.SetIndentSize(size);
+        public void SetIndentationInputMode(IndentationInputMode mode) =>
+            _window.SetIndentationInputMode(mode);
+        public void ApplyEditorConfig(EditorConfigSettings settings) => _window.ApplyEditorConfig(settings);
+        public void SetPosition(LineColumn position) => _window.SetPosition(position);
+        public void SetStartupPosition(int? line, int? column) =>
+            _window.SetStartupPosition(line, column);
+
+        public void RenderWindowMenu(
+            IReadOnlyList<WindowMenuEntry> entries,
+            bool isAlwaysOnTop,
+            Action<string> onSelected) =>
+            _window.RenderWindowMenuCore(entries, isAlwaysOnTop, onSelected);
+
+        public void FocusFind() => _window.FocusFind();
+        public void FocusEditor() => _window.FocusEditorView();
+        public void SelectFindText() => _window.SelectFindText();
+
+        public void Render(
+            IReadOnlyList<LanguageModeEntry> entries,
+            int customModeStartIndex,
+            Action<string> onSelected,
+            Func<string, Task> onEditDefinition,
+            Func<string, Task> onShowInExplorer) =>
+            _window.RenderLanguageModes(
+                entries, customModeStartIndex, onSelected, onEditDefinition, onShowInExplorer);
+
+        public void Select(string id) => _window.SelectLanguageMode(id);
+
+        public void Render(
+            IReadOnlyList<ExternalToolMenuNode> nodes,
+            Func<ExternalToolSettings, ExternalToolMenuState> getState,
+            Func<ExternalToolSettings, Task> onSelected,
+            Func<string, Task> onEditDefinition,
+            Func<string, Task> onShowInExplorer) =>
+            _window.RenderExternalTools(
+                nodes, getState, onSelected, onEditDefinition, onShowInExplorer);
     }
 
 }

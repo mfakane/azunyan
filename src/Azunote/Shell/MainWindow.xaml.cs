@@ -16,9 +16,8 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     private const VirtualKey OemOpenBracketKey = (VirtualKey)0xdb;
 
     private readonly ApplicationCoordinator _application;
-    private readonly MainWindowViewAdapter _view;
     private readonly MainWindowRuntime _runtime;
-    private readonly AppWindow? _appWindow;
+    private AppWindow? _appWindow;
     private bool _allowClose;
     private bool _completionShortcutInvoked;
     private bool _matchingBracketShortcutInvoked;
@@ -34,25 +33,10 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     {
         _application = application ?? throw new ArgumentNullException(nameof(application));
         InitializeComponent();
-        _view = new MainWindowViewAdapter(
-            this,
-            ViewModel,
-            Editor,
-            RootGrid,
-            AuxiliarySplitMenuFlyoutItemStyle,
-            FindTextBox,
-            LanguageModeMenuItem,
-            OpenRecentMenuItem,
-            WindowMenuItem,
-            ToolsMenuItem,
-            StatusTabDisplaySizeMenu,
-            StatusIndentSizeMenu,
-            StatusFilePathMenu,
-            IndentationStatus,
-            FilePathStatus);
-        _view.ConfigureTheme();
+        InitializeView();
+        ConfigureTheme();
         _runtime = new MainWindowRuntime(
-            _view,
+            this,
             ViewModel,
             application.CreateNewDocumentWindowAsync,
             application.OpenFileInNewWindowAsync,
@@ -66,7 +50,6 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         ViewModel.Attach(this);
         RegisterKeyboardAccelerators();
 
-        _appWindow = _view.AppWindow;
         if (_appWindow is not null)
         {
             _appWindow.Closing += AppWindow_Closing;
@@ -390,15 +373,16 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
 
         _disposed = true;
         _runtime.Dispose();
+        DisposeView();
     }
 
     internal string DocumentName => _runtime.DocumentName;
 
-    internal bool IsAlwaysOnTop => _view.IsAlwaysOnTop;
+    internal bool IsAlwaysOnTop => IsAlwaysOnTopView;
 
-    internal WindowLayoutState? WindowSize => _view.WindowSize;
+    internal WindowLayoutState? WindowSize => WindowSizeView;
 
-    internal void ApplyWindowSize(WindowLayoutState size) => _view.ApplyWindowSize(size);
+    internal void ApplyWindowSize(WindowLayoutState size) => ApplyWindowSizeView(size);
 
     internal void ApplyViewState(AzunoteState state) => _runtime.ApplyViewState(state);
 
@@ -407,19 +391,20 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
 
     internal void ActivateWindow()
     {
-        _view.RestoreIfMinimized();
+        RestoreIfMinimizedView();
         Activate();
     }
 
-    internal void MinimizeWindow() => _view.Minimize();
+    internal void MinimizeWindow() => MinimizeView();
 
-    internal void RestoreIfMinimized() => _view.RestoreIfMinimized();
+    internal void RestoreIfMinimized() => RestoreIfMinimizedView();
 
-    internal void FocusEditor() => _view.Focus();
+    internal void FocusEditor() => Focus();
 
     internal void RenderWindowMenu(
         IReadOnlyList<WindowMenuEntry> entries,
         bool isAlwaysOnTop,
         Action<string> onSelected) =>
-        _view.RenderWindowMenu(entries, isAlwaysOnTop, onSelected);
+        RenderWindowMenuCore(entries, isAlwaysOnTop, onSelected);
+
 }
