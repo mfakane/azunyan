@@ -7,13 +7,18 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using WinRT.Interop;
+using Windows.UI;
+using Windows.UI.ViewManagement;
 using Windows.Graphics;
 
 namespace Azunote;
 
 public sealed partial class MainWindow
 {
+    internal const int WindowGroupAccentPaletteSize = 6;
+
     private AzunyanEditorView _editor => Editor;
     private Grid _rootGrid => RootGrid;
     private TextBox _findTextBox => FindTextBox;
@@ -38,8 +43,12 @@ public sealed partial class MainWindow
     private readonly List<MenuFlyoutItemBase> _externalToolContextMenuItems = [];
     private readonly List<MenuFlyoutItemBase> _recentFileMenuItems = [];
     private readonly List<MenuFlyoutItemBase> _windowMenuItems = [];
+    private readonly List<MenuFlyoutSeparator> _windowMenuSeparators = [];
     private readonly Dictionary<string, RadioMenuFlyoutItem> _languageModeItems =
         new(StringComparer.OrdinalIgnoreCase);
+    private int? _windowGroupAccentIndex;
+    private bool _isWindowActive = true;
+    private UISettings? _uiSettings;
     private bool _themeConfigured;
     private Flyout _findNotificationFlyout = null!;
     private TextBlock _findNotificationText = null!;
@@ -65,6 +74,19 @@ public sealed partial class MainWindow
         _windowHandle = WindowNative.GetWindowHandle(this);
         var windowId = Win32Interop.GetWindowIdFromWindow(_windowHandle);
         _appWindow = AppWindow.GetFromWindowId(windowId);
+        if (_appWindow?.TitleBar is not { } titleBar
+            || !AppWindowTitleBar.IsCustomizationSupported())
+        {
+            return;
+        }
+
+        _uiSettings = new UISettings();
+        _uiSettings.ColorValuesChanged += OnColorValuesChanged;
+        ExtendsContentIntoTitleBar = true;
+        SetTitleBar(TitleBarControl);
+        var titleBarHeight = titleBar.Height > 0 ? titleBar.Height : 32;
+        TitleBarRow.Height = new GridLength(titleBarHeight);
+        AppTitleBar.Height = titleBarHeight;
     }
 
     internal IntPtr WindowHandle => _windowHandle;
@@ -105,8 +127,49 @@ public sealed partial class MainWindow
 
     private void OnRootGridLoaded(object sender, RoutedEventArgs args) => ApplyTheme();
 
-    private void ApplyTheme() =>
+    private void OnColorValuesChanged(UISettings sender, object args)
+    {
+        if (_rootGrid.DispatcherQueue.HasThreadAccess)
+        {
+            ApplyWindowGroupAccentCore();
+        }
+        else
+        {
+            _rootGrid.DispatcherQueue.TryEnqueue(ApplyWindowGroupAccentCore);
+        }
+    }
+
+    private void ApplyTheme()
+    {
         _editor.ColorScheme = AzunoteSystemColorScheme.Create(_rootGrid.ActualTheme);
+        ApplyWindowGroupAccentCore();
+    }
+
+    internal void SetWindowGroupAccent(int? accentIndex)
+    {
+        _windowGroupAccentIndex = accentIndex;
+        ApplyWindowGroupAccentCore();
+    }
+
+    private void ApplyWindowGroupAccentCore()
+    {
+        if (_windowGroupAccentIndex is not { } accentIndex
+            || new AccessibilitySettings().HighContrast)
+        {
+            WindowGroupAccentStrip.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        var accentColor = _uiSettings?.GetColorValue(UIColorType.Accent)
+            ?? new UISettings().GetColorValue(UIColorType.Accent);
+        var accent = WindowGroupAccentPalette.Get(
+            accentIndex,
+            _rootGrid.ActualTheme,
+            accentColor);
+        WindowGroupAccentStrip.Background = new SolidColorBrush(
+            _isWindowActive ? accent.Active : accent.Inactive);
+        WindowGroupAccentStrip.Visibility = Visibility.Visible;
+    }
 
     private bool IsFindBoxFocused => _findTextBox.FocusState != FocusState.Unfocused;
 
@@ -280,8 +343,18 @@ public sealed partial class MainWindow
         _viewModel.SetWindowItems(entries, onSelected);
         ClearWindowMenuItems();
         _viewModel.IsAlwaysOnTop = isAlwaysOnTop;
+        WindowMenuItemViewModel? previousEntry = null;
         foreach (var entry in _viewModel.WindowItems)
         {
+            if (entry.IsGroupStart
+                && previousEntry is not null
+                && (previousEntry.IsDuplicateGroup || entry.IsDuplicateGroup))
+            {
+                var separator = new MenuFlyoutSeparator();
+                _windowMenu.Items.Add(separator);
+                _windowMenuSeparators.Add(separator);
+            }
+
             var menuItem = new RadioMenuFlyoutItem
             {
                 Text = entry.Text,
@@ -292,6 +365,7 @@ public sealed partial class MainWindow
             };
             _windowMenu.Items.Add(menuItem);
             _windowMenuItems.Add(menuItem);
+            previousEntry = entry;
         }
     }
 
@@ -502,6 +576,12 @@ public sealed partial class MainWindow
 
     private void DisposeView()
     {
+        if (_uiSettings is not null)
+        {
+            _uiSettings.ColorValuesChanged -= OnColorValuesChanged;
+            _uiSettings = null;
+        }
+
         if (_themeConfigured)
         {
             _rootGrid.ActualThemeChanged -= OnActualThemeChanged;
@@ -578,12 +658,100 @@ public sealed partial class MainWindow
 
     private void ClearWindowMenuItems()
     {
+        foreach (var separator in _windowMenuSeparators)
+        {
+            _windowMenu.Items.Remove(separator);
+        }
+
+        _windowMenuSeparators.Clear();
         foreach (var item in _windowMenuItems)
         {
             _windowMenu.Items.Remove(item);
         }
 
         _windowMenuItems.Clear();
+    }
+
+    private readonly record struct WindowGroupAccent(Color Active, Color Inactive);
+
+    private static class WindowGroupAccentPalette
+    {
+        private const double HueStep = 60;
+        private const double MinimumSaturation = 0.82;
+
+        public static WindowGroupAccent Get(int index, ElementTheme theme, Color baseColor)
+        {
+            var baseHsl = RgbToHsl(baseColor);
+            var hue = NormalizeHue(baseHsl.Hue + (index * HueStep));
+            var saturation = Math.Max(baseHsl.Saturation, MinimumSaturation);
+            var activeLightness = theme == ElementTheme.Dark
+                ? Math.Clamp(baseHsl.Lightness + 0.18, 0.54, 0.68)
+                : Math.Clamp(baseHsl.Lightness, 0.40, 0.52);
+            var inactiveLightness = theme == ElementTheme.Dark
+                ? Math.Clamp(activeLightness - 0.20, 0.30, 0.48)
+                : Math.Clamp(activeLightness + 0.14, 0.52, 0.70);
+
+            return new WindowGroupAccent(
+                HslToRgb(hue, saturation, activeLightness),
+                HslToRgb(hue, saturation, inactiveLightness));
+        }
+
+        private static HslColor RgbToHsl(Color color)
+        {
+            var red = color.R / 255.0;
+            var green = color.G / 255.0;
+            var blue = color.B / 255.0;
+            var max = Math.Max(red, Math.Max(green, blue));
+            var min = Math.Min(red, Math.Min(green, blue));
+            var delta = max - min;
+            var lightness = (max + min) / 2;
+            if (delta < double.Epsilon)
+            {
+                return new HslColor(0, 0, lightness);
+            }
+
+            var saturation = delta / (1 - Math.Abs((2 * lightness) - 1));
+            var hue = max switch
+            {
+                var value when value == red => 60 * (((green - blue) / delta) % 6),
+                var value when value == green => 60 * (((blue - red) / delta) + 2),
+                _ => 60 * (((red - green) / delta) + 4)
+            };
+            return new HslColor(NormalizeHue(hue), saturation, lightness);
+        }
+
+        private static Color HslToRgb(double hue, double saturation, double lightness)
+        {
+            var chroma = (1 - Math.Abs((2 * lightness) - 1)) * saturation;
+            var hueSector = hue / 60;
+            var secondComponent = chroma * (1 - Math.Abs((hueSector % 2) - 1));
+            var (red, green, blue) = hueSector switch
+            {
+                < 1 => (chroma, secondComponent, 0.0),
+                < 2 => (secondComponent, chroma, 0.0),
+                < 3 => (0.0, chroma, secondComponent),
+                < 4 => (0.0, secondComponent, chroma),
+                < 5 => (secondComponent, 0.0, chroma),
+                _ => (chroma, 0.0, secondComponent)
+            };
+            var match = lightness - (chroma / 2);
+            return Color.FromArgb(
+                0xff,
+                ToByte(red + match),
+                ToByte(green + match),
+                ToByte(blue + match));
+        }
+
+        private static byte ToByte(double value) =>
+            (byte)Math.Clamp((int)Math.Round(value * 255), 0, 255);
+
+        private static double NormalizeHue(double hue)
+        {
+            var normalized = hue % 360;
+            return normalized < 0 ? normalized + 360 : normalized;
+        }
+
+        private readonly record struct HslColor(double Hue, double Saturation, double Lightness);
     }
 
     private static IEnumerable<RadioMenuFlyoutItem> GetRadioMenuItems(MenuFlyout menu)

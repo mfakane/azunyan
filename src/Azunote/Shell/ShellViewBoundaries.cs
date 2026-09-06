@@ -20,7 +20,9 @@ internal sealed record StatusBarState(
 internal sealed record WindowMenuEntry(
     string Id,
     string DocumentName,
-    bool IsCurrent);
+    bool IsCurrent,
+    bool IsGroupStart = true,
+    bool IsDuplicateGroup = false);
 
 internal interface IEditorView : IEditorBuffer
 {

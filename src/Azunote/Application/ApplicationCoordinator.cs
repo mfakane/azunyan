@@ -4,10 +4,15 @@ namespace Azunote;
 
 internal sealed class ApplicationCoordinator : IDisposable
 {
+    private static readonly IEqualityComparer<DocumentSession> DocumentSessionComparer =
+        ReferenceEqualityComparer.Instance;
     private readonly WindowRegistry<WindowRegistration> _windows = new();
+    private readonly Dictionary<DocumentSession, int> _windowGroupAccentIndices =
+        new(DocumentSessionComparer);
     private readonly ApplicationStateController _state =
         new(SettingsFileService.GetDefaultDirectory());
     private DispatcherQueue? _dispatcherQueue;
+    private int _nextWindowGroupAccentIndex;
     private bool _disposed;
 
     public MainWindow? Window => _windows.Active?.Window;
@@ -260,20 +265,61 @@ internal sealed class ApplicationCoordinator : IDisposable
 
     internal void RefreshWindowMenus()
     {
-        var entries = _windows.Windows
-            .Select(registration => new WindowMenuEntry(
-                registration.Id,
-                registration.Window.DocumentName,
-                ReferenceEquals(registration, _windows.Active)))
-            .ToArray();
+        var registrations = _windows.Windows.ToArray();
+        var entries = new List<WindowMenuEntry>(registrations.Length);
+        var activeSessions = new HashSet<DocumentSession>(DocumentSessionComparer);
 
-        foreach (var registration in _windows.Windows.ToArray())
+        foreach (var group in registrations.GroupBy(
+                     registration => registration.Window.Runtime.Session,
+                     DocumentSessionComparer))
+        {
+            var groupEntries = group.ToArray();
+            var isDuplicateGroup = groupEntries.Length > 1;
+            var accentIndex = isDuplicateGroup
+                ? GetWindowGroupAccentIndex(group.Key)
+                : (int?)null;
+            activeSessions.Add(group.Key);
+
+            for (var index = 0; index < groupEntries.Length; index++)
+            {
+                var registration = groupEntries[index];
+                registration.Window.SetWindowGroupAccent(accentIndex);
+                entries.Add(new WindowMenuEntry(
+                    registration.Id,
+                    registration.Window.DocumentName,
+                    ReferenceEquals(registration, _windows.Active),
+                    index == 0,
+                    isDuplicateGroup));
+            }
+        }
+
+        foreach (var session in _windowGroupAccentIndices.Keys.ToArray())
+        {
+            if (!activeSessions.Contains(session))
+            {
+                _windowGroupAccentIndices.Remove(session);
+            }
+        }
+
+        foreach (var registration in registrations)
         {
             registration.Window.RenderWindowMenu(
                 entries,
                 registration.Window.IsAlwaysOnTop,
                 ActivateWindowById);
         }
+    }
+
+    private int GetWindowGroupAccentIndex(DocumentSession session)
+    {
+        if (_windowGroupAccentIndices.TryGetValue(session, out var index))
+        {
+            return index;
+        }
+
+        index = _nextWindowGroupAccentIndex++ % MainWindow.WindowGroupAccentPaletteSize;
+        _windowGroupAccentIndices.Add(session, index);
+        return index;
     }
 
     public bool TryShowUnhandledError(Exception exception, string logPath)

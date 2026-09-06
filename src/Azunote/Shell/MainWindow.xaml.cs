@@ -197,7 +197,9 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         object sender,
         Microsoft.UI.Xaml.WindowActivatedEventArgs args)
     {
-        if (args.WindowActivationState != WindowActivationState.Deactivated)
+        _isWindowActive = args.WindowActivationState != WindowActivationState.Deactivated;
+        ApplyWindowGroupAccentCore();
+        if (_isWindowActive)
         {
             _application.WindowActivated(this);
         }

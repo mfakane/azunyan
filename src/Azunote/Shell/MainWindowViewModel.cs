@@ -283,6 +283,8 @@ internal sealed class MainWindowViewModel :
             entry.Id,
             entry.DocumentName,
             entry.IsCurrent,
+            entry.IsGroupStart,
+            entry.IsDuplicateGroup,
             Command(() => onSelected(entry.Id)))).ToArray();
         OnPropertyChanged(nameof(WindowItems));
     }
@@ -528,6 +530,8 @@ internal sealed record WindowMenuItemViewModel(
     string Id,
     string Text,
     bool IsCurrent,
+    bool IsGroupStart,
+    bool IsDuplicateGroup,
     ICommand SelectCommand);
 
 internal sealed record LanguageModeMenuItemViewModel(

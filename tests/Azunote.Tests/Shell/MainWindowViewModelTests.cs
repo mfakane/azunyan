@@ -77,6 +77,38 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void Window_items_preserve_document_group_metadata()
+    {
+        var viewModel = CreateViewModel();
+
+        viewModel.SetWindowItems(
+            [
+                new WindowMenuEntry("window-1", "notes.txt", false, true, true),
+                new WindowMenuEntry("window-2", "notes.txt", true, false, true),
+                new WindowMenuEntry("window-3", "other.txt", false, true, false)
+            ],
+            _ => { });
+
+        Assert.Collection(
+            viewModel.WindowItems,
+            first =>
+            {
+                Assert.True(first.IsGroupStart);
+                Assert.True(first.IsDuplicateGroup);
+            },
+            second =>
+            {
+                Assert.False(second.IsGroupStart);
+                Assert.True(second.IsDuplicateGroup);
+            },
+            third =>
+            {
+                Assert.True(third.IsGroupStart);
+                Assert.False(third.IsDuplicateGroup);
+            });
+    }
+
+    [Fact]
     public void Recent_file_items_include_display_text_and_commands()
     {
         var viewModel = CreateViewModel();

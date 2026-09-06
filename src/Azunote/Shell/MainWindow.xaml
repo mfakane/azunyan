@@ -4,7 +4,12 @@
     Title="{x:Bind ViewModel.Title, Mode=OneWay}"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="using:Azunyan.WinUI">
+    xmlns:controls="using:Microsoft.UI.Xaml.Controls"
+    xmlns:local="using:Azunyan.WinUI"
+    xmlns:media="using:Microsoft.UI.Xaml.Media">
+    <Window.SystemBackdrop>
+        <media:MicaBackdrop />
+    </Window.SystemBackdrop>
     <Grid
         x:Name="RootGrid"
         KeyboardAcceleratorPlacementMode="Hidden">
@@ -211,12 +216,27 @@
             </MenuFlyout>
         </Grid.Resources>
         <Grid.RowDefinitions>
+            <RowDefinition x:Name="TitleBarRow" Height="0" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        <MenuBar Grid.Row="0">
+        <Grid x:Name="AppTitleBar"
+              Grid.Row="0"
+              Height="0"
+              Background="Transparent">
+            <controls:TitleBar x:Name="TitleBarControl"
+                               Title="{x:Bind ViewModel.Title, Mode=OneWay}"
+                               Background="Transparent" />
+            <Border x:Name="WindowGroupAccentStrip"
+                    Height="2"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Top"
+                    Background="Transparent"
+                    IsHitTestVisible="False" />
+        </Grid>
+        <MenuBar Grid.Row="1">
             <MenuBarItem Title="File">
                 <MenuFlyoutItem Text="New" Command="{x:Bind ViewModel.NewCommand}">
                     <MenuFlyoutItem.KeyboardAccelerators>
@@ -374,7 +394,7 @@
                 <MenuFlyoutItem Text="About Azunote" Command="{x:Bind ViewModel.ShowAboutCommand}" />
             </MenuBarItem>
         </MenuBar>
-        <Border x:Name="FindReplacePanel" Grid.Row="1" HorizontalAlignment="Center" Padding="8,0,0,0" BorderThickness="0,0,0,1" Visibility="{x:Bind ViewModel.FindPanelVisibility, Mode=OneWay}">
+        <Border x:Name="FindReplacePanel" Grid.Row="2" HorizontalAlignment="Center" Padding="8,0,0,0" BorderThickness="0,0,0,1" Visibility="{x:Bind ViewModel.FindPanelVisibility, Mode=OneWay}">
             <Grid RowSpacing="8">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -432,7 +452,7 @@
         </Border>
         <local:AzunyanEditorView
             x:Name="Editor"
-            Grid.Row="2"
+            Grid.Row="3"
             AllowDrop="True"
             AcceptsReturn="True"
             FontFamily="Consolas"
@@ -444,7 +464,7 @@
             DragOver="Editor_DragOver"
             Drop="Editor_Drop"
             AutomationProperties.Name="Document editor" />
-        <Border x:Name="StatusBarPanel" Grid.Row="3" BorderThickness="0,1,0,0" Padding="12,6" Visibility="{x:Bind ViewModel.StatusBarVisibility, Mode=OneWay}">
+        <Border x:Name="StatusBarPanel" Grid.Row="4" BorderThickness="0,1,0,0" Padding="12,6" Visibility="{x:Bind ViewModel.StatusBarVisibility, Mode=OneWay}">
             <Grid ColumnSpacing="18">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
