@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8" ?>
 <Window
     x:Class="Azunote.MainWindow"
     Title="{x:Bind ViewModel.Title, Mode=OneWay}"
@@ -6,43 +6,65 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:Microsoft.UI.Xaml.Controls"
     xmlns:local="using:Azunyan.WinUI"
-    xmlns:media="using:Microsoft.UI.Xaml.Media">
+    xmlns:media="using:Microsoft.UI.Xaml.Media"
+>
     <Window.SystemBackdrop>
         <media:MicaBackdrop />
     </Window.SystemBackdrop>
-    <Grid
-        x:Name="RootGrid"
-        KeyboardAcceleratorPlacementMode="Hidden">
+    <Grid x:Name="RootGrid" KeyboardAcceleratorPlacementMode="Hidden">
         <Grid.Resources>
-            <Style x:Name="AuxiliarySplitMenuFlyoutItemStyle"
-                   TargetType="SplitMenuFlyoutItem"
-                   BasedOn="{StaticResource DefaultSplitMenuFlyoutItemStyle}">
+            <Style
+                x:Name="AuxiliarySplitMenuFlyoutItemStyle"
+                TargetType="SplitMenuFlyoutItem"
+                BasedOn="{StaticResource DefaultSplitMenuFlyoutItemStyle}"
+            >
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="SplitMenuFlyoutItem">
-                            <Grid x:Name="RootGrid"
-                                  BorderBrush="{TemplateBinding BorderBrush}"
-                                  BorderThickness="{TemplateBinding BorderThickness}"
-                                  Margin="{StaticResource MenuFlyoutItemMargin}"
-                                  CornerRadius="{TemplateBinding CornerRadius}">
+                            <Grid
+                                x:Name="RootGrid"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Margin="{StaticResource MenuFlyoutItemMargin}"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                            >
                                 <Grid.Resources>
                                     <Style TargetType="Button">
-                                        <Setter Property="Background" Value="Transparent" />
-                                        <Setter Property="BorderThickness" Value="0" />
-                                        <Setter Property="UseSystemFocusVisuals" Value="{StaticResource UseSystemFocusVisuals}" />
-                                        <Setter Property="FocusVisualMargin" Value="-3" />
-                                        <Setter Property="CornerRadius" Value="{ThemeResource ControlCornerRadius}" />
+                                        <Setter
+                                            Property="Background"
+                                            Value="Transparent"
+                                        />
+                                        <Setter
+                                            Property="BorderThickness"
+                                            Value="0"
+                                        />
+                                        <Setter
+                                            Property="UseSystemFocusVisuals"
+                                            Value="{StaticResource UseSystemFocusVisuals}"
+                                        />
+                                        <Setter
+                                            Property="FocusVisualMargin"
+                                            Value="-3"
+                                        />
+                                        <Setter
+                                            Property="CornerRadius"
+                                            Value="{ThemeResource ControlCornerRadius}"
+                                        />
                                         <Setter Property="Template">
                                             <Setter.Value>
-                                                <ControlTemplate TargetType="Button">
-                                                    <ContentPresenter x:Name="ContentPresenter"
-                                                                      Background="{TemplateBinding Background}"
-                                                                      Content="{TemplateBinding Content}"
-                                                                      ContentTransitions="{TemplateBinding ContentTransitions}"
-                                                                      ContentTemplate="{TemplateBinding ContentTemplate}"
-                                                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                                                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
-                                                                      AutomationProperties.AccessibilityView="Raw" />
+                                                <ControlTemplate
+                                                    TargetType="Button"
+                                                >
+                                                    <ContentPresenter
+                                                        x:Name="ContentPresenter"
+                                                        Background="{TemplateBinding Background}"
+                                                        Content="{TemplateBinding Content}"
+                                                        ContentTransitions="{TemplateBinding ContentTransitions}"
+                                                        ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                        HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                        VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                        AutomationProperties.AccessibilityView="Raw"
+                                                    />
                                                 </ControlTemplate>
                                             </Setter.Value>
                                         </Setter>
@@ -51,75 +73,160 @@
                                 <VisualStateManager.VisualStateGroups>
                                     <VisualStateGroup x:Name="CommonStates">
                                         <VisualState x:Name="Normal" />
-                                        <VisualState x:Name="PrimaryPointerOver">
+                                        <VisualState
+                                            x:Name="PrimaryPointerOver"
+                                        >
                                             <VisualState.Setters>
-                                                <Setter Target="PrimaryButton.Background" Value="{ThemeResource MenuFlyoutItemBackgroundPointerOver}" />
-                                                <Setter Target="TextBlock.Foreground" Value="{ThemeResource MenuFlyoutItemForegroundPointerOver}" />
-                                                <Setter Target="IconContent.Foreground" Value="{ThemeResource MenuFlyoutItemForegroundPointerOver}" />
+                                                <Setter
+                                                    Target="PrimaryButton.Background"
+                                                    Value="{ThemeResource MenuFlyoutItemBackgroundPointerOver}"
+                                                />
+                                                <Setter
+                                                    Target="TextBlock.Foreground"
+                                                    Value="{ThemeResource MenuFlyoutItemForegroundPointerOver}"
+                                                />
+                                                <Setter
+                                                    Target="IconContent.Foreground"
+                                                    Value="{ThemeResource MenuFlyoutItemForegroundPointerOver}"
+                                                />
                                             </VisualState.Setters>
                                         </VisualState>
                                         <VisualState x:Name="PrimaryPressed">
                                             <VisualState.Setters>
-                                                <Setter Target="PrimaryButton.Background" Value="{ThemeResource MenuFlyoutItemBackgroundPressed}" />
-                                                <Setter Target="TextBlock.Foreground" Value="{ThemeResource MenuFlyoutItemForegroundPressed}" />
-                                                <Setter Target="IconContent.Foreground" Value="{ThemeResource MenuFlyoutItemForegroundPressed}" />
+                                                <Setter
+                                                    Target="PrimaryButton.Background"
+                                                    Value="{ThemeResource MenuFlyoutItemBackgroundPressed}"
+                                                />
+                                                <Setter
+                                                    Target="TextBlock.Foreground"
+                                                    Value="{ThemeResource MenuFlyoutItemForegroundPressed}"
+                                                />
+                                                <Setter
+                                                    Target="IconContent.Foreground"
+                                                    Value="{ThemeResource MenuFlyoutItemForegroundPressed}"
+                                                />
                                             </VisualState.Setters>
                                         </VisualState>
-                                        <VisualState x:Name="SecondaryPointerOver">
+                                        <VisualState
+                                            x:Name="SecondaryPointerOver"
+                                        >
                                             <VisualState.Setters>
-                                                <Setter Target="SecondaryButton.Background" Value="{ThemeResource MenuFlyoutItemBackgroundPointerOver}" />
-                                                <Setter Target="FlyoutButtonChevron.Foreground" Value="{ThemeResource MenuFlyoutSubItemChevronPointerOver}" />
+                                                <Setter
+                                                    Target="SecondaryButton.Background"
+                                                    Value="{ThemeResource MenuFlyoutItemBackgroundPointerOver}"
+                                                />
+                                                <Setter
+                                                    Target="FlyoutButtonChevron.Foreground"
+                                                    Value="{ThemeResource MenuFlyoutSubItemChevronPointerOver}"
+                                                />
                                             </VisualState.Setters>
                                         </VisualState>
                                         <VisualState x:Name="SecondaryPressed">
                                             <VisualState.Setters>
-                                                <Setter Target="SecondaryButton.Background" Value="{ThemeResource MenuFlyoutItemBackgroundPressed}" />
-                                                <Setter Target="FlyoutButtonChevron.Foreground" Value="{ThemeResource MenuFlyoutSubItemChevronPressed}" />
+                                                <Setter
+                                                    Target="SecondaryButton.Background"
+                                                    Value="{ThemeResource MenuFlyoutItemBackgroundPressed}"
+                                                />
+                                                <Setter
+                                                    Target="FlyoutButtonChevron.Foreground"
+                                                    Value="{ThemeResource MenuFlyoutSubItemChevronPressed}"
+                                                />
                                             </VisualState.Setters>
                                         </VisualState>
                                         <VisualState x:Name="SubMenuOpened">
                                             <VisualState.Setters>
-                                                <Setter Target="SecondaryButton.Background" Value="{ThemeResource MenuFlyoutSubItemBackgroundSubMenuOpened}" />
-                                                <Setter Target="FlyoutButtonChevron.Foreground" Value="{ThemeResource MenuFlyoutSubItemChevronSubMenuOpened}" />
+                                                <Setter
+                                                    Target="SecondaryButton.Background"
+                                                    Value="{ThemeResource MenuFlyoutSubItemBackgroundSubMenuOpened}"
+                                                />
+                                                <Setter
+                                                    Target="FlyoutButtonChevron.Foreground"
+                                                    Value="{ThemeResource MenuFlyoutSubItemChevronSubMenuOpened}"
+                                                />
                                             </VisualState.Setters>
                                         </VisualState>
                                         <VisualState x:Name="Disabled">
                                             <VisualState.Setters>
-                                                <Setter Target="PrimaryButton.Background" Value="{ThemeResource MenuFlyoutItemBackgroundDisabled}" />
-                                                <Setter Target="SecondaryButton.Background" Value="{ThemeResource MenuFlyoutItemBackgroundDisabled}" />
-                                                <Setter Target="TextBlock.Foreground" Value="{ThemeResource MenuFlyoutItemForegroundDisabled}" />
-                                                <Setter Target="FlyoutButtonChevron.Foreground" Value="{ThemeResource MenuFlyoutSubItemChevronDisabled}" />
-                                                <Setter Target="IconContent.Foreground" Value="{ThemeResource MenuFlyoutItemForegroundDisabled}" />
+                                                <Setter
+                                                    Target="PrimaryButton.Background"
+                                                    Value="{ThemeResource MenuFlyoutItemBackgroundDisabled}"
+                                                />
+                                                <Setter
+                                                    Target="SecondaryButton.Background"
+                                                    Value="{ThemeResource MenuFlyoutItemBackgroundDisabled}"
+                                                />
+                                                <Setter
+                                                    Target="TextBlock.Foreground"
+                                                    Value="{ThemeResource MenuFlyoutItemForegroundDisabled}"
+                                                />
+                                                <Setter
+                                                    Target="FlyoutButtonChevron.Foreground"
+                                                    Value="{ThemeResource MenuFlyoutSubItemChevronDisabled}"
+                                                />
+                                                <Setter
+                                                    Target="IconContent.Foreground"
+                                                    Value="{ThemeResource MenuFlyoutItemForegroundDisabled}"
+                                                />
                                             </VisualState.Setters>
                                         </VisualState>
                                     </VisualStateGroup>
-                                    <VisualStateGroup x:Name="CheckPlaceholderStates">
+                                    <VisualStateGroup
+                                        x:Name="CheckPlaceholderStates"
+                                    >
                                         <VisualState x:Name="NoPlaceholder" />
                                         <VisualState x:Name="CheckPlaceholder">
                                             <VisualState.Setters>
-                                                <Setter Target="TextBlock.Margin" Value="{ThemeResource MenuFlyoutItemPlaceholderThemeThickness}" />
+                                                <Setter
+                                                    Target="TextBlock.Margin"
+                                                    Value="{ThemeResource MenuFlyoutItemPlaceholderThemeThickness}"
+                                                />
                                             </VisualState.Setters>
                                         </VisualState>
                                         <VisualState x:Name="IconPlaceholder">
                                             <VisualState.Setters>
-                                                <Setter Target="TextBlock.Margin" Value="{ThemeResource MenuFlyoutItemPlaceholderThemeThickness}" />
-                                                <Setter Target="IconRoot.Visibility" Value="Visible" />
+                                                <Setter
+                                                    Target="TextBlock.Margin"
+                                                    Value="{ThemeResource MenuFlyoutItemPlaceholderThemeThickness}"
+                                                />
+                                                <Setter
+                                                    Target="IconRoot.Visibility"
+                                                    Value="Visible"
+                                                />
                                             </VisualState.Setters>
                                         </VisualState>
-                                        <VisualState x:Name="CheckAndIconPlaceholder">
+                                        <VisualState
+                                            x:Name="CheckAndIconPlaceholder"
+                                        >
                                             <VisualState.Setters>
-                                                <Setter Target="TextBlock.Margin" Value="{ThemeResource MenuFlyoutItemDoublePlaceholderThemeThickness}" />
-                                                <Setter Target="IconRoot.Margin" Value="{ThemeResource MenuFlyoutItemPlaceholderThemeThickness}" />
-                                                <Setter Target="IconRoot.Visibility" Value="Visible" />
+                                                <Setter
+                                                    Target="TextBlock.Margin"
+                                                    Value="{ThemeResource MenuFlyoutItemDoublePlaceholderThemeThickness}"
+                                                />
+                                                <Setter
+                                                    Target="IconRoot.Margin"
+                                                    Value="{ThemeResource MenuFlyoutItemPlaceholderThemeThickness}"
+                                                />
+                                                <Setter
+                                                    Target="IconRoot.Visibility"
+                                                    Value="Visible"
+                                                />
                                             </VisualState.Setters>
                                         </VisualState>
                                     </VisualStateGroup>
-                                    <VisualStateGroup x:Name="PaddingSizeStates">
+                                    <VisualStateGroup
+                                        x:Name="PaddingSizeStates"
+                                    >
                                         <VisualState x:Name="DefaultPadding" />
                                         <VisualState x:Name="NarrowPadding">
                                             <Storyboard>
-                                                <ObjectAnimationUsingKeyFrames Storyboard.TargetName="LayoutGrid" Storyboard.TargetProperty="Padding">
-                                                    <DiscreteObjectKeyFrame KeyTime="0" Value="{StaticResource MenuFlyoutItemThemePaddingNarrow}" />
+                                                <ObjectAnimationUsingKeyFrames
+                                                    Storyboard.TargetName="LayoutGrid"
+                                                    Storyboard.TargetProperty="Padding"
+                                                >
+                                                    <DiscreteObjectKeyFrame
+                                                        KeyTime="0"
+                                                        Value="{StaticResource MenuFlyoutItemThemePaddingNarrow}"
+                                                    />
                                                 </ObjectAnimationUsingKeyFrames>
                                             </Storyboard>
                                         </VisualState>
@@ -131,63 +238,80 @@
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <Button x:Name="PrimaryButton"
-                                            Grid.Column="0"
-                                            Grid.ColumnSpan="2"
-                                            Background="{TemplateBinding Background}"
-                                            HorizontalAlignment="Stretch"
-                                            VerticalAlignment="Stretch" />
-                                    <Border x:Name="SeparatorGrid"
-                                            Grid.Column="1"
-                                            Width="1"
-                                            Height="{StaticResource SplitMenuFlyoutItemSeparatorHeight}"
-                                            Background="{ThemeResource SplitMenuFlyoutItemButtonDividerBrush}" />
-                                    <Button x:Name="SecondaryButton"
-                                            Grid.Column="2"
-                                            Background="{TemplateBinding Background}"
-                                            Width="{StaticResource SplitMenuFlyoutItemChevronButtonWidth}"
-                                            CornerRadius="0,4,4,0"
-                                            HorizontalAlignment="Stretch"
-                                            VerticalAlignment="Stretch" />
+                                    <Button
+                                        x:Name="PrimaryButton"
+                                        Grid.Column="0"
+                                        Grid.ColumnSpan="2"
+                                        Background="{TemplateBinding Background}"
+                                        HorizontalAlignment="Stretch"
+                                        VerticalAlignment="Stretch"
+                                    />
+                                    <Border
+                                        x:Name="SeparatorGrid"
+                                        Grid.Column="1"
+                                        Width="1"
+                                        Height="{StaticResource SplitMenuFlyoutItemSeparatorHeight}"
+                                        Background="{ThemeResource SplitMenuFlyoutItemButtonDividerBrush}"
+                                    />
+                                    <Button
+                                        x:Name="SecondaryButton"
+                                        Grid.Column="2"
+                                        Background="{TemplateBinding Background}"
+                                        Width="{StaticResource SplitMenuFlyoutItemChevronButtonWidth}"
+                                        CornerRadius="0,4,4,0"
+                                        HorizontalAlignment="Stretch"
+                                        VerticalAlignment="Stretch"
+                                    />
                                 </Grid>
-                                <Grid x:Name="LayoutGrid" Padding="{TemplateBinding Padding}">
+                                <Grid
+                                    x:Name="LayoutGrid"
+                                    Padding="{TemplateBinding Padding}"
+                                >
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <Viewbox x:Name="IconRoot"
-                                                 Grid.Column="0"
-                                                 HorizontalAlignment="Left"
-                                                 VerticalAlignment="Center"
-                                                 Width="16"
-                                                 Height="16"
-                                                 Visibility="Collapsed">
-                                            <ContentPresenter x:Name="IconContent"
-                                                              Content="{TemplateBinding Icon}"
-                                                              Foreground="{TemplateBinding Foreground}" />
+                                        <Viewbox
+                                            x:Name="IconRoot"
+                                            Grid.Column="0"
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Center"
+                                            Width="16"
+                                            Height="16"
+                                            Visibility="Collapsed"
+                                        >
+                                            <ContentPresenter
+                                                x:Name="IconContent"
+                                                Content="{TemplateBinding Icon}"
+                                                Foreground="{TemplateBinding Foreground}"
+                                            />
                                         </Viewbox>
-                                        <TextBlock x:Name="TextBlock"
-                                                   Grid.Column="0"
-                                                   Foreground="{TemplateBinding Foreground}"
-                                                   Text="{TemplateBinding Text}"
-                                                   TextTrimming="{ThemeResource MenuFlyoutItemTextTrimming}"
-                                                   FontFamily="{TemplateBinding FontFamily}"
-                                                   FontSize="{TemplateBinding FontSize}"
-                                                   FontWeight="{TemplateBinding FontWeight}"
-                                                   HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                                   VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
-                                                   IsHitTestVisible="False" />
-                                        <FontIcon x:Name="FlyoutButtonChevron"
-                                                  Grid.Column="1"
-                                                  Glyph="&#xE712;"
-                                                  FontFamily="{ThemeResource SymbolThemeFontFamily}"
-                                                  FontSize="12"
-                                                  AutomationProperties.AccessibilityView="Raw"
-                                                  Foreground="{ThemeResource MenuFlyoutSubItemChevron}"
-                                                  Margin="{StaticResource MenuFlyoutItemChevronMargin}"
-                                                  IsHitTestVisible="False"
-                                                  MirroredWhenRightToLeft="True" />
+                                        <TextBlock
+                                            x:Name="TextBlock"
+                                            Grid.Column="0"
+                                            Foreground="{TemplateBinding Foreground}"
+                                            Text="{TemplateBinding Text}"
+                                            TextTrimming="{ThemeResource MenuFlyoutItemTextTrimming}"
+                                            FontFamily="{TemplateBinding FontFamily}"
+                                            FontSize="{TemplateBinding FontSize}"
+                                            FontWeight="{TemplateBinding FontWeight}"
+                                            HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                            VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                            IsHitTestVisible="False"
+                                        />
+                                        <FontIcon
+                                            x:Name="FlyoutButtonChevron"
+                                            Grid.Column="1"
+                                            Glyph="&#xE712;"
+                                            FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                                            FontSize="12"
+                                            AutomationProperties.AccessibilityView="Raw"
+                                            Foreground="{ThemeResource MenuFlyoutSubItemChevron}"
+                                            Margin="{StaticResource MenuFlyoutItemChevronMargin}"
+                                            IsHitTestVisible="False"
+                                            MirroredWhenRightToLeft="True"
+                                        />
                                     </Grid>
                                 </Grid>
                             </Grid>
@@ -199,20 +323,73 @@
                 <TextBlock Padding="12,8" MaxWidth="360" TextWrapping="Wrap" />
             </Flyout>
             <MenuFlyout x:Name="StatusTabDisplaySizeMenu">
-                <RadioMenuFlyoutItem Text="2" Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}" CommandParameter="2" IsChecked="{x:Bind ViewModel.IsTabDisplaySize2, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.StatusTabDisplaySize}" />
-                <RadioMenuFlyoutItem Text="4" Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}" CommandParameter="4" IsChecked="{x:Bind ViewModel.IsTabDisplaySize4, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.StatusTabDisplaySize}" />
-                <RadioMenuFlyoutItem Text="8" Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}" CommandParameter="8" IsChecked="{x:Bind ViewModel.IsTabDisplaySize8, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.StatusTabDisplaySize}" />
+                <RadioMenuFlyoutItem
+                    Text="2"
+                    Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}"
+                    CommandParameter="2"
+                    IsChecked="{x:Bind ViewModel.IsTabDisplaySize2, Mode=OneWay}"
+                    GroupName="{x:Bind ViewModel.Groups.StatusTabDisplaySize}"
+                />
+                <RadioMenuFlyoutItem
+                    Text="4"
+                    Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}"
+                    CommandParameter="4"
+                    IsChecked="{x:Bind ViewModel.IsTabDisplaySize4, Mode=OneWay}"
+                    GroupName="{x:Bind ViewModel.Groups.StatusTabDisplaySize}"
+                />
+                <RadioMenuFlyoutItem
+                    Text="8"
+                    Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}"
+                    CommandParameter="8"
+                    IsChecked="{x:Bind ViewModel.IsTabDisplaySize8, Mode=OneWay}"
+                    GroupName="{x:Bind ViewModel.Groups.StatusTabDisplaySize}"
+                />
             </MenuFlyout>
             <MenuFlyout x:Name="StatusIndentSizeMenu">
-                <RadioMenuFlyoutItem Text="Auto" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="auto" IsChecked="{x:Bind ViewModel.IsIndentSizeAuto, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.StatusIndentSize}" />
-                <RadioMenuFlyoutItem Text="2" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="2" IsChecked="{x:Bind ViewModel.IsIndentSize2, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.StatusIndentSize}" />
-                <RadioMenuFlyoutItem Text="4" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="4" IsChecked="{x:Bind ViewModel.IsIndentSize4, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.StatusIndentSize}" />
-                <RadioMenuFlyoutItem Text="8" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="8" IsChecked="{x:Bind ViewModel.IsIndentSize8, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.StatusIndentSize}" />
+                <RadioMenuFlyoutItem
+                    Text="Auto"
+                    Command="{x:Bind ViewModel.SetIndentSizeCommand}"
+                    CommandParameter="auto"
+                    IsChecked="{x:Bind ViewModel.IsIndentSizeAuto, Mode=OneWay}"
+                    GroupName="{x:Bind ViewModel.Groups.StatusIndentSize}"
+                />
+                <RadioMenuFlyoutItem
+                    Text="2"
+                    Command="{x:Bind ViewModel.SetIndentSizeCommand}"
+                    CommandParameter="2"
+                    IsChecked="{x:Bind ViewModel.IsIndentSize2, Mode=OneWay}"
+                    GroupName="{x:Bind ViewModel.Groups.StatusIndentSize}"
+                />
+                <RadioMenuFlyoutItem
+                    Text="4"
+                    Command="{x:Bind ViewModel.SetIndentSizeCommand}"
+                    CommandParameter="4"
+                    IsChecked="{x:Bind ViewModel.IsIndentSize4, Mode=OneWay}"
+                    GroupName="{x:Bind ViewModel.Groups.StatusIndentSize}"
+                />
+                <RadioMenuFlyoutItem
+                    Text="8"
+                    Command="{x:Bind ViewModel.SetIndentSizeCommand}"
+                    CommandParameter="8"
+                    IsChecked="{x:Bind ViewModel.IsIndentSize8, Mode=OneWay}"
+                    GroupName="{x:Bind ViewModel.Groups.StatusIndentSize}"
+                />
             </MenuFlyout>
             <MenuFlyout x:Name="StatusFilePathMenu">
-                <MenuFlyoutItem Text="Copy File Path" Command="{x:Bind ViewModel.CopyFilePathCommand}" />
-                <MenuFlyoutItem Text="Show in Explorer" Command="{x:Bind ViewModel.ShowFileInExplorerCommand}" IsEnabled="{x:Bind ViewModel.HasFilePath, Mode=OneWay}" />
-                <MenuFlyoutItem Text="Open Folder in Terminal" Command="{x:Bind ViewModel.OpenFolderInTerminalCommand}" IsEnabled="{x:Bind ViewModel.HasFilePath, Mode=OneWay}" />
+                <MenuFlyoutItem
+                    Text="Copy File Path"
+                    Command="{x:Bind ViewModel.CopyFilePathCommand}"
+                />
+                <MenuFlyoutItem
+                    Text="Show in Explorer"
+                    Command="{x:Bind ViewModel.ShowFileInExplorerCommand}"
+                    IsEnabled="{x:Bind ViewModel.HasFilePath, Mode=OneWay}"
+                />
+                <MenuFlyoutItem
+                    Text="Open Folder in Terminal"
+                    Command="{x:Bind ViewModel.OpenFolderInTerminalCommand}"
+                    IsEnabled="{x:Bind ViewModel.HasFilePath, Mode=OneWay}"
+                />
             </MenuFlyout>
         </Grid.Resources>
         <Grid.RowDefinitions>
@@ -222,86 +399,137 @@
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        <Grid x:Name="AppTitleBar"
-              Grid.Row="0"
-              Height="0"
-              Background="Transparent">
-            <controls:TitleBar x:Name="TitleBarControl"
-                               Title="{x:Bind ViewModel.Title, Mode=OneWay}"
-                               Background="Transparent" />
-            <Border x:Name="WindowGroupAccentStrip"
-                    Height="2"
-                    HorizontalAlignment="Stretch"
-                    VerticalAlignment="Top"
-                    Background="Transparent"
-                    IsHitTestVisible="False" />
+        <Grid
+            x:Name="AppTitleBar"
+            Grid.Row="0"
+            Height="0"
+            Background="Transparent"
+        >
+            <controls:TitleBar
+                x:Name="TitleBarControl"
+                Title="{x:Bind ViewModel.Title, Mode=OneWay}"
+                Background="Transparent"
+            />
+            <Border
+                x:Name="WindowGroupAccentStrip"
+                Height="2"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Top"
+                Background="Transparent"
+                IsHitTestVisible="False"
+            />
         </Grid>
         <MenuBar Grid.Row="1">
             <MenuBarItem Title="File">
-                <MenuFlyoutItem Text="New" Command="{x:Bind ViewModel.NewCommand}">
+                <MenuFlyoutItem
+                    Text="New"
+                    Command="{x:Bind ViewModel.NewCommand}"
+                >
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="N" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Open..." Command="{x:Bind ViewModel.OpenCommand}">
+                <MenuFlyoutItem
+                    Text="Open..."
+                    Command="{x:Bind ViewModel.OpenCommand}"
+                >
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="O" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutSubItem x:Name="OpenRecentMenuItem" Text="Open Recent" />
+                <MenuFlyoutSubItem
+                    x:Name="OpenRecentMenuItem"
+                    Text="Open Recent"
+                />
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Save" Command="{x:Bind ViewModel.SaveCommand}">
+                <MenuFlyoutItem
+                    Text="Save"
+                    Command="{x:Bind ViewModel.SaveCommand}"
+                >
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="S" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Save As..." Command="{x:Bind ViewModel.SaveAsCommand}">
+                <MenuFlyoutItem
+                    Text="Save As..."
+                    Command="{x:Bind ViewModel.SaveAsCommand}"
+                >
                     <MenuFlyoutItem.KeyboardAccelerators>
-                        <KeyboardAccelerator Key="S" Modifiers="Control,Shift" />
+                        <KeyboardAccelerator
+                            Key="S"
+                            Modifiers="Control,Shift"
+                        />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Exit" Command="{x:Bind ViewModel.ExitCommand}" />
+                <MenuFlyoutItem
+                    Text="Exit"
+                    Command="{x:Bind ViewModel.ExitCommand}"
+                />
             </MenuBarItem>
             <MenuBarItem Title="Edit">
-                <MenuFlyoutItem Text="Undo" Command="{x:Bind ViewModel.UndoCommand}">
+                <MenuFlyoutItem
+                    Text="Undo"
+                    Command="{x:Bind ViewModel.UndoCommand}"
+                >
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="Z" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Redo" Command="{x:Bind ViewModel.RedoCommand}">
+                <MenuFlyoutItem
+                    Text="Redo"
+                    Command="{x:Bind ViewModel.RedoCommand}"
+                >
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="Y" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Cut" Command="{x:Bind ViewModel.CutCommand}">
+                <MenuFlyoutItem
+                    Text="Cut"
+                    Command="{x:Bind ViewModel.CutCommand}"
+                >
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="X" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Copy" Command="{x:Bind ViewModel.CopyCommand}">
+                <MenuFlyoutItem
+                    Text="Copy"
+                    Command="{x:Bind ViewModel.CopyCommand}"
+                >
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="C" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Paste" Command="{x:Bind ViewModel.PasteCommand}">
+                <MenuFlyoutItem
+                    Text="Paste"
+                    Command="{x:Bind ViewModel.PasteCommand}"
+                >
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="V" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Find..." Command="{x:Bind ViewModel.ShowFindCommand}">
+                <MenuFlyoutItem
+                    Text="Find..."
+                    Command="{x:Bind ViewModel.ShowFindCommand}"
+                >
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="F" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Replace..." Command="{x:Bind ViewModel.ShowReplaceCommand}">
+                <MenuFlyoutItem
+                    Text="Replace..."
+                    Command="{x:Bind ViewModel.ShowReplaceCommand}"
+                >
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="H" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Go to Line..." Command="{x:Bind ViewModel.GoToLineCommand}">
+                <MenuFlyoutItem
+                    Text="Go to Line..."
+                    Command="{x:Bind ViewModel.GoToLineCommand}"
+                >
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="G" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
@@ -310,9 +538,13 @@
                     x:Name="GoToMatchingBracketMenuItem"
                     Text="Go to Matching Bracket"
                     KeyboardAcceleratorTextOverride="Ctrl+["
-                    Command="{x:Bind ViewModel.GoToMatchingBracketCommand}" />
+                    Command="{x:Bind ViewModel.GoToMatchingBracketCommand}"
+                />
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Select All" Command="{x:Bind ViewModel.SelectAllCommand}">
+                <MenuFlyoutItem
+                    Text="Select All"
+                    Command="{x:Bind ViewModel.SelectAllCommand}"
+                >
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="A" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
@@ -320,7 +552,8 @@
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem
                     Text="Show Completions"
-                    Command="{x:Bind ViewModel.ShowCompletionCommand}">
+                    Command="{x:Bind ViewModel.ShowCompletionCommand}"
+                >
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <!-- Keep the shortcut attached to the command; the
                              editor host provides a fallback when native text
@@ -328,143 +561,396 @@
                         <KeyboardAccelerator
                             Key="Space"
                             Modifiers="Control"
-                            Invoked="ShowCompletionAccelerator_Invoked" />
+                            Invoked="ShowCompletionAccelerator_Invoked"
+                        />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
             </MenuBarItem>
             <MenuBarItem Title="View">
-                <MenuFlyoutSubItem x:Name="LanguageModeMenuItem"
-                                    Text="Language Mode" />
+                <MenuFlyoutSubItem
+                    x:Name="LanguageModeMenuItem"
+                    Text="Language Mode"
+                />
                 <MenuFlyoutSeparator />
-                <MenuFlyoutSubItem x:Name="TabDisplaySizeMenuItem"
-                                   Text="Tab Display Size">
-                    <RadioMenuFlyoutItem x:Name="TabDisplaySize2MenuItem" Text="2" Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}" CommandParameter="2" IsChecked="{x:Bind ViewModel.IsTabDisplaySize2, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.TabDisplaySize}" />
-                    <RadioMenuFlyoutItem x:Name="TabDisplaySize4MenuItem" Text="4" Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}" CommandParameter="4" IsChecked="{x:Bind ViewModel.IsTabDisplaySize4, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.TabDisplaySize}" />
-                    <RadioMenuFlyoutItem x:Name="TabDisplaySize8MenuItem" Text="8" Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}" CommandParameter="8" IsChecked="{x:Bind ViewModel.IsTabDisplaySize8, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.TabDisplaySize}" />
+                <MenuFlyoutSubItem
+                    x:Name="TabDisplaySizeMenuItem"
+                    Text="Tab Display Size"
+                >
+                    <RadioMenuFlyoutItem
+                        x:Name="TabDisplaySize2MenuItem"
+                        Text="2"
+                        Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}"
+                        CommandParameter="2"
+                        IsChecked="{x:Bind ViewModel.IsTabDisplaySize2, Mode=OneWay}"
+                        GroupName="{x:Bind ViewModel.Groups.TabDisplaySize}"
+                    />
+                    <RadioMenuFlyoutItem
+                        x:Name="TabDisplaySize4MenuItem"
+                        Text="4"
+                        Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}"
+                        CommandParameter="4"
+                        IsChecked="{x:Bind ViewModel.IsTabDisplaySize4, Mode=OneWay}"
+                        GroupName="{x:Bind ViewModel.Groups.TabDisplaySize}"
+                    />
+                    <RadioMenuFlyoutItem
+                        x:Name="TabDisplaySize8MenuItem"
+                        Text="8"
+                        Command="{x:Bind ViewModel.SetTabDisplaySizeCommand}"
+                        CommandParameter="8"
+                        IsChecked="{x:Bind ViewModel.IsTabDisplaySize8, Mode=OneWay}"
+                        GroupName="{x:Bind ViewModel.Groups.TabDisplaySize}"
+                    />
                 </MenuFlyoutSubItem>
-                <MenuFlyoutSubItem x:Name="IndentSizeMenuItem"
-                                   Text="Indent Size">
-                    <RadioMenuFlyoutItem x:Name="IndentSizeAutoMenuItem" Text="Auto" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="auto" IsChecked="{x:Bind ViewModel.IsIndentSizeAuto, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.IndentSize}" />
-                    <RadioMenuFlyoutItem x:Name="IndentSize2MenuItem" Text="2" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="2" IsChecked="{x:Bind ViewModel.IsIndentSize2, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.IndentSize}" />
-                    <RadioMenuFlyoutItem x:Name="IndentSize4MenuItem" Text="4" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="4" IsChecked="{x:Bind ViewModel.IsIndentSize4, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.IndentSize}" />
-                    <RadioMenuFlyoutItem x:Name="IndentSize8MenuItem" Text="8" Command="{x:Bind ViewModel.SetIndentSizeCommand}" CommandParameter="8" IsChecked="{x:Bind ViewModel.IsIndentSize8, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.IndentSize}" />
+                <MenuFlyoutSubItem
+                    x:Name="IndentSizeMenuItem"
+                    Text="Indent Size"
+                >
+                    <RadioMenuFlyoutItem
+                        x:Name="IndentSizeAutoMenuItem"
+                        Text="Auto"
+                        Command="{x:Bind ViewModel.SetIndentSizeCommand}"
+                        CommandParameter="auto"
+                        IsChecked="{x:Bind ViewModel.IsIndentSizeAuto, Mode=OneWay}"
+                        GroupName="{x:Bind ViewModel.Groups.IndentSize}"
+                    />
+                    <RadioMenuFlyoutItem
+                        x:Name="IndentSize2MenuItem"
+                        Text="2"
+                        Command="{x:Bind ViewModel.SetIndentSizeCommand}"
+                        CommandParameter="2"
+                        IsChecked="{x:Bind ViewModel.IsIndentSize2, Mode=OneWay}"
+                        GroupName="{x:Bind ViewModel.Groups.IndentSize}"
+                    />
+                    <RadioMenuFlyoutItem
+                        x:Name="IndentSize4MenuItem"
+                        Text="4"
+                        Command="{x:Bind ViewModel.SetIndentSizeCommand}"
+                        CommandParameter="4"
+                        IsChecked="{x:Bind ViewModel.IsIndentSize4, Mode=OneWay}"
+                        GroupName="{x:Bind ViewModel.Groups.IndentSize}"
+                    />
+                    <RadioMenuFlyoutItem
+                        x:Name="IndentSize8MenuItem"
+                        Text="8"
+                        Command="{x:Bind ViewModel.SetIndentSizeCommand}"
+                        CommandParameter="8"
+                        IsChecked="{x:Bind ViewModel.IsIndentSize8, Mode=OneWay}"
+                        GroupName="{x:Bind ViewModel.Groups.IndentSize}"
+                    />
                 </MenuFlyoutSubItem>
-                <MenuFlyoutSubItem x:Name="TabInputModeMenuItem"
-                                   Text="Indentation Mode">
-                    <RadioMenuFlyoutItem x:Name="TabInputModeAutoMenuItem" Text="Auto" Command="{x:Bind ViewModel.SetIndentationInputModeCommand}" CommandParameter="auto" IsChecked="{x:Bind ViewModel.IsIndentationModeAuto, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.IndentationInputMode}" />
-                    <RadioMenuFlyoutItem x:Name="TabInputModeTabMenuItem" Text="Tab" Command="{x:Bind ViewModel.SetIndentationInputModeCommand}" CommandParameter="tab" IsChecked="{x:Bind ViewModel.IsIndentationModeTab, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.IndentationInputMode}" />
-                    <RadioMenuFlyoutItem x:Name="TabInputModeSpacesMenuItem" Text="Spaces" Command="{x:Bind ViewModel.SetIndentationInputModeCommand}" CommandParameter="spaces" IsChecked="{x:Bind ViewModel.IsIndentationModeSpaces, Mode=OneWay}" GroupName="{x:Bind ViewModel.Groups.IndentationInputMode}" />
+                <MenuFlyoutSubItem
+                    x:Name="TabInputModeMenuItem"
+                    Text="Indentation Mode"
+                >
+                    <RadioMenuFlyoutItem
+                        x:Name="TabInputModeAutoMenuItem"
+                        Text="Auto"
+                        Command="{x:Bind ViewModel.SetIndentationInputModeCommand}"
+                        CommandParameter="auto"
+                        IsChecked="{x:Bind ViewModel.IsIndentationModeAuto, Mode=OneWay}"
+                        GroupName="{x:Bind ViewModel.Groups.IndentationInputMode}"
+                    />
+                    <RadioMenuFlyoutItem
+                        x:Name="TabInputModeTabMenuItem"
+                        Text="Tab"
+                        Command="{x:Bind ViewModel.SetIndentationInputModeCommand}"
+                        CommandParameter="tab"
+                        IsChecked="{x:Bind ViewModel.IsIndentationModeTab, Mode=OneWay}"
+                        GroupName="{x:Bind ViewModel.Groups.IndentationInputMode}"
+                    />
+                    <RadioMenuFlyoutItem
+                        x:Name="TabInputModeSpacesMenuItem"
+                        Text="Spaces"
+                        Command="{x:Bind ViewModel.SetIndentationInputModeCommand}"
+                        CommandParameter="spaces"
+                        IsChecked="{x:Bind ViewModel.IsIndentationModeSpaces, Mode=OneWay}"
+                        GroupName="{x:Bind ViewModel.Groups.IndentationInputMode}"
+                    />
                 </MenuFlyoutSubItem>
                 <MenuFlyoutSeparator />
-                <ToggleMenuFlyoutItem x:Name="WordWrapMenuItem" Text="Word Wrap" IsChecked="{x:Bind ViewModel.IsWordWrapEnabled, Mode=OneWay}" Command="{x:Bind ViewModel.ToggleWordWrapCommand}" />
-                <ToggleMenuFlyoutItem x:Name="StatusBarMenuItem"
-                                      Text="Status Bar"
-                                      IsChecked="{x:Bind ViewModel.IsStatusBarVisible, Mode=OneWay}"
-                                      Command="{x:Bind ViewModel.ToggleStatusBarCommand}" />
+                <ToggleMenuFlyoutItem
+                    x:Name="WordWrapMenuItem"
+                    Text="Word Wrap"
+                    IsChecked="{x:Bind ViewModel.IsWordWrapEnabled, Mode=OneWay}"
+                    Command="{x:Bind ViewModel.ToggleWordWrapCommand}"
+                />
+                <ToggleMenuFlyoutItem
+                    x:Name="StatusBarMenuItem"
+                    Text="Status Bar"
+                    IsChecked="{x:Bind ViewModel.IsStatusBarVisible, Mode=OneWay}"
+                    Command="{x:Bind ViewModel.ToggleStatusBarCommand}"
+                />
             </MenuBarItem>
             <MenuBarItem x:Name="ToolsMenuItem" Title="Tools">
-                <MenuFlyoutItem Text="Run External Tool..." Command="{x:Bind ViewModel.RunExternalToolCommand}" />
+                <MenuFlyoutItem
+                    Text="Run External Tool..."
+                    Command="{x:Bind ViewModel.RunExternalToolCommand}"
+                />
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Preferences..." Command="{x:Bind ViewModel.OpenPreferencesCommand}" />
+                <MenuFlyoutItem
+                    Text="Preferences..."
+                    Command="{x:Bind ViewModel.OpenPreferencesCommand}"
+                />
             </MenuBarItem>
             <MenuBarItem x:Name="WindowMenuItem" Title="Window">
                 <ToggleMenuFlyoutItem
                     x:Name="AlwaysOnTopMenuItem"
                     Text="Always on Top"
                     IsChecked="{x:Bind ViewModel.IsAlwaysOnTop, Mode=OneWay}"
-                    Command="{x:Bind ViewModel.ToggleAlwaysOnTopCommand}" />
+                    Command="{x:Bind ViewModel.ToggleAlwaysOnTopCommand}"
+                />
                 <MenuFlyoutItem
                     Text="Duplicate Window"
-                    Command="{x:Bind ViewModel.DuplicateWindowCommand}" />
+                    Command="{x:Bind ViewModel.DuplicateWindowCommand}"
+                />
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Show All Windows" Command="{x:Bind ViewModel.ShowAllWindowsCommand}" />
-                <MenuFlyoutItem Text="Minimize All Windows" Command="{x:Bind ViewModel.MinimizeAllWindowsCommand}" />
+                <MenuFlyoutItem
+                    Text="Show All Windows"
+                    Command="{x:Bind ViewModel.ShowAllWindowsCommand}"
+                />
+                <MenuFlyoutItem
+                    Text="Minimize All Windows"
+                    Command="{x:Bind ViewModel.MinimizeAllWindowsCommand}"
+                />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem
                     Text="Next Window"
                     Command="{x:Bind ViewModel.NextWindowCommand}"
-                    KeyboardAcceleratorTextOverride="Ctrl+Tab" />
+                    KeyboardAcceleratorTextOverride="Ctrl+Tab"
+                />
                 <MenuFlyoutItem
                     Text="Previous Window"
                     Command="{x:Bind ViewModel.PreviousWindowCommand}"
-                    KeyboardAcceleratorTextOverride="Ctrl+Shift+Tab" />
+                    KeyboardAcceleratorTextOverride="Ctrl+Shift+Tab"
+                />
                 <MenuFlyoutSeparator />
             </MenuBarItem>
             <MenuBarItem Title="Help">
-                <MenuFlyoutItem Text="About Azunote" Command="{x:Bind ViewModel.ShowAboutCommand}" />
+                <MenuFlyoutItem
+                    Text="About Azunote"
+                    Command="{x:Bind ViewModel.ShowAboutCommand}"
+                />
             </MenuBarItem>
         </MenuBar>
-        <Border x:Name="FindReplacePanel" Grid.Row="2" HorizontalAlignment="Center" Padding="8,0,0,0" BorderThickness="0,0,0,1" Visibility="{x:Bind ViewModel.FindPanelVisibility, Mode=OneWay}">
-            <Grid RowSpacing="8">
+        <Border
+            x:Name="FindReplacePanel"
+            Grid.Row="2"
+            HorizontalAlignment="Center"
+            Margin="0,8,0,0"
+            BorderThickness="0,0,0,1"
+            Visibility="{x:Bind ViewModel.FindPanelVisibility, Mode=OneWay}"
+        >
+            <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-                <Grid Grid.Row="0" ColumnSpacing="8">
+                <Grid Grid.Row="0" ColumnSpacing="8" Margin="0,0,0,8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="32" />
                         <ColumnDefinition Width="320" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <Button x:Name="FindReplaceModeButton" Grid.Column="0" HorizontalAlignment="Stretch" VerticalAlignment="Top" Height="32" Padding="0,1,0,0" Style="{StaticResource SubtleButtonStyle}" Click="FindReplaceModeButton_Click" AutomationProperties.Name="Toggle Replace fields">
-                        <FontIcon Glyph="{x:Bind ViewModel.FindReplaceChevronGlyph, Mode=OneWay}" FontSize="16" />
+                    <Button
+                        x:Name="FindReplaceModeButton"
+                        Grid.Column="0"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Top"
+                        Height="32"
+                        Padding="0,1,0,0"
+                        Style="{StaticResource SubtleButtonStyle}"
+                        Click="FindReplaceModeButton_Click"
+                        AutomationProperties.Name="Toggle Replace fields"
+                    >
+                        <FontIcon
+                            Glyph="{x:Bind ViewModel.FindReplaceChevronGlyph, Mode=OneWay}"
+                            FontSize="16"
+                        />
                     </Button>
                     <Grid Grid.Column="1">
-                        <local:CompletionTextBox x:Name="FindTextBox" Padding="10,6,72,6" PlaceholderText="Search text" AcceptsReturn="True" TextWrapping="Wrap" AutomationProperties.Name="Find text" Text="{x:Bind ViewModel.FindText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" BeforeKeyDown="FindTextBox_BeforeKeyDown" />
-                        <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top" Orientation="Horizontal" Height="24" Margin="0,4,4,4" Spacing="2">
-                            <ToggleButton VerticalAlignment="Stretch" Width="22" Padding="0" Background="Transparent" BorderThickness="0" IsChecked="{x:Bind ViewModel.IsMatchCase, Mode=TwoWay}" ToolTipService.ToolTip="Match Case" AutomationProperties.Name="Match Case">
-                                <TextBlock Text="Aa" FontSize="12" FontWeight="SemiBold" />
+                        <local:CompletionTextBox
+                            x:Name="FindTextBox"
+                            Padding="10,6,72,6"
+                            PlaceholderText="Search text"
+                            AcceptsReturn="True"
+                            TextWrapping="Wrap"
+                            AutomationProperties.Name="Find text"
+                            Text="{x:Bind ViewModel.FindText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                            BeforeKeyDown="FindTextBox_BeforeKeyDown"
+                        />
+                        <StackPanel
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Orientation="Horizontal"
+                            Height="24"
+                            Margin="0,4,4,4"
+                            Spacing="2"
+                        >
+                            <ToggleButton
+                                VerticalAlignment="Stretch"
+                                Width="22"
+                                Padding="0"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                IsChecked="{x:Bind ViewModel.IsMatchCase, Mode=TwoWay}"
+                                ToolTipService.ToolTip="Match Case"
+                                AutomationProperties.Name="Match Case"
+                            >
+                                <TextBlock
+                                    Text="Aa"
+                                    FontSize="12"
+                                    FontWeight="SemiBold"
+                                />
                             </ToggleButton>
-                            <ToggleButton VerticalAlignment="Stretch" Width="22" Padding="0" Background="Transparent" BorderThickness="0" IsChecked="{x:Bind ViewModel.IsMatchWholeWord, Mode=TwoWay}" ToolTipService.ToolTip="Match Whole Word" AutomationProperties.Name="Match Whole Word">
-                                <TextBlock Text="ab" FontSize="12" FontWeight="SemiBold" />
+                            <ToggleButton
+                                VerticalAlignment="Stretch"
+                                Width="22"
+                                Padding="0"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                IsChecked="{x:Bind ViewModel.IsMatchWholeWord, Mode=TwoWay}"
+                                ToolTipService.ToolTip="Match Whole Word"
+                                AutomationProperties.Name="Match Whole Word"
+                            >
+                                <TextBlock
+                                    Text="ab"
+                                    FontSize="12"
+                                    FontWeight="SemiBold"
+                                />
                             </ToggleButton>
-                            <ToggleButton VerticalAlignment="Stretch" Width="22" Padding="0" Background="Transparent" BorderThickness="0" IsChecked="{x:Bind ViewModel.IsRegularExpression, Mode=TwoWay}" ToolTipService.ToolTip="Regular Expression" AutomationProperties.Name="Regular Expression">
-                                <TextBlock Text=".*" FontFamily="Consolas" FontSize="12" FontWeight="SemiBold" />
+                            <ToggleButton
+                                VerticalAlignment="Stretch"
+                                Width="22"
+                                Padding="0"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                IsChecked="{x:Bind ViewModel.IsRegularExpression, Mode=TwoWay}"
+                                ToolTipService.ToolTip="Regular Expression"
+                                AutomationProperties.Name="Regular Expression"
+                            >
+                                <TextBlock
+                                    Text=".*"
+                                    FontFamily="Consolas"
+                                    FontSize="12"
+                                    FontWeight="SemiBold"
+                                />
                             </ToggleButton>
                         </StackPanel>
                     </Grid>
-                    <StackPanel Grid.Column="2" Height="32" Spacing="8" Orientation="Horizontal" VerticalAlignment="Top">
-                        <Button VerticalAlignment="Stretch" Width="32" Padding="1,1,0,0" ToolTipService.ToolTip="Previous" Click="FindPreviousButton_Click">
+                    <StackPanel
+                        Grid.Column="2"
+                        Height="32"
+                        Spacing="8"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Top"
+                    >
+                        <Button
+                            VerticalAlignment="Stretch"
+                            Width="32"
+                            Padding="1,1,0,0"
+                            ToolTipService.ToolTip="Previous"
+                            Click="FindPreviousButton_Click"
+                        >
                             <FontIcon Glyph="&#xE74A;" FontSize="16" />
                         </Button>
-                        <Button VerticalAlignment="Stretch" Width="32" Padding="1,1,0,0" ToolTipService.ToolTip="Next" Click="FindNextButton_Click">
+                        <Button
+                            VerticalAlignment="Stretch"
+                            Width="32"
+                            Padding="1,1,0,0"
+                            ToolTipService.ToolTip="Next"
+                            Click="FindNextButton_Click"
+                        >
                             <FontIcon Glyph="&#xE74B;" FontSize="16" />
                         </Button>
-                        <TextBlock MinWidth="48" HorizontalTextAlignment="Center" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind ViewModel.FindResult, Mode=OneWay}" />
-                        <Button VerticalAlignment="Stretch" Padding="1,1,0,0" Width="32" ToolTipService.ToolTip="Close" Style="{StaticResource SubtleButtonStyle}" Click="CloseFindButton_Click">
+                        <TextBlock
+                            MinWidth="48"
+                            HorizontalTextAlignment="Center"
+                            VerticalAlignment="Center"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="{x:Bind ViewModel.FindResult, Mode=OneWay}"
+                        />
+                        <Button
+                            VerticalAlignment="Stretch"
+                            Padding="1,1,0,0"
+                            Width="32"
+                            ToolTipService.ToolTip="Close"
+                            Style="{StaticResource SubtleButtonStyle}"
+                            Click="CloseFindButton_Click"
+                        >
                             <FontIcon Glyph="&#xE711;" FontSize="16" />
                         </Button>
                     </StackPanel>
                 </Grid>
-                <Grid x:Name="ReplacePanel" Grid.Row="1" ColumnSpacing="8" Visibility="{x:Bind ViewModel.ReplacePanelVisibility, Mode=OneWay}">
+                <Grid
+                    x:Name="ReplacePanel"
+                    Grid.Row="1"
+                    ColumnSpacing="8"
+                    Margin="0,0,0,8"
+                    Visibility="{x:Bind ViewModel.ReplacePanelVisibility, Mode=OneWay}"
+                >
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="32" />
                         <ColumnDefinition Width="320" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <local:CompletionTextBox x:Name="ReplaceTextBox" Grid.Column="1" Grid.RowSpan="2" PlaceholderText="Replace with" AcceptsReturn="True" TextWrapping="Wrap" AutomationProperties.Name="Replace text" Text="{x:Bind ViewModel.ReplaceText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" BeforeKeyDown="ReplaceTextBox_BeforeKeyDown" />
-                    <StackPanel Grid.Column="2" Height="32" Spacing="8" Orientation="Horizontal" VerticalAlignment="Top">
-                        <Button VerticalAlignment="Stretch" Content="Replace" Command="{x:Bind ViewModel.ReplaceCurrentCommand}" />
-                        <Button VerticalAlignment="Stretch" Content="Replace all" Command="{x:Bind ViewModel.ReplaceAllCommand}" />
+                    <local:CompletionTextBox
+                        x:Name="ReplaceTextBox"
+                        Grid.Column="1"
+                        Grid.RowSpan="2"
+                        PlaceholderText="Replace with"
+                        AcceptsReturn="True"
+                        TextWrapping="Wrap"
+                        AutomationProperties.Name="Replace text"
+                        Text="{x:Bind ViewModel.ReplaceText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                        BeforeKeyDown="ReplaceTextBox_BeforeKeyDown"
+                    />
+                    <StackPanel
+                        Grid.Column="2"
+                        Height="32"
+                        Spacing="8"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Top"
+                    >
+                        <Button
+                            VerticalAlignment="Stretch"
+                            Content="Replace"
+                            Command="{x:Bind ViewModel.ReplaceCurrentCommand}"
+                        />
+                        <Button
+                            VerticalAlignment="Stretch"
+                            Content="Replace all"
+                            Command="{x:Bind ViewModel.ReplaceAllCommand}"
+                        />
                     </StackPanel>
                 </Grid>
             </Grid>
         </Border>
-        <local:AzunyanEditorView
-            x:Name="Editor"
+        <Border
             Grid.Row="3"
-            AllowDrop="True"
-            AcceptsReturn="True"
-            FontFamily="Consolas"
-            FontSize="14"
-            TextWrapping="NoWrap"
-            KeyDown="Editor_KeyDown"
-            SelectionChanged="Editor_SelectionChanged"
-            TextChanged="Editor_TextChanged"
-            DragOver="Editor_DragOver"
-            Drop="Editor_Drop"
-            AutomationProperties.Name="Document editor" />
-        <Border x:Name="StatusBarPanel" Grid.Row="4" BorderThickness="0,1,0,0" Padding="12,6" Visibility="{x:Bind ViewModel.StatusBarVisibility, Mode=OneWay}">
+            BorderThickness="0,1"
+            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+        >
+        <local:AzunyanEditorView
+                x:Name="Editor"
+                AllowDrop="True"
+                AcceptsReturn="True"
+                FontFamily="Consolas"
+                FontSize="14"
+                TextWrapping="NoWrap"
+                KeyDown="Editor_KeyDown"
+                SelectionChanged="Editor_SelectionChanged"
+                TextChanged="Editor_TextChanged"
+                DragOver="Editor_DragOver"
+                Drop="Editor_Drop"
+                AutomationProperties.Name="Document editor"
+            />
+        </Border>
+        <Border
+            x:Name="StatusBarPanel"
+            Grid.Row="4"
+            Padding="12,6"
+            Visibility="{x:Bind ViewModel.StatusBarVisibility, Mode=OneWay}"
+        >
             <Grid ColumnSpacing="18">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -474,17 +960,41 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <TextBlock x:Name="PositionStatus"
-                           Grid.Column="0"
-                           Text="{x:Bind ViewModel.PositionStatus, Mode=OneWay}"
-                           Tapped="PositionStatus_Tapped" />
-                <TextBlock x:Name="EncodingStatus" Grid.Column="1" Text="{x:Bind ViewModel.EncodingStatus, Mode=OneWay}" />
-                <TextBlock x:Name="LineEndingStatus" Grid.Column="2" Text="{x:Bind ViewModel.LineEndingStatus, Mode=OneWay}" />
-                <TextBlock x:Name="IndentationStatus" Grid.Column="3" Text="{x:Bind ViewModel.IndentationStatus, Mode=OneWay}"
-                           Tapped="IndentationStatus_Tapped" />
-                <TextBlock x:Name="LanguageModeStatus" Grid.Column="4" Text="{x:Bind ViewModel.LanguageModeStatus, Mode=OneWay}" />
-                <TextBlock x:Name="FilePathStatus" Grid.Column="5" HorizontalAlignment="Right" Text="{x:Bind ViewModel.FilePathStatus, Mode=OneWay}" TextTrimming="CharacterEllipsis"
-                           Tapped="FilePathStatus_Tapped" />
+                <TextBlock
+                    x:Name="PositionStatus"
+                    Grid.Column="0"
+                    Text="{x:Bind ViewModel.PositionStatus, Mode=OneWay}"
+                    Tapped="PositionStatus_Tapped"
+                />
+                <TextBlock
+                    x:Name="EncodingStatus"
+                    Grid.Column="1"
+                    Text="{x:Bind ViewModel.EncodingStatus, Mode=OneWay}"
+                />
+                <TextBlock
+                    x:Name="LineEndingStatus"
+                    Grid.Column="2"
+                    Text="{x:Bind ViewModel.LineEndingStatus, Mode=OneWay}"
+                />
+                <TextBlock
+                    x:Name="IndentationStatus"
+                    Grid.Column="3"
+                    Text="{x:Bind ViewModel.IndentationStatus, Mode=OneWay}"
+                    Tapped="IndentationStatus_Tapped"
+                />
+                <TextBlock
+                    x:Name="LanguageModeStatus"
+                    Grid.Column="4"
+                    Text="{x:Bind ViewModel.LanguageModeStatus, Mode=OneWay}"
+                />
+                <TextBlock
+                    x:Name="FilePathStatus"
+                    Grid.Column="5"
+                    HorizontalAlignment="Right"
+                    Text="{x:Bind ViewModel.FilePathStatus, Mode=OneWay}"
+                    TextTrimming="CharacterEllipsis"
+                    Tapped="FilePathStatus_Tapped"
+                />
             </Grid>
         </Border>
 
