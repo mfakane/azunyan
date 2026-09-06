@@ -408,8 +408,13 @@
             <controls:TitleBar
                 x:Name="TitleBarControl"
                 Title="{x:Bind ViewModel.Title, Mode=OneWay}"
-                Background="Transparent"
-            />
+                Background="Transparent">
+                <controls:TitleBar.IconSource>
+                    <controls:BitmapIconSource
+                        UriSource="ms-appx:///Assets/app.ico"
+                        ShowAsMonochrome="False" />
+                </controls:TitleBar.IconSource>
+            </controls:TitleBar>
             <Border
                 x:Name="WindowGroupAccentStrip"
                 Height="2"

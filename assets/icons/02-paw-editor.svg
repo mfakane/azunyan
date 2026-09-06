@@ -32,7 +32,7 @@
      inkscape:window-x="1432"
      inkscape:window-y="1106"
      inkscape:window-maximized="1"
-     inkscape:current-layer="background" />
+     inkscape:current-layer="g39" />
   <title
      id="icon-title">Paw text editor icon</title>
   <desc
@@ -403,7 +403,7 @@
       <use
          href="#paper-outline"
          xlink:href="#paper-outline"
-         transform="translate(11 27)"
+         transform="translate(11 11)"
          fill="#0644c7"
          opacity=".47"
          filter="url(#shadow-blur)"
