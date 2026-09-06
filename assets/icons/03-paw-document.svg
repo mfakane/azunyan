@@ -1,0 +1,488 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="1254"
+   height="1254"
+   viewBox="157 157 940 940"
+   fill="none"
+   version="1.1"
+   role="img"
+   aria-labelledby="icon-title icon-description"
+   id="svg35"
+   sodipodi:docname="03-paw-document.svg"
+   inkscape:version="1.4.4 (dcaf3e7, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview35"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="0.93062201"
+     inkscape:cx="626.46272"
+     inkscape:cy="627"
+     inkscape:window-width="2560"
+     inkscape:window-height="1369"
+     inkscape:window-x="1432"
+     inkscape:window-y="1106"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="background" />
+  <title
+     id="icon-title">Paw document icon</title>
+  <desc
+     id="icon-description">Editable vector recreation of the supplied icon. Paper, paw pads, details, and background are separate named groups. Curves, gradients, and standard SVG filters only; no embedded raster images. Corners outside the blue tile are transparent.</desc>
+  <defs
+     id="defs33">
+    <linearGradient
+       id="pad-gradient-0"
+       gradientUnits="userSpaceOnUse"
+       x1="516.77"
+       y1="776.55"
+       x2="405.23"
+       y2="640.45">
+      <stop
+         offset="0"
+         stop-color="#2588fb"
+         id="stop1" />
+      <stop
+         offset="1"
+         stop-color="#2d94fc"
+         id="stop2" />
+    </linearGradient>
+    <linearGradient
+       id="pad-gradient-1"
+       gradientUnits="userSpaceOnUse"
+       x1="586.79"
+       y1="687.04"
+       x2="536.21"
+       y2="515.96">
+      <stop
+         offset="0"
+         stop-color="#298ffc"
+         id="stop3" />
+      <stop
+         offset="1"
+         stop-color="#2f95fb"
+         id="stop4" />
+    </linearGradient>
+    <linearGradient
+       id="pad-gradient-2"
+       gradientUnits="userSpaceOnUse"
+       x1="658.96"
+       y1="686.12"
+       x2="730.04"
+       y2="516.88">
+      <stop
+         offset="0"
+         stop-color="#2487fc"
+         id="stop5" />
+      <stop
+         offset="1"
+         stop-color="#298cf9"
+         id="stop6" />
+    </linearGradient>
+    <linearGradient
+       id="pad-gradient-3"
+       gradientUnits="userSpaceOnUse"
+       x1="770.31"
+       y1="786.78"
+       x2="815.69"
+       y2="630.22">
+      <stop
+         offset="0"
+         stop-color="#1e7bf9"
+         id="stop7" />
+      <stop
+         offset="1"
+         stop-color="#227ff7"
+         id="stop8" />
+    </linearGradient>
+    <linearGradient
+       id="pad-gradient-4"
+       gradientUnits="userSpaceOnUse"
+       x1="713.37"
+       y1="981.92"
+       x2="541.63"
+       y2="668.08">
+      <stop
+         offset="0"
+         stop-color="#1b72f4"
+         id="stop9" />
+      <stop
+         offset="1"
+         stop-color="#2489fc"
+         id="stop10" />
+    </linearGradient>
+    <path
+       id="tile-outline"
+       d="M264,0 H990 C1135.8,0 1254,118.2 1254,264 V990 C1254,1135.8 1135.8,1254 990,1254 H264 C118.2,1254 0,1135.8 0,990 V264 C0,118.2 118.2,0 264,0 Z" />
+    <path
+       id="paper-outline"
+       d="M375,164 H700 C722.5,164 739.2,176.9 754.6,192.1 L956.8,393 C980.5,416.5 992,432.8 992,459 V974 C992,1033 945.1,1080 886,1080 H377 C318,1080 272,1035 272,976 V271 C272,212 317,164 375,164 Z" />
+    <clipPath
+       id="tile-clip">
+      <use
+         href="#tile-outline"
+         xlink:href="#tile-outline"
+         id="use10" />
+    </clipPath>
+    <clipPath
+       id="paper-clip">
+      <use
+         href="#paper-outline"
+         xlink:href="#paper-outline"
+         id="use11" />
+    </clipPath>
+    <linearGradient
+       id="background-gradient"
+       gradientUnits="userSpaceOnUse"
+       x1="0"
+       y1="0"
+       x2="1254"
+       y2="1120">
+      <stop
+         offset="0"
+         stop-color="#2c9bfd"
+         id="stop11" />
+      <stop
+         offset=".16"
+         stop-color="#2d99fc"
+         id="stop12" />
+      <stop
+         offset=".42"
+         stop-color="#278cfc"
+         id="stop13" />
+      <stop
+         offset=".73"
+         stop-color="#227df8"
+         id="stop14" />
+      <stop
+         offset="1"
+         stop-color="#1d70ed"
+         id="stop15" />
+    </linearGradient>
+    <linearGradient
+       id="paper-gradient"
+       gradientUnits="userSpaceOnUse"
+       x1="250"
+       y1="200"
+       x2="960"
+       y2="1060">
+      <stop
+         offset="0"
+         stop-color="#fdfdfe"
+         id="stop16" />
+      <stop
+         offset=".48"
+         stop-color="#f5f6fc"
+         id="stop17" />
+      <stop
+         offset="1"
+         stop-color="#e8eefb"
+         id="stop18" />
+    </linearGradient>
+    <linearGradient
+       id="paper-edge-gradient"
+       gradientUnits="userSpaceOnUse"
+       x1="330"
+       y1="200"
+       x2="800"
+       y2="1080">
+      <stop
+         offset="0"
+         stop-color="#fff"
+         stop-opacity="1"
+         id="stop19" />
+      <stop
+         offset=".5"
+         stop-color="#fff"
+         stop-opacity=".7"
+         id="stop20" />
+      <stop
+         offset="1"
+         stop-color="#fff"
+         stop-opacity=".24"
+         id="stop21" />
+    </linearGradient>
+    <linearGradient
+       id="paw-gradient"
+       gradientUnits="userSpaceOnUse"
+       x1="407"
+       y1="524"
+       x2="846"
+       y2="946">
+      <stop
+         offset="0"
+         stop-color="#309eff"
+         id="stop22" />
+      <stop
+         offset=".38"
+         stop-color="#278cfd"
+         id="stop23" />
+      <stop
+         offset="1"
+         stop-color="#1975f7"
+         id="stop24" />
+    </linearGradient>
+    <linearGradient
+       id="document-curl-gradient"
+       gradientUnits="userSpaceOnUse"
+       x1="852"
+       y1="258"
+       x2="739"
+       y2="420">
+      <stop
+         offset="0"
+         stop-color="#fcfdff"
+         id="stop25" />
+      <stop
+         offset=".45"
+         stop-color="#eef3fd"
+         id="stop26" />
+      <stop
+         offset="1"
+         stop-color="#d7e6fc"
+         id="stop27" />
+    </linearGradient>
+    <filter
+       id="shadow-blur"
+       x="-0.07"
+       y="-0.055021834"
+       width="1.14"
+       height="1.1100437"
+       color-interpolation-filters="sRGB">
+      <feGaussianBlur
+         stdDeviation="21"
+         id="feGaussianBlur27" />
+    </filter>
+    <filter
+       id="contact-blur"
+       x="-0.016666667"
+       y="-0.013100437"
+       width="1.0333333"
+       height="1.0262009"
+       color-interpolation-filters="sRGB">
+      <feGaussianBlur
+         stdDeviation="5"
+         id="feGaussianBlur28" />
+    </filter>
+    <filter
+       id="fold-shadow-blur"
+       x="-0.10684932"
+       y="-0.10612245"
+       width="1.2136986"
+       height="1.2122449"
+       color-interpolation-filters="sRGB">
+      <feGaussianBlur
+         stdDeviation="13"
+         id="feGaussianBlur29" />
+    </filter>
+    <filter
+       id="fold-contact-blur"
+       x="-0.032876712"
+       y="-0.032653061"
+       width="1.0657534"
+       height="1.0653061"
+       color-interpolation-filters="sRGB">
+      <feGaussianBlur
+         stdDeviation="4"
+         id="feGaussianBlur30" />
+    </filter>
+    <filter
+       id="paw-inset"
+       x="-0.14225982"
+       y="-0.10712616"
+       width="1.3055527"
+       height="1.2516889"
+       color-interpolation-filters="sRGB">
+      <feGaussianBlur
+         in="SourceAlpha"
+         stdDeviation="6.2"
+         result="blurred-alpha"
+         id="feGaussianBlur31" />
+      <feOffset
+         in="blurred-alpha"
+         dx="2.2"
+         dy="5.2"
+         result="offset-alpha"
+         id="feOffset31" />
+      <feComposite
+         in="SourceAlpha"
+         in2="offset-alpha"
+         operator="out"
+         result="inset-mask"
+         id="feComposite31" />
+      <feFlood
+         flood-color="#0054e3"
+         flood-opacity=".88"
+         result="inset-color"
+         id="feFlood31" />
+      <feComposite
+         in="inset-color"
+         in2="inset-mask"
+         operator="in"
+         result="inset-shadow"
+         id="feComposite32" />
+      <feComposite
+         in="inset-shadow"
+         in2="SourceGraphic"
+         operator="over"
+         id="feComposite33" />
+    </filter>
+  </defs>
+  <g
+     id="background"
+     inkscape:groupmode="layer"
+     inkscape:label="01 Blue rounded tile">
+    <path
+       id="background-tile"
+       d="m 264,0 h 726 c 145.8,0 264,118.2 264,264 v 726 c 0,145.8 -118.2,264 -264,264 H 264 C 118.2,1254 0,1135.8 0,990 V 264 C 0,118.2 118.2,0 264,0 Z"
+       fill="url(#background-gradient)"
+       style="display:none" />
+  </g>
+  <g
+     id="paper-shadow-layer"
+     inkscape:groupmode="layer"
+     inkscape:label="02 Paper shadow">
+    <g
+       clip-path="url(#tile-clip)"
+       id="g34">
+      <use
+         href="#paper-outline"
+         xlink:href="#paper-outline"
+         transform="translate(11 27)"
+         fill="#0644c7"
+         opacity=".47"
+         filter="url(#shadow-blur)"
+         id="use33" />
+      <use
+         href="#paper-outline"
+         xlink:href="#paper-outline"
+         transform="translate(3 7)"
+         fill="#0659d6"
+         opacity=".18"
+         filter="url(#contact-blur)"
+         id="use34" />
+    </g>
+  </g>
+  <g
+     id="paper"
+     inkscape:groupmode="layer"
+     inkscape:label="03 Document sheet">
+    <path
+       id="document-sheet"
+       d="M375,164 H700 C722.5,164 739.2,176.9 754.6,192.1 L956.8,393 C980.5,416.5 992,432.8 992,459 V974 C992,1033 945.1,1080 886,1080 H377 C318,1080 272,1035 272,976 V271 C272,212 317,164 375,164 Z"
+       fill="url(#paper-gradient)" />
+    <path
+       id="document-rim"
+       d="M375,164 H700 C722.5,164 739.2,176.9 754.6,192.1 L956.8,393 C980.5,416.5 992,432.8 992,459 V974 C992,1033 945.1,1080 886,1080 H377 C318,1080 272,1035 272,976 V271 C272,212 317,164 375,164 Z"
+       fill="none"
+       stroke="url(#paper-edge-gradient)"
+       stroke-width="1.5" />
+  </g>
+  <g
+     id="folded-corner"
+     inkscape:groupmode="layer"
+     inkscape:label="04 Folded top-right corner">
+    <g
+       id="corner-shadow"
+       clip-path="url(#paper-clip)">
+      <path
+         d="M700,164 C727,164 741,193 741,227 V347 C741,388 761,412 804,412 H923 C962,412 984.6,426.6 992,458 C990.7,432.3 980.5,416.5 956.8,393 L754.6,192.1 C739.2,176.9 722.5,164 700,164 Z"
+         transform="translate(1 20)"
+         fill="#3977d2"
+         opacity=".53"
+         filter="url(#fold-shadow-blur)"
+         id="path34" />
+      <path
+         d="M700,164 C727,164 741,193 741,227 V347 C741,388 761,412 804,412 H923 C962,412 984.6,426.6 992,458 C990.7,432.3 980.5,416.5 956.8,393 L754.6,192.1 C739.2,176.9 722.5,164 700,164 Z"
+         transform="translate(0 6)"
+         fill="#4c87da"
+         opacity=".35"
+         filter="url(#fold-contact-blur)"
+         id="path35" />
+    </g>
+    <path
+       id="folded-paper"
+       d="M700,164 C727,164 741,193 741,227 V347 C741,388 761,412 804,412 H923 C962,412 984.6,426.6 992,458 C990.7,432.3 980.5,416.5 956.8,393 L754.6,192.1 C739.2,176.9 722.5,164 700,164 Z"
+       fill="url(#document-curl-gradient)" />
+    <path
+       id="fold-edge-glint"
+       d="M700,165 C726.5,165 741,193 741,227 V347 C741,388 761,412 804,412 H923 C962,412 984.6,426.6 992,458"
+       fill="none"
+       stroke="#fff"
+       stroke-opacity=".91"
+       stroke-width="3.4"
+       stroke-linecap="round" />
+    <path
+       id="diagonal-edge-glint"
+       d="M701,164 C722.5,164 739.2,176.9 754.6,192.1 L956.8,393 C980.5,416.5 991.4,432.4 992,457"
+       fill="none"
+       stroke="#fff"
+       stroke-opacity=".76"
+       stroke-width="1.4" />
+  </g>
+  <g
+     id="paw"
+     inkscape:groupmode="layer"
+     inkscape:label="06 Paw pads">
+    <g
+       id="paw-rims"
+       transform="translate(1.3 3.1)"
+       fill="#ffffff"
+       stroke="#ffffff"
+       stroke-width="2.3"
+       stroke-linejoin="round">
+      <path
+         id="toe-outer-left-rim"
+         d="M453.37,638.87 C468.23,639.25 482.85,649.73 493.19,661.77 C503.63,673.93 509.69,687.69 512.94,703.2 C516.63,720.8 516.7,740.64 507.46,755.63 C499.29,768.87 483.86,778.32 468.64,777.9 C453.52,777.49 438.6,767.34 428.22,755.31 C417.82,743.25 411.97,729.28 408.97,713.79 C405.54,696.15 405.79,676.52 415.16,661.41 C423.34,648.22 438.48,638.48 453.37,638.87 Z" />
+      <path
+         id="toe-inner-left-rim"
+         d="M556.24,524.35 C564.68,524.09 573.51,527.42 581,532.61 C587.2,536.9 592.47,542.47 596.73,548.52 C606.83,562.84 611.24,579.83 612.95,597.4 C614.77,616.21 613.5,635.67 604.66,652.31 C600.95,659.28 595.92,665.75 589.74,670.49 C582.92,675.71 574.69,678.81 566.51,678.91 C550.8,679.1 535.25,668.22 525.41,654.62 C515.24,640.56 511.17,623.57 509.65,606.33 C507.98,587.39 509.39,568.15 518.75,551.54 C526.84,537.19 540.87,524.81 556.24,524.35 Z" />
+      <path
+         id="toe-inner-right-rim"
+         d="M698.36,524.29 C706.57,524.26 715.05,527.55 722.05,532.78 C728.31,537.47 733.39,543.7 737.13,550.46 C746.08,566.63 747.4,585.82 745.8,604.5 C744.29,622.03 740.23,639.11 730.16,653.56 C720.71,667.13 705.95,678.36 690.47,678.9 C681.96,679.19 673.22,676.24 666.01,670.97 C659.88,666.5 654.85,660.36 651.12,653.67 C641.72,636.83 640.57,616.56 642.69,597.35 C644.59,580.2 649.1,563.89 659.12,549.59 C668.59,536.08 683,524.36 698.36,524.29 Z" />
+      <path
+         id="toe-outer-right-rim"
+         d="M803.45,638.94 C811.46,639.19 819.57,642.35 826.16,647.39 C832.04,651.88 836.7,657.86 839.95,664.41 C847.73,680.13 847.28,699.07 843.33,716.57 C839.9,731.79 833.82,745.91 823.24,757.52 C812.52,769.28 797.19,778.46 782.34,777.79 C767.39,777.12 752.93,766.48 745.65,752.72 C737.45,737.21 738.37,717.74 742.72,700.3 C746.5,685.1 752.89,671.44 763.35,659.8 C773.85,648.11 788.47,638.46 803.45,638.94 Z" />
+      <path
+         id="central-pad-rim"
+         d="M626.26,704.6 C645.08,704.17 664.82,710.95 678.78,723.29 C691.17,734.23 699.02,749.53 707.89,763.7 C716.86,778.03 726.88,791.19 738.49,803.51 C749.92,815.63 762.88,826.93 770.74,841.33 C780.49,859.18 782.39,881.8 775.5,901.52 C769.84,917.7 758.27,931.93 743.51,939.27 C726.11,947.92 704.3,946.99 685.23,940.83 C676.48,938 668.31,934.07 659.61,931.68 C649.7,928.96 639.11,928.25 628.51,928.23 C617.57,928.22 606.61,928.93 596.37,931.73 C587.68,934.1 579.5,937.98 570.75,940.79 C551.66,946.94 529.84,948.03 512.26,939.6 C497.09,932.33 485.08,917.97 479.38,901.53 C472.69,882.23 474.71,860.06 483.87,842.31 C491.57,827.37 504.34,815.56 516.32,803.35 C527.99,791.47 538.92,779.22 547.18,764.89 C551.43,757.52 554.97,749.6 559.71,742.45 C564.32,735.47 570.07,729.23 576.5,723.91 C590.62,712.22 608.01,705.02 626.26,704.6 Z" />
+    </g>
+    <g
+       id="paw-blue"
+       fill="url(#paw-gradient)">
+      <path
+         id="toe-outer-left"
+         d="M453.37,638.87 C468.23,639.25 482.85,649.73 493.19,661.77 C503.63,673.93 509.69,687.69 512.94,703.2 C516.63,720.8 516.7,740.64 507.46,755.63 C499.29,768.87 483.86,778.32 468.64,777.9 C453.52,777.49 438.6,767.34 428.22,755.31 C417.82,743.25 411.97,729.28 408.97,713.79 C405.54,696.15 405.79,676.52 415.16,661.41 C423.34,648.22 438.48,638.48 453.37,638.87 Z"
+         fill="url(#pad-gradient-0)"
+         filter="url(#paw-inset)" />
+      <path
+         id="toe-inner-left"
+         d="M556.24,524.35 C564.68,524.09 573.51,527.42 581,532.61 C587.2,536.9 592.47,542.47 596.73,548.52 C606.83,562.84 611.24,579.83 612.95,597.4 C614.77,616.21 613.5,635.67 604.66,652.31 C600.95,659.28 595.92,665.75 589.74,670.49 C582.92,675.71 574.69,678.81 566.51,678.91 C550.8,679.1 535.25,668.22 525.41,654.62 C515.24,640.56 511.17,623.57 509.65,606.33 C507.98,587.39 509.39,568.15 518.75,551.54 C526.84,537.19 540.87,524.81 556.24,524.35 Z"
+         fill="url(#pad-gradient-1)"
+         filter="url(#paw-inset)" />
+      <path
+         id="toe-inner-right"
+         d="M698.36,524.29 C706.57,524.26 715.05,527.55 722.05,532.78 C728.31,537.47 733.39,543.7 737.13,550.46 C746.08,566.63 747.4,585.82 745.8,604.5 C744.29,622.03 740.23,639.11 730.16,653.56 C720.71,667.13 705.95,678.36 690.47,678.9 C681.96,679.19 673.22,676.24 666.01,670.97 C659.88,666.5 654.85,660.36 651.12,653.67 C641.72,636.83 640.57,616.56 642.69,597.35 C644.59,580.2 649.1,563.89 659.12,549.59 C668.59,536.08 683,524.36 698.36,524.29 Z"
+         fill="url(#pad-gradient-2)"
+         filter="url(#paw-inset)" />
+      <path
+         id="toe-outer-right"
+         d="M803.45,638.94 C811.46,639.19 819.57,642.35 826.16,647.39 C832.04,651.88 836.7,657.86 839.95,664.41 C847.73,680.13 847.28,699.07 843.33,716.57 C839.9,731.79 833.82,745.91 823.24,757.52 C812.52,769.28 797.19,778.46 782.34,777.79 C767.39,777.12 752.93,766.48 745.65,752.72 C737.45,737.21 738.37,717.74 742.72,700.3 C746.5,685.1 752.89,671.44 763.35,659.8 C773.85,648.11 788.47,638.46 803.45,638.94 Z"
+         fill="url(#pad-gradient-3)"
+         filter="url(#paw-inset)" />
+      <path
+         id="central-pad"
+         d="M626.26,704.6 C645.08,704.17 664.82,710.95 678.78,723.29 C691.17,734.23 699.02,749.53 707.89,763.7 C716.86,778.03 726.88,791.19 738.49,803.51 C749.92,815.63 762.88,826.93 770.74,841.33 C780.49,859.18 782.39,881.8 775.5,901.52 C769.84,917.7 758.27,931.93 743.51,939.27 C726.11,947.92 704.3,946.99 685.23,940.83 C676.48,938 668.31,934.07 659.61,931.68 C649.7,928.96 639.11,928.25 628.51,928.23 C617.57,928.22 606.61,928.93 596.37,931.73 C587.68,934.1 579.5,937.98 570.75,940.79 C551.66,946.94 529.84,948.03 512.26,939.6 C497.09,932.33 485.08,917.97 479.38,901.53 C472.69,882.23 474.71,860.06 483.87,842.31 C491.57,827.37 504.34,815.56 516.32,803.35 C527.99,791.47 538.92,779.22 547.18,764.89 C551.43,757.52 554.97,749.6 559.71,742.45 C564.32,735.47 570.07,729.23 576.5,723.91 C590.62,712.22 608.01,705.02 626.26,704.6 Z"
+         fill="url(#pad-gradient-4)"
+         filter="url(#paw-inset)" />
+    </g>
+  </g>
+</svg>
