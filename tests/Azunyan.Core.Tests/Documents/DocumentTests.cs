@@ -42,6 +42,45 @@ public sealed class DocumentTests
     }
 
     [Fact]
+    public void Undo_group_merges_consecutive_insertions()
+    {
+        var document = new Document();
+
+        document.BeginUndoGroup();
+        document.Insert("a");
+        document.Insert("b");
+        document.Insert("c");
+        document.EndUndoGroup();
+
+        Assert.Equal("abc", document.Text);
+        Assert.True(document.Undo());
+        Assert.Equal(string.Empty, document.Text);
+        Assert.Equal(TextSelection.Caret(0), document.Selection);
+        Assert.False(document.CanUndo);
+        Assert.True(document.Redo());
+        Assert.Equal("abc", document.Text);
+        Assert.Equal(TextSelection.Caret(3), document.Selection);
+    }
+
+    [Fact]
+    public void Undo_group_stops_merging_after_selection_movement()
+    {
+        var document = new Document();
+
+        document.BeginUndoGroup();
+        document.Insert("a");
+        document.SetCaret(0);
+        document.Insert("b");
+        document.EndUndoGroup();
+
+        Assert.Equal("ba", document.Text);
+        Assert.True(document.Undo());
+        Assert.Equal("a", document.Text);
+        Assert.True(document.Undo());
+        Assert.Equal(string.Empty, document.Text);
+    }
+
+    [Fact]
     public void New_edit_clears_redo_history()
     {
         var document = new Document("a");

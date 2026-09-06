@@ -30,6 +30,8 @@ namespace Azunyan.WinUI;
 /// </summary>
 public sealed partial class AzunyanEditorView : UserControl, IDisposable
 {
+    private static readonly TimeSpan TypedInputUndoGroupInterval =
+        TimeSpan.FromMilliseconds(500);
     private readonly AzunyanEditorRenderer _defaultRenderer;
     private Document _document = new();
     private readonly SlidingInputWindowCalculator _inputWindowCalculator = new();
@@ -55,6 +57,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private bool _pasteBatchRefreshPending;
     private bool _pasteBatchRefreshScheduled;
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _pasteBatchRefreshTimer;
+    private bool _typedInputUndoGroupActive;
+    private long? _lastTypedInputTimestamp;
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _typedInputUndoGroupTimer;
     private long _pasteOperationSequence;
     private DateTimeOffset _clipboardUnavailableUntil;
     private AzunyanColorScheme _colorScheme;
@@ -149,6 +154,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         _disposed = true;
+        EndTypedInputUndoGroup();
         if (_pasteBatchRefreshTimer is { } pasteBatchRefreshTimer)
         {
             pasteBatchRefreshTimer.Stop();
@@ -156,6 +162,13 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         _pasteBatchRefreshTimer = null;
+        if (_typedInputUndoGroupTimer is { } typedInputUndoGroupTimer)
+        {
+            typedInputUndoGroupTimer.Stop();
+            typedInputUndoGroupTimer.Tick -= OnTypedInputUndoGroupTimerTick;
+        }
+
+        _typedInputUndoGroupTimer = null;
         InputWindow.NativeTextBoxControl.BeforeKeyDown -= OnInputKeyDown;
         InputWindow.NativeTextBoxControl.AfterKeyUp -= OnInputKeyUp;
         CompletionPopup.Accepted -= CompletionPopup_Accepted;
@@ -542,6 +555,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             return;
         }
 
+        EndTypedInputUndoGroup();
         var oldText = Snapshot.Text;
         _providerScheduler.CancelAll();
         InvalidateProviderGenerations();
@@ -567,6 +581,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     {
         RunAfterComposition(() =>
         {
+            EndTypedInputUndoGroup();
             var hadBlockSelection = _blockSelection is not null;
             _blockSelection = null;
             _document.Selection = selection;
@@ -598,7 +613,11 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     }
 
     public void ReplaceDocumentRange(TextRange range, string replacement) =>
-        RunAfterComposition(() => ReplaceDocumentRangeAndNotify(range, replacement));
+        RunAfterComposition(() =>
+        {
+            EndTypedInputUndoGroup();
+            ReplaceDocumentRangeAndNotify(range, replacement);
+        });
 
     internal void SetAutomationValue(string value)
     {
@@ -1071,6 +1090,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             return;
         }
 
+        EndTypedInputUndoGroup();
         _providerScheduler.CancelAll();
         InvalidateProviderGenerations();
         if (_scrollViewer is not null && !IsProjectedTextSurface)
@@ -1099,6 +1119,15 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             $"native-text-changed generation={args.Generation}; oldRange={args.Change.OldRange}; "
             + $"newTextLength={args.Change.NewText.Length}; selection={args.Selection}; "
             + $"composition={args.CompositionRange?.ToString() ?? "none"}; {DescribeDiagnosticState()}");
+        if (IsTypedInput(args))
+        {
+            BeginTypedInputUndoGroup();
+        }
+        else
+        {
+            EndTypedInputUndoGroup();
+        }
+
         var oldSnapshot = Snapshot;
         _applyingInputChange = true;
         try
@@ -1180,6 +1209,15 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             RequestInputWindowSynchronization();
         }
     }
+
+    private bool IsTypedInput(AzunyanTextInputChangedEventArgs args) =>
+        args.CompositionRange is null
+        && args.Change.NewText.Length > 0
+        && !args.Change.NewText.Contains('\r')
+        && !args.Change.NewText.Contains('\n')
+        && !_nativeKeysDown.Contains(VirtualKey.Control)
+        && !_nativeKeysDown.Contains(VirtualKey.Menu)
+        && _nativeKeysDown.Count > 0;
 
     private void ApplyBlockReplacement(
         TextBlockSelection selection,
@@ -1527,6 +1565,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             AzunyanDiagnosticCategory.Input,
             $"native-composition-changed generation={args.Generation}; composing={args.IsComposing}; "
             + $"range={args.CompositionRange?.ToString() ?? "none"}; {DescribeDiagnosticState()}");
+        EndTypedInputUndoGroup();
         _compositionRange = args.CompositionRange;
         _pendingProviderDocumentChange = null;
         _completionRequested = false;
@@ -1817,6 +1856,66 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             throw new InvalidOperationException(
                 "The editor dispatcher is no longer available.");
         }
+    }
+
+    private void BeginTypedInputUndoGroup()
+    {
+        var now = System.Diagnostics.Stopwatch.GetTimestamp();
+        if (_typedInputUndoGroupActive
+            && _lastTypedInputTimestamp is { } last
+            && System.Diagnostics.Stopwatch.GetElapsedTime(last, now)
+                >= TypedInputUndoGroupInterval)
+        {
+            EndTypedInputUndoGroup();
+        }
+
+        if (!_typedInputUndoGroupActive)
+        {
+            _document.BeginUndoGroup();
+            _typedInputUndoGroupActive = true;
+        }
+
+        _lastTypedInputTimestamp = now;
+        _typedInputUndoGroupTimer ??= DispatcherQueue.CreateTimer();
+        _typedInputUndoGroupTimer.Interval = TypedInputUndoGroupInterval;
+        _typedInputUndoGroupTimer.IsRepeating = false;
+        _typedInputUndoGroupTimer.Stop();
+        _typedInputUndoGroupTimer.Tick -= OnTypedInputUndoGroupTimerTick;
+        _typedInputUndoGroupTimer.Tick += OnTypedInputUndoGroupTimerTick;
+        _typedInputUndoGroupTimer.Start();
+    }
+
+    private void EndTypedInputUndoGroup()
+    {
+        if (_typedInputUndoGroupActive)
+        {
+            _document.EndUndoGroup();
+            _typedInputUndoGroupActive = false;
+        }
+
+        _lastTypedInputTimestamp = null;
+        _typedInputUndoGroupTimer?.Stop();
+    }
+
+    private void OnTypedInputUndoGroupTimerTick(
+        Microsoft.UI.Dispatching.DispatcherQueueTimer sender,
+        object args)
+    {
+        if (!_typedInputUndoGroupActive
+            || _lastTypedInputTimestamp is not { } last)
+        {
+            return;
+        }
+
+        var elapsed = System.Diagnostics.Stopwatch.GetElapsedTime(last);
+        if (elapsed < TypedInputUndoGroupInterval)
+        {
+            sender.Stop();
+            sender.Start();
+            return;
+        }
+
+        EndTypedInputUndoGroup();
     }
 
     private void RequestPendingPasteBatchRefresh()
@@ -2505,6 +2604,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private void ApplyDocumentCommand(Action action)
     {
         ArgumentNullException.ThrowIfNull(action);
+        EndTypedInputUndoGroup();
         var previousSnapshot = Snapshot;
         _applyingDocumentCommand = true;
         try
@@ -2560,6 +2660,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             $"native-focus-changed state={InputWindow.FocusState}; {DescribeDiagnosticState()}");
         if (InputWindow.FocusState == FocusState.Unfocused)
         {
+            EndTypedInputUndoGroup();
             // A window deactivation can lose the physical KeyUp messages.
             // Do not retain delayed commands or native suppression markers
             // across the next focus session.
