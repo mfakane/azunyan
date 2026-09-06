@@ -9,6 +9,8 @@ public sealed class Document
 {
     private readonly SharedBuffer _buffer;
     private TextCaretSet _caretSet;
+    private bool _undoGroupActive;
+    private EditRecord? _undoGroupRecord;
     private bool _disposed;
 
     public Document(string text = "", int undoLimit = 1000)
@@ -93,6 +95,24 @@ public sealed class Document
     public event EventHandler? SelectionChanged;
 
     public event EventHandler? CaretSetChanged;
+
+    /// <summary>
+    /// Starts a group of consecutive edits that should be undone as one
+    /// operation. The caller is responsible for deciding when the group has
+    /// ended; edits are still reported individually through <see cref="Changed"/>.
+    /// </summary>
+    public void BeginUndoGroup()
+    {
+        _undoGroupActive = true;
+        _undoGroupRecord = null;
+    }
+
+    /// <summary>Ends the current undo group.</summary>
+    public void EndUndoGroup()
+    {
+        _undoGroupActive = false;
+        _undoGroupRecord = null;
+    }
 
     public void SetCaretSet(TextCaretSet caretSet)
     {
@@ -181,16 +201,19 @@ public sealed class Document
 
     public bool Undo()
     {
+        EndUndoGroup();
         return _buffer.Undo(this);
     }
 
     public bool Redo()
     {
+        EndUndoGroup();
         return _buffer.Redo(this);
     }
 
     public void ClearHistory()
     {
+        EndUndoGroup();
         _buffer.ClearHistory();
     }
 
@@ -198,6 +221,7 @@ public sealed class Document
     public void Reset(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
+        EndUndoGroup();
         var caret = new TextCaretSet(new[] {
             new TextCaretState(TextSelection.Caret(0), 0)
         });
@@ -238,7 +262,13 @@ public sealed class Document
             return change;
         }
 
-        _buffer.Apply(change, this, oldCaretSet, newCaretSet);
+        _undoGroupRecord = _buffer.Apply(
+            change,
+            this,
+            oldCaretSet,
+            newCaretSet,
+            _undoGroupActive,
+            _undoGroupRecord);
         return change;
     }
 
@@ -250,6 +280,9 @@ public sealed class Document
             return;
         }
 
+        // Moving the caret or changing the selection separates typing runs,
+        // even when the next edit happens to target the same offset again.
+        _undoGroupRecord = null;
         _caretSet = caretSet;
         RaiseCaretEvents(old, caretSet, old.Primary.Selection);
     }
@@ -270,6 +303,28 @@ public sealed class Document
         }
     }
 
+    private static bool CanMergeUndoRecords(
+        EditRecord previous,
+        EditRecord current) =>
+        ReferenceEquals(previous.Origin, current.Origin)
+        && previous.Change.NewText.Length > 0
+        && current.Change.IsInsertion
+        && previous.Change.NewRange.End == current.Change.OldRange.Start
+        && previous.NewCaretSet.Equals(current.OldCaretSet);
+
+    private static EditRecord MergeUndoRecords(
+        EditRecord previous,
+        EditRecord current) =>
+        new(
+            new TextChange(
+                previous.Change.OldRange,
+                previous.Change.OldText,
+                previous.Change.NewText + current.Change.NewText),
+            previous.OldTree,
+            current.NewTree,
+            previous.Origin,
+            previous.OldCaretSet,
+            current.NewCaretSet);
     private void ValidatePosition(int position)
     {
         if (position < 0 || position > Length)
@@ -378,22 +433,47 @@ public sealed class Document
         public bool CanRedo => _redo.Count > 0;
         public event EventHandler<BufferChangedEventArgs>? Changed;
 
-        public void Apply(TextChange change, Document initiator, TextCaretSet oldCarets, TextCaretSet newCarets)
+        public EditRecord? Apply(
+            TextChange change,
+            Document initiator,
+            TextCaretSet oldCarets,
+            TextCaretSet newCarets,
+            bool undoGroupActive,
+            EditRecord? undoGroupRecord)
         {
             var oldTree = _tree;
             var newTree = _tree.Replace(change.OldRange, change.NewText);
             var record = new EditRecord(change, oldTree, newTree, initiator, oldCarets, newCarets);
             _tree = newTree;
-            if (_undoLimit > 0)
+            EditRecord? resultingUndoGroupRecord = null;
+            if (undoGroupActive
+                && undoGroupRecord is { } previousGroupRecord
+                && _undo.Count > 0
+                && ReferenceEquals(_undo[^1], previousGroupRecord)
+                && CanMergeUndoRecords(previousGroupRecord, record))
+            {
+                var mergedRecord = MergeUndoRecords(previousGroupRecord, record);
+                _undo[^1] = mergedRecord;
+                resultingUndoGroupRecord = mergedRecord;
+            }
+            else if (_undoLimit > 0)
             {
                 _undo.Add(record);
                 if (_undo.Count > _undoLimit)
                 {
                     _undo.RemoveAt(0);
                 }
+
+                if (undoGroupActive
+                    && _undo.Count > 0
+                    && ReferenceEquals(_undo[^1], record))
+                {
+                    resultingUndoGroupRecord = record;
+                }
             }
             _redo.Clear();
             Publish(initiator, newCarets, DocumentChangeKind.Edit, change);
+            return resultingUndoGroupRecord;
         }
 
         public bool Undo(Document initiator)
