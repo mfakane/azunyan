@@ -66,8 +66,7 @@ public sealed partial class MainWindow
             $"Editor exception/{source}",
             exception);
         _editorBuffer = new AzunyanEditorBuffer(Editor);
-        _findNotificationFlyout = RootGrid.Resources["FindNotificationFlyout"] as Flyout
-            ?? throw new InvalidOperationException("Find notification flyout is not configured.");
+        _findNotificationFlyout = FindNotificationFlyout;
         _findNotificationText = _findNotificationFlyout.Content as TextBlock
             ?? throw new InvalidOperationException("Find notification flyout must contain a TextBlock.");
 

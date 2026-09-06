@@ -319,7 +319,10 @@
                     </Setter.Value>
                 </Setter>
             </Style>
-            <Flyout x:Key="FindNotificationFlyout" Placement="Bottom">
+            <Flyout
+                x:Name="FindNotificationFlyout"
+                Placement="Bottom"
+            >
                 <TextBlock Padding="12,8" MaxWidth="360" TextWrapping="Wrap" />
             </Flyout>
             <MenuFlyout x:Name="StatusTabDisplaySizeMenu">
