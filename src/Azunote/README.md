@@ -66,7 +66,8 @@ azu +12:4 path\to\file.txt
 
 Line and column are one-based and are clamped to the opened document. Azunote
 uses one process per user session: launching `Azunote.exe` again activates the
-running instance and forwards the command line to it. A forwarded path is
+running instance and forwards the command line to it. A forwarded path
+activates its existing document window when it is already open; otherwise it is
 opened in a new document window. `--wait` also waits for any save confirmation
 when that document window is closed.
 

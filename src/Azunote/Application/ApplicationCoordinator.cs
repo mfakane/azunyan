@@ -112,13 +112,22 @@ internal sealed class ApplicationCoordinator : IDisposable
             }
             else if (!string.IsNullOrWhiteSpace(options.FilePath))
             {
-                var registration = CreateWindowRegistration();
                 var path = ResolvePath(options.FilePath, command.WorkingDirectory);
-                await registration.Window.Runtime.OpenStartupDocumentAsync(
-                    path,
-                    options.Line,
-                    options.Column);
-                await WaitForCloseIfRequestedAsync(registration, options);
+                var existing = FindWindowForFile(path);
+                if (existing is not null)
+                {
+                    existing.Window.ActivateWindow();
+                    await WaitForCloseIfRequestedAsync(existing, options);
+                }
+                else
+                {
+                    var registration = CreateWindowRegistration();
+                    await registration.Window.Runtime.OpenStartupDocumentAsync(
+                        path,
+                        options.Line,
+                        options.Column);
+                    await WaitForCloseIfRequestedAsync(registration, options);
+                }
             }
             else if (options.ShowHelp && _windows.Active is { } active)
             {
@@ -144,6 +153,34 @@ internal sealed class ApplicationCoordinator : IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         var window = CreateWindowRegistration().Window;
         await window.Runtime.OpenStartupDocumentAsync(path);
+    }
+
+    internal async Task OpenFileAsync(MainWindow source, string path)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        var existing = FindWindowForFile(path);
+        if (existing is not null)
+        {
+            existing.Window.ActivateWindow();
+            return;
+        }
+
+        var sourceRegistration = FindRegistration(source);
+        if (sourceRegistration is null)
+        {
+            return;
+        }
+
+        if (source.Runtime.Session.State.FilePath is null && !source.Runtime.IsDirty)
+        {
+            await source.Runtime.OpenStartupDocumentAsync(path);
+        }
+        else
+        {
+            await OpenFileInNewWindowAsync(path);
+        }
     }
 
     internal void DuplicateWindow(MainWindow source)
@@ -400,6 +437,22 @@ internal sealed class ApplicationCoordinator : IDisposable
     private WindowRegistration? FindRegistration(MainWindow window) =>
         _windows.Windows.FirstOrDefault(
             registration => ReferenceEquals(registration.Window, window));
+
+    private WindowRegistration? FindWindowForFile(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        static bool HasPath(WindowRegistration registration, string path) =>
+            registration.Window.Runtime.Session.State.FilePath is { } openPath
+            && string.Equals(openPath, path, StringComparison.OrdinalIgnoreCase);
+
+        if (_windows.Active is { } active && HasPath(active, fullPath))
+        {
+            return active;
+        }
+
+        return _windows.Windows.FirstOrDefault(registration =>
+            HasPath(registration, fullPath));
+    }
 
     private static AzunoteCommandLineOptions ParseCommandLine(
         IReadOnlyList<string> arguments)

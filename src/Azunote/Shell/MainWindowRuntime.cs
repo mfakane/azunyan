@@ -37,7 +37,8 @@ internal sealed class MainWindowRuntime : IDisposable
         Action<bool> recordWordWrap,
         Action<bool> recordStatusBarVisible,
         DocumentSession? session = null,
-        Document? document = null)
+        Document? document = null,
+        Func<string, Task>? openFileRequest = null)
     {
         _window = window ?? throw new ArgumentNullException(nameof(window));
         _view = new MainWindow.ViewBoundary(window);
@@ -87,7 +88,8 @@ internal sealed class MainWindowRuntime : IDisposable
             _languageModes.GetFileDialogFilters,
             () => _languageModes.CurrentModeId,
             createNewWindow,
-            openFileInNewWindow);
+            openFileInNewWindow,
+            openFileRequest: openFileRequest);
         _settings = new SettingsWorkflow(
             settings,
             _languageModes,

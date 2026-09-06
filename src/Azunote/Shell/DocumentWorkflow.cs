@@ -30,6 +30,7 @@ internal sealed class DocumentWorkflow : IDisposable
     private readonly Func<string> _languageModeId;
     private readonly Func<Task> _createNewWindow;
     private readonly Func<string, Task> _openFileInNewWindow;
+    private readonly Func<string, Task>? _openFileRequest;
     private readonly IEditorConfigResolver _editorConfigResolver;
     private EditorConfigSettings _editorConfig = EditorConfigSettings.Empty;
     private IFileChangeMonitor? _fileMonitor;
@@ -51,7 +52,8 @@ internal sealed class DocumentWorkflow : IDisposable
         Func<string> languageModeId,
         Func<Task> createNewWindow,
         Func<string, Task> openFileInNewWindow,
-        IEditorConfigResolver? editorConfigResolver = null)
+        IEditorConfigResolver? editorConfigResolver = null,
+        Func<string, Task>? openFileRequest = null)
     {
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
         _documents = documents ?? throw new ArgumentNullException(nameof(documents));
@@ -64,6 +66,7 @@ internal sealed class DocumentWorkflow : IDisposable
         _languageModeId = languageModeId ?? throw new ArgumentNullException(nameof(languageModeId));
         _createNewWindow = createNewWindow ?? throw new ArgumentNullException(nameof(createNewWindow));
         _openFileInNewWindow = openFileInNewWindow ?? throw new ArgumentNullException(nameof(openFileInNewWindow));
+        _openFileRequest = openFileRequest;
         _editorConfigResolver = editorConfigResolver ?? new EditorConfigResolver();
     }
 
@@ -112,14 +115,7 @@ internal sealed class DocumentWorkflow : IDisposable
                 return;
             }
 
-            if (CurrentFilePath is null && !IsDirty)
-            {
-                await LoadDocumentAsync(path);
-            }
-            else
-            {
-                await _openFileInNewWindow(path);
-            }
+            await OpenFileRequestAsync(path);
         }
         catch (Exception exception)
         {
@@ -133,14 +129,7 @@ internal sealed class DocumentWorkflow : IDisposable
 
         try
         {
-            if (CurrentFilePath is null && !IsDirty)
-            {
-                await LoadDocumentAsync(path);
-            }
-            else
-            {
-                await _openFileInNewWindow(path);
-            }
+            await OpenFileRequestAsync(path);
         }
         catch (Exception exception)
         {
@@ -376,6 +365,18 @@ internal sealed class DocumentWorkflow : IDisposable
             opened: true);
         _editor.Focus();
         StartFileWatcher();
+    }
+
+    private Task OpenFileRequestAsync(string path)
+    {
+        if (_openFileRequest is not null)
+        {
+            return _openFileRequest(path);
+        }
+
+        return CurrentFilePath is null && !IsDirty
+            ? LoadDocumentAsync(path)
+            : _openFileInNewWindow(path);
     }
 
     private async Task<EditorConfigSettings> ResolveCurrentEditorConfigAsync()

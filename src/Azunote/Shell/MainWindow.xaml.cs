@@ -48,7 +48,8 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
             application.RecordWordWrap,
             application.RecordStatusBarVisible,
             session,
-            document);
+            document,
+            path => application.OpenFileAsync(this, path));
         ViewModel.Attach(this);
         RegisterKeyboardAccelerators();
 
