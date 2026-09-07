@@ -50,11 +50,6 @@ internal sealed class ApplicationCoordinator : IDisposable
         return completion.Task;
     }
 
-    internal void ActivateActiveWindow()
-    {
-        _windows.Active?.Window.ActivateWindow();
-    }
-
     private async Task ProcessInitialCommandLineAsync(
         WindowRegistration registration,
         IReadOnlyList<string> arguments)
@@ -74,7 +69,6 @@ internal sealed class ApplicationCoordinator : IDisposable
         if (options.ReadStandardInput)
         {
             await OpenStandardInputAsync(runtime, options);
-            await WaitForCloseIfRequestedAsync(registration, options);
         }
         else if (!string.IsNullOrWhiteSpace(options.FilePath))
         {
@@ -82,6 +76,15 @@ internal sealed class ApplicationCoordinator : IDisposable
                 options.FilePath,
                 options.Line,
                 options.Column);
+        }
+
+        if (!registration.IsClosed)
+        {
+            ActivateWindow(registration);
+        }
+
+        if (options.WaitForExit)
+        {
             await WaitForCloseIfRequestedAsync(registration, options);
         }
         else if (options.ShowHelp)
@@ -99,7 +102,6 @@ internal sealed class ApplicationCoordinator : IDisposable
             await _state.InitializeAsync().ConfigureAwait(true);
             RefreshRecentFileMenus();
             var options = ParseCommandLine(command.Arguments);
-            ActivateActiveWindow();
 
             if (options.ReadStandardInput)
             {
@@ -108,6 +110,7 @@ internal sealed class ApplicationCoordinator : IDisposable
                     command.StandardInput ?? string.Empty,
                     options.Line,
                     options.Column);
+                ActivateWindow(registration);
                 await WaitForCloseIfRequestedAsync(registration, options);
             }
             else if (!string.IsNullOrWhiteSpace(options.FilePath))
@@ -126,11 +129,13 @@ internal sealed class ApplicationCoordinator : IDisposable
                         path,
                         options.Line,
                         options.Column);
+                    ActivateWindow(registration);
                     await WaitForCloseIfRequestedAsync(registration, options);
                 }
             }
             else if (options.ShowHelp && _windows.Active is { } active)
             {
+                active.Window.ActivateWindow();
                 await active.Window.Runtime.ShowCommandLineHelpAsync();
             }
 
@@ -144,15 +149,17 @@ internal sealed class ApplicationCoordinator : IDisposable
 
     internal Task CreateNewDocumentWindowAsync()
     {
-        CreateWindowRegistration();
+        var registration = CreateWindowRegistration();
+        ActivateWindow(registration);
         return Task.CompletedTask;
     }
 
     internal async Task OpenFileInNewWindowAsync(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        var window = CreateWindowRegistration().Window;
-        await window.Runtime.OpenStartupDocumentAsync(path);
+        var registration = CreateWindowRegistration();
+        await registration.Window.Runtime.OpenStartupDocumentAsync(path);
+        ActivateWindow(registration);
     }
 
     internal async Task OpenFileAsync(MainWindow source, string path)
@@ -189,9 +196,10 @@ internal sealed class ApplicationCoordinator : IDisposable
         var registration = FindRegistration(source);
         if (registration is null) return;
 
-        CreateWindowRegistration(
+        var duplicateRegistration = CreateWindowRegistration(
             source.Runtime.Session,
             source.Runtime.CreateDocumentView());
+        ActivateWindow(duplicateRegistration);
     }
 
     internal bool HasOtherView(MainWindow source)
@@ -410,12 +418,16 @@ internal sealed class ApplicationCoordinator : IDisposable
         var registration = new WindowRegistration(window);
         _windows.Register(registration);
         _windows.MarkActive(registration);
-        window.Activate();
-        window.FocusEditor();
         _ = window.Runtime.InitializeSettingsAsync();
         window.RenderRecentFiles(_state.Current.RecentFiles);
         RefreshWindowMenus();
         return registration;
+    }
+
+    private static void ActivateWindow(WindowRegistration registration)
+    {
+        registration.Window.ActivateWindow();
+        registration.Window.FocusEditor();
     }
 
     private void RefreshRecentFileMenus()
