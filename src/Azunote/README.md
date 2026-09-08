@@ -1,4 +1,6 @@
-# Azunote application
+![Icon of Azunote](../../assets/icons/01-paw-notebook-128.png)
+
+# Azunote
 
 Azunote is a small WinUI 3 document-per-window text editor using Windows App
 SDK 2.4.0. Each window owns one document; there is intentionally no project or

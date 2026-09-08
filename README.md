@@ -1,3 +1,5 @@
+![Icon of Azunote](assets/icons/01-paw-notebook-128.png)![Icon of Azunyan](assets/icons/02-paw-editor-128.png)
+
 # Azunyan
 
 Azunyan is a set of reusable text-editor components together with Azunote, a
