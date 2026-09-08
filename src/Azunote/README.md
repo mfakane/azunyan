@@ -3,8 +3,7 @@
 # Azunote
 
 Azunote is a small WinUI 3 document-per-window text editor using Windows App
-SDK 2.4.0. Each window owns one document; there is intentionally no project or
-workspace layer in this phase.
+SDK 2.4.0. Each window owns one document.
 
 This directory contains the application layer built on the reusable
 `Azunyan.Core`, `Azunyan.Syntax`, and `Azunyan.WinUI` components. The
@@ -12,6 +11,23 @@ framework-independent layout APIs live in `Azunyan.Core` under the
 `Azunyan.Layout` namespace. The application-specific command-line contract,
 shell, external tools, TOML settings, file I/O, language modes, and theme are
 kept here.
+
+## Non-goals
+
+Azunote is intended to remain a lightweight document-per-window text editor.
+Its non-goals are:
+
+- Becoming a full integrated development environment (IDE).
+- Providing an application layer for managing projects or workspaces.
+  Workspace-folder detection for substitution variables is only context for
+  external commands, not project or workspace management.
+- Providing an integrated build or debugging environment. Such workflows
+  belong in external tools invoked through Azunote's external-tool integration.
+- Exposing every editor feature supported by Azunyan. Azunote uses a selected
+  subset; these non-goals do not limit the reusable Azunyan components.
+
+Language modes, syntax highlighting, and configuration completion remain part
+of Azunote's lightweight editing experience.
 
 ## Build and test
 
