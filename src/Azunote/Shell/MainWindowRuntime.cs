@@ -194,6 +194,11 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public Task ShowAboutAsync() => ShowAboutDialogAsync();
 
+    public Task ViewLicenseAsync() => OpenRecentFileAsync(Path.Combine(AppContext.BaseDirectory, "LICENSE"));
+
+    public Task ShowThirdPartyNoticesAsync() =>
+        OpenRecentFileAsync(Path.Combine(AppContext.BaseDirectory, "THIRD-PARTY-NOTICES.md"));
+
     public Task ShowCommandLineHelpAsync() => _prompt.ShowErrorAsync(
         "Azunote command line",
         AzunoteCommandLine.Usage);
@@ -341,9 +346,12 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public Task ShowGoToLineAsync() => _goToLine.ShowAsync();
 
-    public void ShowFindPanel(bool replace) => _findReplace.Show(replace);
+    public void ShowFindPanel(bool replace) => _findReplace.Show(replace && !_session.State.IsReadOnly);
 
-    public void ToggleFindReplaceMode() => _findReplace.ToggleMode();
+    public void ToggleFindReplaceMode()
+    {
+        if (!_session.State.IsReadOnly) _findReplace.ToggleMode();
+    }
 
     public void CloseFindPanel() => _findReplace.Close();
 
@@ -355,9 +363,15 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public void FindPrevious() => _findReplace.FindPrevious();
 
-    public void ReplaceCurrent() => _findReplace.ReplaceCurrent();
+    public void ReplaceCurrent()
+    {
+        if (!_session.State.IsReadOnly) _findReplace.ReplaceCurrent();
+    }
 
-    public void ReplaceAll() => _findReplace.ReplaceAll();
+    public void ReplaceAll()
+    {
+        if (!_session.State.IsReadOnly) _findReplace.ReplaceAll();
+    }
 
     public void ObserveTextChanged()
     {
@@ -445,6 +459,7 @@ internal sealed class MainWindowRuntime : IDisposable
         }
     }
 
+
     private void Documents_Changed(
         object? sender,
         DocumentWorkflowChangedEventArgs args)
@@ -484,7 +499,10 @@ internal sealed class MainWindowRuntime : IDisposable
     private ExternalToolMenuState GetExternalToolMenuState(ExternalToolSettings tool)
     {
         var context = CreateExternalToolContext(tool.DefinitionDirectory);
-        return ExternalToolAvailability.Evaluate(tool, context);
+        var state = ExternalToolAvailability.Evaluate(tool, context);
+        return _session.State.IsReadOnly
+            ? state with { IsEnabled = false, DisabledReason = "The document is read-only." }
+            : state;
     }
 
     private ExternalToolContext CreateExternalToolContext(
@@ -542,6 +560,9 @@ internal sealed class MainWindowRuntime : IDisposable
 
     private void RefreshDocumentView()
     {
+        _view.SetReadOnly(_session.State.IsReadOnly);
+        _viewModel.IsReadOnly = _session.State.IsReadOnly;
+        if (_session.State.IsReadOnly) _viewModel.IsReplaceMode = false;
         _status.Refresh();
         _status.RefreshTitle();
         RefreshExternalToolsMenu();

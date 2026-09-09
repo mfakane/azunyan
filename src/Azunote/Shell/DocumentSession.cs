@@ -50,11 +50,11 @@ public sealed class DocumentSession
             IsDirty: !string.IsNullOrEmpty(currentText)));
     }
 
-    public void Load(string fullPath, TextFileData data)
+    public void Load(string fullPath, TextFileData data, bool isReadOnly = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fullPath);
         ArgumentNullException.ThrowIfNull(data);
-        SetSavedState(fullPath, data);
+        SetSavedState(fullPath, data, isReadOnly);
     }
 
     public void MarkSaved(
@@ -77,7 +77,7 @@ public sealed class DocumentSession
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fullPath);
         ArgumentNullException.ThrowIfNull(data);
-        SetSavedState(fullPath, data);
+        SetSavedState(fullPath, data, _state.IsReadOnly);
     }
 
     /// <summary>
@@ -116,14 +116,15 @@ public sealed class DocumentSession
             ? lineEnding
             : GetDefaultLineEnding();
 
-    private void SetSavedState(string fullPath, TextFileData data)
+    private void SetSavedState(string fullPath, TextFileData data, bool isReadOnly)
     {
         _savedText = data.Text;
         Update(new DocumentSessionState(
             FilePath: Path.GetFullPath(fullPath),
             Encoding: data.Encoding,
             LineEnding: GetLineEndingOrDefault(data.LineEnding),
-            IsDirty: false));
+            IsDirty: false,
+            IsReadOnly: isReadOnly));
     }
 
     private void Update(DocumentSessionState state)
@@ -170,4 +171,5 @@ public sealed record DocumentSessionState(
     string? FilePath,
     TextEncodingKind Encoding,
     LineEndingKind LineEnding,
-    bool IsDirty);
+    bool IsDirty,
+    bool IsReadOnly = false);

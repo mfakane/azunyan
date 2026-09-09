@@ -5,6 +5,65 @@ namespace Azunote.Tests;
 
 public sealed class DocumentControllerTests
 {
+    [Theory]
+    [InlineData("LICENSE")]
+    [InlineData("THIRD-PARTY-NOTICES.md")]
+    [InlineData("licenses/Tomlyn/2.10.1/LICENSE.txt")]
+    public async Task Bundled_legal_documents_cannot_be_saved_and_reload_preserves_read_only(string relativePath)
+    {
+        var path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, relativePath));
+        var editor = new FakeEditorBuffer();
+        var session = new DocumentSession();
+        var files = new FakeTextFileStore();
+        var controller = new DocumentController(editor, session, files, new FakeUserPrompt());
+        files.Files[path] = new TextFileData("original license", TextEncodingKind.Utf8, LineEndingKind.Lf);
+
+        await controller.OpenAsync(path);
+        Assert.True(session.State.IsReadOnly);
+        Assert.Equal("original license", editor.Text);
+        editor.SetText("host update");
+        Assert.False(await controller.SaveAsync());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => controller.SaveAsAsync(
+            new SaveFileDialogResult("copy.txt", TextEncodingKind.Utf8, LineEndingKind.Lf)));
+        Assert.Equal("original license", files.Files[path].Text);
+        Assert.Single(files.Files);
+
+        Assert.True(await controller.ReloadFromDiskAsync());
+        Assert.True(session.State.IsReadOnly);
+        Assert.Equal("original license", editor.Text);
+        controller.NewDocument();
+        Assert.False(session.State.IsReadOnly);
+    }
+
+    [Fact]
+    public async Task Save_as_cannot_overwrite_a_bundled_license_from_an_editable_document()
+    {
+        var files = new FakeTextFileStore();
+        var controller = new DocumentController(
+            new FakeEditorBuffer(), new DocumentSession(), files, new FakeUserPrompt());
+        controller.LoadUntitledText("draft");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => controller.SaveAsAsync(
+            new SaveFileDialogResult(Path.Combine(AppContext.BaseDirectory, "LICENSE"),
+                TextEncodingKind.Utf8, LineEndingKind.Lf)));
+
+        Assert.Empty(files.Files);
+        Assert.True(controller.Session.State.IsDirty);
+    }
+
+    [Theory]
+    [InlineData("LICENSE", true)]
+    [InlineData("third-party-notices.MD", true)]
+    [InlineData("licenses/package/NOTICE.txt", true)]
+    [InlineData("licenses/../notes.txt", false)]
+    [InlineData("licenses-other/NOTICE.txt", false)]
+    [InlineData("docs/LICENSE", false)]
+    public void Only_bundled_legal_paths_are_read_only(string relativePath, bool expected)
+    {
+        var root = Path.GetFullPath("legal-path-test");
+        Assert.Equal(expected, BundledLegalDocuments.IsReadOnlyPath(Path.Combine(root, relativePath), root));
+    }
+
     [Fact]
     public async Task Open_and_save_round_trip_through_the_session_and_editor()
     {

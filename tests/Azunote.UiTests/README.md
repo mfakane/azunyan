@@ -25,6 +25,8 @@ ValuePattern, reports geometry for empty caret ranges, keeps ranges bound to the
 from which they were created, and does not expose the native IME input window as a
 duplicate Edit control. They also cover visible range geometry, finding/selecting
 document text, and long document values that require the input window to slide.
+The Help-menu test checks bundled legal text, `[READONLY]` window titles,
+read-only ValuePattern behavior, text selection, and disabled save commands.
 
 The remaining accessibility acceptance is manual: focus the editor with Narrator or NVDA,
 read through Japanese, emoji, combining-mark, Arabic, and Hebrew lines, move by character,

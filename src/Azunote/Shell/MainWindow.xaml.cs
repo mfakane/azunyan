@@ -438,6 +438,10 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
 
     Task IMainWindowActions.ShowAboutAsync() => _runtime.ShowAboutAsync();
 
+    Task IMainWindowActions.ViewLicenseAsync() => _runtime.ViewLicenseAsync();
+
+    Task IMainWindowActions.ShowThirdPartyNoticesAsync() => _runtime.ShowThirdPartyNoticesAsync();
+
     void IMainWindowActions.FindNext() => _runtime.FindNext();
 
     void IMainWindowActions.FindTextChanged() => _runtime.OnFindTextChanged();

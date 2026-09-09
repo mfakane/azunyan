@@ -71,7 +71,7 @@ public sealed class DocumentController
     {
         var data = await _files.ReadAsync(path, encodingHint, cancellationToken);
         ReplaceEditorText(data.Text);
-        _session.Load(path, data);
+        _session.Load(path, data, BundledLegalDocuments.IsReadOnlyPath(path));
         _editor.SetSelection(TextSelection.Caret(0));
     }
 
@@ -101,6 +101,7 @@ public sealed class DocumentController
         EditorConfigSettings? editorConfig,
         CancellationToken cancellationToken = default)
     {
+        if (_session.State.IsReadOnly) return false;
         var path = _session.State.FilePath;
         if (path is null)
         {
@@ -142,6 +143,10 @@ public sealed class DocumentController
     {
         ArgumentNullException.ThrowIfNull(save);
         var path = Path.GetFullPath(save.Path);
+        if (_session.State.IsReadOnly || BundledLegalDocuments.IsReadOnlyPath(path))
+        {
+            throw new InvalidOperationException("The document is read-only.");
+        }
         var lineEnding = DocumentSession.GetLineEndingOrDefault(save.LineEnding);
         var textToSave = EditorConfigTextNormalizer.NormalizeForSave(
             _editor.Text,
@@ -191,6 +196,7 @@ public sealed class DocumentController
         TextEncodingKind? encodingHint,
         CancellationToken cancellationToken = default)
     {
+        if (_session.State.IsReadOnly) return false;
         var data = await _files.ReadAsync(path, encodingHint, cancellationToken);
         var selection = _editor.Selection;
         ReplaceEditorText(data.Text);

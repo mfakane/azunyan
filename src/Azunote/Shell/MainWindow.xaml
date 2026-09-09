@@ -453,6 +453,7 @@
                 <MenuFlyoutItem
                     Text="Save"
                     Command="{x:Bind ViewModel.SaveCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
                 >
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="S" Modifiers="Control" />
@@ -461,6 +462,7 @@
                 <MenuFlyoutItem
                     Text="Save As..."
                     Command="{x:Bind ViewModel.SaveAsCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
                 >
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator
@@ -479,6 +481,7 @@
                 <MenuFlyoutItem
                     Text="Undo"
                     Command="{x:Bind ViewModel.UndoCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
                 >
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="Z" Modifiers="Control" />
@@ -487,6 +490,7 @@
                 <MenuFlyoutItem
                     Text="Redo"
                     Command="{x:Bind ViewModel.RedoCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
                 >
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="Y" Modifiers="Control" />
@@ -496,6 +500,7 @@
                 <MenuFlyoutItem
                     Text="Cut"
                     Command="{x:Bind ViewModel.CutCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
                 >
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="X" Modifiers="Control" />
@@ -512,6 +517,7 @@
                 <MenuFlyoutItem
                     Text="Paste"
                     Command="{x:Bind ViewModel.PasteCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
                 >
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="V" Modifiers="Control" />
@@ -529,6 +535,7 @@
                 <MenuFlyoutItem
                     Text="Replace..."
                     Command="{x:Bind ViewModel.ShowReplaceCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
                 >
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Key="H" Modifiers="Control" />
@@ -561,6 +568,7 @@
                 <MenuFlyoutItem
                     Text="Show Completions"
                     Command="{x:Bind ViewModel.ShowCompletionCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
                 >
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <!-- Keep the shortcut attached to the command; the
@@ -693,6 +701,7 @@
                 <MenuFlyoutItem
                     Text="Run External Tool..."
                     Command="{x:Bind ViewModel.RunExternalToolCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
                 />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem
@@ -735,6 +744,15 @@
             </MenuBarItem>
             <MenuBarItem Title="Help">
                 <MenuFlyoutItem
+                    Text="View License"
+                    Command="{x:Bind ViewModel.ViewLicenseCommand}"
+                />
+                <MenuFlyoutItem
+                    Text="Third Party Notices"
+                    Command="{x:Bind ViewModel.ShowThirdPartyNoticesCommand}"
+                />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem
                     Text="About Azunote"
                     Command="{x:Bind ViewModel.ShowAboutCommand}"
                 />
@@ -761,6 +779,7 @@
                     </Grid.ColumnDefinitions>
                     <Button
                         x:Name="FindReplaceModeButton"
+                        IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
                         Grid.Column="0"
                         HorizontalAlignment="Stretch"
                         VerticalAlignment="Top"
@@ -923,11 +942,13 @@
                             VerticalAlignment="Stretch"
                             Content="Replace"
                             Command="{x:Bind ViewModel.ReplaceCurrentCommand}"
+                            IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
                         />
                         <Button
                             VerticalAlignment="Stretch"
                             Content="Replace all"
                             Command="{x:Bind ViewModel.ReplaceAllCommand}"
+                            IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
                         />
                     </StackPanel>
                 </Grid>

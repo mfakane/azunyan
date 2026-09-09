@@ -29,6 +29,7 @@ internal sealed class MainWindowViewModel :
     private string _replaceText = string.Empty;
     private string _findResult = string.Empty;
     private bool _isReplaceMode;
+    private bool _isReadOnly;
     private bool _isMatchCase;
     private bool _isMatchWholeWord;
     private bool _isRegularExpression;
@@ -80,6 +81,8 @@ internal sealed class MainWindowViewModel :
         NextWindowCommand = Command(() => Actions.NextWindow());
         PreviousWindowCommand = Command(() => Actions.PreviousWindow());
         ShowAboutCommand = Async(() => Actions.ShowAboutAsync());
+        ViewLicenseCommand = Async(() => Actions.ViewLicenseAsync());
+        ShowThirdPartyNoticesCommand = Async(() => Actions.ShowThirdPartyNoticesAsync());
         FindNextCommand = Command(() => Actions.FindNext());
         ReplaceCurrentCommand = Command(() => Actions.ReplaceCurrent());
         ReplaceAllCommand = Command(() => Actions.ReplaceAll());
@@ -205,6 +208,15 @@ internal sealed class MainWindowViewModel :
     public ICommand NextWindowCommand { get; }
     public ICommand PreviousWindowCommand { get; }
     public ICommand ShowAboutCommand { get; }
+    public bool IsReadOnly
+    {
+        get => _isReadOnly;
+        set => SetProperty(ref _isReadOnly, value, dependentProperties: [nameof(CanEdit)]);
+    }
+
+    public bool CanEdit => !IsReadOnly;
+    public ICommand ViewLicenseCommand { get; }
+    public ICommand ShowThirdPartyNoticesCommand { get; }
     public ICommand FindNextCommand { get; }
     public ICommand ReplaceCurrentCommand { get; }
     public ICommand ReplaceAllCommand { get; }
@@ -518,6 +530,8 @@ internal interface IMainWindowActions
     void NextWindow();
     void PreviousWindow();
     Task ShowAboutAsync();
+    Task ViewLicenseAsync();
+    Task ShowThirdPartyNoticesAsync();
     void FindNext();
     void FindTextChanged();
     void FindOptionsChanged();

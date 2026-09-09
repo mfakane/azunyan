@@ -7,6 +7,13 @@ small document-per-window text editor built with WinUI 3. Azunote-specific
 build, usage, configuration, and runtime documentation is maintained in
 [src/Azunote/README.md](src/Azunote/README.md).
 
+## License
+
+Azunyan and Azunote are licensed under the [zlib license](LICENSE).
+Third-party components retain their own licenses; see
+[Third-party notices](THIRD-PARTY-NOTICES.md) for bundled license texts and
+redistribution requirements.
+
 ## Components
 
 | Project | Responsibility |
@@ -96,6 +103,13 @@ docs/                  architecture and Azunote configuration documentation
 ```
 
 ## Editor components
+
+`AzunyanEditorView.IsReadOnly` disables editing through the control, including
+IME input, paste, cut, undo/redo, replacement, completion acceptance, and UI
+Automation value writes. Selection, copying, navigation, and scrolling remain
+available. Hosts can still load text with `SetText` or update the underlying
+`Document`; the property controls interaction with this view, not buffer
+immutability.
 
 ### Providers
 

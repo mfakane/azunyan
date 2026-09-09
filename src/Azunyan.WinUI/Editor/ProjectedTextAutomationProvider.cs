@@ -44,7 +44,7 @@ internal sealed partial class ProjectedTextAutomationProvider :
     public SupportedTextSelection SupportedTextSelection =>
         SupportedTextSelection.Single;
 
-    public bool IsReadOnly => false;
+    public bool IsReadOnly => _owner.InvokeOnEditorThread(() => _owner.IsReadOnly);
 
     public string Value => _owner.InvokeOnEditorThread(
         () => _owner.Snapshot.Text);

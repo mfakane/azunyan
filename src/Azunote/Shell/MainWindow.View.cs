@@ -894,6 +894,7 @@ public sealed partial class MainWindow
         internal Microsoft.UI.Dispatching.DispatcherQueue DispatcherQueue => _window.DispatcherQueue;
         internal XamlRoot? XamlRoot => _window.XamlRoot;
         internal void SetDocument(Document document) => _window.SetDocument(document);
+        internal void SetReadOnly(bool value) => _window._editor.IsReadOnly = value;
         internal void SetDiagnosticLogging(IReadOnlyList<string> logging) =>
             _window.SetDiagnosticLogging(logging);
 

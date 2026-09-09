@@ -73,6 +73,14 @@ internal sealed partial class AzunyanEditorViewAutomationPeer : FrameworkElement
         }
     }
 
+    internal void NotifyReadOnlyChanged(bool oldValue, bool newValue)
+    {
+        if (ListenerExists(AutomationEvents.PropertyChanged))
+        {
+            RaisePropertyChangedEvent(ValuePatternIdentifiers.IsReadOnlyProperty, oldValue, newValue);
+        }
+    }
+
     internal void NotifyLayoutChanged()
     {
         if (ListenerExists(AutomationEvents.LayoutInvalidated))

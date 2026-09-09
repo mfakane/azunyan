@@ -7,6 +7,21 @@ namespace Azunote.Tests.Shell;
 public sealed class DocumentStatusPresenterTests
 {
     [Fact]
+    public void Read_only_document_title_contains_the_readonly_marker()
+    {
+        var session = new DocumentSession();
+        session.Load("LICENSE", new TextFileData("license", TextEncodingKind.Utf8, LineEndingKind.Lf),
+            isReadOnly: true);
+        var chrome = new FakeWindowChromeView();
+        var presenter = new DocumentStatusPresenter(
+            new FakeEditorView("license"), session, new FakeStatusBarView(), chrome);
+
+        presenter.RefreshTitle();
+
+        Assert.Equal("LICENSE [READONLY] - Azunote", chrome.Title);
+    }
+
+    [Fact]
     public void Refresh_projects_position_file_metadata_and_title()
     {
         var editor = new FakeEditorView("first\nsecond");

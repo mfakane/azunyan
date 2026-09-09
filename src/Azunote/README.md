@@ -29,6 +29,21 @@ Its non-goals are:
 Language modes, syntax highlighting, and configuration completion remain part
 of Azunote's lightweight editing experience.
 
+## License
+
+Azunote and the Azunyan editor components are licensed under the
+[zlib license](../../LICENSE). Third-party components retain their own
+licenses. See [Third-party notices](../../THIRD-PARTY-NOTICES.md) for the
+dependency inventory and redistribution requirements.
+
+Build and publish output includes `LICENSE`, `THIRD-PARTY-NOTICES.md`, and
+the `licenses` directory. Keep these files with binary distributions.
+Help > View License and Help > Third Party Notices display the bundled texts
+in Azunote itself. Bundled legal documents, including files under `licenses`,
+open read-only and show `[READONLY]` in the title bar. Selection, copying,
+search, and navigation remain available; editing, saving, and external tools
+are disabled. Duplicate windows preserve the same read-only state.
+
 ## Build and test
 
 First run `git submodule update --init external/Win2D` and

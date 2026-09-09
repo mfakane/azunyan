@@ -9,7 +9,8 @@ public sealed partial class AzunyanEditorView
 {
     private void UpdateCompletionPopup()
     {
-        if (!IsLoaded
+        if (IsReadOnly
+            || !IsLoaded
             || !IsProjectedTextSurface
             || IsComposing
             || !_completionRequested)

@@ -27,6 +27,54 @@ public sealed class AzunoteUiTests : IClassFixture<AzunoteUiFixture>
     }
 
     [AzunoteUiFact]
+    public void Help_opens_read_only_documents_with_selectable_text_and_readonly_titles()
+    {
+        var source = _fixture.Window;
+        foreach (var (menu, fileName, expectedText) in new[]
+        {
+            ("Third Party Notices", "THIRD-PARTY-NOTICES.md", "Third-party notices"),
+            ("View License", "LICENSE", "Permission is granted")
+        })
+        {
+            AzunoteUiFixture.InvokeMenuItem(source, "Help", menu);
+            var title = $"{fileName} [READONLY] - Azunote";
+            var legalWindow = _fixture.WaitForWindows(windows => windows.Any(w => w.Current.Name == title))
+                .First(w => w.Current.Name == title);
+            try
+            {
+                var editor = AzunoteUiFixture.WaitForElement(
+                    legalWindow, AutomationElement.NameProperty, "Document editor");
+                var value = AzunoteUiFixture.WaitForValuePattern(editor,
+                    text => text.Contains(expectedText, StringComparison.Ordinal));
+                Assert.True(value.Current.IsReadOnly);
+                var original = value.Current.Value;
+
+                var textPattern = AzunoteUiFixture.WaitForTextPattern(editor);
+                editor.SetFocus();
+                var range = textPattern.DocumentRange.FindText(expectedText, false, false);
+                Assert.NotNull(range);
+                range!.Select();
+                Assert.Equal(expectedText, AzunoteUiFixture.WaitForSelectionText(
+                    textPattern, text => text == expectedText));
+
+                Assert.Throws<InvalidOperationException>(() => value.SetValue("overwrite"));
+                Assert.Equal(original, value.Current.Value);
+
+                AzunoteUiFixture.OpenMenu(legalWindow, "File");
+                Assert.False(AzunoteUiFixture.WaitForElement(
+                    legalWindow, AutomationElement.NameProperty, "Save").Current.IsEnabled);
+                Assert.False(AzunoteUiFixture.WaitForElement(
+                    legalWindow, AutomationElement.NameProperty, "Save As...").Current.IsEnabled);
+                AzunoteUiFixture.InvokeMenuItem(legalWindow, "File", "Exit");
+            }
+            catch (Exception exception)
+            {
+                throw new XunitException($"{fileName}: {exception}");
+            }
+        }
+    }
+
+    [AzunoteUiFact]
     public void Projected_editor_exposes_snapshot_text_and_visible_ranges()
     {
         var editor = _fixture.Editor;
@@ -316,6 +364,22 @@ public sealed class AzunoteUiTests : IClassFixture<AzunoteUiFixture>
                 ? originalWindow
                 : null,
             "The Window menu did not list the new Untitled window.");
+    }
+
+    [AzunoteUiFact]
+    public void Duplicate_window_exposes_selectable_text()
+    {
+        var source = _fixture.Window;
+        var before = _fixture.WaitForWindows(_ => true).Select(w => w.Current.NativeWindowHandle).ToHashSet();
+        AzunoteUiFixture.InvokeMenuItem(source, "Window", "Duplicate Window");
+        var duplicate = _fixture.WaitForWindows(windows => windows.Any(w => !before.Contains(w.Current.NativeWindowHandle)))
+            .First(w => !before.Contains(w.Current.NativeWindowHandle));
+        var editor = AzunoteUiFixture.WaitForElement(duplicate, AutomationElement.NameProperty, "Document editor");
+        var text = AzunoteUiFixture.WaitForTextPattern(editor);
+        var range = text.DocumentRange.FindText("日本語", false, false);
+        Assert.NotNull(range);
+        range!.Select();
+        Assert.Equal("日本語", AzunoteUiFixture.WaitForSelectionText(text, selected => selected == "日本語"));
     }
 
     [AzunoteUiFact]

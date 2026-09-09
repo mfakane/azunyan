@@ -415,6 +415,38 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     internal TextBox InputHost => InputWindow.NativeTextBoxControl;
 
+    public static readonly DependencyProperty IsReadOnlyProperty = DependencyProperty.Register(
+        nameof(IsReadOnly), typeof(bool), typeof(AzunyanEditorView),
+        new PropertyMetadata(false, OnIsReadOnlyChanged));
+
+    /// <summary>
+    /// Prevents editing through this control while preserving selection, copying,
+    /// navigation, and scrolling. Hosts may still load text with SetText or update
+    /// the underlying Document; this is a view policy, not an immutable buffer.
+    /// </summary>
+    public bool IsReadOnly
+    {
+        get => (bool)GetValue(IsReadOnlyProperty);
+        set => SetValue(IsReadOnlyProperty, value);
+    }
+
+    private static void OnIsReadOnlyChanged(DependencyObject sender, DependencyPropertyChangedEventArgs args)
+    {
+        var editor = (AzunyanEditorView)sender;
+        editor.EndTypedInputUndoGroup();
+        editor.InputHost.IsReadOnly = (bool)args.NewValue;
+        if ((bool)args.NewValue)
+        {
+            editor._compositionRange = null;
+            editor.SyncInputWindow();
+            editor.DrainPendingCompositionOperations();
+        }
+        editor._completionRequested = false;
+        editor._explicitCompletionRequested = false;
+        editor.HideCompletionPopup();
+        editor._automationPeer?.NotifyReadOnlyChanged((bool)args.OldValue, (bool)args.NewValue);
+    }
+
     public string Text
     {
         get => Snapshot.Text;
@@ -659,6 +691,10 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     internal void SetAutomationValue(string value)
     {
         ArgumentNullException.ThrowIfNull(value);
+        if (IsReadOnly)
+        {
+            throw new InvalidOperationException("The editor is read-only.");
+        }
         if (string.Equals(value, Snapshot.Text, StringComparison.Ordinal))
         {
             return;
@@ -737,6 +773,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     private bool UndoDocumentCore()
     {
+        if (IsReadOnly) return false;
         var hadBlockSelection = _blockSelection is not null;
         _blockSelection = null;
         var result = ApplyHistoryCommand(_document.Undo);
@@ -761,6 +798,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     private bool RedoDocumentCore()
     {
+        if (IsReadOnly) return false;
         var hadBlockSelection = _blockSelection is not null;
         _blockSelection = null;
         var result = ApplyHistoryCommand(_document.Redo);
@@ -790,6 +828,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     private void CutSelectionToClipboardCore()
     {
+        if (IsReadOnly) return;
         if (_blockSelection is { } blockSelection)
         {
             SetClipboardText(GetBlockSelectionText(blockSelection));
@@ -928,7 +967,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     {
         RunAfterComposition(() =>
         {
-            ApplyDocumentCommand(() =>
+            ApplyNavigationCommand(() =>
             {
                 if (_blockSelection is not null)
                 {
@@ -968,6 +1007,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     /// <summary>Requests completion explicitly, independent of the current prefix.</summary>
     public void RequestCompletion()
     {
+        if (IsReadOnly) return;
         if (!IsLoaded || IsComposing)
         {
             return;
@@ -1143,6 +1183,11 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         object? sender,
         AzunyanTextInputChangedEventArgs args)
     {
+        if (IsReadOnly)
+        {
+            SyncInputWindow();
+            return;
+        }
         if (args.Generation != _inputWindowGeneration)
         {
             LogDiagnostic(
@@ -1365,6 +1410,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     private async Task PasteFromClipboardAsync()
     {
+        if (IsReadOnly) return;
         if (DateTimeOffset.UtcNow < _clipboardUnavailableUntil)
         {
             return;
@@ -1396,7 +1442,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             return;
         }
 
-        if (_disposed)
+        if (_disposed || IsReadOnly)
         {
             return;
         }
@@ -1600,6 +1646,12 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         object? sender,
         AzunyanTextInputCompositionChangedEventArgs args)
     {
+        if (IsReadOnly)
+        {
+            _compositionRange = null;
+            SyncInputWindow();
+            return;
+        }
         if (args.Generation != _inputWindowGeneration)
         {
             LogDiagnostic(
@@ -1768,6 +1820,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         TextRange range,
         string replacement)
     {
+        if (IsReadOnly) return;
         var hadBlockSelection = _blockSelection is not null;
         _blockSelection = null;
         var oldText = Snapshot.Text;
@@ -2119,7 +2172,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             case VirtualKey.A when control && !menu && !IsComposing:
                 QueueKeyEdit(args.Key, () =>
                 {
-                    ApplyDocumentCommand(() =>
+                    ApplyNavigationCommand(() =>
                     {
                         _blockSelection = null;
                         _document.Selection = new TextSelection(0, Snapshot.Length);
@@ -2192,7 +2245,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             case VirtualKey.Left when !IsComposing && !menu:
                 QueueKeyEdit(args.Key, () =>
                 {
-                    ApplyDocumentCommand(() =>
+                    ApplyNavigationCommand(() =>
                     {
                         if (_blockSelection is not null)
                         {
@@ -2215,7 +2268,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             case VirtualKey.Right when !IsComposing && !menu:
                 QueueKeyEdit(args.Key, () =>
                 {
-                    ApplyDocumentCommand(() =>
+                    ApplyNavigationCommand(() =>
                     {
                         if (_blockSelection is not null)
                         {
@@ -2320,7 +2373,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 {
                     if (control)
                     {
-                        ApplyDocumentCommand(() =>
+                        ApplyNavigationCommand(() =>
                             _document.SetCaretSet(TextCaretSetOperations.MoveToLineBoundary(
                                 Snapshot,
                                 Document.CaretSet,
@@ -2349,7 +2402,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 {
                     if (control)
                     {
-                        ApplyDocumentCommand(() =>
+                        ApplyNavigationCommand(() =>
                             _document.SetCaretSet(TextCaretSetOperations.MoveToLineBoundary(
                                 Snapshot,
                                 Document.CaretSet,
@@ -2568,7 +2621,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         Func<TextCaretSet> fallback)
     {
         ArgumentNullException.ThrowIfNull(fallback);
-        ApplyDocumentCommand(() =>
+        ApplyNavigationCommand(() =>
         {
             var next = _renderer is IAzunyanEditorNavigationGeometry navigation
                 && navigation.TryNavigate(
@@ -2648,9 +2701,12 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         return false;
     }
 
-    private void ApplyDocumentCommand(Action action)
+    private void ApplyNavigationCommand(Action action) => ApplyDocumentCommand(action, editsText: false);
+
+    private void ApplyDocumentCommand(Action action, bool editsText = true)
     {
         ArgumentNullException.ThrowIfNull(action);
+        if (IsReadOnly && editsText) return;
         EndTypedInputUndoGroup();
         var previousSnapshot = Snapshot;
         _applyingDocumentCommand = true;
@@ -2776,9 +2832,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private void EditorContextMenu_Opening(object sender, object e)
     {
         var canCopy = HasCopyableSelection();
-        CutContextMenuItem.IsEnabled = canCopy;
+        CutContextMenuItem.IsEnabled = canCopy && !IsReadOnly;
         CopyContextMenuItem.IsEnabled = canCopy;
-        PasteContextMenuItem.IsEnabled = ClipboardContainsText();
+        PasteContextMenuItem.IsEnabled = !IsReadOnly && ClipboardContainsText();
     }
 
     private void CutContextMenuItem_Click(object sender, RoutedEventArgs e) =>

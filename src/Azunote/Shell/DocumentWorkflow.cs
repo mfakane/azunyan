@@ -175,6 +175,7 @@ internal sealed class DocumentWorkflow : IDisposable
 
     public async Task<bool> SaveAsync()
     {
+        if (_documents.Session.State.IsReadOnly) return false;
         if (CurrentFilePath is null)
         {
             return await SaveAsAsync();
@@ -196,6 +197,7 @@ internal sealed class DocumentWorkflow : IDisposable
 
     public async Task<bool> SaveAsAsync()
     {
+        if (_documents.Session.State.IsReadOnly) return false;
         try
         {
             var save = _fileDialogs.ShowSave(
@@ -265,6 +267,10 @@ internal sealed class DocumentWorkflow : IDisposable
         ExternalToolDefinition definition,
         CancellationToken cancellationToken = default)
     {
+        if (_documents.Session.State.IsReadOnly)
+        {
+            throw new InvalidOperationException("External tools cannot run on a read-only document.");
+        }
         StopFileWatcher();
         try
         {
