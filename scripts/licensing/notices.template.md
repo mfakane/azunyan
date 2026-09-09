@@ -49,12 +49,11 @@ notices when the complete texts accompany the distribution.
 
 ## Open release checks
 
-1. **Win2D 1.3.2:** its `.nuspec` requires license acceptance and points to the
-   EULA URL above, but the URL redirected to an unrelated Microsoft Learn page
-   during this review. The package contains no license text. The
-   [Win2D source license](https://github.com/microsoft/Win2D/blob/winappsdk/main/LICENSE.txt)
-   is MIT; it is not evidence that the prebuilt NuGet binary has the same terms.
-   Obtain the applicable binary EULA from Microsoft and bundle it before release.
+1. **Win2D:** use the local package built by `scripts/Build-Win2D.ps1` from
+   commit `25680382dd2136779e10ea6084f0c5ba437ae288`, and preserve its MIT text.
+   The pinned upstream packaging script explicitly selects the repository
+   license for local builds and a separate EULA URL for Microsoft's signed
+   distribution. This inventory covers the local build, not that distribution.
 2. Review and satisfy the Microsoft binary distribution conditions, including
    the agreement requirement, for the intended distribution channel. This notice
    file is not an EULA, and Azunote's zlib license applies to its original code.

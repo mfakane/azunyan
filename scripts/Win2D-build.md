@@ -34,7 +34,31 @@ components (run with administrator privileges):
 Both installers completed with exit code 0. The native `winrt.lib.uap.vcxproj`
 Release/x64 build then succeeded without SDK or toolset overrides, producing
 `bin/uapx64/release/winrt.lib.uap/winrt.lib`. No local package has been generated
-or substituted for Azunyan's existing NuGet reference yet.
+or substituted during that initial prerequisite check.
+
+## Build the package used by Azunyan
+
+From the repository root, run:
+
+```powershell
+git submodule update --init external/Win2D
+./scripts/Build-Win2D.ps1
+dotnet build src/Azunote/Azunote.csproj -c Debug
+```
+
+The script creates `artifacts/packages/Microsoft.Graphics.Win2D.1.4.0-azunyan.25680382dd21.nupkg`.
+Both application and control reference this exact version. Root `NuGet.Config`
+maps Win2D exclusively to that local feed; other dependencies use nuget.org.
+Generate the package before the first restore on a fresh clone or CI worker.
+The ignored package can be cached between builds; do not replace its contents
+with binaries from a different source revision. Bump the local version when
+changing the source or packaging recipe.
+
+This package supports only win-x64 and .NET consumers. It contains the native
+DLL, generated .NET projection, WinMD, upstream build integration, MIT license,
+and source commit. The upstream source stays unmodified. Azure-specific
+SourceLink is disabled for this GitHub build; provenance is recorded in NuGet
+repository metadata and `Win2D.githash.txt` instead.
 
 At this commit, `build/nuget/build-nupkg.cmd` explicitly distinguishes the
 Microsoft signed distribution (EULA URL and license acceptance) from local

@@ -38,5 +38,6 @@ Remove obsolete license files explicitly after reviewing the distribution.
 Commit both inputs and generated outputs. Do not change upstream document text
 or normalize its encoding or line endings; `.gitattributes` preserves its bytes.
 
-Unresolved binary-license questions, including the Win2D EULA, remain in the
-generated notice. Successful generation is not a redistribution approval.
+Win2D now uses a pinned local source build with its MIT license. Other binary
+distribution requirements remain in the generated notice. Successful generation
+is not a redistribution approval.

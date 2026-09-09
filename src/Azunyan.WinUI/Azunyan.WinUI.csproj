@@ -15,7 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Azunyan.Core\Azunyan.Core.csproj" />
-    <PackageReference Include="Microsoft.Graphics.Win2D" Version="1.3.2" />
+    <PackageReference Include="Microsoft.Graphics.Win2D" Version="[1.4.0-azunyan.25680382dd21]" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.4.0" />
   </ItemGroup>
 </Project>

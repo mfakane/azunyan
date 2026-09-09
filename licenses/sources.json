@@ -1,5 +1,11 @@
 [
   {
+    "component": "Microsoft.Graphics.Win2D/1.4.0-azunyan.25680382dd21",
+    "file": "licenses/Microsoft.Graphics.Win2D/1.4.0-azunyan.25680382dd21/LICENSE.txt",
+    "source": "https://raw.githubusercontent.com/microsoft/Win2D/25680382dd2136779e10ea6084f0c5ba437ae288/LICENSE.txt",
+    "sha256": "c3ba493105fa52657c4c60d9b1680da7c01b188a8665d7a823c2a187fd259808"
+  },
+  {
     "component": "microsoft.netcore.app.runtime.nativeaot.win-x64/10.0.11",
     "file": "licenses/microsoft.netcore.app.runtime.nativeaot.win-x64/10.0.11/LICENSE.TXT",
     "source": "https://www.nuget.org/packages/microsoft.netcore.app.runtime.nativeaot.win-x64/10.0.11",

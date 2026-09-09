@@ -35,7 +35,7 @@ binary, or that all redistribution conditions have been satisfied.
 | Microsoft.WindowsAppSDK.ML | 2.1.74 | [License](licenses/Microsoft.WindowsAppSDK.ML/2.1.74/license.txt), [notices](licenses/Microsoft.WindowsAppSDK.ML/2.1.74/ThirdPartyNotices.txt) |
 | Microsoft.Windows.AI.MachineLearning | 2.1.74 | [License](licenses/Microsoft.Windows.AI.MachineLearning/2.1.74/license.txt), [notices](licenses/Microsoft.Windows.AI.MachineLearning/2.1.74/ThirdPartyNotices.txt) |
 | Microsoft.Windows.SDK.NET.Ref | 10.0.19041.57 | Windows SDK terms, including redistribution terms for supplied code; [license (RTF)](licenses/Microsoft.Windows.SDK.NET.Ref/10.0.19041.57/sdk_license.rtf), obtained through the package's [license URL](https://aka.ms/WinSDKLicenseURL) |
-| Microsoft.Graphics.Win2D | 1.3.2 | Package specifies a [Microsoft Win2D EULA URL](http://www.microsoft.com/web/webpi/eula/eula_win2d_10012014.htm); **unresolved**, see below. |
+| Microsoft.Graphics.Win2D | 1.4.0-azunyan.25680382dd21 | MIT; locally built from commit 25680382dd2136779e10ea6084f0c5ba437ae288; [license](licenses/Microsoft.Graphics.Win2D/1.4.0-azunyan.25680382dd21/LICENSE.txt) |
 
 The files in `licenses` preserve upstream license and notice documents.
 [sources.json](licenses/sources.json) records their package versions or source
@@ -69,12 +69,11 @@ notices when the complete texts accompany the distribution.
 
 ## Open release checks
 
-1. **Win2D 1.3.2:** its `.nuspec` requires license acceptance and points to the
-   EULA URL above, but the URL redirected to an unrelated Microsoft Learn page
-   during this review. The package contains no license text. The
-   [Win2D source license](https://github.com/microsoft/Win2D/blob/winappsdk/main/LICENSE.txt)
-   is MIT; it is not evidence that the prebuilt NuGet binary has the same terms.
-   Obtain the applicable binary EULA from Microsoft and bundle it before release.
+1. **Win2D:** use the local package built by `scripts/Build-Win2D.ps1` from
+   commit `25680382dd2136779e10ea6084f0c5ba437ae288`, and preserve its MIT text.
+   The pinned upstream packaging script explicitly selects the repository
+   license for local builds and a separate EULA URL for Microsoft's signed
+   distribution. This inventory covers the local build, not that distribution.
 2. Review and satisfy the Microsoft binary distribution conditions, including
    the agreement requirement, for the intended distribution channel. This notice
    file is not an EULA, and Azunote's zlib license applies to its original code.

@@ -30,6 +30,16 @@ Visual Studio AppxPackage directory explicitly with `-p:AppxMSBuildToolsPath`.
 
 ## Build and test
 
+First initialize and build the pinned Win2D source package:
+
+```powershell
+git submodule update --init external/Win2D
+./scripts/Build-Win2D.ps1
+```
+
+See [Win2D build prerequisites](scripts/Win2D-build.md). The local package is
+required before restoring the solution and can be reused for subsequent builds.
+
 Build the complete solution from the repository root:
 
 ```powershell

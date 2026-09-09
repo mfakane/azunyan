@@ -31,6 +31,10 @@ of Azunote's lightweight editing experience.
 
 ## Build and test
 
+First run `git submodule update --init external/Win2D` and
+`./scripts/Build-Win2D.ps1` from the repository root to generate the pinned local
+Win2D package. See [build prerequisites](../../scripts/Win2D-build.md).
+
 The application targets Windows x64. Build it from the repository root with:
 
 ```powershell
