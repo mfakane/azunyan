@@ -100,6 +100,7 @@ function Copy-AzunotePayload($Context, [string] $Destination) {
 
 function Copy-AzunotePortablePayload($Context, [string] $Destination) {
     New-Item -ItemType Directory -Force $Destination | Out-Null
+    New-Item -ItemType Directory -Force (Join-Path $Destination 'appdata') | Out-Null
 
     # PublishSingleFile embeds the native runtime, WinUI resources, and the
     # application's generated content. Keep only the files users need to see

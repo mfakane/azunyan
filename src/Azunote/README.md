@@ -123,9 +123,11 @@ See the user-facing documentation for the application configuration:
 - [External Tools](../../docs/external-tools.md), including tool discovery and launch definitions
 - [Substitution Variables](../../docs/substitution-variables.md), including `.env` loading and expansion
 
-The settings directory is `%LOCALAPPDATA%\Azunote`. Tools > Preferences... opens
-it in Explorer. The directory is created on first launch and is watched for
-valid external changes.
+The settings directory is `%LOCALAPPDATA%\Azunote` by default. When an
+`appdata` directory exists next to `Azunote.exe`, as it does in the portable
+ZIP, that directory is used instead. Tools > Preferences... opens the selected
+directory in Explorer. The directory is created on first launch and is watched
+for valid external changes.
 
 ## Editor integration
 

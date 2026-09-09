@@ -34,15 +34,19 @@ Existing output files are not overwritten. Neither script installs the app.
 
 The ZIP contains a top-level `Azunote-<version>-win-x64` folder. Its visible
 top level contains `Azunote.exe`, `README.md`, `LICENSE`,
-`THIRD-PARTY-NOTICES.md`, and the `azu.cmd`/`azu.ps1` launchers. The
+`THIRD-PARTY-NOTICES.md`, the `azu.cmd`/`azu.ps1` launchers, and an empty
+`appdata/` directory. The
 redistribution-required `licenses/` directory is kept with the notices; build
 artifacts such as DLLs, WinMDs, PRI files, satellite resources, manifests, and
 PDBs are not placed in the ZIP. Extract the entire folder and run
 `Azunote.exe` or the adjacent `azu` launchers. Here "portable" means no
 installer or separately installed .NET/Windows App SDK runtime is required;
-the first launch extracts the bundled runtime under `%TEMP%/.net`. Settings
-still use Azunote's normal user configuration location. It does not enable a
-separate USB-local settings mode.
+the first launch extracts the bundled runtime under `%TEMP%/.net`. Because the
+ZIP includes `appdata/`, settings, application state, custom modes, and external
+tools are stored below that directory instead of the normal
+`%LOCALAPPDATA%/Azunote` directory. Removing `appdata/` before launching again
+restores the normal user configuration location. This is a folder-local data
+mode, not a separate USB-local settings mode.
 
 ## Package identity and signing
 

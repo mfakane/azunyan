@@ -591,12 +591,24 @@ public sealed class ExternalToolCatalog
 public static class SettingsFileService
 {
     public const string SettingsDirectoryName = "Azunote";
+    public const string PortableDataDirectoryName = "appdata";
     public const string SettingsFileName = "settings.toml";
     public const string ToolsDirectoryName = "tools";
     public const string ModesDirectoryName = "modes";
 
-    public static string GetDefaultDirectory()
+    public static string GetDefaultDirectory() => GetDefaultDirectory(AppContext.BaseDirectory);
+
+    internal static string GetDefaultDirectory(string applicationBaseDirectory)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(applicationBaseDirectory);
+        var portableDirectory = Path.Combine(
+            Path.GetFullPath(applicationBaseDirectory),
+            PortableDataDirectoryName);
+        if (Directory.Exists(portableDirectory))
+        {
+            return portableDirectory;
+        }
+
         var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         if (string.IsNullOrWhiteSpace(localAppData))
         {
