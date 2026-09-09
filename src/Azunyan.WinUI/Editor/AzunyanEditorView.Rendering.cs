@@ -188,6 +188,12 @@ public sealed partial class AzunyanEditorView
         try
         {
             var actualRect = InputWindow.GetCaretRect(EditorHost);
+            if (actualRect.IsEmpty)
+            {
+                // Native caret geometry can be unavailable after selection
+                // changes. Keep the projected position until the next render.
+                return;
+            }
             var deltaX = desiredRect.X - actualRect.X;
             var deltaY = desiredRect.Y - actualRect.Y;
             if (Math.Abs(deltaX) <= 0.5 && Math.Abs(deltaY) <= 0.5)

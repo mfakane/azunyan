@@ -11,14 +11,11 @@ namespace Azunote.UiTests;
 /// Windows UI Automation smoke tests for the unpackaged Azunote desktop app.
 /// These tests are opt-in because they need an unlocked interactive desktop.
 /// </summary>
-public sealed class AzunoteUiTests : IClassFixture<AzunoteUiFixture>
+public sealed class AzunoteUiTests : IDisposable
 {
-    private readonly AzunoteUiFixture _fixture;
+    private readonly AzunoteUiFixture _fixture = new();
 
-    public AzunoteUiTests(AzunoteUiFixture fixture)
-    {
-        _fixture = fixture;
-    }
+    public void Dispose() => _fixture.Dispose();
 
     [AzunoteUiFact]
     public void Main_window_starts_without_initialization_exception()
@@ -40,6 +37,7 @@ public sealed class AzunoteUiTests : IClassFixture<AzunoteUiFixture>
             var title = $"{fileName} [READONLY] - Azunote";
             var legalWindow = _fixture.WaitForWindows(windows => windows.Any(w => w.Current.Name == title))
                 .First(w => w.Current.Name == title);
+            using var process = Process.GetProcessById(legalWindow.Current.ProcessId);
             try
             {
                 var editor = AzunoteUiFixture.WaitForElement(
@@ -50,6 +48,7 @@ public sealed class AzunoteUiTests : IClassFixture<AzunoteUiFixture>
                 var original = value.Current.Value;
 
                 var textPattern = AzunoteUiFixture.WaitForTextPattern(editor);
+                Assert.Single(textPattern.GetSelection());
                 editor.SetFocus();
                 var range = textPattern.DocumentRange.FindText(expectedText, false, false);
                 Assert.NotNull(range);
@@ -69,7 +68,7 @@ public sealed class AzunoteUiTests : IClassFixture<AzunoteUiFixture>
             }
             catch (Exception exception)
             {
-                throw new XunitException($"{fileName}: {exception}");
+                throw new XunitException($"{fileName}: process exited={process.HasExited}; {exception}");
             }
         }
     }
@@ -402,10 +401,10 @@ public sealed class AzunoteUiTests : IClassFixture<AzunoteUiFixture>
                             ControlType.MenuItem))
                     .Cast<AutomationElement>()
                     .Count(item => item.TryGetCurrentPattern(
-                            SelectionItemPattern.Pattern,
+                            TogglePattern.Pattern,
                             out var pattern)
-                        && pattern is SelectionItemPattern selection
-                        && selection.Current.IsSelected);
+                        && pattern is TogglePattern toggle
+                        && toggle.Current.ToggleState == ToggleState.On);
                 return selectedItems == 1 ? window : null;
             },
             "The active window did not have exactly one checked document in the Window menu.");
@@ -542,7 +541,10 @@ public sealed class AzunoteUiFixture : IDisposable
                 out var expandCollapse)
             && expandCollapse is ExpandCollapsePattern pattern)
         {
-            pattern.Expand();
+            if (pattern.Current.ExpandCollapseState == ExpandCollapseState.Collapsed)
+            {
+                pattern.Expand();
+            }
             return;
         }
 
@@ -556,11 +558,35 @@ public sealed class AzunoteUiFixture : IDisposable
     {
         OpenMenu(window, menuName);
         var item = WaitFor(
-            () => window.FindFirst(
-                TreeScope.Descendants,
-                new PropertyCondition(AutomationElement.NameProperty, itemName)),
+            () =>
+            {
+                var candidate = window.FindFirst(
+                    TreeScope.Descendants,
+                    new PropertyCondition(AutomationElement.NameProperty, itemName));
+                if (candidate is not null && !candidate.Current.IsOffscreen)
+                {
+                    return candidate;
+                }
+                // A preceding flyout can still be closing when the first
+                // expand request is sent. Retry against its current state.
+                OpenMenu(window, menuName);
+                return null;
+            },
             $"Could not find menu item {menuName} > {itemName}.");
         Invoke(item);
+        WaitFor(
+            () =>
+            {
+                try
+                {
+                    return item.Current.IsOffscreen ? item : null;
+                }
+                catch (ElementNotAvailableException)
+                {
+                    return item;
+                }
+            },
+            $"Menu item {menuName} > {itemName} did not close after invocation.");
     }
 
     public void Dispose()

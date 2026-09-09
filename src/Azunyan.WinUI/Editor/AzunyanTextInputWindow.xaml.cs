@@ -126,12 +126,23 @@ public sealed partial class AzunyanTextInputWindow : UserControl
 
     /// <summary>
     /// Returns the native caret rectangle transformed into the requested
-    /// ancestor's coordinate space.
+    /// ancestor's coordinate space, or <see cref="Rect.Empty"/> when native
+    /// layout has not supplied usable geometry yet.
     /// </summary>
     public Rect GetCaretRect(UIElement relativeTo)
     {
         ArgumentNullException.ThrowIfNull(relativeTo);
         var localRect = GetNativeCaretRect();
+        // The native TextBox can report negative dimensions while its sliding
+        // window is being laid out (not necessarily Rect.Empty). Such geometry
+        // cannot be reconstructed through Rect's constructor or used to align
+        // the input host. Let the next render pass retry instead.
+        if (localRect.IsEmpty || localRect.Width < 0 || localRect.Height < 0
+            || !double.IsFinite(localRect.X) || !double.IsFinite(localRect.Y)
+            || !double.IsFinite(localRect.Width) || !double.IsFinite(localRect.Height))
+        {
+            return Rect.Empty;
+        }
         var transform = NativeTextBox.TransformToVisual(relativeTo);
         var origin = transform.TransformPoint(new Point(localRect.X, localRect.Y));
         return new Rect(origin.X, origin.Y, localRect.Width, localRect.Height);

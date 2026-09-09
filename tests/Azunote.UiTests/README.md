@@ -18,7 +18,8 @@ dotnet test tests/Azunote.UiTests/Azunote.UiTests.csproj -c Debug --no-build
 ```
 
 If the executable is in a non-default location, set `AZUNOTE_EXE` to its full path.
-The fixture starts only the process it owns and closes it after the test class finishes.
+Each test starts its own process and closes it when the test finishes, so document,
+window, and menu state cannot leak into subsequent tests.
 
 The current tests verify that the projected editor exposes TextPattern and a read/write
 ValuePattern, reports geometry for empty caret ranges, keeps ranges bound to the snapshot
