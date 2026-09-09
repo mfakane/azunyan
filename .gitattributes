@@ -1,0 +1,2 @@
+# Preserve upstream legal documents byte-for-byte for licenses/sources.json hashes.
+licenses/** -text
