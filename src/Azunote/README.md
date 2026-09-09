@@ -46,6 +46,9 @@ are disabled. Duplicate windows preserve the same read-only state.
 
 ## Build and test
 
+For Native AOT MSIX/APPX and portable ZIP outputs, see
+[distribution scripts](../../scripts/Packaging.md).
+
 First run `git submodule update --init external/Win2D` and
 `./scripts/Build-Win2D.ps1` from the repository root to generate the pinned local
 Win2D package. See [build prerequisites](../../scripts/Win2D-build.md).
