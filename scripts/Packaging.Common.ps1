@@ -21,25 +21,68 @@ function New-AzunoteDistribution([string] $OutputDirectory, [string] $Version) {
     }
 }
 
-function Publish-AzunoteDistribution($Context) {
+function Publish-AzunoteDistribution($Context, [switch] $SingleFile) {
     & (Join-Path $PSScriptRoot 'Generate-ThirdPartyNotices.ps1') -Check
     $project = Join-Path $Context.Repo 'src/Azunote/Azunote.csproj'
+    $publishProperties = @(
+        '-p:WindowsPackageType=None'
+        # PublishSingleFile is evaluated for the referenced WinUI project too.
+        '-p:EnableMsixTooling=true'
+    )
+    if ($SingleFile) {
+        # Windows App SDK supports single-file only for unpackaged,
+        # self-contained apps. Its auto-initializer locates the extracted
+        # native runtime before WinUI starts.
+        $publishProperties += @(
+            # Native AOT leaves the Windows App SDK native payload as loose
+            # files. The managed single-file host can bundle that payload.
+            '-p:PublishAot=false'
+            '-p:PublishTrimmed=false'
+            '-p:PublishSingleFile=true'
+            '-p:IncludeAllContentForSelfExtract=true'
+            '-p:WindowsAppSdkUndockedRegFreeWinRTInitialize=true'
+        )
+    } else {
+        $publishProperties += @(
+            '-p:PublishAot=true'
+            '-p:PublishTrimmed=true'
+        )
+    }
     $previousPath = $env:PATH
     try {
         # Native AOT's linker discovery invokes vswhere by name.
         $env:PATH = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer;$previousPath"
         & dotnet publish $project -c Release -r win-x64 --self-contained true `
-            -p:PublishAot=true -p:PublishTrimmed=true -p:WindowsPackageType=None `
+            @publishProperties `
             "-p:Version=$($Context.Version)" -o $Context.Publish
-        if ($LASTEXITCODE) { throw "Native AOT publish failed ($LASTEXITCODE)." }
+        if ($LASTEXITCODE) { throw "Azunote publish failed ($LASTEXITCODE)." }
     } finally { $env:PATH = $previousPath }
-    foreach ($file in @('Azunote.exe', 'LICENSE', 'THIRD-PARTY-NOTICES.md', 'licenses/sources.json')) {
+    $requiredFiles = @('Azunote.exe')
+    if (!$SingleFile) {
+        $requiredFiles += @('LICENSE', 'THIRD-PARTY-NOTICES.md', 'licenses/sources.json')
+    }
+    foreach ($file in $requiredFiles) {
         if (!(Test-Path -LiteralPath (Join-Path $Context.Publish $file))) {
             throw "Publish output is missing $file."
         }
     }
-    # Verify this is a native executable, rather than silently packaging an apphost.
+    if ($SingleFile) {
+        $unexpectedFiles = @(Get-ChildItem -LiteralPath $Context.Publish -File -Recurse |
+            Where-Object {
+                $_.Extension -ne '.pdb' -and
+                [IO.Path]::GetRelativePath($Context.Publish, $_.FullName) -ne 'Azunote.exe'
+            })
+        if ($unexpectedFiles.Count) {
+            $names = $unexpectedFiles |
+                ForEach-Object { [IO.Path]::GetRelativePath($Context.Publish, $_.FullName) }
+            throw "Single-file publish left loose non-PDB files: $($names -join ', ')"
+        }
+    }
+    # Both distribution modes must produce an executable, not a loose apphost.
     if (Test-Path (Join-Path $Context.Publish 'Azunote.dll')) {
+        if ($SingleFile) {
+            throw 'Managed Azunote.dll found in single-file output.'
+        }
         throw 'Managed Azunote.dll found in Native AOT output.'
     }
 }
@@ -53,6 +96,35 @@ function Copy-AzunotePayload($Context, [string] $Destination) {
         New-Item -ItemType Directory -Force (Split-Path $target) | Out-Null
         Copy-Item -LiteralPath $file.FullName -Destination $target
     }
+}
+
+function Copy-AzunotePortablePayload($Context, [string] $Destination) {
+    New-Item -ItemType Directory -Force $Destination | Out-Null
+
+    # PublishSingleFile embeds the native runtime, WinUI resources, and the
+    # application's generated content. Keep only the files users need to see
+    # and the legal texts that must accompany a redistribution.
+    $files = @(
+        @{ Source = Join-Path $Context.Repo 'src/Azunote/README.md'; Name = 'README.md' }
+        @{ Source = Join-Path $Context.Repo 'LICENSE'; Name = 'LICENSE' }
+        @{ Source = Join-Path $Context.Repo 'THIRD-PARTY-NOTICES.md'; Name = 'THIRD-PARTY-NOTICES.md' }
+        @{ Source = Join-Path $Context.Repo 'src/Azunote/azu.cmd'; Name = 'azu.cmd' }
+        @{ Source = Join-Path $Context.Repo 'src/Azunote/azu.ps1'; Name = 'azu.ps1' }
+    )
+    foreach ($file in $files) {
+        if (!(Test-Path -LiteralPath $file.Source -PathType Leaf)) {
+            throw "Portable distribution source is missing $($file.Name)."
+        }
+        Copy-Item -LiteralPath $file.Source -Destination (Join-Path $Destination $file.Name)
+    }
+
+    $licenses = Join-Path $Context.Repo 'licenses'
+    if (!(Test-Path -LiteralPath $licenses -PathType Container)) {
+        throw 'Portable distribution source is missing licenses/.'
+    }
+    Copy-Item -LiteralPath $licenses -Destination (Join-Path $Destination 'licenses') -Recurse
+    Copy-Item -LiteralPath (Join-Path $Context.Publish 'Azunote.exe') `
+        -Destination (Join-Path $Destination 'Azunote.exe')
 }
 
 function Find-AzunoteWinApp($Context) {

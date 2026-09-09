@@ -1,4 +1,4 @@
-# Azunote Native AOT distributions
+# Azunote distributions
 
 Run these PowerShell 7 scripts on Windows with the .NET 10 SDK, Visual Studio
 C++ build tools, and Windows SDK installed. First initialize and build the
@@ -14,12 +14,14 @@ git submodule update --init external/Win2D
 ./scripts/Package-AzunoteMsix.ps1
 ```
 
-Both scripts publish Release/win-x64 with Native AOT and a self-contained .NET
-deployment. The application project enables self-contained Windows App SDK.
-Each run uses a new staging directory under `artifacts/packaging` to avoid
-including stale files. PDBs remain in staging but are omitted from distributions.
-The executable, native dependencies, assets, default configuration, launchers,
-`LICENSE`, `THIRD-PARTY-NOTICES.md`, and `licenses/` are preserved.
+Both scripts publish Release/win-x64 as self-contained deployments. The
+MSIX/APPX script uses Native AOT and keeps the self-contained Windows App SDK
+runtime as loose package files. The ZIP script uses the managed Windows App SDK
+single-file mode (without Native AOT), so the native runtime, WinUI resources,
+and application content are bundled into `Azunote.exe` and extracted to a
+temporary directory when it starts. Each run uses a new staging directory
+under `artifacts/packaging` to avoid including stale files. PDBs remain in
+staging but are omitted from distributions.
 
 Outputs default to `artifacts/distributions`, with a SHA-256 sidecar for each
 archive. The default version comes from `src/Azunote/Package.appxmanifest`.
@@ -30,11 +32,17 @@ Existing output files are not overwritten. Neither script installs the app.
 ./scripts/Package-AzunoteMsix.ps1 -Version 0.2.0.0 -Format appx
 ```
 
-The ZIP contains a top-level `Azunote-<version>-win-x64` folder. Extract the
-entire folder and run `Azunote.exe` or the adjacent `azu` launchers. Here
-"portable" means no installer or separately installed .NET/Windows App SDK
-runtime is required; settings still use Azunote's normal user configuration
-location. It does not enable a separate USB-local settings mode.
+The ZIP contains a top-level `Azunote-<version>-win-x64` folder. Its visible
+top level contains `Azunote.exe`, `README.md`, `LICENSE`,
+`THIRD-PARTY-NOTICES.md`, and the `azu.cmd`/`azu.ps1` launchers. The
+redistribution-required `licenses/` directory is kept with the notices; build
+artifacts such as DLLs, WinMDs, PRI files, satellite resources, manifests, and
+PDBs are not placed in the ZIP. Extract the entire folder and run
+`Azunote.exe` or the adjacent `azu` launchers. Here "portable" means no
+installer or separately installed .NET/Windows App SDK runtime is required;
+the first launch extracts the bundled runtime under `%TEMP%/.net`. Settings
+still use Azunote's normal user configuration location. It does not enable a
+separate USB-local settings mode.
 
 ## Package identity and signing
 

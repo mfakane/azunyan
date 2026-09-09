@@ -736,24 +736,11 @@ public static class SettingsFileService
             return;
         }
 
-        var defaultModesDirectory = Path.Combine(
-            AppContext.BaseDirectory,
-            "Resources",
-            "DefaultAppData",
-            ModesDirectoryName);
+        var defaultFiles = BundledDefaultAppData.GetFiles(ModesDirectoryName);
         Directory.CreateDirectory(modesDirectory);
-        if (!Directory.Exists(defaultModesDirectory))
-        {
-            return;
-        }
-
-        foreach (var sourcePath in Directory.EnumerateFiles(
-                     defaultModesDirectory,
-                     "*",
-                     SearchOption.AllDirectories))
+        foreach (var relativePath in defaultFiles)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var relativePath = Path.GetRelativePath(defaultModesDirectory, sourcePath);
             var destinationPath = Path.Combine(modesDirectory, relativePath);
             var destinationDirectory = Path.GetDirectoryName(destinationPath);
             if (!string.IsNullOrWhiteSpace(destinationDirectory))
@@ -761,7 +748,13 @@ public static class SettingsFileService
                 Directory.CreateDirectory(destinationDirectory);
             }
 
-            await using var source = File.OpenRead(sourcePath);
+            await using var source = BundledDefaultAppData.OpenRead(
+                Path.Combine(ModesDirectoryName, relativePath));
+            if (source is null)
+            {
+                continue;
+            }
+
             await using var destination = File.Create(destinationPath);
             await source.CopyToAsync(destination, cancellationToken);
         }
@@ -771,12 +764,8 @@ public static class SettingsFileService
         string settingsPath,
         CancellationToken cancellationToken)
     {
-        var defaultSettingsPath = Path.Combine(
-            AppContext.BaseDirectory,
-            "Resources",
-            "DefaultAppData",
-            SettingsFileName);
-        if (!File.Exists(defaultSettingsPath))
+        await using var source = BundledDefaultAppData.OpenRead(SettingsFileName);
+        if (source is null)
         {
             await File.WriteAllTextAsync(
                 settingsPath,
@@ -786,7 +775,6 @@ public static class SettingsFileService
             return;
         }
 
-        await using var source = File.OpenRead(defaultSettingsPath);
         await using var destination = File.Create(settingsPath);
         await source.CopyToAsync(destination, cancellationToken);
     }
@@ -795,24 +783,10 @@ public static class SettingsFileService
         string settingsDirectory,
         CancellationToken cancellationToken)
     {
-        var defaultToolsDirectory = Path.Combine(
-            AppContext.BaseDirectory,
-            "Resources",
-            "DefaultAppData",
-            ToolsDirectoryName);
         var toolsDirectory = GetToolsDirectoryPath(settingsDirectory);
-        if (!Directory.Exists(defaultToolsDirectory))
-        {
-            return;
-        }
-
-        foreach (var sourcePath in Directory.EnumerateFiles(
-                     defaultToolsDirectory,
-                     "*",
-                     SearchOption.AllDirectories))
+        foreach (var relativePath in BundledDefaultAppData.GetFiles(ToolsDirectoryName))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var relativePath = Path.GetRelativePath(defaultToolsDirectory, sourcePath);
             var destinationPath = Path.Combine(toolsDirectory, relativePath);
             var destinationDirectory = Path.GetDirectoryName(destinationPath);
             if (!string.IsNullOrWhiteSpace(destinationDirectory))
@@ -825,7 +799,13 @@ public static class SettingsFileService
                 continue;
             }
 
-            await using var source = File.OpenRead(sourcePath);
+            await using var source = BundledDefaultAppData.OpenRead(
+                Path.Combine(ToolsDirectoryName, relativePath));
+            if (source is null)
+            {
+                continue;
+            }
+
             await using var destination = File.Create(destinationPath);
             await source.CopyToAsync(destination, cancellationToken);
         }

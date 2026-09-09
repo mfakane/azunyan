@@ -6,9 +6,9 @@ $context = New-AzunoteDistribution $OutputDirectory $Version
 $name = "Azunote-$($context.Version)-win-x64"
 $archive = Join-Path $context.Output "$name.zip"
 if (Test-Path -LiteralPath $archive) { throw "Output already exists: $archive" }
-Publish-AzunoteDistribution $context
+Publish-AzunoteDistribution $context -SingleFile
 $payload = Join-Path $context.Work $name
-Copy-AzunotePayload $context $payload
+Copy-AzunotePortablePayload $context $payload
 [IO.Compression.ZipFile]::CreateFromDirectory($payload, $archive,
     [IO.Compression.CompressionLevel]::Optimal, $true)
 Complete-AzunoteDistribution $archive
