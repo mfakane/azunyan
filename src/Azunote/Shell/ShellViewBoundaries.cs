@@ -6,7 +6,8 @@ namespace Azunote;
 internal sealed record EditorLanguageConfiguration(
     IReadOnlyList<string> CompletionTriggers,
     ISyntaxProvider? Syntax,
-    ICompletionProvider? Completion);
+    ICompletionProvider? Completion,
+    IFoldingProvider? Folding = null);
 
 internal sealed record StatusBarState(
     string Position,

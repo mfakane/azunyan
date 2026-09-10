@@ -21,6 +21,7 @@ public sealed class LanguageModeControllerTests
         Assert.Equal("azunote", controller.CurrentModeId);
         Assert.NotNull(editor.LanguageConfiguration?.Syntax);
         Assert.NotNull(editor.LanguageConfiguration?.Completion);
+        Assert.IsType<AzunoteFoldingProvider>(editor.LanguageConfiguration?.Folding);
         Assert.Equal("azunote", menu.SelectedId);
     }
 

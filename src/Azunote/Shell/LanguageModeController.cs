@@ -106,7 +106,8 @@ internal sealed class LanguageModeController
         _editor.ApplyLanguage(new EditorLanguageConfiguration(
             mode.CompletionTriggers,
             isAzunote ? new AzunoteSyntaxProvider() : mode.Provider,
-            isAzunote ? new AzunoteCompletionProvider(schemas) : null));
+            isAzunote ? new AzunoteCompletionProvider(schemas) : null,
+            mode.FoldingProvider));
         _menu.Select(id);
         if (refresh)
         {

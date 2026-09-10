@@ -109,7 +109,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             TextDrawingSurface,
             GutterCanvas,
             TextRenderLayer,
-            RenderOverlay);
+            RenderOverlay,
+            ToggleFold);
         _defaultRenderer.LayoutInvalidated += OnRendererLayoutInvalidated;
         _providerScheduler = new EditorProviderScheduler(_providers);
         _renderer = _defaultRenderer;
@@ -129,6 +130,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         InputWindow.NativeTextBoxControl.BeforeKeyDown += OnInputKeyDown;
         InputWindow.NativeTextBoxControl.AfterKeyUp += OnInputKeyUp;
         EditorPointerSurface.PointerPressed += OnInputPointerPressed;
+        EditorPointerSurface.DoubleTapped += OnInputDoubleTapped;
         EditorPointerSurface.PointerReleased += OnInputPointerReleased;
         EditorPointerSurface.PointerCanceled += OnInputPointerCanceled;
         EditorPointerSurface.PointerCaptureLost += OnInputPointerCaptureLost;
@@ -175,6 +177,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         SetAdditionalContextMenuItems([]);
         InputWindow.NativeTextBoxControl.ContextFlyout = null;
         EditorPointerSurface.ContextRequested -= OnEditorContextRequested;
+        EditorPointerSurface.DoubleTapped -= OnInputDoubleTapped;
         EditorPointerSurface.PointerReleased -= OnInputPointerReleased;
         EditorPointerSurface.PointerCanceled -= OnInputPointerCanceled;
         EditorPointerSurface.PointerCaptureLost -= OnInputPointerCaptureLost;
@@ -2914,18 +2917,14 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 GetVerticalOffset(),
                 _characterWidth,
                 out var anchor,
-                out var foldId,
+                out _,
                 out var adornmentId,
                 out var blockPosition))
         {
             return;
         }
 
-        if (foldId is not null)
-        {
-            ToggleFold(foldId);
-        }
-        else if (adornmentId is not null
+        if (adornmentId is not null
             && TryGetAdornment(adornmentId, out var adornment))
         {
             SetDocumentSelection(TextSelection.Caret(anchor.Position.Offset));
@@ -2973,6 +2972,46 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         InputWindow.Focus(FocusState.Pointer);
+        args.Handled = true;
+    }
+
+    private void OnInputDoubleTapped(
+        object sender,
+        DoubleTappedRoutedEventArgs args)
+    {
+        if (!IsProjectedTextSurface)
+        {
+            return;
+        }
+
+        var point = args.GetPosition(EditorPointerSurface);
+        if (!_defaultRenderer.TextRenderer.TryHitTest(
+                point.X,
+                point.Y,
+                InputWindow.NativeTextBoxControl.Padding.Left,
+                InputWindow.NativeTextBoxControl.Padding.Top,
+                GetHorizontalOffset(),
+                GetVerticalOffset(),
+                _characterWidth,
+                out _,
+                out var foldId,
+                out _,
+                out _)
+            || (foldId is null
+                && !_defaultRenderer.TextRenderer.TryGetFoldIdAtBodyPoint(
+                    point.X,
+                    point.Y,
+                    InputWindow.NativeTextBoxControl.Padding.Left,
+                    InputWindow.NativeTextBoxControl.Padding.Top,
+                    GetHorizontalOffset(),
+                    GetVerticalOffset(),
+                    _characterWidth,
+                    out foldId)))
+        {
+            return;
+        }
+
+        ToggleFold(foldId!);
         args.Handled = true;
     }
 
@@ -3676,7 +3715,10 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         RootGrid.Background = new SolidColorBrush(_colorScheme.EditorBackground);
         InputWindow.NativeTextBoxControl.Background =
             new SolidColorBrush(_colorScheme.EditorBackground);
-        GutterCanvas.Background = new SolidColorBrush(_colorScheme.GutterBackground);
+        GutterCanvas.Background = new SolidColorBrush(
+            IsProjectedTextSurface
+                ? Colors.Transparent
+                : _colorScheme.GutterBackground);
 
         CompletionPopup.ColorScheme = _colorScheme;
 
@@ -3688,6 +3730,11 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     private void UpdateTextSurfaceMode()
     {
+        GutterCanvas.Background = new SolidColorBrush(
+            IsProjectedTextSurface
+                ? Colors.Transparent
+                : _colorScheme.GutterBackground);
+
         if (_renderer is not null && !IsProjectedTextSurface)
         {
             // A custom renderer owns the complete document surface too. Its

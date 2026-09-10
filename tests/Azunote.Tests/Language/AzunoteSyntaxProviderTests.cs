@@ -26,4 +26,18 @@ public sealed class AzunoteSyntaxProviderTests
             ],
             spans.Select(span => $"{text[span.Range.Start..span.Range.End]}:{span.Classification}"));
     }
+
+    [Fact]
+    public async Task Configuration_provider_folds_toml_sections()
+    {
+        const string text = "[debug]\nlogging = []\n[terminal]\ncommand = \"wt.exe\"";
+        var snapshot = new TextSnapshot(text);
+        var provider = new AzunoteFoldingProvider();
+
+        var folds = await provider.GetFoldsAsync(
+            new EditorProviderContext(snapshot, 0, TextSelection.Caret(0)));
+
+        var fold = Assert.Single(folds.Where(item => item.Id.Contains("debug", StringComparison.Ordinal)));
+        Assert.Equal("\nlogging = []\n", snapshot.GetText(fold.Range));
+    }
 }

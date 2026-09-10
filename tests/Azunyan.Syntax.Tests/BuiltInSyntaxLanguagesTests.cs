@@ -80,8 +80,70 @@ public sealed class BuiltInSyntaxLanguagesTests
         Assert.Contains(".cs", BuiltInSyntaxLanguages.CSharp.FileExtensions);
         Assert.Contains(".tsx", BuiltInSyntaxLanguages.TypeScript.FileExtensions);
         Assert.Contains("*.toml", BuiltInSyntaxLanguages.Toml.Patterns);
+        Assert.IsType<TomlFoldingProvider>(BuiltInSyntaxLanguages.Toml.FoldingProvider);
         Assert.Equal([".", "(", "{", "[", "->"], BuiltInSyntaxLanguages.CSharp.CompletionTriggerCharacters);
         Assert.Equal(8, BuiltInSyntaxLanguages.All.Count);
+    }
+
+    [Fact]
+    public async Task Toml_folding_provider_folds_tables_and_arrays_of_tables()
+    {
+        const string text =
+            "# document\n"
+            + "[owner]\n"
+            + "name = \"Tom\"\n"
+            + "[database] # connection settings\n"
+            + "ports = [8001, 8001]\n"
+            + "[[products]]\n"
+            + "name = \"Hammer\"\n"
+            + "[[products]]\n"
+            + "name = \"Nail\"";
+        var snapshot = new TextSnapshot(text);
+        var provider = Assert.IsType<TomlFoldingProvider>(
+            BuiltInSyntaxLanguages.Toml.FoldingProvider);
+
+        var folds = await provider.GetFoldsAsync(
+            new EditorProviderContext(snapshot, 0, TextSelection.Caret(0)));
+
+        Assert.Equal(
+            [
+                "\nname = \"Tom\"\n",
+                "\nports = [8001, 8001]\n",
+                "\nname = \"Hammer\"\n",
+                "\nname = \"Nail\""
+            ],
+            folds.Select(fold => snapshot.GetText(fold.Range)));
+        Assert.Equal(
+            [
+                "toml-section:table:owner:0",
+                "toml-section:table:database:0",
+                "toml-section:array:products:0",
+                "toml-section:array:products:1"
+            ],
+            folds.Select(fold => fold.Id));
+        Assert.All(folds, fold => Assert.Equal(" …", fold.Placeholder));
+    }
+
+    [Fact]
+    public async Task Toml_folding_provider_ignores_comments_and_multiline_strings()
+    {
+        const string text =
+            "message = \"\"\"\n"
+            + "[not-a-section]\n"
+            + "still = \"inside the string\"\n"
+            + "\"\"\"\n"
+            + "# [also-not-a-section]\n"
+            + "[real]\n"
+            + "value = true";
+        var snapshot = new TextSnapshot(text);
+        var provider = new TomlFoldingProvider();
+
+        var folds = await provider.GetFoldsAsync(
+            new EditorProviderContext(snapshot, 0, TextSelection.Caret(0)));
+
+        var fold = Assert.Single(folds);
+        Assert.Equal("toml-section:table:real:0", fold.Id);
+        Assert.Equal("\nvalue = true", snapshot.GetText(fold.Range));
     }
 
     [Fact]

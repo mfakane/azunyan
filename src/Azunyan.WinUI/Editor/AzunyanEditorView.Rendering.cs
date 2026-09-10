@@ -62,9 +62,16 @@ public sealed partial class AzunyanEditorView
             ? providerGutter!.Max(item => item.Text.Length)
             : 0;
         var showLogicalLineNumbers = supportsLogicalLineGutter && ShowLineNumbers;
+        var hasFoldGutter = supportsLogicalLineGutter
+            && currentFrame?.Document?.Folds is { Count: > 0 };
+        var foldGutterWidth = hasFoldGutter ? 20 : 0;
         var gutterWidth = showLogicalLineNumbers || hasProviderGutter
-            ? Math.Max(32, (Math.Max(digits, providerGutterDigits) * _characterWidth) + 16)
-            : 0;
+            ? Math.Max(
+                32,
+                (Math.Max(digits, providerGutterDigits) * _characterWidth)
+                    + 16
+                    + foldGutterWidth)
+            : foldGutterWidth;
         GutterColumn.Width = new GridLength(gutterWidth);
         GutterCanvas.Clip = new RectangleGeometry
         {

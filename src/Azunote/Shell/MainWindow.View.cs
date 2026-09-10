@@ -215,8 +215,8 @@ public sealed partial class MainWindow
         _editor.CompletionTriggerCharacters = configuration.CompletionTriggers;
         _editor.Providers.Syntax = configuration.Syntax;
         _editor.Providers.Completion = configuration.Completion;
+        _editor.Providers.Folding = configuration.Folding;
         _editor.Providers.Tooltip = null;
-        _editor.Providers.Folding = null;
         _editor.Providers.Decorations = null;
         _editor.Providers.Gutter = null;
         _editor.Providers.Inlay = null;
