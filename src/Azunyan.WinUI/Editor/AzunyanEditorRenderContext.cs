@@ -39,7 +39,8 @@ internal sealed class AzunyanEditorRenderContext
         TextWrapping textWrapping,
         int tabDisplaySize,
         IReadOnlySet<string> collapsedFoldIds,
-        EditorProviderFrame? providerFrame)
+        EditorProviderFrame? providerFrame,
+        Action<string>? toggleFold)
     {
         Snapshot = snapshot;
         Selection = selection;
@@ -70,13 +71,15 @@ internal sealed class AzunyanEditorRenderContext
         CollapsedFoldIds = collapsedFoldIds;
         ProviderFrame = providerFrame;
         ProviderResults = providerFrame?.ToLegacyResults();
+        ToggleFold = toggleFold;
     }
 
     internal AzunyanEditorRenderContext(
         AzunyanEditorRenderFrame frame,
         Canvas gutterLayer,
         Canvas textLayer,
-        Canvas overlayLayer)
+        Canvas overlayLayer,
+        Action<string>? toggleFold = null)
         : this(
             frame.Snapshot,
             frame.Selection,
@@ -105,7 +108,8 @@ internal sealed class AzunyanEditorRenderContext
             frame.TextWrapping,
             frame.TabDisplaySize,
             frame.CollapsedFoldIds,
-            frame.ProviderFrame)
+            frame.ProviderFrame,
+            toggleFold)
     {
     }
 
@@ -167,6 +171,8 @@ internal sealed class AzunyanEditorRenderContext
     public int TabDisplaySize { get; }
 
     public IReadOnlySet<string> CollapsedFoldIds { get; }
+
+    internal Action<string>? ToggleFold { get; }
 
     /// <summary>
     /// The immutable provider channels used to build this render pass. A

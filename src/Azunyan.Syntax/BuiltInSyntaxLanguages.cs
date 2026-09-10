@@ -163,7 +163,8 @@ public static class BuiltInSyntaxLanguages
                 @"(?<![\w.])(?:[-+]?(?:\d(?:_?\d)*(?:\.\d(?:_?\d)*)?(?:[eE][-+]?\d(?:_?\d)*)?|0x[0-9A-Fa-f](?:_?[0-9A-Fa-f])*|0o[0-7](?:_?[0-7])*|0b[01](?:_?[01])*))(?![\w.])",
                 "number")
         ],
-        CommonCompletionTriggers);
+        CommonCompletionTriggers,
+        foldingProvider: new TomlFoldingProvider());
 
     private static SyntaxLanguageDefinition CreateMarkdown() =>
         new("markdown", "Markdown", [".md", ".markdown", ".mdown"],

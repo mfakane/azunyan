@@ -78,6 +78,49 @@ public sealed class AzunoteUiTests : IClassFixture<AzunoteUiFixture>
     }
 
     [AzunoteUiFact]
+    public void Fold_gutter_chevron_invokes_toml_section_toggle()
+    {
+        var editor = _fixture.Editor;
+        var valuePattern = AzunoteUiFixture.WaitForValuePattern(editor);
+        var original = valuePattern.Current.Value;
+        const string toml = "[server]\nname = \"Azunote\"\nport = 8080\n";
+
+        try
+        {
+            valuePattern.SetValue(toml);
+            var textPattern = AzunoteUiFixture.WaitForTextPattern(editor);
+            AzunoteUiFixture.WaitForDocumentText(
+                textPattern,
+                text => string.Equals(text, toml, StringComparison.Ordinal));
+
+            var collapseButton = AzunoteUiFixture.WaitForElement(
+                editor,
+                AutomationElement.NameProperty,
+                "Collapse section");
+            Assert.Equal(ControlType.Button, collapseButton.Current.ControlType);
+            ((InvokePattern)collapseButton.GetCurrentPattern(InvokePattern.Pattern))
+                .Invoke();
+
+            var expandButton = AzunoteUiFixture.WaitForElement(
+                editor,
+                AutomationElement.NameProperty,
+                "Expand section");
+            Assert.Equal(ControlType.Button, expandButton.Current.ControlType);
+            ((InvokePattern)expandButton.GetCurrentPattern(InvokePattern.Pattern))
+                .Invoke();
+
+            AzunoteUiFixture.WaitForElement(
+                editor,
+                AutomationElement.NameProperty,
+                "Collapse section");
+        }
+        finally
+        {
+            AzunoteUiFixture.WaitForValuePattern(editor).SetValue(original);
+        }
+    }
+
+    [AzunoteUiFact]
     public void Find_and_replace_modes_are_exposed()
     {
         var window = _fixture.Window;

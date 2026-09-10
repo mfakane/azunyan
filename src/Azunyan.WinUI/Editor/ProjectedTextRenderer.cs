@@ -5,8 +5,11 @@ using System.Globalization;
 using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.UI;
 using Microsoft.Graphics.Canvas.UI.Xaml;
+using Microsoft.UI;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using Windows.Foundation;
 using Windows.UI;
 using Windows.UI.Text;
@@ -20,6 +23,8 @@ namespace Azunyan.WinUI;
 /// </summary>
 internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
 {
+    private const double FoldChevronWidth = 20;
+    private const double FoldChevronFontSize = 14;
     private readonly CanvasControl _gutterSurface;
     private readonly CanvasControl _textSurface;
     private readonly Dictionary<ProjectedLine, UnwrappedLineLayout> _lineLayouts = new();
@@ -798,6 +803,70 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         return true;
     }
 
+    internal bool TryGetFoldIdAtBodyPoint(
+        double x,
+        double y,
+        double contentLeft,
+        double contentTop,
+        double horizontalOffset,
+        double verticalOffset,
+        double characterWidth,
+        out string foldId)
+    {
+        foldId = string.Empty;
+        if (_cachedLayout is not { } layout
+            || _renderFrame is not { } frame
+            || !double.IsFinite(x)
+            || !double.IsFinite(y)
+            || !double.IsFinite(contentLeft)
+            || !double.IsFinite(contentTop)
+            || !double.IsFinite(horizontalOffset)
+            || !double.IsFinite(verticalOffset)
+            || !double.IsFinite(characterWidth)
+            || characterWidth <= 0
+            || layout.Rows.Rows.Count == 0
+            || frame.Context.DocumentResults?.Folds is not { Count: > 0 } folds)
+        {
+            return false;
+        }
+
+        var documentY = Math.Clamp(
+            y + verticalOffset - contentTop,
+            0,
+            layout.Heights.TotalHeight);
+        var rowIndex = layout.Heights.FindLine(documentY);
+        var row = layout.Rows.Rows[rowIndex];
+        if (row.TextLine is not { } textLine)
+        {
+            return false;
+        }
+
+        var xInTextPixels = x + horizontalOffset - contentLeft;
+        if (xInTextPixels < 0)
+        {
+            return false;
+        }
+
+        var textWidth = GetTextLayoutForGlobalRow(row)?.Width
+            ?? row.TextLength * characterWidth;
+        if (xInTextPixels > textWidth)
+        {
+            return false;
+        }
+
+        foreach (var fold in folds)
+        {
+            if (frame.Context.Snapshot.Lines.GetLine(fold.Range.Start)
+                == textLine.LogicalLine)
+            {
+                foldId = fold.Id;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     internal bool TryNavigateCarets(
         TextCaretSet carets,
         AzunyanEditorNavigationKind kind,
@@ -1158,8 +1227,73 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         {
             _pendingDocumentChange = null;
         }
+        RenderFoldChevrons(context, layouts);
         _gutterSurface.Invalidate();
         _textSurface.Invalidate();
+    }
+
+    private static void RenderFoldChevrons(
+        AzunyanEditorRenderContext context,
+        IReadOnlyList<ViewportRowLayout> layouts)
+    {
+        if (context.ToggleFold is null
+            || context.DocumentResults?.Folds is not { Count: > 0 } folds
+            || context.GutterWidth < FoldChevronWidth)
+        {
+            return;
+        }
+
+        foreach (var rowLayout in layouts)
+        {
+            var row = rowLayout.Row;
+            if (row.Kind != VisualRowKind.Text || row.IsContinuation)
+            {
+                continue;
+            }
+
+            foreach (var fold in folds.Where(fold =>
+                context.Snapshot.Lines.GetLine(fold.Range.Start) == row.LogicalLine))
+            {
+                var collapsed = context.CollapsedFoldIds.Contains(fold.Id);
+                var button = new Button
+                {
+                    Content = new FontIcon
+                    { 
+                        Glyph = collapsed ? "\uE76C" : "\uE70D",
+                        FontSize = FoldChevronFontSize,
+                    },
+                    Width = FoldChevronWidth,
+                    Height = context.LineHeight,
+                    Padding = new Thickness(0),
+                    Margin = new Thickness(0),
+                    BorderThickness = new Thickness(0),
+                    BorderBrush = new SolidColorBrush(Colors.Transparent),
+                    Background = new SolidColorBrush(Colors.Transparent),
+                    Foreground = new SolidColorBrush(context.ColorScheme.GutterForeground),
+                    HorizontalContentAlignment = HorizontalAlignment.Center,
+                    VerticalContentAlignment = VerticalAlignment.Center,
+                    IsTabStop = true
+                };
+
+                AutomationProperties.SetName(
+                    button,
+                    collapsed ? "Expand section" : "Collapse section");
+                AutomationProperties.SetAutomationId(
+                    button,
+                    $"azunyan-fold-{fold.Id}");
+                AutomationProperties.SetHelpText(button, fold.Id);
+                ToolTipService.SetToolTip(
+                    button,
+                    collapsed ? "Expand section" : "Collapse section");
+                button.Click += (_, _) => context.ToggleFold(fold.Id);
+
+                Canvas.SetLeft(button, 0);
+                Canvas.SetTop(
+                    button,
+                    context.ContentTop + rowLayout.Top - context.VerticalOffset);
+                context.GutterLayer.Children.Add(button);
+            }
+        }
     }
 
     private void OnCreateResources(CanvasControl sender, CanvasCreateResourcesEventArgs args)
@@ -2263,15 +2397,19 @@ internal sealed class AzunyanEditorRenderer :
         CanvasControl textSurface,
         Canvas gutterLayer,
         Canvas textLayer,
-        Canvas overlayLayer)
+        Canvas overlayLayer,
+        Action<string>? toggleFold = null)
     {
         TextRenderer = new ProjectedTextRenderer(gutterSurface, textSurface);
         _gutterLayer = gutterLayer ?? throw new ArgumentNullException(nameof(gutterLayer));
         _textLayer = textLayer ?? throw new ArgumentNullException(nameof(textLayer));
         _overlayLayer = overlayLayer ?? throw new ArgumentNullException(nameof(overlayLayer));
+        ToggleFold = toggleFold;
     }
 
     public ProjectedTextRenderer TextRenderer { get; }
+
+    private Action<string>? ToggleFold { get; }
 
     public event EventHandler? LayoutInvalidated
     {
@@ -2284,7 +2422,8 @@ internal sealed class AzunyanEditorRenderer :
             frame,
             _gutterLayer,
             _textLayer,
-            _overlayLayer));
+            _overlayLayer,
+            ToggleFold));
 
     public bool TryGetCaretRect(DocumentAnchor anchor, out Rect rect) =>
         TextRenderer.TryGetCaretRect(anchor, out rect);

@@ -114,68 +114,15 @@ public sealed class AzunoteTooltipProvider : ITooltipProvider
 }
 
 /// <summary>
-/// Supplies lightweight heading-based folds for Azunote. The editor owns
+/// Supplies TOML table folds for Azunote configuration files. The editor owns
 /// collapsed state; this provider only reports candidate ranges.
 /// </summary>
 public sealed class AzunoteFoldingProvider : IFoldingProvider
 {
+    private static readonly TomlFoldingProvider Provider = new();
+
     public ValueTask<IReadOnlyList<FoldRange>> GetFoldsAsync(
         EditorProviderContext context,
         CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        var snapshot = context.Snapshot;
-        var headings = new List<(int Line, int Level, TextRange Range)>();
-        for (var line = 0; line < snapshot.Lines.LineCount; line++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var range = snapshot.Lines.GetLineRange(line);
-            var text = snapshot.GetText(range);
-            var level = GetHeadingLevel(text);
-            if (level > 0)
-            {
-                headings.Add((line, level, range));
-            }
-        }
-
-        var folds = new List<FoldRange>();
-        for (var index = 0; index < headings.Count; index++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var heading = headings[index];
-            var end = snapshot.Length;
-            for (var next = index + 1; next < headings.Count; next++)
-            {
-                if (headings[next].Level <= heading.Level)
-                {
-                    end = headings[next].Range.Start;
-                    break;
-                }
-            }
-
-            var start = heading.Range.End;
-            if (end > start)
-            {
-                folds.Add(new FoldRange(
-                    $"heading:{heading.Line}",
-                    TextRange.FromBounds(start, end),
-                    " …"));
-            }
-        }
-
-        return ValueTask.FromResult<IReadOnlyList<FoldRange>>(folds);
-    }
-
-    private static int GetHeadingLevel(string line)
-    {
-        var level = 0;
-        while (level < line.Length && line[level] == '#')
-        {
-            level++;
-        }
-
-        return level > 0 && (level == line.Length || char.IsWhiteSpace(line[level]))
-            ? level
-            : 0;
-    }
+        => Provider.GetFoldsAsync(context, cancellationToken);
 }

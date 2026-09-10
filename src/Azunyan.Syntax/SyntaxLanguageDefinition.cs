@@ -13,7 +13,8 @@ public sealed class SyntaxLanguageDefinition : ISyntaxAnalysisProvider, IIncreme
         IEnumerable<string> patterns,
         IEnumerable<ISyntaxProvider> sources,
         IEnumerable<string>? completionTriggerCharacters = null,
-        string? definitionPath = null)
+        string? definitionPath = null,
+        IFoldingProvider? foldingProvider = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(id);
         ArgumentException.ThrowIfNullOrEmpty(displayName);
@@ -38,6 +39,7 @@ public sealed class SyntaxLanguageDefinition : ISyntaxAnalysisProvider, IIncreme
             .Select(NormalizeTrigger)
             .Distinct(StringComparer.Ordinal)
             .ToArray();
+        FoldingProvider = foldingProvider;
         _provider = new CompositeSyntaxProvider(sources);
     }
 
@@ -65,6 +67,11 @@ public sealed class SyntaxLanguageDefinition : ISyntaxAnalysisProvider, IIncreme
     /// are inserted. Multi-character triggers such as <c>-&gt;</c> are allowed.
     /// </summary>
     public IReadOnlyList<string> CompletionTriggerCharacters { get; }
+
+    /// <summary>
+    /// Optional document-scoped folding provider associated with this language.
+    /// </summary>
+    public IFoldingProvider? FoldingProvider { get; }
 
     public IReadOnlyList<ISyntaxProvider> Sources => _provider.Sources;
 
