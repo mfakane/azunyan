@@ -2,10 +2,11 @@
 
 Run these PowerShell 7 scripts on Windows with the .NET 10 SDK, Visual Studio
 C++ build tools, and Windows SDK installed. First initialize and build the
-[pinned Win2D package](Win2D-build.md). MSIX creation uses the winapp CLI from
-the application's restored `Microsoft.Windows.SDK.BuildTools.WinApp` package
-(currently 0.6.1); a global CLI installation is not required. Explicit APPX
-output uses the Windows SDK's `makeappx.exe`; signing uses `signtool.exe`.
+[pinned Win2D package](Win2D-build.md). MSIX and APPX creation use the winapp
+CLI (currently 0.6.1). The script prefers a `winapp` executable on `PATH`, such
+as one installed by `setup-WinAppCli`, and falls back to the application's
+restored `Microsoft.Windows.SDK.BuildTools.WinApp` package. Explicit APPX
+output and legacy certificate-store signing are routed through `winapp tool`.
 
 ```powershell
 git submodule update --init external/Win2D
@@ -58,23 +59,26 @@ For MSIX, `winapp pack` resolves the executable token and architecture. It uses
 `--self-contained` to retain runtime bundling. Without the latter, winapp removes
 runtime payload files and adds an external Windows App Runtime dependency even
 when the publish folder already contains the runtime.
-APPX retains the direct MakeAppx path with validation enabled. The SDK build
-tools needed by winapp are resolved by the CLI from the project and NuGet cache.
+APPX uses `winapp tool makeappx`; the SDK build tools needed by winapp are
+resolved by the CLI from the project, NuGet cache, or its configured tool cache.
 
 Without `-CertificateThumbprint`, the package is unsigned. Sign it before
-sideloading. To use an existing code-signing certificate with a private key in
-the current user's `My` certificate store:
+sideloading. For a PFX certificate, use the WinApp CLI signing path:
 
 ```powershell
 ./scripts/Package-AzunoteMsix.ps1 -Version 0.2.0.0 `
-    -Publisher 'CN=Your Publisher' -CertificateThumbprint YOUR_THUMBPRINT
+    -Publisher 'CN=Your Publisher' `
+    -CertificatePath C:/secure/devcert.pfx `
+    -CertificatePassword password
 ```
 
 The certificate subject must match the manifest publisher, and the installing
 machine must trust it. `-TimestampUrl` optionally supplies an RFC 3161 timestamp
-service. The script verifies the signature after signing; it never creates
-certificates or changes trust settings. Unsigned packages can also be handed to
-an external signing service.
+service. The script verifies the signature through `winapp tool signtool`; it
+never creates certificates or changes trust settings. The existing
+`-CertificateThumbprint` parameter remains supported through the same CLI tool
+wrapper for callers using the current user's `My` certificate store. Unsigned
+packages can also be handed to an external signing service.
 
 The scripts verify the generated notice inventory before publishing. The
 distribution review items in `THIRD-PARTY-NOTICES.md` still apply.

@@ -128,27 +128,29 @@ function Copy-AzunotePortablePayload($Context, [string] $Destination) {
         -Destination (Join-Path $Destination 'Azunote.exe')
 }
 
-function Find-AzunoteWinApp($Context) {
-    # Use the CLI version restored by the application, not an arbitrary PATH version.
+function Find-AzunoteWinApp($Context, [string] $PreferredPath) {
+    if ($PreferredPath) {
+        $resolved = Resolve-Path -LiteralPath $PreferredPath -ErrorAction SilentlyContinue
+        if (!$resolved) { throw "WinApp CLI was not found: $PreferredPath" }
+        return $resolved.Path
+    }
+
+    # Prefer the version installed by setup-WinAppCli or another explicit PATH setup.
+    foreach ($commandName in @('winapp', 'winapp.exe')) {
+        $command = Get-Command $commandName -CommandType Application -ErrorAction SilentlyContinue
+        if ($command) { return $command.Source }
+    }
+
+    # Keep a local fallback for developers who only restore the application's package.
     $assets = Get-Content (Join-Path $Context.Repo 'src/Azunote/obj/project.assets.json') -Raw | ConvertFrom-Json
     $library = $assets.libraries.PSObject.Properties |
         Where-Object Name -Like 'Microsoft.Windows.SDK.BuildTools.WinApp/*' | Select-Object -First 1
-    if (!$library) { throw 'WinApp CLI was not found in the restored application dependencies.' }
+    if (!$library) { throw 'WinApp CLI was not found on PATH or in the restored application dependencies.' }
     foreach ($folder in $assets.packageFolders.PSObject.Properties.Name) {
         $tool = Join-Path $folder "$($library.Value.path)/tools/win-x64/winapp.exe"
         if (Test-Path -LiteralPath $tool) { return $tool }
     }
     throw 'The restored WinApp CLI executable is missing.'
-}
-
-function Find-AzunoteSdkTool([string] $Name) {
-    $sdkBin = "${env:ProgramFiles(x86)}/Windows Kits/10/bin"
-    $tool = Get-ChildItem $sdkBin -Directory | Where-Object Name -Match '^10\.0\.\d+\.\d+$' |
-        Sort-Object { [version]$_.Name } -Descending |
-        ForEach-Object { Join-Path $_.FullName "x64/$Name" } |
-        Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-    if (!$tool) { throw "Install the Windows SDK: $Name was not found." }
-    return $tool
 }
 
 function Complete-AzunoteDistribution([string] $Path) {
