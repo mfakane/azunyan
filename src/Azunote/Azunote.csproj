@@ -55,4 +55,29 @@
              CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!--
+    Native AOT currently leaves compiled XAML resources in the intermediate
+    output instead of copying them to PublishDir. Application.LoadComponent
+    needs the loose XBF files when the app is packaged.
+  -->
+  <Target Name="CopyXamlResourcesForAot" AfterTargets="Publish"
+          Condition="'$(PublishAot)' == 'true'">
+    <ItemGroup>
+      <_AzunoteAppXamlResources Include="$(OutputPath)**\*.xbf"
+                                Exclude="$(PublishDir)**\*" />
+      <_AzunoteReferencedXamlResources
+          Include="$(MSBuildProjectDirectory)\..\Azunyan.WinUI\$(IntermediateOutputPath)embed\Azunyan.WinUI\**\*.xbf" />
+      <_AzunoteXamlResources Include="$(OutputPath)$(AssemblyName).pri" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_AzunoteAppXamlResources)"
+          DestinationFiles="@(_AzunoteAppXamlResources->'$(PublishDir)%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_AzunoteReferencedXamlResources)"
+          DestinationFiles="@(_AzunoteReferencedXamlResources->'$(PublishDir)Azunyan.WinUI\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_AzunoteXamlResources)"
+          DestinationFiles="@(_AzunoteXamlResources->'$(PublishDir)%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
 </Project>
