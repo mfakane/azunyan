@@ -1,5 +1,7 @@
 using Microsoft.UI.Xaml;
+using Microsoft.Windows.AppLifecycle;
 using System.Runtime.InteropServices;
+using WindowsFileActivation = Windows.ApplicationModel.Activation.IFileActivatedEventArgs;
 
 namespace Azunote;
 
@@ -43,7 +45,11 @@ public partial class App : Application, IDisposable
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
-        var arguments = Environment.GetCommandLineArgs().Skip(1).ToArray();
+        // A packaged file activation carries its payload through the Windows
+        // App SDK activation model. Keep ordinary command-line launches on
+        // the existing raw-argument path.
+        var activation = AppInstance.GetCurrent().GetActivatedEventArgs();
+        var arguments = GetLaunchArguments(activation);
         if (AzunoteCommandLine.IsHelpRequested(arguments))
         {
             AttachParentConsoleForOutput();
@@ -83,6 +89,24 @@ public partial class App : Application, IDisposable
         _application.Launch(arguments);
         NativeCrashReporter.Install();
         _singleInstance.Start(_application.HandleForwardedCommandLineAsync);
+    }
+
+    private static string[] GetLaunchArguments(
+        AppActivationArguments? activation)
+    {
+        if (activation?.Kind == ExtendedActivationKind.File
+            && activation.Data is WindowsFileActivation fileActivation)
+        {
+            if (fileActivation.Files.Count > 0
+                && !string.IsNullOrWhiteSpace(fileActivation.Files[0].Path))
+            {
+                return [fileActivation.Files[0].Path];
+            }
+
+            return [];
+        }
+
+        return Environment.GetCommandLineArgs().Skip(1).ToArray();
     }
 
     private void OnUnhandledException(
