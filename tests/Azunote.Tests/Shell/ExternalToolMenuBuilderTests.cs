@@ -123,6 +123,19 @@ public sealed class ExternalToolMenuBuilderTests
                 ExternalToolMenuTarget.Context)).Tool);
     }
 
+    [Fact]
+    public void EnumerateTools_includes_tools_without_menu_targets()
+    {
+        var tool = CreateTool("Shortcut only");
+        tool.Menus = [];
+        var nodes = new[] { new ExternalToolMenuNode(tool.Name, tool) };
+
+        Assert.Same(tool, Assert.Single(ExternalToolMenuBuilder.EnumerateTools(nodes)));
+        Assert.Empty(ExternalToolMenuBuilder.Build(
+            nodes,
+            _ => new ExternalToolMenuState(true, true)));
+    }
+
     private static ExternalToolSettings CreateTool(string name) => new()
     {
         Name = name

@@ -622,21 +622,47 @@ public sealed partial class MainWindow
         Func<ExternalToolSettings, ExternalToolMenuState> getState,
         Func<ExternalToolSettings, Task> onSelected)
     {
+        var candidatesByShortcut = new Dictionary<
+            ExternalToolShortcut,
+            List<ExternalToolSettings>>();
         foreach (var tool in ExternalToolMenuBuilder.EnumerateTools(nodes))
         {
-            if (!ExternalToolShortcut.TryParse(tool.Shortcut, out var shortcut)
-                || !getState(tool).IsEnabled)
+            if (!ExternalToolShortcut.TryParse(tool.Shortcut, out var parsedShortcut))
+            {
+                continue;
+            }
+
+            var shortcut = parsedShortcut!;
+            if (!candidatesByShortcut.TryGetValue(shortcut, out var candidates))
+            {
+                candidates = [];
+                candidatesByShortcut.Add(shortcut, candidates);
+            }
+
+            candidates.Add(tool);
+        }
+
+        foreach (var (shortcut, candidates) in candidatesByShortcut)
+        {
+            if (!candidates.Any(tool => getState(tool).IsEnabled))
             {
                 continue;
             }
 
             var accelerator = new KeyboardAccelerator
             {
-                Key = shortcut!.Key,
+                Key = shortcut.Key,
                 Modifiers = shortcut.Modifiers
             };
             accelerator.Invoked += (sender, args) =>
             {
+                var tool = candidates.FirstOrDefault(
+                    candidate => getState(candidate).IsEnabled);
+                if (tool is null)
+                {
+                    return;
+                }
+
                 args.Handled = true;
                 _ = onSelected(tool);
             };

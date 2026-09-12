@@ -466,12 +466,6 @@ public sealed class ExternalToolSettings
             throw new SettingsFileException("Each external tool needs a non-empty name.");
         }
 
-        if (Menus.Length == 0)
-        {
-            throw new SettingsFileException(
-                $"External tool '{Name}' needs at least one menu target.");
-        }
-
         Menus = Menus
             .Select(menu => ExternalToolEnumValues.Parse<ExternalToolMenuTarget>(menu, "menus"))
             .Select(ExternalToolEnumValues.ToTomlValue)

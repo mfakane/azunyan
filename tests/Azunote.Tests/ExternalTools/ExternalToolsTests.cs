@@ -1008,7 +1008,7 @@ public sealed class ExternalToolsTests
     }
 
     [Fact]
-    public void External_tool_settings_normalize_menu_targets_and_reject_empty_or_unknown_values()
+    public void External_tool_settings_normalize_menu_targets_and_allow_empty_or_reject_unknown_values()
     {
         var settings = new ExternalToolSettings
         {
@@ -1027,7 +1027,8 @@ public sealed class ExternalToolsTests
             Menus = [],
             Launch = new ExternalToolLaunchSettings { Command = "formatter" }
         };
-        Assert.Throws<SettingsFileException>(() => empty.ToDefinition());
+        _ = empty.ToDefinition();
+        Assert.Empty(empty.Menus);
 
         var unknown = new ExternalToolSettings
         {
