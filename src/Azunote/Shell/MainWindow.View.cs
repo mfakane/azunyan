@@ -8,6 +8,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using WinRT;
 using WinRT.Interop;
 using Windows.UI;
 using Windows.UI.ViewManagement;
@@ -99,8 +100,7 @@ public sealed partial class MainWindow
         : null;
 
     private bool IsAlwaysOnTopView =>
-        _appWindow?.Presenter is OverlappedPresenter presenter
-            && presenter.IsAlwaysOnTop;
+        GetOverlappedPresenter()?.IsAlwaysOnTop ?? false;
 
     private int TabDisplaySize => _editor.TabDisplaySize;
 
@@ -109,6 +109,12 @@ public sealed partial class MainWindow
     private IndentationInputMode IndentationInputMode => _editor.IndentationInputMode;
 
     internal XamlRoot? XamlRoot => _rootGrid.XamlRoot;
+
+    private OverlappedPresenter? GetOverlappedPresenter()
+    {
+        var presenter = _appWindow?.Presenter;
+        return presenter is null ? null : presenter.As<OverlappedPresenter>();
+    }
 
     private void ConfigureTheme()
     {
@@ -308,7 +314,7 @@ public sealed partial class MainWindow
 
     internal void ToggleAlwaysOnTop()
     {
-        if (_appWindow?.Presenter is OverlappedPresenter presenter)
+        if (GetOverlappedPresenter() is { } presenter)
         {
             presenter.IsAlwaysOnTop = !presenter.IsAlwaysOnTop;
         }
@@ -316,7 +322,7 @@ public sealed partial class MainWindow
 
     private void MinimizeView()
     {
-        if (_appWindow?.Presenter is OverlappedPresenter presenter)
+        if (GetOverlappedPresenter() is { } presenter)
         {
             presenter.Minimize();
         }
@@ -324,7 +330,7 @@ public sealed partial class MainWindow
 
     private void RestoreIfMinimizedView()
     {
-        if (_appWindow?.Presenter is OverlappedPresenter presenter
+        if (GetOverlappedPresenter() is { } presenter
             && presenter.State == OverlappedPresenterState.Minimized)
         {
             presenter.Restore();
