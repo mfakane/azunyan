@@ -392,7 +392,12 @@ public sealed class DocumentWorkflowTests
         Func<string, Task>? openFileInNewWindow = null)
     {
         var documents = new DocumentController(editor, session, files, prompt);
-        var externalTools = new ExternalToolController(editor, documents, files, prompt);
+        var externalTools = new ExternalToolController(
+            editor,
+            documents,
+            files,
+            prompt,
+            _ => Task.CompletedTask);
         var modes = LanguageModeCatalog.Create();
         return new DocumentWorkflow(
             editor,

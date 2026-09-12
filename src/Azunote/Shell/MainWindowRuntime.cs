@@ -31,6 +31,7 @@ internal sealed class MainWindowRuntime : IDisposable
         MainWindowViewModel viewModel,
         Func<Task> createNewWindow,
         Func<string, Task> openFileInNewWindow,
+        Func<string, Task> openTextInNewWindow,
         Action refreshWindowMenus,
         IFilePathActions filePathActions,
         Action<string> recordRecentFile,
@@ -75,6 +76,7 @@ internal sealed class MainWindowRuntime : IDisposable
             documents,
             files,
             _prompt,
+            openTextInNewWindow,
             () => _languageModes.CurrentModeId);
 
         _documents = new DocumentWorkflow(

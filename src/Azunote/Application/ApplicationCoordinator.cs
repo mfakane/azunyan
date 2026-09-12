@@ -162,6 +162,14 @@ internal sealed class ApplicationCoordinator : IDisposable
         ActivateWindow(registration);
     }
 
+    internal async Task OpenTextInNewWindowAsync(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        var registration = CreateWindowRegistration();
+        await registration.Window.Runtime.OpenStartupTextAsync(text);
+        ActivateWindow(registration);
+    }
+
     internal async Task OpenFileAsync(MainWindow source, string path)
     {
         ArgumentNullException.ThrowIfNull(source);

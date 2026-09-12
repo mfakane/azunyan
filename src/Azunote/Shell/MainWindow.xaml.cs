@@ -42,6 +42,7 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
             ViewModel,
             application.CreateNewDocumentWindowAsync,
             application.OpenFileInNewWindowAsync,
+            application.OpenTextInNewWindowAsync,
             application.RefreshWindowMenus,
             new WinUiFilePathActions(),
             application.RecordRecentFile,

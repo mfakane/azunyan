@@ -3,8 +3,9 @@ using Azunyan.Core;
 namespace Azunote;
 
 /// <summary>
-/// Applies external-tool results to the current editor buffer. Process
-/// execution and output interpretation remain in ExternalTools.cs.
+/// Applies external-tool results to the current editor buffer or opens them in
+/// a new window. Process execution and output interpretation remain in
+/// ExternalTools.cs.
 /// </summary>
 public sealed class ExternalToolController
 {
@@ -12,6 +13,7 @@ public sealed class ExternalToolController
     private readonly DocumentController _documents;
     private readonly ITextFileStore _files;
     private readonly IUserPrompt _prompt;
+    private readonly Func<string, Task> _openTextInNewWindow;
     private readonly Func<string> _languageModeId;
 
     public ExternalToolController(
@@ -19,12 +21,15 @@ public sealed class ExternalToolController
         DocumentController documents,
         ITextFileStore files,
         IUserPrompt prompt,
+        Func<string, Task> openTextInNewWindow,
         Func<string>? languageModeId = null)
     {
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
         _documents = documents ?? throw new ArgumentNullException(nameof(documents));
         _files = files ?? throw new ArgumentNullException(nameof(files));
         _prompt = prompt ?? throw new ArgumentNullException(nameof(prompt));
+        _openTextInNewWindow = openTextInNewWindow
+            ?? throw new ArgumentNullException(nameof(openTextInNewWindow));
         _languageModeId = languageModeId ?? (() => string.Empty);
     }
 
@@ -124,7 +129,7 @@ public sealed class ExternalToolController
 
                 return;
             case ExternalToolOutputMode.NewDocument:
-                _documents.LoadUntitledText(action.Text);
+                await _openTextInNewWindow(action.Text);
                 return;
             case ExternalToolOutputMode.ReloadFile:
                 await ReloadOutputAsync(temporaryFilePath, filePath, cancellationToken);

@@ -29,7 +29,12 @@ public sealed class ExternalToolControllerTests
             var files = new FakeTextFileStore();
             var prompt = new FakeUserPrompt();
             var documents = new DocumentController(editor, session, files, prompt);
-            var controller = new ExternalToolController(editor, documents, files, prompt);
+            var controller = new ExternalToolController(
+                editor,
+                documents,
+                files,
+                prompt,
+                _ => Task.CompletedTask);
 
             var result = await controller.RunAsync(
                 new ExternalToolDefinition(
@@ -74,8 +79,18 @@ public sealed class ExternalToolControllerTests
             var session = new DocumentSession();
             var files = new FakeTextFileStore();
             var prompt = new FakeUserPrompt();
+            var openedText = string.Empty;
             var documents = new DocumentController(editor, session, files, prompt);
-            var controller = new ExternalToolController(editor, documents, files, prompt);
+            var controller = new ExternalToolController(
+                editor,
+                documents,
+                files,
+                prompt,
+                text =>
+                {
+                    openedText = text;
+                    return Task.CompletedTask;
+                });
 
             var result = await controller.RunAsync(
                 new ExternalToolDefinition(
@@ -85,7 +100,8 @@ public sealed class ExternalToolControllerTests
                         ExternalToolOutputMode.NewDocument)));
 
             Assert.Equal(3, result.ExitCode);
-            Assert.Equal("external failure", editor.Text.Trim());
+            Assert.Equal("before", editor.Text);
+            Assert.Equal("external failure", openedText.Trim());
             Assert.Empty(prompt.Errors);
         }
         finally
@@ -121,7 +137,12 @@ public sealed class ExternalToolControllerTests
             var files = new FakeTextFileStore();
             var prompt = new FakeUserPrompt();
             var documents = new DocumentController(editor, session, files, prompt);
-            var controller = new ExternalToolController(editor, documents, files, prompt);
+            var controller = new ExternalToolController(
+                editor,
+                documents,
+                files,
+                prompt,
+                _ => Task.CompletedTask);
 
             var result = await controller.RunAsync(
                 new ExternalToolDefinition(
