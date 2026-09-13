@@ -40,6 +40,28 @@ public sealed class ExternalToolPlaceholderCompletionProviderTests
     }
 
     [Fact]
+    public void Completes_pattern_aware_workspace_placeholders()
+    {
+        var folderResult = ExternalToolPlaceholderCompletionProvider.GetCompletions(
+            "${workspaceFolder:",
+            "${workspaceFolder:".Length);
+        var basenameResult = ExternalToolPlaceholderCompletionProvider.GetCompletions(
+            "${workspaceFolderBasename:",
+            "${workspaceFolderBasename:".Length);
+
+        Assert.NotNull(folderResult);
+        Assert.Contains(folderResult!.Items, item => item.Label == "${workspaceFolder:*.csproj}");
+        Assert.Contains(folderResult.Items, item => item.Label == "${workspaceFolder:*.sln|*.slnx}");
+        Assert.NotNull(basenameResult);
+        Assert.Contains(
+            basenameResult!.Items,
+            item => item.Label == "${workspaceFolderBasename:*.csproj}");
+        Assert.Contains(
+            basenameResult.Items,
+            item => item.Label == "${workspaceFolderBasename:*.sln|*.slnx}");
+    }
+
+    [Fact]
     public void Closed_placeholder_replaces_only_the_name()
     {
         const string text = "prefix ${fi} suffix";

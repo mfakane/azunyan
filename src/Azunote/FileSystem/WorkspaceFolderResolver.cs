@@ -1,4 +1,6 @@
 using System.Text;
+using Microsoft.Extensions.FileSystemGlobbing;
+using Microsoft.Extensions.FileSystemGlobbing.Abstractions;
 
 namespace Azunote;
 
@@ -10,7 +12,9 @@ internal static class WorkspaceFolderResolver
         encoderShouldEmitUTF8Identifier: false,
         throwOnInvalidBytes: true);
 
-    public static string? FindForFile(string? filePath)
+    public static string? FindForFile(
+        string? filePath,
+        string? patternExpression = null)
     {
         if (string.IsNullOrWhiteSpace(filePath))
         {
@@ -19,19 +23,73 @@ internal static class WorkspaceFolderResolver
 
         var fullPath = Path.GetFullPath(filePath);
         var directory = Path.GetDirectoryName(fullPath);
+        var matcher = patternExpression is null
+            ? null
+            : CreateMatcher(patternExpression);
+        if (patternExpression is not null && matcher is null)
+        {
+            return null;
+        }
+
         for (var current = directory;
              !string.IsNullOrWhiteSpace(current);
              current = GetParentDirectory(current))
         {
-            if (Directory.Exists(Path.Combine(current, GitDirectoryName))
-                || File.Exists(Path.Combine(current, GitDirectoryName))
-                || IsRootEditorConfig(Path.Combine(current, EditorConfigFileName)))
+            if (matcher is not null
+                ? HasMatchingFile(matcher, current)
+                : IsDefaultWorkspaceFolder(current))
             {
                 return current;
             }
         }
 
         return null;
+    }
+
+    private static bool IsDefaultWorkspaceFolder(string directory) =>
+        Directory.Exists(Path.Combine(directory, GitDirectoryName))
+            || File.Exists(Path.Combine(directory, GitDirectoryName))
+            || IsRootEditorConfig(Path.Combine(directory, EditorConfigFileName));
+
+    private static Matcher? CreateMatcher(string patternExpression)
+    {
+        var matcher = new Matcher(StringComparison.OrdinalIgnoreCase);
+        var hasPattern = false;
+        foreach (var pattern in patternExpression.Split(
+                     '|',
+                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            try
+            {
+                matcher.AddInclude(pattern);
+                hasPattern = true;
+            }
+            catch (ArgumentException)
+            {
+                // Ignore malformed alternatives while preserving any valid
+                // alternatives in the same OR expression.
+            }
+        }
+
+        return hasPattern ? matcher : null;
+    }
+
+    private static bool HasMatchingFile(Matcher matcher, string directory)
+    {
+        try
+        {
+            return matcher.Execute(
+                new DirectoryInfoWrapper(new DirectoryInfo(directory))).HasMatches;
+        }
+        catch (Exception exception) when (
+            exception is IOException
+                or UnauthorizedAccessException
+                or ArgumentException)
+        {
+            // Pattern-based workspace discovery is advisory. An inaccessible
+            // directory must not prevent external tools from running.
+            return false;
+        }
     }
 
     private static bool IsRootEditorConfig(string path)

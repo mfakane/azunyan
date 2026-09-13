@@ -14,7 +14,11 @@ internal static class AzunotePlaceholderCatalog
     [
         new("userHome", "Placeholder", "Path of the user's home folder.", "${userHome} -> C:\\Users\\user"),
         new("workspaceFolder", "Placeholder", "Path of the workspace folder containing the current document.", "${workspaceFolder} -> C:\\work"),
+        new("workspaceFolder:*.csproj", "Placeholder", "Nearest ancestor containing a matching workspace file.", "${workspaceFolder:*.csproj} -> C:\\work"),
+        new("workspaceFolder:*.sln|*.slnx", "Placeholder", "Nearest ancestor containing either matching workspace file.", "${workspaceFolder:*.sln|*.slnx} -> C:\\work"),
         new("workspaceFolderBasename", "Placeholder", "Name of the workspace folder without any slashes.", "${workspaceFolderBasename} -> work"),
+        new("workspaceFolderBasename:*.csproj", "Placeholder", "Name of the nearest ancestor containing a matching workspace file.", "${workspaceFolderBasename:*.csproj} -> work"),
+        new("workspaceFolderBasename:*.sln|*.slnx", "Placeholder", "Name of the nearest ancestor containing either matching workspace file.", "${workspaceFolderBasename:*.sln|*.slnx} -> work"),
         new("file", "Placeholder", "Path passed to the external process for the current document.", "${file} -> C:\\work\\notes\\current.azunote"),
         new("fileWorkspaceFolder", "Placeholder", "Workspace folder containing the current document.", "${fileWorkspaceFolder} -> C:\\work"),
         new("relativeFile", "Placeholder", "Current document path relative to the workspace folder.", "${relativeFile} -> notes\\current.azunote"),

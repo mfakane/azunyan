@@ -33,7 +33,9 @@ These variables follow the names used by VS Code's predefined variables.
 | --- | --- |
 | `${userHome}` | The current user's home directory. |
 | `${workspaceFolder}` | The workspace folder containing the document. Azunote discovers it from the nearest ancestor containing `.git` or an `.editorconfig` with `root = true`. |
+| `${workspaceFolder:pattern}` | The nearest ancestor containing a file matched by the glob `pattern`. Multiple patterns can be separated with `\|`, for example `${workspaceFolder:*.sln\|*.slnx}`. |
 | `${workspaceFolderBasename}` | The name of `${workspaceFolder}`. |
+| `${workspaceFolderBasename:pattern}` | The name of the nearest ancestor containing a file matched by `pattern`. It supports the same `\|`-separated patterns as `${workspaceFolder:pattern}`. |
 | `${file}` | The path of the file supplied to the tool. For a dirty or untitled document this is the temporary execution file. |
 | `${fileWorkspaceFolder}` | The workspace folder containing the document. |
 | `${relativeFile}` | The document path relative to `${workspaceFolder}`. |
@@ -58,6 +60,13 @@ These variables follow the names used by VS Code's predefined variables.
  execution. `${file}` can therefore point to a temporary file when the current
  document has unsaved changes or has not been saved yet. Use the `document*`
  variables below when the original document path is required.
+
+For `${workspaceFolder:pattern}`, matching starts in the current document's
+directory and walks toward the filesystem root. Patterns are evaluated relative
+to each candidate directory using the same glob syntax as
+`Microsoft.Extensions.FileSystemGlobbing`; use `**` when a match may be nested
+below the candidate directory. If no pattern matches, the variable expands to
+an empty string.
 
 ## Azunote-specific variables
 

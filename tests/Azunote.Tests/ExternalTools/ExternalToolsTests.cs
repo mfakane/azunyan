@@ -270,6 +270,47 @@ public sealed class ExternalToolsTests
     }
 
     [Fact]
+    public void Context_expands_workspace_folder_from_a_file_pattern()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"azunote-workspace-{Guid.NewGuid():N}");
+        var nested = Path.Combine(root, "src", "nested");
+        var path = Path.Combine(nested, "notes.md");
+        try
+        {
+            Directory.CreateDirectory(nested);
+            File.WriteAllText(Path.Combine(root, "project.slnx"), string.Empty);
+            File.WriteAllText(
+                Path.Combine(root, "src", "project.csproj"),
+                string.Empty);
+
+            var context = new ExternalToolContext(path, string.Empty, string.Empty);
+
+            Assert.Null(context.WorkspaceFolder);
+            Assert.Equal(
+                Path.GetFullPath(Path.Combine(root, "src")),
+                context.Expand("${workspaceFolder:*.csproj}"));
+            Assert.Equal(
+                "src",
+                context.Expand("${workspaceFolderBasename:*.csproj}"));
+            Assert.Equal(
+                Path.GetFullPath(root),
+                context.Expand("${workspaceFolder:*.sln|*.slnx}"));
+            Assert.Equal(
+                Path.GetFileName(Path.TrimEndingDirectorySeparator(Path.GetFullPath(root))),
+                context.Expand("${workspaceFolderBasename:*.sln|*.slnx}"));
+            Assert.Equal(string.Empty, context.Expand("${workspaceFolder:*.sln}"));
+            Assert.Equal(string.Empty, context.Expand("${workspaceFolderBasename:*.sln}"));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void Context_leaves_workspace_folder_empty_without_a_root_marker()
     {
         var root = Path.Combine(Path.GetTempPath(), $"azunote-workspace-{Guid.NewGuid():N}");

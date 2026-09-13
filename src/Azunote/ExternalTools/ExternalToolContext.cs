@@ -5,6 +5,8 @@ namespace Azunote;
 
 public sealed partial record ExternalToolContext
 {
+    private const string WorkspaceFolderPatternPrefix = "workspaceFolder:";
+
     [GeneratedRegex(@"\$\{(?<name>[^{}]+)\}", RegexOptions.Compiled | RegexOptions.CultureInvariant)]
     private static partial Regex PlaceholderPattern();
 
@@ -211,6 +213,22 @@ public sealed partial record ExternalToolContext
                 return InputCaptures.TryGetValue(captureName, out var capture)
                     ? capture
                     : string.Empty;
+            }
+
+            if (name.StartsWith(WorkspaceFolderPatternPrefix, StringComparison.Ordinal))
+            {
+                return WorkspaceFolderResolver.FindForFile(
+                    DocumentFilePath ?? ExecutionFilePath,
+                    name[WorkspaceFolderPatternPrefix.Length..]) ?? string.Empty;
+            }
+
+            const string workspaceFolderBasenamePatternPrefix = "workspaceFolderBasename:";
+            if (name.StartsWith(workspaceFolderBasenamePatternPrefix, StringComparison.Ordinal))
+            {
+                return GetPathBasename(
+                    WorkspaceFolderResolver.FindForFile(
+                        DocumentFilePath ?? ExecutionFilePath,
+                        name[workspaceFolderBasenamePatternPrefix.Length..])) ?? string.Empty;
             }
 
             return name switch
