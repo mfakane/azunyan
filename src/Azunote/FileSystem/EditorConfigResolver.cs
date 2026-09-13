@@ -1,6 +1,6 @@
 using System.Text;
-using System.Text.RegularExpressions;
 using Azunyan.Core;
+using Microsoft.Extensions.FileSystemGlobbing;
 
 namespace Azunote;
 
@@ -337,90 +337,14 @@ internal sealed class EditorConfigResolver : IEditorConfigResolver
 
             try
             {
-                return Regex.IsMatch(
-                    candidate,
-                    $"\\A{ToRegex(normalizedPattern)}\\z",
-                    RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+                var matcher = new Matcher(StringComparison.OrdinalIgnoreCase);
+                matcher.AddInclude(normalizedPattern);
+                return matcher.Match(candidate).HasMatches;
             }
             catch (ArgumentException)
             {
                 return false;
             }
-        }
-
-        private static string ToRegex(string pattern)
-        {
-            var result = new StringBuilder();
-            for (var index = 0; index < pattern.Length; index++)
-            {
-                var current = pattern[index];
-                switch (current)
-                {
-                    case '*':
-                        if (index + 1 < pattern.Length && pattern[index + 1] == '*')
-                        {
-                            if (index + 2 < pattern.Length && pattern[index + 2] == '/')
-                            {
-                                result.Append("(?:.*/)?");
-                                index += 2;
-                            }
-                            else
-                            {
-                                result.Append(".*");
-                                index++;
-                            }
-                        }
-                        else
-                        {
-                            result.Append("[^/]*");
-                        }
-
-                        break;
-                    case '?':
-                        result.Append("[^/]");
-                        break;
-                    case '[':
-                        var closing = pattern.IndexOf(']', index + 1);
-                        if (closing < 0)
-                        {
-                            result.Append("\\[");
-                        }
-                        else
-                        {
-                            var characterClass = pattern[(index + 1)..closing];
-                            if (characterClass.StartsWith('!'))
-                            {
-                                characterClass = '^' + characterClass[1..];
-                            }
-
-                            result.Append('[').Append(characterClass).Append(']');
-                            index = closing;
-                        }
-
-                        break;
-                    case '{':
-                        var braceEnd = pattern.IndexOf('}', index + 1);
-                        if (braceEnd < 0)
-                        {
-                            result.Append("\\{");
-                        }
-                        else
-                        {
-                            var alternatives = pattern[(index + 1)..braceEnd].Split(',');
-                            result.Append("(?:")
-                                .Append(string.Join('|', alternatives.Select(ToRegex)))
-                                .Append(')');
-                            index = braceEnd;
-                        }
-
-                        break;
-                    default:
-                        result.Append(Regex.Escape(current.ToString()));
-                        break;
-                }
-            }
-
-            return result.ToString();
         }
     }
 }

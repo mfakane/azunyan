@@ -6,7 +6,7 @@ Azunyan and Azunote's original code is licensed under the [zlib license](LICENSE
 Dependencies are licensed separately. The zlib license does not replace or
 grant additional rights to third-party components.
 
-This inventory was reviewed on 2026-09-09 against Azunote's restored
+This inventory was reviewed on 2026-09-14 against Azunote's restored
 `net10.0-windows10.0.19041.0` / `win-x64` dependencies, with Native AOT and
 self-contained Windows App SDK deployment enabled. It conservatively includes
 notices for runtime dependencies even when trimming or unused SDK features may
@@ -21,6 +21,7 @@ binary, or that all redistribution conditions have been satisfied.
 | .NET Native AOT runtime | 10.0.11 | MIT and third-party terms; [license](licenses/microsoft.netcore.app.runtime.nativeaot.win-x64/10.0.11/LICENSE.TXT), [notices](licenses/microsoft.netcore.app.runtime.nativeaot.win-x64/10.0.11/THIRD-PARTY-NOTICES.TXT) |
 | .NET runtime (non-AOT self-contained builds) | 10.0.11 | MIT and third-party terms; [license](licenses/microsoft.netcore.app.runtime.win-x64/10.0.11/LICENSE.TXT), [notices](licenses/microsoft.netcore.app.runtime.win-x64/10.0.11/THIRD-PARTY-NOTICES.TXT) |
 | System.Numerics.Tensors | 9.0.0 | MIT; [license](licenses/System.Numerics.Tensors/9.0.0/LICENSE.TXT), [notices](licenses/System.Numerics.Tensors/9.0.0/THIRD-PARTY-NOTICES.TXT) |
+| Microsoft.Extensions.FileSystemGlobbing | 9.0.4 | MIT; [license](licenses/Microsoft.Extensions.FileSystemGlobbing/9.0.4/LICENSE.TXT), [notices](licenses/Microsoft.Extensions.FileSystemGlobbing/9.0.4/THIRD-PARTY-NOTICES.TXT) |
 | Microsoft.Web.WebView2 SDK | 1.0.3719.77 | BSD-style three-clause terms; [license](licenses/Microsoft.Web.WebView2/1.0.3719.77/LICENSE.txt), [notices](licenses/Microsoft.Web.WebView2/1.0.3719.77/NOTICE.txt). This is the SDK, not a license for a separately distributed browser runtime. |
 | Microsoft.WindowsAppSDK | 2.4.0 | Microsoft Software License Terms; [license](licenses/Microsoft.WindowsAppSDK/2.4.0/license.txt), [notices](licenses/Microsoft.WindowsAppSDK/2.4.0/NOTICE.txt) |
 | Microsoft.WindowsAppSDK.Runtime | 2.4.0 | [License](licenses/Microsoft.WindowsAppSDK.Runtime/2.4.0/license.txt), [notices](licenses/Microsoft.WindowsAppSDK.Runtime/2.4.0/NOTICE.txt) |

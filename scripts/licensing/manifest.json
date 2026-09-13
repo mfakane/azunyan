@@ -1,5 +1,5 @@
 {
-  "reviewDate": "2026-09-09",
+  "reviewDate": "2026-09-14",
   "targetFramework": "net10.0-windows10.0.19041.0",
   "runtimeIdentifier": "win-x64",
   "components": [
@@ -22,6 +22,11 @@
       "name": "System.Numerics.Tensors",
       "version": "9.0.0",
       "notice": "MIT; [license](licenses/System.Numerics.Tensors/9.0.0/LICENSE.TXT), [notices](licenses/System.Numerics.Tensors/9.0.0/THIRD-PARTY-NOTICES.TXT)"
+    },
+    {
+      "name": "Microsoft.Extensions.FileSystemGlobbing",
+      "version": "9.0.4",
+      "notice": "MIT; [license](licenses/Microsoft.Extensions.FileSystemGlobbing/9.0.4/LICENSE.TXT), [notices](licenses/Microsoft.Extensions.FileSystemGlobbing/9.0.4/THIRD-PARTY-NOTICES.TXT)"
     },
     {
       "name": "Microsoft.Web.WebView2 SDK",
@@ -299,6 +304,20 @@
       "file": "licenses/Microsoft.Graphics.Win2D/1.4.0-azunyan.25680382dd21/LICENSE.txt",
       "source": "https://raw.githubusercontent.com/microsoft/Win2D/25680382dd2136779e10ea6084f0c5ba437ae288/LICENSE.txt",
       "sha256": "c3ba493105fa52657c4c60d9b1680da7c01b188a8665d7a823c2a187fd259808"
+    },
+    {
+      "component": "Microsoft.Extensions.FileSystemGlobbing/9.0.4",
+      "file": "licenses/Microsoft.Extensions.FileSystemGlobbing/9.0.4/LICENSE.TXT",
+      "source": "https://www.nuget.org/packages/Microsoft.Extensions.FileSystemGlobbing/9.0.4",
+      "packageFile": "LICENSE.TXT",
+      "sha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b"
+    },
+    {
+      "component": "Microsoft.Extensions.FileSystemGlobbing/9.0.4",
+      "file": "licenses/Microsoft.Extensions.FileSystemGlobbing/9.0.4/THIRD-PARTY-NOTICES.TXT",
+      "source": "https://www.nuget.org/packages/Microsoft.Extensions.FileSystemGlobbing/9.0.4",
+      "packageFile": "THIRD-PARTY-NOTICES.TXT",
+      "sha256": "40686c6447a7d5b5d3693068e4571b5f483d7ed335aeee773ef662440de4c5d5"
     }
   ]
 }

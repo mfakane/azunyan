@@ -1,4 +1,5 @@
 using Azunyan.Core;
+using Microsoft.Extensions.FileSystemGlobbing;
 
 namespace Azunyan.Syntax;
 
@@ -177,6 +178,16 @@ internal static class SyntaxPatternMatcher
         var candidate = pattern.Contains('/', StringComparison.Ordinal)
             ? path
             : path[(path.LastIndexOf('/') + 1)..];
+        var matcher = new Matcher(StringComparison.OrdinalIgnoreCase);
+        try
+        {
+            matcher.AddInclude(pattern);
+        }
+        catch (ArgumentException)
+        {
+            return -1;
+        }
+
         var score = 0;
         var hasMatch = false;
         for (var start = 0; start <= candidate.Length; start++)
@@ -186,7 +197,7 @@ internal static class SyntaxPatternMatcher
                 continue;
             }
 
-            if (IsGlobMatch(candidate[start..], pattern))
+            if (matcher.Match(candidate[start..]).HasMatches)
             {
                 hasMatch = true;
                 score = Math.Max(score, pattern.Count(char.IsLetterOrDigit) * 4
@@ -196,45 +207,5 @@ internal static class SyntaxPatternMatcher
         }
 
         return hasMatch ? score : -1;
-    }
-
-    private static bool IsGlobMatch(string text, string pattern)
-    {
-        var textIndex = 0;
-        var patternIndex = 0;
-        var starIndex = -1;
-        var starTextIndex = -1;
-        while (textIndex < text.Length)
-        {
-            if (patternIndex < pattern.Length
-                && (pattern[patternIndex] == '?'
-                    || char.ToUpperInvariant(pattern[patternIndex])
-                        == char.ToUpperInvariant(text[textIndex])))
-            {
-                patternIndex++;
-                textIndex++;
-            }
-            else if (patternIndex < pattern.Length && pattern[patternIndex] == '*')
-            {
-                starIndex = patternIndex++;
-                starTextIndex = textIndex;
-            }
-            else if (starIndex >= 0)
-            {
-                patternIndex = starIndex + 1;
-                textIndex = ++starTextIndex;
-            }
-            else
-            {
-                return false;
-            }
-        }
-
-        while (patternIndex < pattern.Length && pattern[patternIndex] == '*')
-        {
-            patternIndex++;
-        }
-
-        return patternIndex == pattern.Length;
     }
 }

@@ -289,4 +289,16 @@ public sealed class BuiltInSyntaxLanguagesTests
             definition.GetPatternMatchScore(@"C:\Users\test\modes\custom.toml")
                 > definition.GetPatternMatchScore(@"C:\Users\test\other.toml"));
     }
+
+    [Fact]
+    public void Path_patterns_use_segment_aware_globbing()
+    {
+        var path = @"C:\Users\test\src\nested\custom.toml";
+
+        Assert.True(
+            SyntaxLanguageDefinition.GetPatternMatchScore(path, ["src/**/*.toml"]) >= 0);
+        Assert.Equal(
+            -1,
+            SyntaxLanguageDefinition.GetPatternMatchScore(path, ["src/*.toml"]));
+    }
 }
