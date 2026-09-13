@@ -719,6 +719,7 @@
                 <MenuFlyoutItem
                     Text="Duplicate Window"
                     Command="{x:Bind ViewModel.DuplicateWindowCommand}"
+                    KeyboardAcceleratorTextOverride="Ctrl+\"
                 />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem

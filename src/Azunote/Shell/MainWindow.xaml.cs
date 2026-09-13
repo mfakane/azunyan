@@ -13,6 +13,7 @@ namespace Azunote;
 
 public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
 {
+    private const VirtualKey OemBackslashKey = (VirtualKey)0xdc;
     private const VirtualKey OemOpenBracketKey = (VirtualKey)0xdb;
 
     private readonly ApplicationCoordinator _application;
@@ -20,6 +21,7 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     private AppWindow? _appWindow;
     private bool _allowClose;
     private bool _completionShortcutInvoked;
+    private bool _duplicateWindowShortcutInvoked;
     private bool _matchingBracketShortcutInvoked;
     private bool _findNextShortcutInvoked;
     private bool _findPreviousShortcutInvoked;
@@ -68,6 +70,14 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         var escape = new KeyboardAccelerator { Key = VirtualKey.Escape };
         escape.Invoked += EscapeAccelerator_Invoked;
         RootGrid.KeyboardAccelerators.Add(escape);
+
+        var duplicateWindow = new KeyboardAccelerator
+        {
+            Key = OemBackslashKey,
+            Modifiers = VirtualKeyModifiers.Control
+        };
+        duplicateWindow.Invoked += DuplicateWindowAccelerator_Invoked;
+        RootGrid.KeyboardAccelerators.Add(duplicateWindow);
 
         var nextWindow = new KeyboardAccelerator
         {
@@ -162,6 +172,15 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         }
     }
 
+    private void DuplicateWindowAccelerator_Invoked(
+        KeyboardAccelerator sender,
+        KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = true;
+        _duplicateWindowShortcutInvoked = true;
+        _application.DuplicateWindow(this);
+    }
+
     private void NextWindowAccelerator_Invoked(
         KeyboardAccelerator sender,
         KeyboardAcceleratorInvokedEventArgs args)
@@ -226,6 +245,24 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     {
         if (HandleFindNavigationKeyDown(e))
         {
+            return;
+        }
+
+        if (e.Key == OemBackslashKey
+            && IsKeyDown(VirtualKey.Control)
+            && !IsKeyDown(VirtualKey.Menu))
+        {
+            var acceleratorInvoked = _duplicateWindowShortcutInvoked;
+            _duplicateWindowShortcutInvoked = false;
+            e.Handled = true;
+            if (!acceleratorInvoked)
+            {
+                // WinUI does not consistently invoke KeyboardAccelerator for
+                // OEM punctuation keys. Keep this fallback in the shell so
+                // the editor component remains unaware of the application shortcut.
+                _application.DuplicateWindow(this);
+            }
+
             return;
         }
 
