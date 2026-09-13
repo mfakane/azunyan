@@ -74,6 +74,7 @@ public sealed class FindReplaceControllerTests
         controller.FindNext();
         Assert.Equal("1/2", view.Result);
         Assert.Null(view.Notification);
+        Assert.Equal(1, editor.ScrollSelectionIntoViewCount);
 
         controller.FindNext();
         Assert.Equal("2/2", view.Result);

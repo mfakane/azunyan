@@ -113,6 +113,7 @@ internal sealed class FindReplaceController
         _editor.SetSelection(new Azunyan.Core.TextSelection(
             foundResult.Match.Start,
             foundResult.Match.End));
+        _editor.ScrollSelectionIntoView();
         _state.SetResult(matchNumber, totalMatches);
         if (foundResult.Wrapped)
         {

@@ -26,6 +26,8 @@ internal sealed class FakeEditorView : IEditorView
 
     public int MoveToMatchingBracketCount { get; private set; }
 
+    public int ScrollSelectionIntoViewCount { get; private set; }
+
     public int RefreshProvidersCount { get; private set; }
 
     public bool WordWrapEnabled { get; private set; }
@@ -77,6 +79,8 @@ internal sealed class FakeEditorView : IEditorView
     }
 
     public void SelectAll() => _document.Select(new TextRange(0, Text.Length));
+
+    public void ScrollSelectionIntoView() => ScrollSelectionIntoViewCount++;
 
     public void MoveToMatchingBracket() => MoveToMatchingBracketCount++;
 

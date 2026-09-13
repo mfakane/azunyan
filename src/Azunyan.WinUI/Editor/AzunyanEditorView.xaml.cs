@@ -3650,6 +3650,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             return false;
         }
 
+        var viewportHeight = Math.Max(1, ProjectedSurfaceHost.ActualHeight);
+        var padding = InputWindow.NativeTextBoxControl.Padding;
         var targetOffset = startOffset;
         if (!alignToTop
             && _defaultRenderer.TextRenderer.TryGetViewportOffset(
@@ -3658,12 +3660,14 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 out var endOffset))
         {
             targetOffset = endOffset
-                - Math.Max(1, EditorHost.ActualHeight)
-                + _lineHeight;
+                - viewportHeight
+                + _lineHeight
+                + Math.Max(0, padding.Top)
+                + Math.Max(0, padding.Bottom);
         }
 
         var maximum = GetProjectedScrollMaximum(
-            Math.Max(1, ProjectedSurfaceHost.ActualHeight));
+            viewportHeight);
         targetOffset = Math.Clamp(targetOffset, 0, maximum);
         _synchronizingProjectedScroll = true;
         try

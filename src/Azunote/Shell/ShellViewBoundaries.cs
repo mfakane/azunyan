@@ -47,6 +47,8 @@ internal interface IEditorView : IEditorBuffer
 
     void SelectAll();
 
+    void ScrollSelectionIntoView();
+
     void MoveToMatchingBracket();
 
     void Select(TextRange range);

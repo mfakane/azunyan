@@ -951,6 +951,7 @@ public sealed partial class MainWindow
         public void Copy() => _window.Copy();
         public void Paste() => _window.Paste();
         public void SelectAll() => _window.SelectAll();
+        public void ScrollSelectionIntoView() => _window._editor.ScrollSelectionIntoView();
         public void MoveToMatchingBracket() => _window.MoveToMatchingBracket();
         public void Select(TextRange range) => _window.Select(range);
         public void RequestCompletion() => _window.RequestCompletion();
