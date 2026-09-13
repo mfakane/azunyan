@@ -377,6 +377,80 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         }
     }
 
+    private void ExecuteTextEditingCommand(
+        Action editorCommand,
+        Action<TextBox> textBoxCommand)
+    {
+        if (FindTextBox.FocusState != FocusState.Unfocused)
+        {
+            textBoxCommand(FindTextBox);
+            return;
+        }
+
+        if (ReplaceTextBox.FocusState != FocusState.Unfocused)
+        {
+            textBoxCommand(ReplaceTextBox);
+            return;
+        }
+
+        editorCommand();
+    }
+
+    private static void CutTextBoxSelection(TextBox textBox)
+    {
+        if (textBox.SelectionLength == 0)
+        {
+            return;
+        }
+
+        CopyTextBoxSelection(textBox);
+        ReplaceTextBoxSelection(textBox, string.Empty);
+    }
+
+    private static void CopyTextBoxSelection(TextBox textBox)
+    {
+        if (textBox.SelectionLength == 0)
+        {
+            return;
+        }
+
+        var selectedText = textBox.Text.Substring(
+            textBox.SelectionStart,
+            textBox.SelectionLength);
+        var dataPackage = new DataPackage();
+        dataPackage.SetText(selectedText);
+        Clipboard.SetContent(dataPackage);
+    }
+
+    private static async void PasteIntoTextBox(TextBox textBox)
+    {
+        try
+        {
+            var dataView = Clipboard.GetContent();
+            if (!dataView.Contains(StandardDataFormats.Text))
+            {
+                return;
+            }
+
+            var text = await dataView.GetTextAsync();
+            ReplaceTextBoxSelection(textBox, text);
+        }
+        catch (Exception exception)
+        {
+            ErrorReporter.LogException("Find/replace clipboard paste", exception);
+        }
+    }
+
+    private static void ReplaceTextBoxSelection(TextBox textBox, string replacement)
+    {
+        var selectionStart = textBox.SelectionStart;
+        var selectionLength = textBox.SelectionLength;
+        textBox.Text = textBox.Text.Remove(selectionStart, selectionLength)
+            .Insert(selectionStart, replacement);
+        textBox.SelectionStart = selectionStart + replacement.Length;
+        textBox.SelectionLength = 0;
+    }
+
     private static void InsertFindTextNewLine(TextBox textBox)
     {
         var selectionStart = textBox.SelectionStart;
@@ -419,13 +493,21 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
 
     void IMainWindowActions.Redo() => _runtime.Redo();
 
-    void IMainWindowActions.Cut() => _runtime.Cut();
+    void IMainWindowActions.Cut() => ExecuteTextEditingCommand(
+        _runtime.Cut,
+        CutTextBoxSelection);
 
-    void IMainWindowActions.Copy() => _runtime.Copy();
+    void IMainWindowActions.Copy() => ExecuteTextEditingCommand(
+        _runtime.Copy,
+        CopyTextBoxSelection);
 
-    void IMainWindowActions.Paste() => _runtime.Paste();
+    void IMainWindowActions.Paste() => ExecuteTextEditingCommand(
+        _runtime.Paste,
+        PasteIntoTextBox);
 
-    void IMainWindowActions.SelectAll() => _runtime.SelectAll();
+    void IMainWindowActions.SelectAll() => ExecuteTextEditingCommand(
+        _runtime.SelectAll,
+        textBox => textBox.SelectAll());
 
     void IMainWindowActions.GoToMatchingBracket() => _runtime.MoveToMatchingBracket();
 
