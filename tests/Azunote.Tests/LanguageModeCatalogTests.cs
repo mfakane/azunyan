@@ -31,6 +31,7 @@ public sealed class LanguageModeCatalogTests
 
         Assert.DoesNotContain(catalog.Entries, entry => entry.DisplayName == "Custom JSON");
         Assert.Equal("json", catalog.SelectForPath("data.json"));
+        Assert.Equal("yaml", catalog.SelectForPath("config.yml"));
     }
 
     [Fact]

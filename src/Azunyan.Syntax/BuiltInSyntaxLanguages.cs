@@ -21,6 +21,8 @@ public static class BuiltInSyntaxLanguages
 
     public static SyntaxLanguageDefinition Json => CreateJson();
 
+    public static SyntaxLanguageDefinition Yaml => CreateYaml();
+
     public static SyntaxLanguageDefinition Toml => CreateToml();
 
     public static SyntaxLanguageDefinition Markdown => CreateMarkdown();
@@ -34,6 +36,7 @@ public static class BuiltInSyntaxLanguages
         TypeScript,
         Python,
         Json,
+        Yaml,
         Toml,
         Markdown,
         PowerShell
@@ -140,6 +143,9 @@ public static class BuiltInSyntaxLanguages
             new RegexSyntaxRule(@"(?<![\w.])-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?(?![\w.])", "number")
         ],
         CommonCompletionTriggers);
+
+    private static SyntaxLanguageDefinition CreateYaml() =>
+        new("yaml", "YAML", [".yaml", ".yml"], [new YamlSyntaxProvider()]);
 
     private static SyntaxLanguageDefinition CreateToml() =>
         new("toml", "TOML", ["*.toml"],

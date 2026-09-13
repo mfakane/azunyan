@@ -39,6 +39,41 @@ public sealed class BuiltInSyntaxLanguagesTests
         };
         yield return new object[]
         {
+            BuiltInSyntaxLanguages.Yaml,
+            "---\n"
+            + "name: app\n"
+            + "enabled: true\n"
+            + "ports:\n"
+            + "  - 8080\n"
+            + "message: \"hello # yaml\"\n"
+            + "nested:\n"
+            + "  value: null # note\n"
+            + "literal: |\n"
+            + "  line # content\n"
+            + "  next\n"
+            + "...",
+            new[]
+            {
+                "---:heading",
+                "name:keyword",
+                "enabled:keyword",
+                "true:keyword",
+                "ports:keyword",
+                "8080:number",
+                "message:keyword",
+                "\"hello # yaml\":string",
+                "nested:keyword",
+                "value:keyword",
+                "null:keyword",
+                "# note:comment",
+                "literal:keyword",
+                "|:string",
+                "  line # content\n  next:string",
+                "...:heading"
+            }
+        };
+        yield return new object[]
+        {
             BuiltInSyntaxLanguages.Toml,
             "# note\nname = \"azunote\"\n[tool]\nactive = true\ncount = 42",
             new[] { "# note:comment", "name:keyword", "\"azunote\":string", "[tool]:heading", "active:keyword", "true:keyword", "count:keyword", "42:number" }
@@ -79,10 +114,89 @@ public sealed class BuiltInSyntaxLanguagesTests
     {
         Assert.Contains(".cs", BuiltInSyntaxLanguages.CSharp.FileExtensions);
         Assert.Contains(".tsx", BuiltInSyntaxLanguages.TypeScript.FileExtensions);
+        Assert.Contains(".yaml", BuiltInSyntaxLanguages.Yaml.FileExtensions);
+        Assert.Contains(".yml", BuiltInSyntaxLanguages.Yaml.FileExtensions);
         Assert.Contains("*.toml", BuiltInSyntaxLanguages.Toml.Patterns);
         Assert.IsType<TomlFoldingProvider>(BuiltInSyntaxLanguages.Toml.FoldingProvider);
         Assert.Equal([".", "(", "{", "[", "->"], BuiltInSyntaxLanguages.CSharp.CompletionTriggerCharacters);
-        Assert.Equal(8, BuiltInSyntaxLanguages.All.Count);
+        Assert.Equal(9, BuiltInSyntaxLanguages.All.Count);
+    }
+
+    [Fact]
+    public async Task Yaml_scanner_handles_flow_collections_tags_anchors_and_comments()
+    {
+        const string text =
+            "defaults: &base {name: 'app''s', enabled: false, count: 0x2a}\n"
+            + "service: !!str *base # reference\n"
+            + "url: https://example.test/a#b\n";
+
+        var snapshot = new TextSnapshot(text);
+        var spans = await BuiltInSyntaxLanguages.Yaml.GetSyntaxAsync(
+            new EditorProviderContext(snapshot, 0, TextSelection.Caret(0)));
+
+        Assert.Equal(
+            [
+                "defaults:keyword",
+                "&base:variable",
+                "name:keyword",
+                "'app''s':string",
+                "enabled:keyword",
+                "false:keyword",
+                "count:keyword",
+                "0x2a:number",
+                "service:keyword",
+                "!!str:variable",
+                "*base:variable",
+                "# reference:comment",
+                "url:keyword"
+            ],
+            spans.Select(span => $"{text[span.Range.Start..span.Range.End]}:{span.Classification}"));
+    }
+
+    [Fact]
+    public async Task Yaml_block_scalar_stops_at_less_indented_lines_and_keeps_hashes_as_text()
+    {
+        const string text =
+            "message: >-2\n"
+            + "    first # text\n"
+            + "    second\n"
+            + "next: true\n";
+
+        var snapshot = new TextSnapshot(text);
+        var spans = await BuiltInSyntaxLanguages.Yaml.GetSyntaxAsync(
+            new EditorProviderContext(snapshot, 0, TextSelection.Caret(0)));
+
+        Assert.Equal(
+            [
+                "message:keyword",
+                ">-2:string",
+                "    first # text\n    second:string",
+                "next:keyword",
+                "true:keyword"
+            ],
+            spans.Select(span => $"{text[span.Range.Start..span.Range.End]}:{span.Classification}"));
+    }
+
+    [Fact]
+    public async Task Yaml_quoted_scalars_can_cross_lines_without_starting_comments()
+    {
+        const string text =
+            "message: \"first\n"
+            + "  second # still text\"\n"
+            + "next: 1\n";
+
+        var snapshot = new TextSnapshot(text);
+        var spans = await BuiltInSyntaxLanguages.Yaml.GetSyntaxAsync(
+            new EditorProviderContext(snapshot, 0, TextSelection.Caret(0)));
+
+        Assert.Equal(
+            [
+                "message:keyword",
+                "\"first\n  second # still text\":string",
+                "next:keyword",
+                "1:number"
+            ],
+            spans.Select(span => $"{text[span.Range.Start..span.Range.End]}:{span.Classification}"));
     }
 
     [Fact]
