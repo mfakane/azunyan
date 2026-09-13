@@ -55,12 +55,29 @@ MSIX/APPX uses the existing manifest, replacing the executable token, version,
 and architecture in the staging copy only. `-IdentityName` and `-Publisher`
 override identity fields when needed for Store or organizational distribution.
 For MSIX, `winapp pack` resolves the executable token and architecture. It uses
-`--skip-pri` to preserve the resources produced by `dotnet publish`, and
+`--skip-pri` to preserve the package index prepared by the script, and
 `--self-contained` to retain runtime bundling. Without the latter, winapp removes
 runtime payload files and adds an external Windows App Runtime dependency even
 when the publish folder already contains the runtime.
 APPX uses `winapp tool makeappx`; the SDK build tools needed by winapp are
 resolved by the CLI from the project, NuGet cache, or its configured tool cache.
+
+Both formats import the compiled `Azunote.pri` into the package-root
+`resources.pri`, retaining WinUI/XBF resources and using the package identity
+as the resource map name. The `resources.pri` from self-contained runtime
+publish is not the app's index and does not index its shell icons. Packaging
+checks all 14 target sizes and three variants for both AppList and file
+association icons before packing.
+
+To regenerate icons, run `./scripts/Set-AzunoteIconWithWinApp.ps1`. It derives
+small SVGs from the master geometry, generates the PNG families, then combines
+the exact-size AppList PNGs into a 14-frame `app.ico`. Rebuild and reinstall
+the package to update shell assets; regeneration alone does not update an
+installed app.
+
+Run `./scripts/Test-AzunoteShellAssets.ps1 -PublishedDirectory <publish-folder>`
+to verify the ICO frames, default/custom package identities, and preservation of
+all compiled resource candidates, including embedded XBF data.
 
 Without `-CertificateThumbprint`, the package is unsigned. Sign it before
 sideloading. For a PFX certificate, use the WinApp CLI signing path:

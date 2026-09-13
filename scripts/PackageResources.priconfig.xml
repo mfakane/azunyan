@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources targetOsVersion="10.0.0" majorVersion="1">
+  <!-- Import the compiled app resources, including WinUI/XBF data and shell
+       image qualifiers. Do not use the runtime's unrelated resources.pri. -->
+  <index root="\" startIndexAt="Azunote.pri">
+    <default>
+      <qualifier name="Language" value="en-US" />
+    </default>
+    <indexer-config type="PRI" />
+  </index>
+</resources>

@@ -98,6 +98,50 @@ function Copy-AzunotePayload($Context, [string] $Destination) {
     }
 }
 
+function New-AzunotePackageResources($Context, [string] $Payload, [string] $WinApp, [string] $IdentityName) {
+    $appPri = Join-Path $Payload 'Azunote.pri'
+    if (!(Test-Path -LiteralPath $appPri -PathType Leaf)) {
+        throw 'Publish output is missing Azunote.pri; shell icons cannot be indexed.'
+    }
+
+    # Self-contained publish also ships a resources.pri belonging to the Windows
+    # App Runtime. The shell needs the app's index at this well-known filename.
+    # Import the compiled PRI instead of re-indexing loose files: this preserves
+    # embedded XBF/WinUI resources and remaps the root for -IdentityName overrides.
+    $config = Join-Path $PSScriptRoot 'PackageResources.priconfig.xml'
+    $packagePri = Join-Path $Context.Work 'package-resources.pri'
+    & $WinApp tool makepri new /pr $Payload /cf $config /in $IdentityName /of $packagePri
+    if ($LASTEXITCODE) { throw "Package PRI generation failed ($LASTEXITCODE)." }
+
+    $dump = Join-Path $Context.Work 'package-resources.xml'
+    & $WinApp tool makepri dump /if $packagePri /of $dump /dt detailed
+    if ($LASTEXITCODE) { throw "Package PRI inspection failed ($LASTEXITCODE)." }
+    [xml] $index = Get-Content -LiteralPath $dump -Raw
+    $map = $index.SelectSingleNode('/PriInfo/ResourceMap[@primary="true"]')
+    if ($null -eq $map -or $map.GetAttribute('name') -ne $IdentityName) {
+        throw "Package PRI does not contain the primary map for $IdentityName."
+    }
+    foreach ($family in @('AppList', 'FileAssociation')) {
+        $resource = $map.SelectSingleNode("ResourceMapSubtree[@name='Files']/ResourceMapSubtree[@name='Assets']/NamedResource[@name='$family.png']")
+        if ($null -eq $resource) { throw "Package PRI has no Assets/$family.png resource." }
+        foreach ($size in @(16, 20, 24, 30, 32, 36, 40, 48, 60, 64, 72, 80, 96, 256)) {
+            foreach ($form in @('', 'UNPLATED', 'LIGHTUNPLATED')) {
+                $formPredicate = if ($form) {
+                    "QualifierSet/Qualifier[@name='AlternateForm' and @value='$form']"
+                } else {
+                    "not(QualifierSet/Qualifier[@name='AlternateForm'])"
+                }
+                $candidate = $resource.SelectSingleNode("Candidate[QualifierSet/Qualifier[@name='TargetSize' and @value='$size'] and $formPredicate]")
+                if ($null -eq $candidate -or
+                    !(Test-Path -LiteralPath (Join-Path $Payload $candidate.Value) -PathType Leaf)) {
+                    throw "Package PRI is missing a usable $family ${size}px '$form' candidate. Regenerate assets and publish again."
+                }
+            }
+        }
+    }
+    Copy-Item -LiteralPath $packagePri -Destination (Join-Path $Payload 'resources.pri')
+}
+
 function Copy-AzunotePortablePayload($Context, [string] $Destination) {
     New-Item -ItemType Directory -Force $Destination | Out-Null
     New-Item -ItemType Directory -Force (Join-Path $Destination 'appdata') | Out-Null
