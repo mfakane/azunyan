@@ -10,6 +10,9 @@
    id="svg43"
    sodipodi:docname="02-paw-editor.svg"
    inkscape:version="1.4.4 (dcaf3e7, 2026-05-05)"
+   inkscape:export-filename="02-paw-editor-128.png"
+   inkscape:export-xdpi="96"
+   inkscape:export-ydpi="96"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:xlink="http://www.w3.org/1999/xlink"
@@ -36,7 +39,7 @@
   <title
      id="icon-title">Paw text editor icon</title>
   <desc
-     id="icon-description">Editable vector recreation of the supplied icon. Paper, paw pads, details, and background are separate named groups. Curves, gradients, and standard SVG filters only; no embedded raster images. Corners outside the blue tile are transparent.</desc>
+     id="icon-description">Editable vector recreation of the supplied icon. Paper, paw pads, details, and background are separate named groups. Curves, gradients, and standard SVG filters only; no embedded raster images. Corners outside the azuki tile are transparent.</desc>
   <defs
      id="defs38">
     <linearGradient
@@ -48,11 +51,11 @@
        y2="721.64">
       <stop
          offset="0"
-         stop-color="#2786fe"
+         stop-color="#87345e"
          id="stop1" />
       <stop
          offset="1"
-         stop-color="#2d8cfb"
+         stop-color="#ad5078"
          id="stop2" />
     </linearGradient>
     <linearGradient
@@ -64,11 +67,11 @@
        y2="642.08">
       <stop
          offset="0"
-         stop-color="#2988fd"
+         stop-color="#983a66"
          id="stop3" />
       <stop
          offset="1"
-         stop-color="#2f90fc"
+         stop-color="#b1517a"
          id="stop4" />
     </linearGradient>
     <linearGradient
@@ -80,11 +83,11 @@
        y2="696.66">
       <stop
          offset="0"
-         stop-color="#2682fb"
+         stop-color="#87345e"
          id="stop5" />
       <stop
          offset="1"
-         stop-color="#2989fd"
+         stop-color="#983a66"
          id="stop6" />
     </linearGradient>
     <linearGradient
@@ -96,11 +99,11 @@
        y2="828.61">
       <stop
          offset="0"
-         stop-color="#237cf8"
+         stop-color="#772852"
          id="stop7" />
       <stop
          offset="1"
-         stop-color="#2580fc"
+         stop-color="#85315c"
          id="stop8" />
     </linearGradient>
     <linearGradient
@@ -112,11 +115,11 @@
        y2="751.23">
       <stop
          offset="0"
-         stop-color="#2278f8"
+         stop-color="#70204d"
          id="stop9" />
       <stop
          offset="1"
-         stop-color="#2584fd"
+         stop-color="#8e335e"
          id="stop10" />
     </linearGradient>
     <path
@@ -148,23 +151,23 @@
        y2="1120">
       <stop
          offset="0"
-         stop-color="#319eff"
+         stop-color="#b1517a"
          id="stop11" />
       <stop
          offset=".16"
-         stop-color="#309bfe"
+         stop-color="#a44a73"
          id="stop12" />
       <stop
          offset=".42"
-         stop-color="#278cfc"
+         stop-color="#933866"
          id="stop13" />
       <stop
          offset=".73"
-         stop-color="#217af9"
+         stop-color="#7a2955"
          id="stop14" />
       <stop
          offset="1"
-         stop-color="#1d6dec"
+         stop-color="#641e45"
          id="stop15" />
     </linearGradient>
     <linearGradient
@@ -180,11 +183,11 @@
          id="stop16" />
       <stop
          offset=".48"
-         stop-color="#f5f7fe"
+         stop-color="#f8eff6"
          id="stop17" />
       <stop
          offset="1"
-         stop-color="#e5edfc"
+         stop-color="#f0e5f0"
          id="stop18" />
     </linearGradient>
     <linearGradient
@@ -219,15 +222,15 @@
        y2="954">
       <stop
          offset="0"
-         stop-color="#309eff"
+         stop-color="#b1517a"
          id="stop22" />
       <stop
          offset=".38"
-         stop-color="#278cfd"
+         stop-color="#933866"
          id="stop23" />
       <stop
          offset="1"
-         stop-color="#1975f7"
+         stop-color="#70204d"
          id="stop24" />
     </linearGradient>
     <linearGradient
@@ -238,11 +241,11 @@
        y2="1">
       <stop
          offset="0"
-         stop-color="#b5d1ff"
+         stop-color="#cfa4c1"
          id="stop25" />
       <stop
          offset="1"
-         stop-color="#bed9fd"
+         stop-color="#d9bbd2"
          id="stop26" />
     </linearGradient>
     <linearGradient
@@ -253,11 +256,11 @@
        y2="1">
       <stop
          offset="0"
-         stop-color="#bad4ff"
+         stop-color="#e6d2e4"
          id="stop27" />
       <stop
          offset="1"
-         stop-color="#b0cffb"
+         stop-color="#d9b0cf"
          id="stop28" />
     </linearGradient>
     <radialGradient
@@ -267,15 +270,15 @@
        r=".84">
       <stop
          offset="0"
-         stop-color="#299cff"
+         stop-color="#b1517a"
          id="stop29" />
       <stop
          offset=".56"
-         stop-color="#1b8bff"
+         stop-color="#933866"
          id="stop30" />
       <stop
          offset="1"
-         stop-color="#055be6"
+         stop-color="#641e45"
          id="stop31" />
     </radialGradient>
     <filter
@@ -325,7 +328,7 @@
          result="inset-mask"
          id="feComposite33" />
       <feFlood
-         flood-color="#0054e3"
+         flood-color="#50143a"
          flood-opacity=".88"
          result="inset-color"
          id="feFlood33" />
@@ -366,7 +369,7 @@
          result="inset-mask"
          id="feComposite36" />
       <feFlood
-         flood-color="#0348d6"
+         flood-color="#551739"
          flood-opacity=".86"
          result="inset-color"
          id="feFlood36" />
@@ -386,7 +389,7 @@
   <g
      id="background"
      inkscape:groupmode="layer"
-     inkscape:label="01 Blue rounded tile">
+     inkscape:label="01 Azuki rounded tile">
     <path
        id="background-tile"
        d="m 264,0 h 726 c 145.8,0 264,118.2 264,264 v 726 c 0,145.8 -118.2,264 -264,264 H 264 C 118.2,1254 0,1135.8 0,990 V 264 C 0,118.2 118.2,0 264,0 Z"
@@ -404,7 +407,7 @@
          href="#paper-outline"
          xlink:href="#paper-outline"
          transform="translate(11 11)"
-         fill="#0644c7"
+         fill="#59163d"
          opacity=".47"
          filter="url(#shadow-blur)"
          id="use38" />
@@ -412,7 +415,7 @@
          href="#paper-outline"
          xlink:href="#paper-outline"
          transform="translate(3 7)"
-         fill="#0659d6"
+         fill="#641e45"
          opacity=".18"
          filter="url(#contact-blur)"
          id="use39" />
@@ -434,13 +437,13 @@
          y="208"
          width="865"
          height="110"
-         fill="#dce8ff"
+         fill="#eadfea"
          opacity=".20"
          id="rect39" />
       <path
          d="M194,318 H1059"
          fill="none"
-         stroke="#b3cefb"
+         stroke="#c18fac"
          stroke-width="4.2"
          id="path39" />
       <path
@@ -466,7 +469,7 @@
     <path
        id="gutter-separator"
        d="M315.5,323 V1026"
-       stroke="#cbdbfd"
+       stroke="#d9b0cf"
        stroke-width="4"
        stroke-linecap="round" />
     <path
@@ -483,7 +486,7 @@
     <g
        id="title-button-minimize"
        fill="none"
-       stroke="#1f75f7"
+       stroke="#933866"
        stroke-width="8.5"
        stroke-linecap="round"
        stroke-linejoin="round">
@@ -494,7 +497,7 @@
     <g
        id="title-button-maximize"
        fill="none"
-       stroke="#1f75f7"
+       stroke="#933866"
        stroke-width="8.5"
        stroke-linecap="round"
        stroke-linejoin="round">
@@ -509,7 +512,7 @@
     <g
        id="title-button-close"
        fill="none"
-       stroke="#1f75f7"
+       stroke="#933866"
        stroke-width="8.5"
        stroke-linecap="round"
        stroke-linejoin="round">
