@@ -85,6 +85,28 @@ public sealed class FindReplaceControllerTests
     }
 
     [Fact]
+    public void Find_does_not_take_focus_from_the_find_replace_input()
+    {
+        var editor = new FakeEditorView("one two one");
+        var view = new FakeFindReplaceView
+        {
+            FindText = "one",
+            IsFindBoxFocused = true
+        };
+        var controller = new FindReplaceController(
+            editor,
+            view,
+            view,
+            () => { },
+            () => { });
+
+        controller.FindNext();
+
+        Assert.Equal(0, editor.FocusCount);
+        Assert.True(view.IsFindBoxFocused);
+    }
+
+    [Fact]
     public void Invalid_regular_expression_is_shown_in_a_notification()
     {
         var view = new FakeFindReplaceView

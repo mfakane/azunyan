@@ -110,7 +110,6 @@ internal sealed class FindReplaceController
             query,
             foundResult.Match.Start,
             _state.Options) + 1;
-        _editor.Focus();
         _editor.SetSelection(new Azunyan.Core.TextSelection(
             foundResult.Match.Start,
             foundResult.Match.End));
