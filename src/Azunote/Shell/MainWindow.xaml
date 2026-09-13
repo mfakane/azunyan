@@ -414,7 +414,7 @@
                 Background="Transparent">
                 <controls:TitleBar.IconSource>
                     <controls:BitmapIconSource
-                        UriSource="ms-appx:///Assets/AppList.targetsize-96.png"
+                        UriSource="ms-appx:///Assets/TitleBarIcon.png"
                         ShowAsMonochrome="False" />
                 </controls:TitleBar.IconSource>
             </controls:TitleBar>

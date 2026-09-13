@@ -74,6 +74,7 @@ public sealed partial class MainWindow
         _windowHandle = WindowNative.GetWindowHandle(this);
         var windowId = Win32Interop.GetWindowIdFromWindow(_windowHandle);
         _appWindow = AppWindow.GetFromWindowId(windowId);
+        _appWindow?.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "app.ico"));
         if (_appWindow?.TitleBar is not { } titleBar
             || !AppWindowTitleBar.IsCustomizationSupported())
         {
