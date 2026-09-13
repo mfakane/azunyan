@@ -39,7 +39,7 @@
   <title
      id="icon-title">Paw notebook icon</title>
   <desc
-     id="icon-description">Editable vector recreation of the supplied icon. Paper, paw pads, details, and background are separate named groups. Curves, gradients, and standard SVG filters only; no embedded raster images. Corners outside the blue tile are transparent.</desc>
+     id="icon-description">Editable vector recreation of the supplied icon. Paper, paw pads, details, and background are separate named groups. Curves, gradients, and standard SVG filters only; no embedded raster images. Corners outside the azuki tile are transparent.</desc>
   <defs
      id="defs46">
     <linearGradient
@@ -51,11 +51,11 @@
        y2="661.35">
       <stop
          offset="0"
-         stop-color="#2584fc"
+         stop-color="#87345e"
          id="stop1" />
       <stop
          offset="1"
-         stop-color="#3a9dfc"
+         stop-color="#ad5078"
          id="stop2" />
     </linearGradient>
     <linearGradient
@@ -67,11 +67,11 @@
        y2="571.73">
       <stop
          offset="0"
-         stop-color="#2f91fd"
+         stop-color="#983a66"
          id="stop3" />
       <stop
          offset="1"
-         stop-color="#3a9efc"
+         stop-color="#b1517a"
          id="stop4" />
     </linearGradient>
     <linearGradient
@@ -83,11 +83,11 @@
        y2="567.38">
       <stop
          offset="0"
-         stop-color="#2584fc"
+         stop-color="#87345e"
          id="stop5" />
       <stop
          offset="1"
-         stop-color="#2d8ffc"
+         stop-color="#983a66"
          id="stop6" />
     </linearGradient>
     <linearGradient
@@ -99,11 +99,11 @@
        y2="667.06">
       <stop
          offset="0"
-         stop-color="#2179f7"
+         stop-color="#772852"
          id="stop7" />
       <stop
          offset="1"
-         stop-color="#2580fb"
+         stop-color="#85315c"
          id="stop8" />
     </linearGradient>
     <linearGradient
@@ -115,11 +115,11 @@
        y2="692.6">
       <stop
          offset="0"
-         stop-color="#1e72f4"
+         stop-color="#70204d"
          id="stop9" />
       <stop
          offset="1"
-         stop-color="#298aff"
+         stop-color="#8e335e"
          id="stop10" />
     </linearGradient>
     <path
@@ -151,23 +151,23 @@
        y2="1120">
       <stop
          offset="0"
-         stop-color="#319eff"
+         stop-color="#b1517a"
          id="stop11" />
       <stop
          offset=".16"
-         stop-color="#309bfe"
+         stop-color="#a44a73"
          id="stop12" />
       <stop
          offset=".42"
-         stop-color="#278cfc"
+         stop-color="#933866"
          id="stop13" />
       <stop
          offset=".73"
-         stop-color="#217af9"
+         stop-color="#7a2955"
          id="stop14" />
       <stop
          offset="1"
-         stop-color="#1d6dec"
+         stop-color="#641e45"
          id="stop15" />
     </linearGradient>
     <linearGradient
@@ -184,11 +184,11 @@
          id="stop16" />
       <stop
          offset=".48"
-         stop-color="#f1f6ff"
+         stop-color="#f8eff6"
          id="stop17" />
       <stop
          offset="1"
-         stop-color="#e4efff"
+         stop-color="#f0e5f0"
          id="stop18" />
     </linearGradient>
     <linearGradient
@@ -224,15 +224,15 @@
        y2="923">
       <stop
          offset="0"
-         stop-color="#309eff"
+         stop-color="#b1517a"
          id="stop22" />
       <stop
          offset=".38"
-         stop-color="#278cfd"
+         stop-color="#933866"
          id="stop23" />
       <stop
          offset="1"
-         stop-color="#1975f7"
+         stop-color="#70204d"
          id="stop24" />
     </linearGradient>
     <linearGradient
@@ -243,11 +243,11 @@
        y2="1">
       <stop
          offset="0"
-         stop-color="#b5d1ff"
+         stop-color="#cfa4c1"
          id="stop25" />
       <stop
          offset="1"
-         stop-color="#bed9fd"
+         stop-color="#d9bbd2"
          id="stop26" />
     </linearGradient>
     <linearGradient
@@ -258,15 +258,15 @@
        y2="1">
       <stop
          offset="0"
-         stop-color="#d8e9ff"
+         stop-color="#e6d2e4"
          id="stop27" />
       <stop
          offset=".46"
-         stop-color="#b4d6ff"
+         stop-color="#c18fac"
          id="stop28" />
       <stop
          offset="1"
-         stop-color="#7eb5ff"
+         stop-color="#984c70"
          id="stop29" />
     </linearGradient>
     <linearGradient
@@ -281,7 +281,7 @@
          id="stop30" />
       <stop
          offset="1"
-         stop-color="#b3dcff"
+         stop-color="#d9b0cf"
          stop-opacity=".48"
          id="stop31" />
     </linearGradient>
@@ -292,15 +292,15 @@
        r=".82">
       <stop
          offset="0"
-         stop-color="#1587fa"
+         stop-color="#78264f"
          id="stop32" />
       <stop
          offset=".58"
-         stop-color="#0769e9"
+         stop-color="#641e45"
          id="stop33" />
       <stop
          offset="1"
-         stop-color="#064bce"
+         stop-color="#551739"
          id="stop34" />
     </radialGradient>
     <linearGradient
@@ -313,15 +313,15 @@
        gradientTransform="translate(0,-5.9968104)">
       <stop
          offset="0"
-         stop-color="#70aafb"
+         stop-color="#913560"
          id="stop35" />
       <stop
          offset=".55"
-         stop-color="#80b7ff"
+         stop-color="#a45177"
          id="stop36" />
       <stop
          offset="1"
-         stop-color="#98c6ff"
+         stop-color="#c77ea5"
          id="stop37" />
     </linearGradient>
     <linearGradient
@@ -334,15 +334,15 @@
        gradientTransform="translate(0,-5.9968104)">
       <stop
          offset="0"
-         stop-color="#b2d5ff"
+         stop-color="#bd89ad"
          id="stop38" />
       <stop
          offset=".56"
-         stop-color="#91c0ff"
+         stop-color="#a9668e"
          id="stop39" />
       <stop
          offset="1"
-         stop-color="#79aff8"
+         stop-color="#923f69"
          id="stop40" />
     </linearGradient>
     <filter
@@ -414,7 +414,7 @@
          result="inset-mask"
          id="feComposite44" />
       <feFlood
-         flood-color="#0054e3"
+         flood-color="#50143a"
          flood-opacity=".88"
          result="inset-color"
          id="feFlood44" />
@@ -594,7 +594,7 @@
   <g
      id="background"
      inkscape:groupmode="layer"
-     inkscape:label="01 Blue rounded tile">
+     inkscape:label="01 Azuki rounded tile">
     <path
        id="background-tile"
        d="m 264,0 h 726 c 145.8,0 264,118.2 264,264 v 726 c 0,145.8 -118.2,264 -264,264 H 264 C 118.2,1254 0,1135.8 0,990 V 264 C 0,118.2 118.2,0 264,0 Z"
@@ -613,7 +613,7 @@
          href="#paper-outline"
          xlink:href="#paper-outline"
          transform="translate(11,11)"
-         fill="#0644c7"
+         fill="#59163d"
          opacity="0.47"
          filter="url(#shadow-blur)"
          id="use46" />
@@ -621,7 +621,7 @@
          href="#paper-outline"
          xlink:href="#paper-outline"
          transform="translate(3,7)"
-         fill="#0659d6"
+         fill="#641e45"
          opacity="0.18"
          filter="url(#contact-blur)"
          id="use47" />
@@ -644,7 +644,7 @@
          id="curl-cast-shadow"
          d="m 810,1061 c 7.7,0 14.9,-1 22.4,-3 47.8,-12.3 68.4,-60.2 76.7,-114.8 4.4,-28.5 16.1,-49.1 40.9,-58.7 15,-5.8 31,-4.7 47,-4.7 38,0 62,-25.8 62,-66.8 0,46 -153,204 -226.6,245 -7.5,2 -14.7,3 -22.4,3 z"
          transform="translate(8,12)"
-         fill="#357bdd"
+         fill="#792850"
          opacity="0.25"
          filter="url(#fold-shadow-blur)" />
     </g>
@@ -695,7 +695,7 @@
          width="42"
          height="140"
          rx="21"
-         fill="#1b66d2"
+         fill="#5f1a44"
          opacity="0.23"
          filter="url(#ring-shadow)" />
       <rect
@@ -747,7 +747,7 @@
          width="42"
          height="140"
          rx="21"
-         fill="#1b66d2"
+         fill="#5f1a44"
          opacity="0.23"
          filter="url(#ring-shadow)" />
       <rect
@@ -799,7 +799,7 @@
          width="42"
          height="140"
          rx="21"
-         fill="#1b66d2"
+         fill="#5f1a44"
          opacity="0.23"
          filter="url(#ring-shadow)" />
       <rect
@@ -851,7 +851,7 @@
          width="42"
          height="140"
          rx="21"
-         fill="#1b66d2"
+         fill="#5f1a44"
          opacity="0.23"
          filter="url(#ring-shadow)" />
       <rect

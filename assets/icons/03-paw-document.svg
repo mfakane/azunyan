@@ -36,7 +36,7 @@
   <title
      id="icon-title">Paw document icon</title>
   <desc
-     id="icon-description">Editable vector recreation of the supplied icon. Paper, paw pads, details, and background are separate named groups. Curves, gradients, and standard SVG filters only; no embedded raster images. Corners outside the blue tile are transparent.</desc>
+     id="icon-description">Editable vector recreation of the supplied icon. Paper, paw pads, details, and background are separate named groups. Curves, gradients, and standard SVG filters only; no embedded raster images. Corners outside the azuki tile are transparent.</desc>
   <defs
      id="defs33">
     <linearGradient
@@ -48,11 +48,11 @@
        y2="640.45">
       <stop
          offset="0"
-         stop-color="#2588fb"
+         stop-color="#8a3561"
          id="stop1" />
       <stop
          offset="1"
-         stop-color="#2d94fc"
+         stop-color="#a44b75"
          id="stop2" />
     </linearGradient>
     <linearGradient
@@ -64,11 +64,11 @@
        y2="515.96">
       <stop
          offset="0"
-         stop-color="#298ffc"
+         stop-color="#963660"
          id="stop3" />
       <stop
          offset="1"
-         stop-color="#2f95fb"
+         stop-color="#a1436d"
          id="stop4" />
     </linearGradient>
     <linearGradient
@@ -80,11 +80,11 @@
        y2="516.88">
       <stop
          offset="0"
-         stop-color="#2487fc"
+         stop-color="#89345e"
          id="stop5" />
       <stop
          offset="1"
-         stop-color="#298cf9"
+         stop-color="#973862"
          id="stop6" />
     </linearGradient>
     <linearGradient
@@ -96,11 +96,11 @@
        y2="630.22">
       <stop
          offset="0"
-         stop-color="#1e7bf9"
+         stop-color="#78274f"
          id="stop7" />
       <stop
          offset="1"
-         stop-color="#227ff7"
+         stop-color="#822f57"
          id="stop8" />
     </linearGradient>
     <linearGradient
@@ -112,11 +112,11 @@
        y2="668.08">
       <stop
          offset="0"
-         stop-color="#1b72f4"
+         stop-color="#70204d"
          id="stop9" />
       <stop
          offset="1"
-         stop-color="#2489fc"
+         stop-color="#90355f"
          id="stop10" />
     </linearGradient>
     <path
@@ -148,23 +148,23 @@
        y2="1120">
       <stop
          offset="0"
-         stop-color="#2c9bfd"
+         stop-color="#a74b75"
          id="stop11" />
       <stop
          offset=".16"
-         stop-color="#2d99fc"
+         stop-color="#a54a73"
          id="stop12" />
       <stop
          offset=".42"
-         stop-color="#278cfc"
+         stop-color="#933866"
          id="stop13" />
       <stop
          offset=".73"
-         stop-color="#227df8"
+         stop-color="#7e2d53"
          id="stop14" />
       <stop
          offset="1"
-         stop-color="#1d70ed"
+         stop-color="#671f46"
          id="stop15" />
     </linearGradient>
     <linearGradient
@@ -180,11 +180,11 @@
          id="stop16" />
       <stop
          offset=".48"
-         stop-color="#f5f6fc"
+         stop-color="#f8f0f7"
          id="stop17" />
       <stop
          offset="1"
-         stop-color="#e8eefb"
+         stop-color="#f0e6f0"
          id="stop18" />
     </linearGradient>
     <linearGradient
@@ -219,15 +219,15 @@
        y2="946">
       <stop
          offset="0"
-         stop-color="#309eff"
+         stop-color="#b1517a"
          id="stop22" />
       <stop
          offset=".38"
-         stop-color="#278cfd"
+         stop-color="#933866"
          id="stop23" />
       <stop
          offset="1"
-         stop-color="#1975f7"
+         stop-color="#70204d"
          id="stop24" />
     </linearGradient>
     <linearGradient
@@ -243,11 +243,11 @@
          id="stop25" />
       <stop
          offset=".45"
-         stop-color="#eef3fd"
+         stop-color="#f5e9f4"
          id="stop26" />
       <stop
          offset="1"
-         stop-color="#d7e6fc"
+         stop-color="#eadfea"
          id="stop27" />
     </linearGradient>
     <filter
@@ -319,7 +319,7 @@
          result="inset-mask"
          id="feComposite31" />
       <feFlood
-         flood-color="#0054e3"
+         flood-color="#50143a"
          flood-opacity=".88"
          result="inset-color"
          id="feFlood31" />
@@ -339,7 +339,7 @@
   <g
      id="background"
      inkscape:groupmode="layer"
-     inkscape:label="01 Blue rounded tile">
+     inkscape:label="01 Azuki rounded tile">
     <path
        id="background-tile"
        d="m 264,0 h 726 c 145.8,0 264,118.2 264,264 v 726 c 0,145.8 -118.2,264 -264,264 H 264 C 118.2,1254 0,1135.8 0,990 V 264 C 0,118.2 118.2,0 264,0 Z"
@@ -357,7 +357,7 @@
          href="#paper-outline"
          xlink:href="#paper-outline"
          transform="translate(11 11)"
-         fill="#0644c7"
+         fill="#59163d"
          opacity=".47"
          filter="url(#shadow-blur)"
          id="use33" />
@@ -365,7 +365,7 @@
          href="#paper-outline"
          xlink:href="#paper-outline"
          transform="translate(3 7)"
-         fill="#0659d6"
+         fill="#641e45"
          opacity=".18"
          filter="url(#contact-blur)"
          id="use34" />
@@ -396,14 +396,14 @@
       <path
          d="M700,164 C727,164 741,193 741,227 V347 C741,388 761,412 804,412 H923 C962,412 984.6,426.6 992,458 C990.7,432.3 980.5,416.5 956.8,393 L754.6,192.1 C739.2,176.9 722.5,164 700,164 Z"
          transform="translate(1 20)"
-         fill="#3977d2"
+         fill="#7d2845"
          opacity=".53"
          filter="url(#fold-shadow-blur)"
          id="path34" />
       <path
          d="M700,164 C727,164 741,193 741,227 V347 C741,388 761,412 804,412 H923 C962,412 984.6,426.6 992,458 C990.7,432.3 980.5,416.5 956.8,393 L754.6,192.1 C739.2,176.9 722.5,164 700,164 Z"
          transform="translate(0 6)"
-         fill="#4c87da"
+         fill="#923751"
          opacity=".35"
          filter="url(#fold-contact-blur)"
          id="path35" />

@@ -29,29 +29,29 @@ foreach ($name in @('01-paw-notebook', '03-paw-document')) {
     # ~0.75px at 32px: a crisp paper edge replaces the original diffuse shadow.
     $sheetId = if ($name -eq '01-paw-notebook') { 'back-sheet' } else { 'document-sheet' }
     $sheet = $svg.SelectSingleNode("//*[@id='$sheetId']")
-    $sheet.SetAttribute('stroke', '#3979cd')
+    $sheet.SetAttribute('stroke', '#68254b')
     $sheet.SetAttribute('stroke-width', '22')
     $sheet.SetAttribute('stroke-linejoin', 'round')
 
     foreach ($node in $svg.SelectNodes("//*[@id='paw-blue']/*")) {
-        $node.SetAttribute('stroke', '#2078e5')
+        $node.SetAttribute('stroke', '#6c1f49')
         $node.SetAttribute('stroke-width', '6')
         $node.SetAttribute('stroke-linejoin', 'round')
     }
     foreach ($node in $svg.SelectNodes("//*[@id='note-lines']/*")) {
         # Enlarge the ink symmetrically without moving the original line boxes.
-        $node.SetAttribute('style', 'fill:#8fb7ed;stroke:#8fb7ed;stroke-width:9')
+        $node.SetAttribute('style', 'fill:#b9789e;stroke:#b9789e;stroke-width:9')
     }
     foreach ($node in $svg.SelectNodes("//*[@id='binding']/*/*")) {
         if ($node.GetAttribute('id') -match '^binding-\d+-ring$') {
-            $node.SetAttribute('stroke', '#74a9e9')
+            $node.SetAttribute('stroke', '#a56087')
             $node.SetAttribute('stroke-width', '8')
         }
     }
     foreach ($id in @('curl-edge-highlight', 'fold-edge-glint')) {
         $node = $svg.SelectSingleNode("//*[@id='$id']")
         if ($null -ne $node) {
-            $node.SetAttribute('stroke', '#8bb6ea')
+            $node.SetAttribute('stroke', '#bc88a6')
             $node.SetAttribute('stroke-width', '10')
             $node.SetAttribute('stroke-opacity', '1')
         }
