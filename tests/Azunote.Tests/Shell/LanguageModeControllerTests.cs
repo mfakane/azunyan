@@ -1,4 +1,5 @@
 using Azunote;
+using Azunyan.Core;
 using Xunit;
 
 namespace Azunote.Tests.Shell;
@@ -41,5 +42,23 @@ public sealed class LanguageModeControllerTests
 
         Assert.Equal("plain-text", controller.CurrentModeId);
         Assert.True(controller.IsManuallySelected);
+    }
+
+    [Fact]
+    public void Uses_document_word_completion_for_plain_text_and_other_language_modes()
+    {
+        var editor = new FakeEditorView();
+        var menu = new FakeLanguageModeMenuView();
+        var controller = new LanguageModeController(
+            editor,
+            menu,
+            () => null);
+
+        controller.Initialize();
+        Assert.IsType<DocumentWordCompletionProvider>(editor.LanguageConfiguration?.Completion);
+
+        controller.DocumentOpened("config.yml");
+        Assert.Equal("yaml", controller.CurrentModeId);
+        Assert.IsType<DocumentWordCompletionProvider>(editor.LanguageConfiguration?.Completion);
     }
 }

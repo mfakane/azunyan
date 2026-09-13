@@ -82,6 +82,12 @@ The Open and Save dialogs use the same mode definitions for their file-type
 filters. Open starts on supported formats, while Save As starts on the active
 language mode.
 
+Language modes without a dedicated completion provider, including Plain Text,
+use document-word completion. Ctrl+Space suggests longer words already present
+in the current document and replaces the word prefix at the caret. A mode's
+`completionTriggerCharacters` can also request the same completion after a
+configured literal trigger.
+
 A custom mode can also request completion after insertion with literal
 `completionTriggerCharacters` such as `->`. Explicit completion is available
 from Edit > Show Completions with Ctrl+Space.

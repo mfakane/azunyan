@@ -5,6 +5,9 @@ namespace Azunote;
 
 internal sealed class LanguageModeController
 {
+    private static readonly ICompletionProvider DocumentWordCompletion =
+        new DocumentWordCompletionProvider();
+
     private readonly IEditorView _editor;
     private readonly ILanguageModeMenuView _menu;
     private readonly Func<string?> _currentFilePath;
@@ -103,10 +106,13 @@ internal sealed class LanguageModeController
         var schemas = isAzunote
             ? AzunoteSchemaCatalog.ForPath(_currentFilePath())
             : Array.Empty<AzunoteSchemaDefinition>();
+        var completion = isAzunote
+            ? new AzunoteCompletionProvider(schemas)
+            : DocumentWordCompletion;
         _editor.ApplyLanguage(new EditorLanguageConfiguration(
             mode.CompletionTriggers,
             isAzunote ? new AzunoteSyntaxProvider() : mode.Provider,
-            isAzunote ? new AzunoteCompletionProvider(schemas) : null,
+            completion,
             mode.FoldingProvider));
         _menu.Select(id);
         if (refresh)
