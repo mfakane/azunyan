@@ -56,7 +56,7 @@ shell.
 ## state.toml
 
 `state.toml` is rewritten automatically and should not be edited. It stores
-the last window layout, Word Wrap and Status Bar preferences, and up to 20
+the last window layout, Word Wrap and Status Bar preferences, and up to 10
 recently opened file paths.
 
 ## Custom language modes

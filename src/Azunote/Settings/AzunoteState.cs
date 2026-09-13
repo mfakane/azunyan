@@ -34,7 +34,7 @@ public sealed class WindowLayoutState
 
 internal static class AzunoteStateNormalization
 {
-    public const int MaximumRecentFiles = 20;
+    public const int MaximumRecentFiles = 10;
 
     public static AzunoteState Normalize(AzunoteState? state)
     {
