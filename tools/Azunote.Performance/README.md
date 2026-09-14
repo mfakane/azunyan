@@ -14,8 +14,9 @@ The CSV contains 30 samples per case after three warm-up iterations, using CRLF 
 10,000, 1,000,000 and 10,000,000 characters, 0/10/100 tools, and a 128-character selection.
 Each tool resolves the harness executable. The synthetic workspace contains `.git` and
 `.env`. Cold means a new application cache, not a cold filesystem or process. The warm
-case uses a one-minute expiry to keep expiry out of the measured loop (production: one
-second). JIT tiering remains enabled. These are small component measurements, not an SLA.
+case uses a one-minute expiry to keep expiry out of the measured loop, with watchers
+disabled in this original comparison. Production expiry is described below. JIT tiering
+remains enabled. These are small component measurements, not an SLA.
 
 `two_menus_before` reconstructs the old two-menu call pattern using the current uncached
 evaluator: one new context and one evaluation for every tool in each menu. It does not run
@@ -41,6 +42,25 @@ and 76,363,840 allocated bytes to 6.591 / 7.670 ms and zero allocated bytes per 
 The document-wide comparison is still O(n). This does not include materializing a newly
 edited snapshot, and it does not establish whole-editor latency for large documents.
 
+## Watched discovery comparison
+
+```powershell
+dotnet run --project tools/Azunote.Performance/Azunote.Performance.csproj -c Release -p:PublishAot=false -p:PublishTrimmed=false -- --watch-cache
+```
+
+This mode compares one-second TTL-only caching with five-minute watched discovery on a
+local temporary workspace, using 1M characters and 100 tools. Both paths are warmed 100
+times before the usual three warm-ups and 30 samples. A synthetic cache clock advances
+two seconds per batch; there is no real two-second wait. Native watchers are active, but
+no files change during measurement. Initial watcher setup is outside the measured loop,
+and allocations count only the calling thread, not native buffers or callback threads.
+
+On the same machine/date as above, TTL-only p50 / p95 was 1.035 / 1.222 ms; watched
+discovery was 0.841 / 1.090 ms. That is about 0.19 ms (19%) less per batch at the median,
+not a measured change in typing latency. See [watch-sample.csv](watch-sample.csv).
+This small local-workspace comparison does not measure deep searches, network filesystems,
+watcher setup/teardown, or high-rate filesystem notifications.
+
 ## Implementation and limits
 
 - `LatestUiWork` uses a capacity-one `System.Threading.Channels` queue, one consumer,
@@ -55,17 +75,27 @@ edited snapshot, and it does not establish whole-editor latency for large docume
   views share the resulting states. Enabled-state changes reuse controls; visibility or
   definition-tree changes rebuild the external-tool section. Shortcuts stay registered
   and re-evaluate their candidates when invoked, preserving candidate order.
-- A window-owned `Microsoft.Extensions.Caching.Memory` cache holds at most 512 entries
-  with a one-second absolute expiry, including negative lookups. It stores process
-  environment, nearest `.env` results, workspace discoveries and launch resolution.
+- A window-owned `Microsoft.Extensions.Caching.Memory` cache holds at most 512 entries,
+  including negative lookups. It stores process environment, nearest `.env` results,
+  workspace discoveries and launch resolution. Fully watched `.env` and default workspace
+  searches (`.git` / root `.editorconfig`) have a five-minute safety expiry. Process
+  environment, launch resolution and arbitrary workspace globs retain a one-second expiry.
   Keys include discovery inputs and, for launch resolution, PATH/PATHEXT and cwd. Commands
   longer than 4096 characters bypass caching. The bound is entry count, not bytes.
-- TTLs are checked on access; they are not background refresh timers. Menu entry, window
-  activation, settings reload, editing and selection request new evaluation. External
-  filesystem changes can remain invisible until an evaluation after expiry. No watcher
-  is created for every ancestor directory. Commands always revalidate using uncached
-  environment/filesystem resolution, and removed/replaced definitions cannot execute
-  through an old menu callback.
+- A process-wide registry shares at most 128 non-recursive `FileSystemWatcher` instances
+  across windows and cache entries. Subscriptions cover searched directories, including
+  negative lookups, and their parent directories to detect replacement/rename. Only
+  relevant names invalidate an entry. `CancellationChangeToken` connects notifications
+  to `MemoryCache` expiration tokens and requests a coalesced background menu evaluation,
+  including while the user is idle. Eviction/window closure releases subscriptions.
+- Remote/unavailable locations, watcher limits/errors and transient read failures fall
+  back to one-second expiry. Failed watchers are retired and creation retries have a
+  two-second backoff. Watcher errors invalidate affected entries; the safety TTL covers
+  missed notifications. TTLs are checked on access, not by background refresh timers:
+  missed events and unmonitored changes can remain invisible until an evaluation after
+  expiry. Menu entry, window activation, settings reload, editing and selection request
+  evaluation. Commands always revalidate using uncached environment/filesystem resolution,
+  and removed/replaced definitions cannot execute through an old menu callback.
 - Closing the window cancels pending work; the cache is disposed after the worker exits.
   Environment values and document text are never emitted by the measurements.
 - Saved text is normalized on load/save; comparison reads the current text without
@@ -104,12 +134,14 @@ composition and slow/network filesystem behavior need a separate interactive tra
 
 `dotnet test Azunyan.slnx` covers saved-content semantics, fake-time throttling, superseded
 work before/during UI application, shutdown without a dispatcher pump, and cache expiry
-for creation/edit/deletion and nearest-parent changes. UI tests are opt-in; see
+for creation/edit/deletion and nearest-parent changes. Watcher tests additionally cover
+sharing/refcounts, rename, negative lookups, invalidation during cache fill, limits/errors,
+missed-event expiry, locked-file retry and native notifications. UI tests are opt-in; see
 [the UI test instructions](../../tests/Azunote.UiTests/README.md).
 
-Validation: 375 non-UI tests passed; the existing 14 UI tests passed
-on the managed build, and the new selection/menu identity test passed on the Native AOT
-build. Release managed build and Release/win-x64 self-contained AOT publish succeeded.
+Validation after watched-cache changes: 390 non-UI tests passed; both focused external-tool
+UI tests passed on the managed build, and all 16 UI tests passed on the Native AOT build.
+Release managed build and Release/win-x64 self-contained AOT publish succeeded.
 Actual IME keyboard composition was not verified: desktop automation could not focus
-the test window. The additional menu test uses UI Automation selection without relying
-on synthetic keyboard input.
+the test window. The selection test uses UI Automation selection without synthetic
+keyboard input; the watched-menu test updates `.env` without any editor interaction.

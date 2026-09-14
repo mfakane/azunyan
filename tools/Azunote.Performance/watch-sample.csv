@@ -1,0 +1,3 @@
+operation,characters,tools,p50_ms,p95_ms,p99_ms,bytes_per_iteration
+ttl_batches_2s_apart,1000000,100,1.035,1.222,2.009,1432951
+watched_batches_2s_apart,1000000,100,0.841,1.090,1.107,1423366

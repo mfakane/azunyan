@@ -7,6 +7,11 @@ using Azunyan.Core;
 // Component benchmark, not an input-to-screen latency benchmark. Baseline reproduces
 // the former two-menu evaluation pattern, including fresh contexts for every tool.
 Console.WriteLine("operation,characters,tools,p50_ms,p95_ms,p99_ms,bytes_per_iteration");
+if (args.Contains("--watch-cache", StringComparer.Ordinal))
+{
+    CompareWatchedCache();
+    return;
+}
 var directory = Directory.CreateTempSubdirectory("azunote-performance-");
 try
 {
@@ -80,4 +85,51 @@ static string Normalize(string text)
         else normalized.Append(text[index]);
     }
     return normalized.ToString();
+}
+
+static void CompareWatchedCache()
+{
+    var directory = Directory.CreateTempSubdirectory("azunote-watch-performance-");
+    try
+    {
+        Directory.CreateDirectory(Path.Combine(directory.FullName, ".git"));
+        File.WriteAllText(Path.Combine(directory.FullName, ".env"), "BENCHMARK_VALUE=example");
+        var session = new DocumentSession();
+        var snapshot = new TextSnapshot(new string('x', 1_000_000));
+        session.MarkSaved(Path.Combine(directory.FullName, "test.txt"), snapshot.Text,
+            TextEncodingKind.Utf8, LineEndingKind.Lf);
+        var tools = Enumerable.Range(0, 100).Select(index => new ExternalToolSettings
+        {
+            Name = $"Tool {index}", Launch = new() { Command = Environment.ProcessPath! }
+        }).ToDictionary(tool => tool, tool => new PreparedExternalTool(tool));
+        var input = new ExternalToolEvaluationInput(snapshot, new TextSelection(0, 128), session.State, "text", tools);
+        var clock = new BenchmarkClock();
+        using var registry = new SharedFileWatchRegistry();
+        using var ttl = new ExternalToolAvailabilityCache(clock);
+        using var watched = new ExternalToolAvailabilityCache(clock, watches: registry);
+        // JIT warm-up with both paths before comparing expiry behavior.
+        for (var i = 0; i < 100; i++)
+        {
+            input.Evaluate(() => true, ttl);
+            input.Evaluate(() => true, watched);
+        }
+        Measure("ttl_batches_2s_apart", 1_000_000, 100, () =>
+        {
+            clock.Advance();
+            input.Evaluate(() => true, ttl);
+        });
+        Measure("watched_batches_2s_apart", 1_000_000, 100, () =>
+        {
+            clock.Advance();
+            input.Evaluate(() => true, watched);
+        });
+    }
+    finally { directory.Delete(recursive: true); }
+}
+
+sealed class BenchmarkClock : TimeProvider
+{
+    private DateTimeOffset _now = DateTimeOffset.UtcNow;
+    public override DateTimeOffset GetUtcNow() => _now;
+    public void Advance() => _now += TimeSpan.FromSeconds(2);
 }
