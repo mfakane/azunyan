@@ -15,6 +15,7 @@ internal sealed class LatestUiWork<TInput, TResult> : IDisposable
         AllowSynchronousContinuations = false
     });
     private readonly CancellationTokenSource _shutdown = new();
+    private readonly object _shutdownGate = new();
     private readonly IUiDispatcher _dispatcher;
     private readonly Func<TInput> _capture;
     private readonly Func<TInput, Func<bool>, TResult> _evaluate;
@@ -85,7 +86,13 @@ internal sealed class LatestUiWork<TInput, TResult> : IDisposable
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         finally
         {
-            _shutdown.Dispose();
+            // Cancellation can resume this worker before Cancel returns on the UI
+            // thread. Do not dispose the source concurrently with that call.
+            lock (_shutdownGate)
+            {
+                Volatile.Write(ref _disposed, 1);
+                _shutdown.Dispose();
+            }
         }
     }
 
@@ -107,8 +114,12 @@ internal sealed class LatestUiWork<TInput, TResult> : IDisposable
 
     public void Dispose()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
-        _shutdown.Cancel();
-        _requests.Writer.TryComplete();
+        lock (_shutdownGate)
+        {
+            if (_disposed != 0) return;
+            Volatile.Write(ref _disposed, 1);
+            _shutdown.Cancel();
+            _requests.Writer.TryComplete();
+        }
     }
 }

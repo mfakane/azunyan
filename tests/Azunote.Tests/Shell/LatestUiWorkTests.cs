@@ -7,6 +7,28 @@ namespace Azunote.Tests.Shell;
 public sealed class LatestUiWorkTests
 {
     [Fact]
+    public async Task Rejected_dispatcher_stops_worker_and_later_requests_are_harmless()
+    {
+        var time = new ObservedTime();
+        using var worker = new LatestUiWork<int, int>(new RejectedDispatcher(),
+            () => throw new InvalidOperationException("Capture must not run"),
+            (value, _) => value, _ => Assert.True(false, "Apply must not run"),
+            exception => throw exception, time);
+        worker.Request();
+        await time.WaitForDelay();
+        time.Advance();
+        await worker.Completion.WaitAsync(TimeSpan.FromSeconds(5));
+        worker.Request();
+        worker.Dispose();
+        Assert.True(worker.Completion.IsCompletedSuccessfully);
+    }
+
+    private sealed class RejectedDispatcher : IUiDispatcher
+    {
+        public bool TryEnqueue(Action action) => false;
+    }
+
+    [Fact]
     public async Task Request_during_evaluation_invalidates_work_and_keeps_only_latest_input()
     {
         var time = new ObservedTime();
