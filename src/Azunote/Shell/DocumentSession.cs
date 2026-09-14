@@ -25,10 +25,22 @@ public sealed class DocumentSession
     {
         ArgumentNullException.ThrowIfNull(text);
         using var measurement = ShellPerformance.Measure("document.compare");
-        return string.Equals(
-            NormalizeLineEndings(text),
-            NormalizeLineEndings(_savedText),
-            StringComparison.Ordinal);
+        if (ReferenceEquals(text, _savedText)) return true;
+        if (text.IndexOf('\r') < 0) return string.Equals(text, _savedText, StringComparison.Ordinal);
+        // The saved representation is already normalized. Compare the current
+        // representation without allocating another document-sized string.
+        var savedIndex = 0;
+        for (var index = 0; index < text.Length; index++)
+        {
+            var character = text[index];
+            if (character == '\r')
+            {
+                if (index + 1 < text.Length && text[index + 1] == '\n') index++;
+                character = '\n';
+            }
+            if (savedIndex >= _savedText.Length || character != _savedText[savedIndex++]) return false;
+        }
+        return savedIndex == _savedText.Length;
     }
 
     public void ObserveText(string text)
@@ -66,7 +78,7 @@ public sealed class DocumentSession
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fullPath);
         ArgumentNullException.ThrowIfNull(currentText);
-        _savedText = currentText;
+        _savedText = NormalizeLineEndings(currentText);
         Update(new DocumentSessionState(
             FilePath: Path.GetFullPath(fullPath),
             Encoding: encoding,
@@ -119,7 +131,7 @@ public sealed class DocumentSession
 
     private void SetSavedState(string fullPath, TextFileData data, bool isReadOnly)
     {
-        _savedText = data.Text;
+        _savedText = NormalizeLineEndings(data.Text);
         Update(new DocumentSessionState(
             FilePath: Path.GetFullPath(fullPath),
             Encoding: data.Encoding,

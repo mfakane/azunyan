@@ -27,8 +27,7 @@ internal sealed class DocumentStatusPresenter
     public void Refresh(LineEndingKind? lineEnding = null)
     {
         var snapshot = _editor.Snapshot;
-        var text = snapshot.Text;
-        var selectionStart = Math.Clamp(_editor.Selection.Start, 0, text.Length);
+        var selectionStart = Math.Clamp(_editor.Selection.Start, 0, snapshot.Length);
         var lineColumn = snapshot.Lines.GetLineColumn(selectionStart);
         var state = new StatusBarState(
             $"Ln {lineColumn.Line + 1}, Col {lineColumn.Column + 1}",

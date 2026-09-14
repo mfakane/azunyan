@@ -5,6 +5,39 @@ namespace Azunote.Tests;
 
 public sealed class DocumentSessionTests
 {
+    [Theory]
+    [InlineData("a\r\nb\rc\n", "a\nb\nc\n", true)]
+    [InlineData("a\nb\nc\n", "a\r\nb\rc\n", true)]
+    [InlineData("a\r\n", "a\r", true)]
+    [InlineData("a\r\n", "a", false)]
+    [InlineData("a", "a\r\n", false)]
+    [InlineData("a\r\r\n", "a\n", false)]
+    [InlineData("", "\r", false)]
+    public void Saved_comparison_preserves_mixed_newlines_and_trailing_newlines(string saved, string current, bool same)
+    {
+        var session = new DocumentSession();
+        session.MarkSaved("test.txt", saved, TextEncodingKind.Utf8, LineEndingKind.CrLf);
+        Assert.Equal(same, session.IsSameAsSaved(current));
+        session.ObserveText(current);
+        Assert.Equal(!same, session.State.IsDirty);
+        session.ObserveText(saved);
+        Assert.False(session.State.IsDirty);
+    }
+
+    [Fact]
+    public void Comparing_large_CRLF_document_does_not_allocate_normalized_copies()
+    {
+        var saved = string.Concat(Enumerable.Repeat("line\r\n", 100_000));
+        var session = new DocumentSession();
+        session.MarkSaved("large.txt", saved, TextEncodingKind.Utf8, LineEndingKind.CrLf);
+        session.IsSameAsSaved(saved); // warm up diagnostics
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        var same = session.IsSameAsSaved(saved);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        Assert.True(same);
+        Assert.True(allocated < 1024, $"Allocated {allocated} bytes comparing saved text");
+    }
+
     [Fact]
     public void Untitled_text_is_dirty_only_when_it_differs_from_empty_saved_text()
     {
