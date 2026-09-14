@@ -709,12 +709,39 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         out DocumentAnchor anchor,
         out string? foldId,
         out string? adornmentId,
-        out TextBlockPosition blockPosition)
+        out TextBlockPosition blockPosition) => TryHitTest(
+            x,
+            y,
+            contentLeft,
+            contentTop,
+            horizontalOffset,
+            verticalOffset,
+            characterWidth,
+            out anchor,
+            out foldId,
+            out adornmentId,
+            out blockPosition,
+            out _);
+
+    public bool TryHitTest(
+        double x,
+        double y,
+        double contentLeft,
+        double contentTop,
+        double horizontalOffset,
+        double verticalOffset,
+        double characterWidth,
+        out DocumentAnchor anchor,
+        out string? foldId,
+        out string? adornmentId,
+        out TextBlockPosition blockPosition,
+        out int? textPosition)
     {
         anchor = DocumentAnchor.Before(0);
         foldId = null;
         adornmentId = null;
         blockPosition = new TextBlockPosition(0, 0);
+        textPosition = null;
         if (_cachedLayout is not { } layout
             || !double.IsFinite(x)
             || !double.IsFinite(y)
@@ -767,6 +794,39 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             ?.GetDocumentAnchorAtCaretStop(localColumn)
             ?? textLine.GetAnchor(visualColumn);
 
+        if (GetTextElementStartAtPoint(
+                row,
+                xInTextPixels,
+                characterWidth)
+            is int hitLocalColumn)
+        {
+            var hitVisualColumn = row.TextStartColumn + hitLocalColumn;
+            var hitColumn = 0;
+            foreach (var inline in textLine.Inlines)
+            {
+                switch (inline)
+                {
+                    case FoldPlaceholder fold:
+                        hitColumn += fold.DisplayText.Length;
+                        break;
+                    case ProjectedText text:
+                        if (hitVisualColumn >= hitColumn
+                            && hitVisualColumn < hitColumn + text.Source.Length)
+                        {
+                            textPosition = text.Source.Start
+                                + hitVisualColumn
+                                - hitColumn;
+                        }
+
+                        hitColumn += text.Source.Length;
+                        break;
+                    case InlineAdornment adornment:
+                        hitColumn += adornment.Content.Text.Length;
+                        break;
+                }
+            }
+        }
+
         var column = 0;
         foreach (var inline in textLine.Inlines)
         {
@@ -801,6 +861,43 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         }
 
         return true;
+    }
+
+    private int? GetTextElementStartAtPoint(
+        VisualRow row,
+        double x,
+        double characterWidth)
+    {
+        if (!double.IsFinite(x) || x < 0)
+        {
+            return null;
+        }
+
+        if (GetTextLayoutForGlobalRow(row) is { } textLayout)
+        {
+            var stops = textLayout.GetGraphemeCaretStops();
+            for (var index = 0; index + 1 < stops.Count; index++)
+            {
+                var start = textLayout.GetCaretPosition(stops[index]).X;
+                var end = textLayout.GetCaretPosition(stops[index + 1]).X;
+                if (x >= start && x < end)
+                {
+                    return stops[index];
+                }
+            }
+
+            return null;
+        }
+
+        if (x >= row.TextLength * characterWidth)
+        {
+            return null;
+        }
+
+        return Math.Clamp(
+            (int)Math.Floor(x / characterWidth),
+            0,
+            Math.Max(0, row.TextLength - 1));
     }
 
     internal bool TryGetFoldIdAtBodyPoint(

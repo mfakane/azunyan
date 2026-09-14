@@ -3000,22 +3000,47 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 out _,
                 out var foldId,
                 out _,
-                out _)
-            || (foldId is null
-                && !_defaultRenderer.TextRenderer.TryGetFoldIdAtBodyPoint(
-                    point.X,
-                    point.Y,
-                    InputWindow.NativeTextBoxControl.Padding.Left,
-                    InputWindow.NativeTextBoxControl.Padding.Top,
-                    GetHorizontalOffset(),
-                    GetVerticalOffset(),
-                    _characterWidth,
-                    out foldId)))
+                out _,
+                out var textPosition))
         {
             return;
         }
 
-        ToggleFold(foldId!);
+        if (foldId is null
+            && _defaultRenderer.TextRenderer.TryGetFoldIdAtBodyPoint(
+                point.X,
+                point.Y,
+                InputWindow.NativeTextBoxControl.Padding.Left,
+                InputWindow.NativeTextBoxControl.Padding.Top,
+                GetHorizontalOffset(),
+                GetVerticalOffset(),
+                _characterWidth,
+                out var bodyFoldId))
+        {
+            foldId = bodyFoldId;
+        }
+
+        if (foldId is not null)
+        {
+            ToggleFold(foldId);
+            args.Handled = true;
+            return;
+        }
+
+        if (textPosition is not int position)
+        {
+            return;
+        }
+
+        var wordRange = UnicodeText.GetWordRange(Snapshot.Text, position);
+        if (wordRange.IsEmpty)
+        {
+            args.Handled = true;
+            return;
+        }
+
+        StopPointerSelection();
+        SetDocumentSelection(new TextSelection(wordRange.Start, wordRange.End));
         args.Handled = true;
     }
 

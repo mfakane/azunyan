@@ -207,6 +207,42 @@ public static class UnicodeText
         return position;
     }
 
+    public static TextRange GetWordRange(string text, int position)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        ValidatePosition(text, position, allowEnd: false);
+
+        var element = GetTextElementRange(text, position);
+        if (char.IsWhiteSpace(text[element.Start]))
+        {
+            return TextRange.Empty(element.Start);
+        }
+
+        var word = IsWordCharacter(text, element.Start);
+        var start = element.Start;
+        while (start > 0)
+        {
+            var previous = GetPreviousTextElementPosition(text, start);
+            if (char.IsWhiteSpace(text[previous])
+                || IsWordCharacter(text, previous) != word)
+            {
+                break;
+            }
+
+            start = previous;
+        }
+
+        var end = element.End;
+        while (end < text.Length
+            && !char.IsWhiteSpace(text[end])
+            && IsWordCharacter(text, end) == word)
+        {
+            end = GetNextTextElementPosition(text, end);
+        }
+
+        return TextRange.FromBounds(start, end);
+    }
+
     public static TextRange GetBackwardDeleteRange(string text, int position)
     {
         ArgumentNullException.ThrowIfNull(text);

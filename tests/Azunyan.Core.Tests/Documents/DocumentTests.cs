@@ -209,6 +209,18 @@ public sealed class DocumentTests
     }
 
     [Fact]
+    public void Word_range_uses_unicode_text_elements_and_skips_whitespace()
+    {
+        const string text = "one 日本語 é +++ two";
+
+        Assert.Equal(new TextRange(0, 3), UnicodeText.GetWordRange(text, 1));
+        Assert.Equal(new TextRange(4, 3), UnicodeText.GetWordRange(text, 5));
+        Assert.Equal(new TextRange(8, 2), UnicodeText.GetWordRange(text, 9));
+        Assert.Equal(new TextRange(11, 3), UnicodeText.GetWordRange(text, 12));
+        Assert.Equal(TextRange.Empty(3), UnicodeText.GetWordRange(text, 3));
+    }
+
+    [Fact]
     public void Newline_auto_indent_carries_leading_spaces_and_preserves_line_ending()
     {
         var document = new Document("  first\r\nsecond");
