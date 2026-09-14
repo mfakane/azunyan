@@ -223,6 +223,7 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         if (_isWindowActive)
         {
             _application.WindowActivated(this);
+            _runtime.RefreshExternalToolsMenu();
         }
     }
 

@@ -684,7 +684,7 @@ public sealed partial class MainWindow
             accelerator.Invoked += (sender, args) =>
             {
                 var tool = candidates.FirstOrDefault(
-                    candidate => getState(candidate).IsEnabled);
+                    candidate => _runtime.GetExternalToolMenuState(candidate).IsEnabled);
                 if (tool is null)
                 {
                     return;

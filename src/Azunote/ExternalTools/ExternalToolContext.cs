@@ -119,7 +119,7 @@ public sealed partial record ExternalToolContext
             ? null
             : ExecutionFilePath;
 
-    public string? ToolDirectory { get; }
+    public string? ToolDirectory { get; internal init; }
 
     public string? WorkspaceFolder { get; }
 

@@ -12,7 +12,10 @@ public static class ExternalToolAvailability
 {
     public static ExternalToolMenuState Evaluate(
         ExternalToolSettings settings,
-        ExternalToolContext context)
+        ExternalToolContext context) => Evaluate(settings, context, definition: null);
+
+    internal static ExternalToolMenuState Evaluate(
+        ExternalToolSettings settings, ExternalToolContext context, ExternalToolDefinition? definition)
     {
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(context);
@@ -27,7 +30,7 @@ public static class ExternalToolAvailability
                 : new ExternalToolMenuState(false, false, conditionFailure);
         }
 
-        var definition = settings.ToDefinition();
+        definition ??= settings.ToDefinition();
         ExternalToolContext invocationContext;
         try
         {

@@ -18,6 +18,10 @@ internal sealed class SettingsWorkflow : IDisposable
     private IReadOnlyList<ExternalToolMenuNode> _externalToolMenu = [];
     private IFileChangeMonitor? _settingsMonitor;
     private bool _disposed;
+    private readonly Action? _requestToolRefresh;
+    internal IReadOnlyList<ExternalToolMenuNode> ExternalToolMenu => _externalToolMenu;
+    internal IReadOnlyDictionary<ExternalToolSettings, PreparedExternalTool> PreparedTools { get; private set; }
+        = new Dictionary<ExternalToolSettings, PreparedExternalTool>();
 
     public SettingsWorkflow(
         SettingsController settings,
@@ -32,7 +36,8 @@ internal sealed class SettingsWorkflow : IDisposable
         Func<ExternalToolSettings, ExternalToolMenuState>? getToolState = null,
         Func<string, Task>? editDefinition = null,
         Func<string, Task>? showDefinitionInExplorer = null,
-        Action<AzunoteSettings>? applySettings = null)
+        Action<AzunoteSettings>? applySettings = null,
+        Action? requestToolRefresh = null)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _languageModes = languageModes ?? throw new ArgumentNullException(nameof(languageModes));
@@ -47,6 +52,7 @@ internal sealed class SettingsWorkflow : IDisposable
         _editDefinition = editDefinition ?? (_ => Task.CompletedTask);
         _showDefinitionInExplorer = showDefinitionInExplorer ?? (_ => Task.CompletedTask);
         _applySettings = applySettings ?? (_ => { });
+        _requestToolRefresh = requestToolRefresh;
     }
 
     public AzunoteSettings Current => _settings.Current;
@@ -89,13 +95,23 @@ internal sealed class SettingsWorkflow : IDisposable
         StopWatcher();
     }
 
-    public void RefreshExternalToolsMenu() => RenderExternalTools();
+    public void RefreshExternalToolsMenu()
+    {
+        if (_requestToolRefresh is { } request) request();
+        else RenderExternalTools();
+    }
+
+    internal void ApplyExternalToolStates(IReadOnlyDictionary<ExternalToolSettings, ExternalToolMenuState> states) =>
+        _externalToolsMenu.Render(_externalToolMenu, tool => states[tool],
+            _runConfiguredTool, _editDefinition, _showDefinitionInExplorer);
 
     private async Task<bool> ReloadAsync(bool showError)
     {
         try
         {
             var settings = await _settings.LoadAsync();
+            var preparedTools = ExternalToolMenuBuilder.EnumerateTools(settings.ExternalToolMenu).Distinct()
+                .ToDictionary(tool => tool, tool => new PreparedExternalTool(tool));
             _applySettings(settings);
             _languageModes.Initialize(settings.CustomSyntaxModes);
             if (!_languageModes.IsManuallySelected
@@ -105,7 +121,8 @@ internal sealed class SettingsWorkflow : IDisposable
             }
 
             _externalToolMenu = settings.ExternalToolMenu;
-            RenderExternalTools();
+            PreparedTools = preparedTools;
+            RefreshExternalToolsMenu();
 
             return true;
         }

@@ -13,6 +13,7 @@ internal sealed class MainWindowRuntime : IDisposable
     private readonly LanguageModeController _languageModes;
     private readonly DocumentWorkflow _documents;
     private readonly SettingsWorkflow _settings;
+    private readonly LatestUiWork<ExternalToolEvaluationInput, Dictionary<ExternalToolSettings, ExternalToolMenuState>> _toolUpdates;
     private readonly EditorCommandController _editorCommands;
     private readonly FindReplaceController _findReplace;
     private readonly GoToLineController _goToLine;
@@ -105,7 +106,14 @@ internal sealed class MainWindowRuntime : IDisposable
             GetExternalToolMenuState,
             OpenDefinitionAsync,
             ShowFileInExplorerAsync,
-            ApplySettings);
+            ApplySettings,
+            RefreshExternalToolsMenu);
+        _toolUpdates = new(_dispatcher,
+            () => new(_view.Snapshot, _view.Selection, _session.State,
+                _languageModes.CurrentModeId, _settings.PreparedTools),
+            (input, isCurrent) => input.Evaluate(isCurrent),
+            states => _settings.ApplyExternalToolStates(states),
+            exception => ErrorReporter.LogException("External tool availability", exception));
         _editorCommands = new EditorCommandController(_view, _viewModel);
         _viewModel.TabDisplaySize = _view.TabDisplaySize;
         _viewModel.IndentSize = _view.IndentSize;
@@ -390,7 +398,7 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public void RefreshStatus() => _status.Refresh();
 
-    public void RefreshExternalToolsMenu() => _settings.RefreshExternalToolsMenu();
+    public void RefreshExternalToolsMenu() => _toolUpdates?.Request();
 
     public void OpenDroppedFile(string path) => _documents.OpenDroppedFile(path);
 
@@ -412,6 +420,7 @@ internal sealed class MainWindowRuntime : IDisposable
         }
 
         _disposed = true;
+        _toolUpdates.Dispose();
         _session.StateChanged -= Session_StateChanged;
         _languageModes.Changed -= LanguageModes_Changed;
         _documents.Changed -= Documents_Changed;
@@ -505,7 +514,7 @@ internal sealed class MainWindowRuntime : IDisposable
         RefreshDocumentView();
     }
 
-    private ExternalToolMenuState GetExternalToolMenuState(ExternalToolSettings tool)
+    internal ExternalToolMenuState GetExternalToolMenuState(ExternalToolSettings tool)
     {
         var context = CreateExternalToolContext(tool.DefinitionDirectory);
         var state = ExternalToolAvailability.Evaluate(tool, context);
