@@ -24,6 +24,49 @@ public sealed class AzunoteUiTests : IDisposable
     }
 
     [AzunoteUiFact]
+    public void Tool_menu_tracks_selection_without_recreating_the_menu_item()
+    {
+        // A unique definition in the test executable's portable data directory;
+        // never edit the user's global settings or an existing tool definition.
+        var tools = Path.Combine(Path.GetDirectoryName(AzunoteUiFixture.ResolveExecutablePath())!, "appdata", "tools");
+        Directory.CreateDirectory(tools);
+        var name = "Selection test " + Guid.NewGuid().ToString("N");
+        var definition = Path.Combine(tools, name + ".tool.toml");
+        File.WriteAllText(definition, $"""
+            name = "{name}"
+            visibility = "always"
+            [when]
+            selection = "nonEmpty"
+            [launch]
+            cmd = "echo unused"
+            """);
+        try
+        {
+            var window = _fixture.Window;
+            var text = AzunoteUiFixture.WaitForTextPattern(_fixture.Editor);
+            AzunoteUiFixture.OpenMenu(window, "Tools");
+            var item = AzunoteUiFixture.WaitForElement(window, AutomationElement.NameProperty, name);
+            Assert.False(item.Current.IsEnabled);
+            var identity = item.GetRuntimeId();
+            var selection = text.DocumentRange.FindText("日本語", false, false)!;
+            selection.Select();
+            AzunoteUiFixture.WaitFor(() => item.Current.IsEnabled ? item : null,
+                "Selection did not enable the tool.");
+            Assert.Equal(identity, item.GetRuntimeId());
+            selection.MoveEndpointByRange(TextPatternRangeEndpoint.End, selection, TextPatternRangeEndpoint.Start);
+            selection.Select();
+            AzunoteUiFixture.WaitFor(() => !item.Current.IsEnabled ? item : null,
+                "Clearing selection did not disable the tool.");
+            Assert.Equal(identity, item.GetRuntimeId());
+        }
+        finally
+        {
+            _fixture.Dispose();
+            File.Delete(definition);
+        }
+    }
+
+    [AzunoteUiFact]
     public void Help_opens_read_only_documents_with_selectable_text_and_readonly_titles()
     {
         var source = _fixture.Window;
@@ -878,7 +921,7 @@ public sealed class AzunoteUiFixture : IDisposable
             $"UI Automation element {element.Current.Name} is not invokable.");
     }
 
-    private static string ResolveExecutablePath()
+    internal static string ResolveExecutablePath()
     {
         var configured = Environment.GetEnvironmentVariable(ExecutableVariable);
         if (!string.IsNullOrWhiteSpace(configured))

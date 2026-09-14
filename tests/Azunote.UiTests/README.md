@@ -21,6 +21,12 @@ If the executable is in a non-default location, set `AZUNOTE_EXE` to its full pa
 Each test starts its own process and closes it when the test finishes, so document,
 window, and menu state cannot leak into subsequent tests.
 
+The external-tool selection test creates a uniquely named definition in the executable's
+portable `appdata/tools` directory and removes that definition afterwards. Use a writable
+test build directory. It verifies disabled/enabled/disabled transitions while a menu is
+open and checks that the UI Automation runtime ID of the item does not change. No external
+command is executed. To exercise the Native AOT build, set `AZUNOTE_EXE` to its executable.
+
 The current tests verify that the projected editor exposes TextPattern and a read/write
 ValuePattern, reports geometry for empty caret ranges, keeps ranges bound to the snapshot
 from which they were created, and does not expose the native IME input window as a
