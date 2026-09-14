@@ -25,6 +25,11 @@ internal static class ExternalToolEnvironmentResolver
             values[environmentVariable.Key] = environmentVariable.Value;
         }
 
+        if (definition.Environment.Count == 0)
+        {
+            return new ExternalToolEnvironmentSnapshot(values, dotenvValues);
+        }
+
         var baseValues = new Dictionary<string, string>(values, StringComparer.OrdinalIgnoreCase);
         var configuredValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var environmentVariable in definition.Environment)

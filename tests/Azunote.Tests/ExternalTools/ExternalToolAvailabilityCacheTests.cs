@@ -6,6 +6,33 @@ namespace Azunote.Tests;
 public sealed class ExternalToolAvailabilityCacheTests
 {
     [Fact]
+    public void Workspace_and_nearest_dotenv_are_rediscovered_after_parent_or_child_changes()
+    {
+        var directory = Directory.CreateTempSubdirectory("azunote-workspace-cache-");
+        try
+        {
+            var child = Directory.CreateDirectory(Path.Combine(directory.FullName, "child"));
+            var file = Path.Combine(child.FullName, "test.txt");
+            File.WriteAllText(Path.Combine(directory.FullName, ".env"), "VALUE=parent");
+            var time = new FakeTimeProvider();
+            using var cache = new ExternalToolAvailabilityCache(time);
+            Assert.Equal("parent", cache.DotEnv(child.FullName)["VALUE"]);
+            Assert.Null(cache.Workspace(file, "marker.txt"));
+            File.WriteAllText(Path.Combine(child.FullName, ".env"), "VALUE=child");
+            File.WriteAllText(Path.Combine(directory.FullName, "marker.txt"), "");
+            time.Advance(TimeSpan.FromSeconds(1));
+            Assert.Equal("child", cache.DotEnv(child.FullName)["VALUE"]);
+            Assert.Equal(directory.FullName, cache.Workspace(file, "marker.txt"));
+            File.Delete(Path.Combine(child.FullName, ".env"));
+            File.Delete(Path.Combine(directory.FullName, "marker.txt"));
+            time.Advance(TimeSpan.FromSeconds(1));
+            Assert.Equal("parent", cache.DotEnv(child.FullName)["VALUE"]);
+            Assert.Null(cache.Workspace(file, "marker.txt"));
+        }
+        finally { directory.Delete(recursive: true); }
+    }
+
+    [Fact]
     public void Dotenv_creation_edit_and_deletion_are_seen_after_expiration()
     {
         var directory = Directory.CreateTempSubdirectory("azunote-cache-");

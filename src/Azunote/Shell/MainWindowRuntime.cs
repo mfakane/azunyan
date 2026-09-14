@@ -524,6 +524,10 @@ internal sealed class MainWindowRuntime : IDisposable
 
     internal ExternalToolMenuState GetExternalToolMenuState(ExternalToolSettings tool)
     {
+        if (!_settings.PreparedTools.ContainsKey(tool))
+        {
+            return new(false, false, "The tool definition has changed. Please reopen the menu.");
+        }
         var context = CreateExternalToolContext(tool.DefinitionDirectory);
         var state = ExternalToolAvailability.Evaluate(tool, context);
         return _session.State.IsReadOnly

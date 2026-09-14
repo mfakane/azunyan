@@ -7,6 +7,41 @@ namespace Azunote.Tests.Shell;
 public sealed class LatestUiWorkTests
 {
     [Fact]
+    public async Task Request_during_evaluation_invalidates_work_and_keeps_only_latest_input()
+    {
+        var time = new ObservedTime();
+        var dispatcher = new QueuedDispatcher();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var release = new ManualResetEventSlim();
+        var input = 1;
+        var applied = new List<int>();
+        using var worker = new LatestUiWork<int, int>(dispatcher, () => input,
+            (value, isCurrent) =>
+            {
+                if (value == 1)
+                {
+                    started.SetResult();
+                    Assert.True(release.Wait(TimeSpan.FromSeconds(5)));
+                    Assert.False(isCurrent());
+                }
+                return value;
+            }, applied.Add, exception => throw exception, time);
+        worker.Request();
+        await time.WaitForDelay();
+        time.Advance();
+        await dispatcher.RunNext();
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        input = 2;
+        worker.Request();
+        release.Set();
+        await time.WaitForDelay();
+        time.Advance();
+        await dispatcher.RunNext();
+        await dispatcher.RunNext();
+        Assert.Equal(new[] { 2 }, applied);
+    }
+
+    [Fact]
     public async Task Burst_captures_latest_input_once_and_applies_on_dispatcher()
     {
         var time = new ObservedTime();

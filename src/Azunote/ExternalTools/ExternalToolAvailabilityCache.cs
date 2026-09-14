@@ -45,10 +45,14 @@ internal sealed class ExternalToolAvailabilityCache : IDisposable
         Get(("workspace", path, pattern, Environment.CurrentDirectory),
             () => WorkspaceFolderResolver.FindForFile(path, pattern));
 
-    public ExternalToolLaunchPlan? Launch(string command, ExternalToolCommandMode mode, string? directory) =>
-        Get(("launch", command, mode, directory, Environment.CurrentDirectory,
+    public ExternalToolLaunchPlan? Launch(string command, ExternalToolCommandMode mode, string? directory)
+    {
+        // Expanded commands can contain document/selection text. Do not retain large payloads as keys.
+        if (command.Length > 4096) return ExternalToolLaunchResolver.Resolve(command, mode, directory);
+        return Get(("launch", command, mode, directory, Environment.CurrentDirectory,
                 Environment.GetEnvironmentVariable("PATH"), Environment.GetEnvironmentVariable("PATHEXT")),
             () => ExternalToolLaunchResolver.Resolve(command, mode, directory));
+    }
 
     public void Dispose() => _cache.Dispose();
 

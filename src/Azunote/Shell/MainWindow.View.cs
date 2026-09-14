@@ -568,6 +568,11 @@ public sealed partial class MainWindow
             && states.All(pair => _renderedToolStates.TryGetValue(pair.Key, out var old)
                 && old.IsVisible == pair.Value.IsVisible))
         {
+            if (states.Any(pair => _renderedToolStates[pair.Key] != pair.Value))
+            {
+                _viewModel.SetExternalToolItems(nodes, tool => states[tool],
+                    onSelected, onEditDefinition, onShowInExplorer);
+            }
             foreach (var (tool, controls) in _toolControls)
             {
                 if (_renderedToolStates[tool] == states[tool]) continue;
@@ -602,7 +607,7 @@ public sealed partial class MainWindow
         _editor.SetAdditionalContextMenuItems(contextMenuItems);
         _externalToolContextMenuItems.AddRange(contextMenuItems);
 
-        RegisterExternalToolAccelerators(nodes, getState, onSelected);
+        RegisterExternalToolAccelerators(nodes, onSelected);
     }
 
     private void DisposeView()
@@ -651,7 +656,6 @@ public sealed partial class MainWindow
 
     private void RegisterExternalToolAccelerators(
         IReadOnlyList<ExternalToolMenuNode> nodes,
-        Func<ExternalToolSettings, ExternalToolMenuState> getState,
         Func<ExternalToolSettings, Task> onSelected)
     {
         var candidatesByShortcut = new Dictionary<
