@@ -14,7 +14,7 @@ internal sealed class MainWindowRuntime : IDisposable
     private readonly DocumentWorkflow _documents;
     private readonly SettingsWorkflow _settings;
     private readonly LatestUiWork<ExternalToolEvaluationInput, Dictionary<ExternalToolSettings, ExternalToolMenuState>> _toolUpdates;
-    private readonly ExternalToolAvailabilityCache _toolCache = new();
+    private readonly ExternalToolAvailabilityCache _toolCache;
     private readonly EditorCommandController _editorCommands;
     private readonly FindReplaceController _findReplace;
     private readonly GoToLineController _goToLine;
@@ -109,6 +109,7 @@ internal sealed class MainWindowRuntime : IDisposable
             ShowFileInExplorerAsync,
             ApplySettings,
             RefreshExternalToolsMenu);
+        _toolCache = new(watches: SharedFileWatchRegistry.Shared, invalidated: RefreshExternalToolsMenu);
         _toolUpdates = new(_dispatcher,
             () => new(_view.Snapshot, _view.Selection, _session.State,
                 _languageModes.CurrentModeId, _settings.PreparedTools),

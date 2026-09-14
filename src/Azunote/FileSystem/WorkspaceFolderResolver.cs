@@ -14,7 +14,9 @@ internal static class WorkspaceFolderResolver
 
     public static string? FindForFile(
         string? filePath,
-        string? patternExpression = null)
+        string? patternExpression = null) => FindForFile(filePath, patternExpression, null);
+
+    internal static string? FindForFile(string? filePath, string? patternExpression, Action<string>? observeDirectory)
     {
         using var measurement = ShellPerformance.Measure("workspace.search");
         if (string.IsNullOrWhiteSpace(filePath))
@@ -36,6 +38,7 @@ internal static class WorkspaceFolderResolver
              !string.IsNullOrWhiteSpace(current);
              current = GetParentDirectory(current))
         {
+            observeDirectory?.Invoke(current);
             if (matcher is not null
                 ? HasMatchingFile(matcher, current)
                 : IsDefaultWorkspaceFolder(current))

@@ -73,10 +73,12 @@ internal static class DotEnvFileLoader
         encoderShouldEmitUTF8Identifier: false,
         throwOnInvalidBytes: true);
 
-    public static IReadOnlyDictionary<string, string> Load(string? documentDirectory)
+    public static IReadOnlyDictionary<string, string> Load(string? documentDirectory) => Load(documentDirectory, null);
+
+    internal static IReadOnlyDictionary<string, string> Load(string? documentDirectory, Action<string>? observeDirectory)
     {
         using var measurement = ShellPerformance.Measure("dotenv.search");
-        var path = FindNearestFile(documentDirectory);
+        var path = FindNearestFile(documentDirectory, observeDirectory);
         if (path is null)
         {
             return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -198,12 +200,13 @@ internal static class DotEnvFileLoader
             char.IsLetterOrDigit(character) || character == '_');
     }
 
-    private static string? FindNearestFile(string? documentDirectory)
+    private static string? FindNearestFile(string? documentDirectory, Action<string>? observeDirectory)
     {
         for (var current = documentDirectory;
              !string.IsNullOrWhiteSpace(current);
              current = GetParentDirectory(current))
         {
+            observeDirectory?.Invoke(Path.GetFullPath(current));
             var path = Path.Combine(current, DotEnvFileName);
             if (File.Exists(path))
             {

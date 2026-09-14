@@ -8,11 +8,20 @@ internal sealed class ExternalToolAvailabilityCache : IDisposable
 {
     private readonly MemoryCache _cache;
     private readonly TimeSpan _lifetime;
+    private readonly TimeSpan _watchedLifetime;
+    private readonly SharedFileWatchRegistry? _watches;
+    private readonly Action? _invalidated;
+    private readonly object _dependenciesGate = new();
+    private readonly HashSet<FileWatchDependencies> _dependencies = [];
     private sealed record Cached<T>(T Value);
 
-    public ExternalToolAvailabilityCache(TimeProvider? time = null, TimeSpan? lifetime = null)
+    public ExternalToolAvailabilityCache(TimeProvider? time = null, TimeSpan? lifetime = null,
+        SharedFileWatchRegistry? watches = null, Action? invalidated = null, TimeSpan? watchedLifetime = null)
     {
         _lifetime = lifetime ?? TimeSpan.FromSeconds(1);
+        _watchedLifetime = watchedLifetime ?? TimeSpan.FromMinutes(5);
+        _watches = watches;
+        _invalidated = invalidated;
 #pragma warning disable CS0618 // MemoryCache's clock abstraction has not yet migrated to TimeProvider.
         _cache = new MemoryCache(new MemoryCacheOptions
         {
@@ -39,11 +48,42 @@ internal sealed class ExternalToolAvailabilityCache : IDisposable
         Get("process-environment", ExternalToolEnvironmentResolver.LoadProcessEnvironment);
 
     public IReadOnlyDictionary<string, string> DotEnv(string? directory) =>
-        Get(("dotenv", directory), () => DotEnvFileLoader.Load(directory));
+        GetWatched(("dotenv", directory), observe => DotEnvFileLoader.Load(directory, observe), [".env"]);
 
     public string? Workspace(string? path, string? pattern) =>
-        Get(("workspace", path, pattern, Environment.CurrentDirectory),
-            () => WorkspaceFolderResolver.FindForFile(path, pattern));
+        pattern is not null
+            ? Get(("workspace", path, pattern, Environment.CurrentDirectory),
+                () => WorkspaceFolderResolver.FindForFile(path, pattern))
+            : GetWatched(("workspace", path, pattern, Environment.CurrentDirectory),
+                observe => WorkspaceFolderResolver.FindForFile(path, null, observe), [".git", ".editorconfig"]);
+
+    private T GetWatched<T>(object key, Func<Action<string>?, T> factory, string[] names)
+    {
+        if (_cache.TryGetValue(key, out Cached<T>? cached)) return cached!.Value;
+        if (_watches is null) return Get(key, () => factory(null));
+        var dependencies = new FileWatchDependencies(_watches, _invalidated, Released);
+        lock (_dependenciesGate) _dependencies.Add(dependencies);
+        try
+        {
+            // Each resolver registers dependencies BEFORE probing that directory.
+            // A concurrent change expires the token even if insertion happens later.
+            var value = factory(directory => dependencies.ObserveDirectory(directory, names));
+            var options = new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = dependencies.FullyMonitored ? _watchedLifetime : _lifetime,
+                Size = 1
+            };
+            dependencies.Attach(options);
+            _cache.Set(key, new Cached<T>(value), options);
+            return value;
+        }
+        catch { dependencies.Dispose(); throw; }
+    }
+
+    private void Released(FileWatchDependencies dependencies)
+    {
+        lock (_dependenciesGate) _dependencies.Remove(dependencies);
+    }
 
     public ExternalToolLaunchPlan? Launch(string command, ExternalToolCommandMode mode, string? directory)
     {
@@ -54,7 +94,14 @@ internal sealed class ExternalToolAvailabilityCache : IDisposable
             () => ExternalToolLaunchResolver.Resolve(command, mode, directory));
     }
 
-    public void Dispose() => _cache.Dispose();
+    public void Dispose()
+    {
+        _cache.Dispose();
+        // MemoryCache.Dispose does not run eviction callbacks for all remaining entries.
+        FileWatchDependencies[] dependencies;
+        lock (_dependenciesGate) dependencies = _dependencies.ToArray();
+        foreach (var dependency in dependencies) dependency.Dispose();
+    }
 
 #pragma warning disable CS0618
     private sealed class CacheClock(TimeProvider time) : ISystemClock
