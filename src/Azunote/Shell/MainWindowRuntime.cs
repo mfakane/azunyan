@@ -377,6 +377,7 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public void ObserveTextChanged()
     {
+        using var measurement = ShellPerformance.Measure("text.changed");
         _documents.ObserveTextChanged();
         RefreshDocumentView();
     }

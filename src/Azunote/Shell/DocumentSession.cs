@@ -24,6 +24,7 @@ public sealed class DocumentSession
     public bool IsSameAsSaved(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
+        using var measurement = ShellPerformance.Measure("document.compare");
         return string.Equals(
             NormalizeLineEndings(text),
             NormalizeLineEndings(_savedText),

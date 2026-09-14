@@ -16,6 +16,7 @@ public static class ExternalToolAvailability
     {
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(context);
+        using var measurement = ShellPerformance.Measure("tools.evaluate");
 
         var conditionFailure = CheckConditions(settings.When ?? new(), context);
         var visibility = ParseVisibility(settings.Visibility);

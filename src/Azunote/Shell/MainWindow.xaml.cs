@@ -237,6 +237,7 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
 
     private void Editor_SelectionChanged(object sender, RoutedEventArgs e)
     {
+        using var measurement = ShellPerformance.Measure("selection.changed");
         _runtime.RefreshStatus();
         _runtime.RefreshExternalToolsMenu();
     }

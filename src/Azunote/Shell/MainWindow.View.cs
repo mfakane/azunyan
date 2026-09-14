@@ -557,6 +557,7 @@ public sealed partial class MainWindow
         ArgumentNullException.ThrowIfNull(onSelected);
         ArgumentNullException.ThrowIfNull(onEditDefinition);
         ArgumentNullException.ThrowIfNull(onShowInExplorer);
+        using var measurement = ShellPerformance.Measure("tools.render");
         ClearExternalToolAccelerators();
         ClearExternalToolMenuItems();
         ClearExternalToolContextMenuItems();

@@ -43,6 +43,7 @@ internal static class ExternalToolEnvironmentResolver
 
     private static Dictionary<string, string> LoadProcessEnvironment()
     {
+        using var measurement = ShellPerformance.Measure("environment.read");
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (System.Collections.DictionaryEntry environmentVariable in
                  Environment.GetEnvironmentVariables())
@@ -66,6 +67,7 @@ internal static class DotEnvFileLoader
 
     public static IReadOnlyDictionary<string, string> Load(string? documentDirectory)
     {
+        using var measurement = ShellPerformance.Measure("dotenv.search");
         var path = FindNearestFile(documentDirectory);
         if (path is null)
         {

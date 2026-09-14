@@ -104,6 +104,7 @@ internal static class ExternalToolLaunchResolver
         string? definitionDirectory)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(command);
+        using var measurement = ShellPerformance.Measure("command.search");
 
         if (commandMode == ExternalToolCommandMode.Cmd)
         {
