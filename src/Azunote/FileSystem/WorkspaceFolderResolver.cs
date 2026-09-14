@@ -16,7 +16,8 @@ internal static class WorkspaceFolderResolver
         string? filePath,
         string? patternExpression = null) => FindForFile(filePath, patternExpression, null);
 
-    internal static string? FindForFile(string? filePath, string? patternExpression, Action<string>? observeDirectory)
+    internal static string? FindForFile(string? filePath, string? patternExpression, Action<string>? observeDirectory,
+        Action? readFailed = null)
     {
         using var measurement = ShellPerformance.Measure("workspace.search");
         if (string.IsNullOrWhiteSpace(filePath))
@@ -41,7 +42,7 @@ internal static class WorkspaceFolderResolver
             observeDirectory?.Invoke(current);
             if (matcher is not null
                 ? HasMatchingFile(matcher, current)
-                : IsDefaultWorkspaceFolder(current))
+                : IsDefaultWorkspaceFolder(current, readFailed))
             {
                 return current;
             }
@@ -50,10 +51,10 @@ internal static class WorkspaceFolderResolver
         return null;
     }
 
-    private static bool IsDefaultWorkspaceFolder(string directory) =>
+    private static bool IsDefaultWorkspaceFolder(string directory, Action? readFailed) =>
         Directory.Exists(Path.Combine(directory, GitDirectoryName))
             || File.Exists(Path.Combine(directory, GitDirectoryName))
-            || IsRootEditorConfig(Path.Combine(directory, EditorConfigFileName));
+            || IsRootEditorConfig(Path.Combine(directory, EditorConfigFileName), readFailed);
 
     private static Matcher? CreateMatcher(string patternExpression)
     {
@@ -96,7 +97,7 @@ internal static class WorkspaceFolderResolver
         }
     }
 
-    private static bool IsRootEditorConfig(string path)
+    private static bool IsRootEditorConfig(string path, Action? readFailed)
     {
         if (!File.Exists(path))
         {
@@ -153,6 +154,7 @@ internal static class WorkspaceFolderResolver
                 or DecoderFallbackException
                 or ArgumentException)
         {
+            readFailed?.Invoke();
             // Workspace discovery is advisory. An unreadable configuration
             // file must not prevent external tools from running.
         }

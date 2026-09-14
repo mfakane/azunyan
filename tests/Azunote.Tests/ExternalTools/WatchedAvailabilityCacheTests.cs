@@ -6,6 +6,41 @@ namespace Azunote.Tests;
 public sealed class WatchedAvailabilityCacheTests
 {
     [Fact]
+    public void Locked_editorconfig_does_not_hide_nearer_workspace_for_the_long_TTL()
+    {
+        using var workspace = new Workspace();
+        Directory.CreateDirectory(Path.Combine(workspace.Root, ".git"));
+        var path = Path.Combine(workspace.Child, ".editorconfig");
+        File.WriteAllText(path, "root = true");
+        var native = new FakeDirectoryWatches();
+        var time = new FakeTimeProvider();
+        using var registry = new SharedFileWatchRegistry(native.Create, time);
+        using var cache = new ExternalToolAvailabilityCache(time, watches: registry);
+        var document = Path.Combine(workspace.Child, "document.txt");
+        using (var locked = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+            Assert.Equal(workspace.Root, cache.Workspace(document, null));
+        time.Advance(TimeSpan.FromSeconds(1));
+        Assert.Equal(workspace.Child, cache.Workspace(document, null));
+    }
+
+    [Fact]
+    public void Transient_read_failure_uses_short_TTL_even_when_directory_watch_succeeds()
+    {
+        using var workspace = new Workspace();
+        var path = Path.Combine(workspace.Child, ".env");
+        File.WriteAllText(path, "VALUE=unlocked");
+        var native = new FakeDirectoryWatches();
+        var time = new FakeTimeProvider();
+        using var registry = new SharedFileWatchRegistry(native.Create, time);
+        using var cache = new ExternalToolAvailabilityCache(time, watches: registry);
+        using (var locked = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+            Assert.Empty(cache.DotEnv(workspace.Child));
+        // Closing a file handle need not produce a filesystem notification.
+        time.Advance(TimeSpan.FromSeconds(1));
+        Assert.Equal("unlocked", cache.DotEnv(workspace.Child)["VALUE"]);
+    }
+
+    [Fact]
     public void Change_during_dependency_registration_cannot_publish_an_unexpired_cache_entry()
     {
         using var workspace = new Workspace();

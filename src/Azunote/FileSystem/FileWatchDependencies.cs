@@ -12,6 +12,7 @@ internal sealed class FileWatchDependencies(
     private int _invalidated;
     private bool _complete = true;
     public bool FullyMonitored => _complete && _leases.Count > 0;
+    public void MarkIncomplete() => _complete = false;
 
     public void ObserveDirectory(string directory, string[] names)
     {

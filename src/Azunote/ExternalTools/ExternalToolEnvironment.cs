@@ -75,7 +75,8 @@ internal static class DotEnvFileLoader
 
     public static IReadOnlyDictionary<string, string> Load(string? documentDirectory) => Load(documentDirectory, null);
 
-    internal static IReadOnlyDictionary<string, string> Load(string? documentDirectory, Action<string>? observeDirectory)
+    internal static IReadOnlyDictionary<string, string> Load(string? documentDirectory, Action<string>? observeDirectory,
+        Action? readFailed = null)
     {
         using var measurement = ShellPerformance.Measure("dotenv.search");
         var path = FindNearestFile(documentDirectory, observeDirectory);
@@ -94,6 +95,7 @@ internal static class DotEnvFileLoader
                 or DecoderFallbackException
                 or ArgumentException)
         {
+            readFailed?.Invoke();
             return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         }
     }

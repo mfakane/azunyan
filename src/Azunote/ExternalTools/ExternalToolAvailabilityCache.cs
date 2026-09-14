@@ -48,26 +48,26 @@ internal sealed class ExternalToolAvailabilityCache : IDisposable
         Get("process-environment", ExternalToolEnvironmentResolver.LoadProcessEnvironment);
 
     public IReadOnlyDictionary<string, string> DotEnv(string? directory) =>
-        GetWatched(("dotenv", directory), observe => DotEnvFileLoader.Load(directory, observe), [".env"]);
+        GetWatched(("dotenv", directory), (observe, failed) => DotEnvFileLoader.Load(directory, observe, failed), [".env"]);
 
     public string? Workspace(string? path, string? pattern) =>
         pattern is not null
             ? Get(("workspace", path, pattern, Environment.CurrentDirectory),
                 () => WorkspaceFolderResolver.FindForFile(path, pattern))
             : GetWatched(("workspace", path, pattern, Environment.CurrentDirectory),
-                observe => WorkspaceFolderResolver.FindForFile(path, null, observe), [".git", ".editorconfig"]);
+                (observe, failed) => WorkspaceFolderResolver.FindForFile(path, null, observe, failed), [".git", ".editorconfig"]);
 
-    private T GetWatched<T>(object key, Func<Action<string>?, T> factory, string[] names)
+    private T GetWatched<T>(object key, Func<Action<string>?, Action?, T> factory, string[] names)
     {
         if (_cache.TryGetValue(key, out Cached<T>? cached)) return cached!.Value;
-        if (_watches is null) return Get(key, () => factory(null));
+        if (_watches is null) return Get(key, () => factory(null, null));
         var dependencies = new FileWatchDependencies(_watches, _invalidated, Released);
         lock (_dependenciesGate) _dependencies.Add(dependencies);
         try
         {
             // Each resolver registers dependencies BEFORE probing that directory.
             // A concurrent change expires the token even if insertion happens later.
-            var value = factory(directory => dependencies.ObserveDirectory(directory, names));
+            var value = factory(directory => dependencies.ObserveDirectory(directory, names), dependencies.MarkIncomplete);
             var options = new MemoryCacheEntryOptions
             {
                 AbsoluteExpirationRelativeToNow = dependencies.FullyMonitored ? _watchedLifetime : _lifetime,
