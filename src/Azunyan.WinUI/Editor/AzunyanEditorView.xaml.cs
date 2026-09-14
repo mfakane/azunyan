@@ -2832,8 +2832,12 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         args.Handled = true;
     }
 
+    /// <summary>Allows the host to request fresh advisory menu state without blocking opening.</summary>
+    public event EventHandler? ContextMenuOpening;
+
     private void EditorContextMenu_Opening(object sender, object e)
     {
+        ContextMenuOpening?.Invoke(this, EventArgs.Empty);
         var canCopy = HasCopyableSelection();
         CutContextMenuItem.IsEnabled = canCopy && !IsReadOnly;
         CopyContextMenuItem.IsEnabled = canCopy;

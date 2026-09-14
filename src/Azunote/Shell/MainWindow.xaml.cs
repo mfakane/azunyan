@@ -54,6 +54,13 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
             document,
             path => application.OpenFileAsync(this, path));
         ViewModel.Attach(this);
+        // MenuBarItem does not expose its internal flyout's Opening event.
+        // Cover pointer and keyboard entry, including reopening an already focused item.
+        ToolsMenuItem.PointerEntered += (_, _) => _runtime.RefreshExternalToolsMenu();
+        ToolsMenuItem.PointerPressed += (_, _) => _runtime.RefreshExternalToolsMenu();
+        ToolsMenuItem.GotFocus += (_, _) => _runtime.RefreshExternalToolsMenu();
+        ToolsMenuItem.KeyDown += (_, _) => _runtime.RefreshExternalToolsMenu();
+        Editor.ContextMenuOpening += (_, _) => _runtime.RefreshExternalToolsMenu();
         RegisterKeyboardAccelerators();
 
         if (_appWindow is not null)
