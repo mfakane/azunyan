@@ -137,6 +137,7 @@ public sealed class ExternalToolController
                 else
                 {
                     _editor.Replace(selection.Range, action.Text);
+                    _editor.SetSelection(SelectReplacement(selection, action.Text.Length));
                     _documents.Session.ObserveText(_editor.Text);
                 }
 
@@ -162,6 +163,19 @@ public sealed class ExternalToolController
             default:
                 throw new InvalidOperationException($"Unsupported external-tool output mode: {action.Mode}.");
         }
+    }
+
+    /// <summary>
+    /// Keeps the replaced text selected, preserving the direction the original
+    /// selection was made in.
+    /// </summary>
+    private static TextSelection SelectReplacement(TextSelection selection, int length)
+    {
+        var start = selection.Start;
+        var end = start + length;
+        return selection.IsReversed
+            ? new TextSelection(end, start)
+            : new TextSelection(start, end);
     }
 
     private async Task ReloadOutputAsync(

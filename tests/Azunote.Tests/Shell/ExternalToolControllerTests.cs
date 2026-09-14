@@ -1,4 +1,5 @@
 using Azunote;
+using Azunyan.Core;
 using Xunit;
 
 namespace Azunote.Tests.Shell;
@@ -45,6 +46,67 @@ public sealed class ExternalToolControllerTests
 
             Assert.True(result.Succeeded, result.StandardError);
             Assert.Equal("mixed output\r\n", editor.Text);
+            Assert.Empty(prompt.Errors);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Replace_selection_action_keeps_the_replacement_selected()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            $"azunote external controller selection {Guid.NewGuid():N}");
+        var scriptPath = Path.Combine(root, "write selection.cmd");
+        try
+        {
+            Directory.CreateDirectory(root);
+            await File.WriteAllTextAsync(
+                scriptPath,
+                "@echo off\r\n<nul set /p =REPLACED\r\nexit /b 0\r\n");
+
+            var editor = new FakeEditorView("one two three");
+            var session = new DocumentSession();
+            var files = new FakeTextFileStore();
+            var prompt = new FakeUserPrompt();
+            var documents = new DocumentController(editor, session, files, prompt);
+            var controller = new ExternalToolController(
+                editor,
+                documents,
+                files,
+                prompt,
+                _ => Task.CompletedTask);
+            var definition = new ExternalToolDefinition(
+                scriptPath,
+                stdout: new ExternalToolOutputActions(
+                    ExternalToolOutputMode.ReplaceSelection,
+                    ExternalToolOutputMode.Ignore));
+
+            editor.SetSelection(new TextSelection(4, 7));
+            var result = await controller.RunAsync(definition);
+
+            Assert.True(result.Succeeded, result.StandardError);
+            Assert.Equal("one REPLACED three", editor.Text);
+            Assert.Equal(new TextSelection(4, 12), editor.Selection);
+            Assert.Equal("REPLACED", editor.SelectedText);
+
+            editor.SetText("one two three");
+            editor.SetSelection(new TextSelection(7, 4));
+            await controller.RunAsync(definition);
+
+            Assert.Equal(new TextSelection(12, 4), editor.Selection);
+            Assert.Equal("REPLACED", editor.SelectedText);
             Assert.Empty(prompt.Errors);
         }
         finally
