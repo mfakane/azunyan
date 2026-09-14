@@ -151,11 +151,43 @@ A run that finds no parked process falls back to a cold launch, so `pwsh_warm` i
 bound on the benefit, not a guarantee for every invocation. Times include the interpreter,
 the script and the pipe handshake, but not menu evaluation or applying output to the editor.
 
-Same machine as above, SDK 10.0.401, PowerShell 7.6.6; 2026-09-15. `pwsh_cold` p50 / p95 was
-527.631 / 580.907 ms and `pwsh_warm` was 119.669 / 125.141 ms. That is about 408 ms
-(77%) less per invocation at the median. See [pwsh-warm-sample.csv](pwsh-warm-sample.csv).
-The saving is the interpreter start-up, so it repeats for every part of a `per` run, and it
-does not change how long the script itself takes.
+`pwsh_per8_max<N>` runs the same tool with `per = "line"` over eight lines, which launches
+eight processes in sequence, with `tools.powerShellWarmProcesses` set to `<N>` and
+`powerShellWarmIdleProcesses` left at 1. Only the first part starts from a resting process;
+the reservation the run makes warms the rest while earlier parts are still running, so a
+deeper pool mostly helps the later parts.
+
+Same machine as above, SDK 10.0.401, PowerShell 7.6.6; 2026-09-15. See
+[pwsh-warm-sample.csv](pwsh-warm-sample.csv). Times are milliseconds.
+
+| Case | p50 | p95 |
+| --- | --- | --- |
+| `pwsh_cold` | 561.509 | 595.950 |
+| `pwsh_warm` | 129.264 | 146.904 |
+| `pwsh_per8_max1` | 2511.510 | 2815.537 |
+| `pwsh_per8_max2` | 2139.230 | 2225.113 |
+| `pwsh_per8_max4` | 1598.349 | 2082.823 |
+| `pwsh_per8_max8` | 1868.128 | 1938.931 |
+
+A single run costs about 432 ms (77%) less at the median. The saving is the interpreter
+start-up, so it repeats for every part of a `per` run and does not change how long the
+script itself takes.
+
+Warming happens while the run's own parts are executing, so a large burst competes with them
+for CPU and the useful depth depends on how many cores are free. Repeating the run with the
+harness process restricted by processor affinity, which its child interpreters inherit:
+
+| Logical processors | `max1` p50 | `max2` p50 | `max4` p50 | `max8` p50 |
+| --- | --- | --- | --- | --- |
+| 4 | 3054.918 | 3072.292 | 3430.048 | 3778.636 |
+| 8 | 2648.859 | 2494.037 | 1785.151 | 2727.543 |
+| 32 (unrestricted) | 2511.510 | 2139.230 | 1598.349 | 1868.128 |
+
+A depth of 4 is the fastest at 8 and 32 but costs about 12% against a depth of 1 at 4, so a
+fixed default would be wrong on small machines. `tools.powerShellWarmProcesses` therefore
+defaults to half the logical processor count, clamped to 1 to 4. Affinity restriction is not
+the same as a smaller machine — cache and memory bandwidth are unchanged — so treat the table
+as evidence that the optimum moves with core count, not as per-machine tuning values.
 
 ## Verification
 

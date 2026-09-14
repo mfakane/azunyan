@@ -138,6 +138,8 @@ static void CompareWatchedCache()
 // the process is warmed while the user is editing, not while the tool runs.
 static void ComparePowerShellWarmStart()
 {
+    const int PerLineCount = 8;
+
     if (ExternalToolLaunchResolver.ResolvePowerShell() is null)
     {
         Console.Error.WriteLine("No PowerShell interpreter was found.");
@@ -158,6 +160,39 @@ static void ComparePowerShellWarmStart()
     using var pool = new PowerShellWarmPool();
     pool.EnsureWarm();
     MeasureRuns("pwsh_warm", () => Run(pool), before: () => WaitForWarm(pool));
+
+    // A per run launches one process per part. The reservation raises the
+    // waiting count for that run only, so deeper pools help the later parts.
+    var perDefinition = new ExternalToolDefinition(
+        "$null = [Console]::In.ReadToEnd()",
+        inputMode: ExternalToolInputMode.Document,
+        per: "line",
+        stdin: "${input}",
+        commandMode: ExternalToolCommandMode.Pwsh);
+    var lines = string.Join('\n', Enumerable.Repeat("line text", PerLineCount));
+    var perContext = new ExternalToolContext(null, lines, string.Empty);
+    foreach (var size in new[] { 1, 2, 4, 8 })
+    {
+        using var perPool = new PowerShellWarmPool();
+        perPool.Configure(maxProcesses: size, idleProcesses: 1);
+        perPool.EnsureWarm();
+        MeasureRuns(
+            string.Create(CultureInfo.InvariantCulture, $"pwsh_per{PerLineCount}_max{size}"),
+            () => RunPer(perPool),
+            before: () => WaitForWarm(perPool));
+
+        ExternalToolResult RunPer(PowerShellWarmPool warmPool)
+        {
+            var result = ExternalToolRunner.RunAsync(perDefinition, perContext, warmPool)
+                .GetAwaiter().GetResult();
+            if (!result.Succeeded)
+            {
+                throw new InvalidOperationException(result.StandardError);
+            }
+
+            return result;
+        }
+    }
 
     ExternalToolResult Run(PowerShellWarmPool? warmPool)
     {

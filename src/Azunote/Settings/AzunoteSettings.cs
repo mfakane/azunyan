@@ -18,6 +18,8 @@ public sealed class AzunoteSettings
 
     public AzunoteDebugSettings Debug { get; set; } = new();
 
+    public AzunoteToolsSettings Tools { get; set; } = new();
+
     public ShellCommandSettings Terminal { get; set; } = new()
     {
         Command = "wt.exe",
@@ -50,6 +52,73 @@ public sealed class AzunoteSettings
     /// </summary>
     [JsonIgnore]
     public IReadOnlyList<ExternalToolMenuNode> ExternalToolMenu { get; internal set; } = [];
+}
+
+/// <summary>
+/// Settings that apply to external tools as a whole. Individual tools are
+/// defined by their own files below the tools folder.
+/// </summary>
+public sealed class AzunoteToolsSettings
+{
+    public const int DefaultPowerShellWarmIdleProcesses = 1;
+    public const int MaximumPowerShellWarmProcesses = 16;
+
+    /// <summary>
+    /// Half the logical processor count, between 1 and 4. The processes a run
+    /// reserves are started while that run's earlier parts are executing, so
+    /// the useful depth depends on how many cores are free: measurements show
+    /// a depth of 4 helping on 8 and 32 logical processors but costing time on
+    /// 4. See tools/Azunote.Performance/README.md.
+    /// </summary>
+    public static readonly int DefaultPowerShellWarmProcesses =
+        Math.Clamp(Environment.ProcessorCount / 2, 1, 4);
+
+    /// <summary>
+    /// Most PowerShell processes kept started and waiting at once. A run that
+    /// is known to launch several processes, such as one using `per`, raises
+    /// the count up to this limit for the duration of that run. The default is
+    /// derived from the logical processor count; see
+    /// <see cref="DefaultPowerShellWarmProcesses"/>.
+    /// </summary>
+    public int PowerShellWarmProcesses { get; set; } = DefaultPowerShellWarmProcesses;
+
+    /// <summary>
+    /// PowerShell processes kept waiting when no run is in progress. It is
+    /// clamped to <see cref="PowerShellWarmProcesses"/>. Zero keeps no process
+    /// waiting until a run raises the count.
+    /// </summary>
+    public int PowerShellWarmIdleProcesses { get; set; } = DefaultPowerShellWarmIdleProcesses;
+
+    internal void Validate()
+    {
+        PowerShellWarmProcesses = Require(
+            PowerShellWarmProcesses,
+            nameof(PowerShellWarmProcesses),
+            "tools.powerShellWarmProcesses");
+        PowerShellWarmIdleProcesses = Require(
+            PowerShellWarmIdleProcesses,
+            nameof(PowerShellWarmIdleProcesses),
+            "tools.powerShellWarmIdleProcesses");
+        if (PowerShellWarmIdleProcesses > PowerShellWarmProcesses)
+        {
+            throw new SettingsFileException(
+                "tools.powerShellWarmIdleProcesses must not be greater than "
+                + $"tools.powerShellWarmProcesses ({PowerShellWarmProcesses}).");
+        }
+    }
+
+    private static int Require(int value, string propertyName, string settingName)
+    {
+        var minimum = propertyName == nameof(PowerShellWarmProcesses) ? 1 : 0;
+        if (value < minimum || value > MaximumPowerShellWarmProcesses)
+        {
+            throw new SettingsFileException(
+                $"Invalid {settingName} value '{value}'. Expected {minimum} to "
+                + $"{MaximumPowerShellWarmProcesses}.");
+        }
+
+        return value;
+    }
 }
 
 public sealed class AzunoteDebugSettings
@@ -91,6 +160,7 @@ public sealed class AzunoteDebugSettings
         typeof(ExternalToolCommandTomlConverter)])]
 [TomlSerializable(typeof(AzunoteSettings))]
 [TomlSerializable(typeof(AzunoteDebugSettings))]
+[TomlSerializable(typeof(AzunoteToolsSettings))]
 [TomlSerializable(typeof(AzunoteState))]
 [TomlSerializable(typeof(WindowLayoutState))]
 [TomlSerializable(typeof(ShellCommandSettings))]
@@ -663,6 +733,8 @@ public static class SettingsFileService
             : AzunoteSettings.DefaultFontSize;
         settings.Debug ??= new();
         settings.Debug.Validate();
+        settings.Tools ??= new();
+        settings.Tools.Validate();
         settings.Terminal ??= new();
         settings.Terminal.Validate("terminal");
         settings.Explorer ??= new();
@@ -692,6 +764,8 @@ public static class SettingsFileService
 
         settings.Debug ??= new();
         settings.Debug.Validate();
+        settings.Tools ??= new();
+        settings.Tools.Validate();
 
         var toml = TomlSerializer.Serialize(
             settings,

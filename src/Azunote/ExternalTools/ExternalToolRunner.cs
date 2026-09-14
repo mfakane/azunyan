@@ -54,7 +54,16 @@ public sealed class ExternalToolRunner
         var exitCode = 0;
         var invocationCount = 0;
 
-        foreach (var inputPart in definition.Per.GetInputParts(sourceInput))
+        // The part count is known before the first process starts, so a run
+        // that launches several processes can raise the waiting count for
+        // exactly as long as it needs it.
+        var inputParts = definition.Per.GetInputParts(sourceInput);
+        using var reservation = inputParts.Count > 1
+            && definition.CommandMode == ExternalToolCommandMode.Pwsh
+            ? warmPool?.Reserve(inputParts.Count)
+            : null;
+
+        foreach (var inputPart in inputParts)
         {
             cancellationToken.ThrowIfCancellationRequested();
             invocationCount++;

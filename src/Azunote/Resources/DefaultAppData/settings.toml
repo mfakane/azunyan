@@ -10,6 +10,17 @@ fontSize = 14
 [debug]
 logging = []
 
+# External tools. PowerShell tools start faster when a process is already
+# waiting. powerShellWarmIdleProcesses is how many wait while nothing is
+# running; use 0 to keep none waiting until a run asks for them.
+# powerShellWarmProcesses is the most that may wait at once, which a run known
+# to launch several processes, such as one using per, reserves for that run
+# only. Leave it unset to use half the logical processor count, between 1 and
+# 4, which suits most machines.
+[tools]
+powerShellWarmIdleProcesses = 1
+# powerShellWarmProcesses = 4
+
 # Configure the status bar's "Open Folder in Terminal" command here.
 [terminal]
 command = "wt.exe"

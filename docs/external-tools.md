@@ -111,14 +111,32 @@ respective shell with the configured value as one command string:
 cmd = "echo Hello"
 ```
 
-While at least one tool definition uses `pwsh`, Azunote keeps one PowerShell
-process started and waiting so that the interpreter start-up cost is paid
+While at least one tool definition uses `pwsh`, Azunote keeps PowerShell
+processes started and waiting so that the interpreter start-up cost is paid
 before a run is requested. A waiting process serves exactly one run and then
 exits; processes are never reused, so exit codes, standard input, stream
-separation and `[env]` isolation are the same as a plain launch. The waiting
-process is replaced after each run, terminated when it stays unused, and
+separation and `[env]` isolation are the same as a plain launch. Waiting
+processes are replaced after each run, terminated when they stay unused, and
 terminated when Azunote exits. If no waiting process is available, the tool is
 launched the usual way and behaves identically.
+
+How many wait is controlled by `[tools].powerShellWarmProcesses` and
+`[tools].powerShellWarmIdleProcesses` in
+[settings.toml](settings.md). The idle value is how many wait while nothing is
+running. A run whose launch count is known in advance raises the count to that
+many, up to `powerShellWarmProcesses`, and it returns to the idle value when
+the run ends. `per` is what makes a run launch several processes, and the count
+comes from the parts the current input actually produces, not from the `per`
+value alone: `per = "line"` over a one-line selection still needs one process.
+Nothing waits while no `pwsh` tool is configured.
+
+The extra processes for a run are started while that run's earlier parts are
+already executing, so raising `powerShellWarmProcesses` helps the later parts
+rather than the first one, and a large value competes with the run for CPU. How
+deep is useful therefore depends on how many cores are free, which is why the
+default is derived from the logical processor count rather than fixed. In the
+[recorded measurements](../tools/Azunote.Performance/README.md) a depth of 4 was
+the fastest on 8 and 32 logical processors but slower than a depth of 1 on 4.
 
 `command`, `args`, `cmd`, `pwsh`, and `workingDirectory` support substitution variables. The
 `[env]` values do as well; see the [substitution variable documentation](substitution-variables.md)

@@ -168,6 +168,9 @@ internal sealed class MainWindowRuntime : IDisposable
 
     private void ApplySettings(AzunoteSettings settings)
     {
+        _powerShellWarmPool.Configure(
+            settings.Tools.PowerShellWarmProcesses,
+            settings.Tools.PowerShellWarmIdleProcesses);
         _view.SetDiagnosticLogging(settings.Debug.Logging);
         _view.SetFontFamily(settings.FontFamily);
         _view.SetFontSize(settings.FontSize);

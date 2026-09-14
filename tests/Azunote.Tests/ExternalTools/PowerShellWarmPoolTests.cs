@@ -201,7 +201,7 @@ public sealed class PowerShellWarmPoolTests
         using var pool = new PowerShellWarmPool();
         pool.EnsureWarm();
         await WaitForWarmAsync(pool);
-        pool.KillWarmProcessForTest();
+        pool.KillWarmProcessesForTest();
 
         var result = await ExternalToolRunner.RunAsync(
             Pwsh("Write-Output 'fallback'"),
@@ -301,6 +301,143 @@ public sealed class PowerShellWarmPoolTests
         }
 
         Assert.False(pool.HasWarmProcess);
+    }
+
+    [Fact]
+    public async Task The_resting_count_follows_the_configured_idle_processes()
+    {
+        if (!PowerShellAvailable)
+        {
+            return;
+        }
+
+        using var pool = new PowerShellWarmPool();
+        pool.Configure(maxProcesses: 4, idleProcesses: 2);
+        pool.EnsureWarm();
+        await WaitForCountAsync(pool, 2);
+
+        Assert.Equal(2, pool.TargetProcessCount);
+        Assert.Equal(2, pool.WarmProcessCount);
+        Assert.Equal(2, pool.StartCount);
+    }
+
+    [Fact]
+    public void A_reservation_raises_the_target_up_to_the_maximum_and_then_restores_it()
+    {
+        using var pool = new PowerShellWarmPool(resolveLauncher: () => null);
+        pool.Configure(maxProcesses: 4, idleProcesses: 2);
+        pool.EnsureWarm();
+        Assert.Equal(2, pool.TargetProcessCount);
+
+        using (pool.Reserve(3))
+        {
+            Assert.Equal(3, pool.TargetProcessCount);
+            using (pool.Reserve(50))
+            {
+                Assert.Equal(4, pool.TargetProcessCount);
+            }
+
+            Assert.Equal(3, pool.TargetProcessCount);
+        }
+
+        Assert.Equal(2, pool.TargetProcessCount);
+    }
+
+    [Fact]
+    public void A_reservation_below_the_resting_count_does_not_lower_it()
+    {
+        using var pool = new PowerShellWarmPool(resolveLauncher: () => null);
+        pool.Configure(maxProcesses: 4, idleProcesses: 3);
+        pool.EnsureWarm();
+
+        using (pool.Reserve(2))
+        {
+            Assert.Equal(3, pool.TargetProcessCount);
+        }
+
+        Assert.Equal(3, pool.TargetProcessCount);
+    }
+
+    [Fact]
+    public void No_pwsh_tool_keeps_the_target_at_zero()
+    {
+        using var pool = new PowerShellWarmPool(resolveLauncher: () => null);
+        pool.Configure(maxProcesses: 4, idleProcesses: 2);
+        Assert.Equal(0, pool.TargetProcessCount);
+
+        pool.EnsureWarm();
+        Assert.Equal(2, pool.TargetProcessCount);
+
+        pool.Cool();
+        Assert.Equal(0, pool.TargetProcessCount);
+        using (pool.Reserve(4))
+        {
+            Assert.Equal(0, pool.TargetProcessCount);
+        }
+    }
+
+    [Fact]
+    public async Task A_per_run_reserves_and_then_releases_the_extra_processes()
+    {
+        if (!PowerShellAvailable)
+        {
+            return;
+        }
+
+        using var pool = new PowerShellWarmPool();
+        pool.Configure(maxProcesses: 4, idleProcesses: 1);
+        pool.EnsureWarm();
+        await WaitForCountAsync(pool, 1);
+
+        var definition = Pwsh(
+            "Write-Output ([Console]::In.ReadToEnd())",
+            stdin: "${input}",
+            inputMode: ExternalToolInputMode.Selection,
+            per: "line");
+        var result = await ExternalToolRunner.RunAsync(
+            definition,
+            Context(selection: string.Join('\n', "one", "two", "three", "four", "five")),
+            pool);
+
+        Assert.True(result.Succeeded, result.StandardError);
+        Assert.Equal(5, result.InvocationCount);
+        // The reservation is released with the run, so the target is the
+        // resting count again.
+        Assert.Equal(1, pool.TargetProcessCount);
+        await WaitForCountAsync(pool, 1);
+        Assert.Equal(1, pool.WarmProcessCount);
+    }
+
+    [Fact]
+    public async Task A_single_part_run_does_not_reserve_extra_processes()
+    {
+        if (!PowerShellAvailable)
+        {
+            return;
+        }
+
+        using var pool = new PowerShellWarmPool();
+        pool.Configure(maxProcesses: 4, idleProcesses: 1);
+        pool.EnsureWarm();
+        await WaitForCountAsync(pool, 1);
+
+        var result = await ExternalToolRunner.RunAsync(
+            Pwsh("Write-Output 'single'"),
+            Context(),
+            pool);
+
+        Assert.True(result.Succeeded, result.StandardError);
+        Assert.Equal(1, result.InvocationCount);
+        // One taken and one replacement: the run never asked for more.
+        Assert.Equal(2, pool.StartCount);
+    }
+
+    private static async Task WaitForCountAsync(PowerShellWarmPool pool, int count)
+    {
+        for (var attempt = 0; attempt < 200 && pool.WarmProcessCount < count; attempt++)
+        {
+            await Task.Delay(50);
+        }
     }
 
     private static bool HasExited(int processId)
