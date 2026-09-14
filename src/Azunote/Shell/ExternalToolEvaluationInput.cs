@@ -7,7 +7,7 @@ internal sealed record ExternalToolEvaluationInput(
     TextSnapshot Snapshot, TextSelection Selection, DocumentSessionState State, string LanguageId,
     IReadOnlyDictionary<ExternalToolSettings, PreparedExternalTool> Tools)
 {
-    public ExternalToolContext CreateContext(string? toolDirectory)
+    public ExternalToolContext CreateContext(string? toolDirectory, ExternalToolAvailabilityCache? cache = null)
     {
         var selection = new TextSelection(Math.Clamp(Selection.Anchor, 0, Snapshot.Length),
             Math.Clamp(Selection.Active, 0, Snapshot.Length));
@@ -16,10 +16,12 @@ internal sealed record ExternalToolEvaluationInput(
         return new ExternalToolContext(State.FilePath, State.FilePath, Snapshot.Text,
             Snapshot.GetText(selection.Range), caret.Line + 1, caret.Column + 1,
             LanguageId, toolDirectory, State.Encoding, State.LineEnding, State.IsDirty,
-            lines.GetLineColumn(selection.Start), lines.GetLineColumn(selection.End));
+            lines.GetLineColumn(selection.Start), lines.GetLineColumn(selection.End),
+            cache is null ? null : cache.Workspace);
     }
 
-    public Dictionary<ExternalToolSettings, ExternalToolMenuState> Evaluate(Func<bool> isCurrent)
+    public Dictionary<ExternalToolSettings, ExternalToolMenuState> Evaluate(Func<bool> isCurrent,
+        ExternalToolAvailabilityCache? cache = null)
     {
         using var measurement = ShellPerformance.Measure("tools.batch");
         var states = new Dictionary<ExternalToolSettings, ExternalToolMenuState>();
@@ -29,8 +31,8 @@ internal sealed record ExternalToolEvaluationInput(
             if (!isCurrent()) break;
             try
             {
-                context ??= CreateContext(null);
-                var state = prepared.Evaluate(context with { ToolDirectory = prepared.Definition.DefinitionDirectory });
+                context ??= CreateContext(null, cache);
+                var state = prepared.Evaluate(context with { ToolDirectory = prepared.Definition.DefinitionDirectory }, cache);
                 states[tool] = State.IsReadOnly
                     ? state with { IsEnabled = false, DisabledReason = "The document is read-only." }
                     : state;

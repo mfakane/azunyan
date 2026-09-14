@@ -5,6 +5,7 @@ namespace Azunote;
 
 public sealed partial record ExternalToolContext
 {
+    private readonly Func<string?, string?, string?> _findWorkspace;
     private const string WorkspaceFolderPatternPrefix = "workspaceFolder:";
 
     [GeneratedRegex(@"\$\{(?<name>[^{}]+)\}", RegexOptions.Compiled | RegexOptions.CultureInvariant)]
@@ -41,7 +42,8 @@ public sealed partial record ExternalToolContext
         LineEndingKind lineEnding = LineEndingKind.Lf,
         bool isDirty = false,
         LineColumn? selectionStart = null,
-        LineColumn? selectionEnd = null)
+        LineColumn? selectionEnd = null,
+        Func<string?, string?, string?>? workspaceResolver = null)
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(selection);
@@ -57,8 +59,8 @@ public sealed partial record ExternalToolContext
         ToolDirectory = string.IsNullOrWhiteSpace(toolDirectory)
             ? null
             : Path.GetFullPath(toolDirectory);
-        WorkspaceFolder = WorkspaceFolderResolver.FindForFile(
-            DocumentFilePath ?? ExecutionFilePath);
+        _findWorkspace = workspaceResolver ?? WorkspaceFolderResolver.FindForFile;
+        WorkspaceFolder = _findWorkspace(DocumentFilePath ?? ExecutionFilePath, null);
         Document = document;
         Selection = selection;
         LineNumber = lineNumber;
@@ -217,7 +219,7 @@ public sealed partial record ExternalToolContext
 
             if (name.StartsWith(WorkspaceFolderPatternPrefix, StringComparison.Ordinal))
             {
-                return WorkspaceFolderResolver.FindForFile(
+                return _findWorkspace(
                     DocumentFilePath ?? ExecutionFilePath,
                     name[WorkspaceFolderPatternPrefix.Length..]) ?? string.Empty;
             }
@@ -226,7 +228,7 @@ public sealed partial record ExternalToolContext
             if (name.StartsWith(workspaceFolderBasenamePatternPrefix, StringComparison.Ordinal))
             {
                 return GetPathBasename(
-                    WorkspaceFolderResolver.FindForFile(
+                    _findWorkspace(
                         DocumentFilePath ?? ExecutionFilePath,
                         name[workspaceFolderBasenamePatternPrefix.Length..])) ?? string.Empty;
             }

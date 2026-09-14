@@ -14,6 +14,19 @@
     "sha256": "40686c6447a7d5b5d3693068e4571b5f483d7ed335aeee773ef662440de4c5d5"
   },
   {
+    "component": "Microsoft.Extensions.Caching.Memory/10.0.0",
+    "file": "licenses/Microsoft.Extensions/10.0.0/LICENSE.TXT",
+    "source": "https://raw.githubusercontent.com/dotnet/dotnet/b0f34d51fccc69fd334253924abd8d6853fad7aa/LICENSE.TXT",
+    "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+  },
+  {
+    "component": "Microsoft.Extensions.Caching.Memory/10.0.0",
+    "file": "licenses/Microsoft.Extensions/10.0.0/THIRD-PARTY-NOTICES.TXT",
+    "source": "https://www.nuget.org/packages/Microsoft.Extensions.Caching.Memory/10.0.0",
+    "packageFile": "THIRD-PARTY-NOTICES.TXT",
+    "sha256": "6d15e10a101c6bfff2ab4429ed061bf76c456fc4b23ad6b03e0d0f8377148a21"
+  },
+  {
     "component": "Microsoft.Graphics.Win2D/1.4.0-azunyan.25680382dd21",
     "file": "licenses/Microsoft.Graphics.Win2D/1.4.0-azunyan.25680382dd21/LICENSE.txt",
     "source": "https://raw.githubusercontent.com/microsoft/Win2D/25680382dd2136779e10ea6084f0c5ba437ae288/LICENSE.txt",

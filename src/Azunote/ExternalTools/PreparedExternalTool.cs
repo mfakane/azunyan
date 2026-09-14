@@ -28,6 +28,6 @@ internal sealed class PreparedExternalTool
         };
     }
 
-    public ExternalToolMenuState Evaluate(ExternalToolContext context) =>
-        ExternalToolAvailability.Evaluate(_conditions, context, Definition);
+    public ExternalToolMenuState Evaluate(ExternalToolContext context, ExternalToolAvailabilityCache? cache = null) =>
+        ExternalToolAvailability.Evaluate(_conditions, context, Definition, cache);
 }

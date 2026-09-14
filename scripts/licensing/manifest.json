@@ -4,6 +4,11 @@
   "runtimeIdentifier": "win-x64",
   "components": [
     {
+      "name": "Microsoft.Extensions.Caching.Memory, Caching.Abstractions, DependencyInjection.Abstractions, Logging.Abstractions, Options, and Primitives",
+      "version": "10.0.0",
+      "notice": "MIT; [license](licenses/Microsoft.Extensions/10.0.0/LICENSE.TXT), [shared package notices](licenses/Microsoft.Extensions/10.0.0/THIRD-PARTY-NOTICES.TXT). All six packages declare MIT and contain identical third-party notices."
+    },
+    {
       "name": "Tomlyn",
       "version": "2.10.1",
       "notice": "BSD-2-Clause; [copyright, conditions, and disclaimer](licenses/Tomlyn/2.10.1/LICENSE.txt)"
@@ -304,6 +309,19 @@
       "file": "licenses/Microsoft.Graphics.Win2D/1.4.0-azunyan.25680382dd21/LICENSE.txt",
       "source": "https://raw.githubusercontent.com/microsoft/Win2D/25680382dd2136779e10ea6084f0c5ba437ae288/LICENSE.txt",
       "sha256": "c3ba493105fa52657c4c60d9b1680da7c01b188a8665d7a823c2a187fd259808"
+    },
+    {
+      "component": "Microsoft.Extensions.Caching.Memory/10.0.0",
+      "file": "licenses/Microsoft.Extensions/10.0.0/LICENSE.TXT",
+      "source": "https://raw.githubusercontent.com/dotnet/dotnet/b0f34d51fccc69fd334253924abd8d6853fad7aa/LICENSE.TXT",
+      "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+    },
+    {
+      "component": "Microsoft.Extensions.Caching.Memory/10.0.0",
+      "file": "licenses/Microsoft.Extensions/10.0.0/THIRD-PARTY-NOTICES.TXT",
+      "source": "https://www.nuget.org/packages/Microsoft.Extensions.Caching.Memory/10.0.0",
+      "packageFile": "THIRD-PARTY-NOTICES.TXT",
+      "sha256": "6d15e10a101c6bfff2ab4429ed061bf76c456fc4b23ad6b03e0d0f8377148a21"
     },
     {
       "component": "Microsoft.Extensions.FileSystemGlobbing/9.0.4",

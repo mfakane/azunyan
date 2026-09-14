@@ -17,6 +17,7 @@ binary, or that all redistribution conditions have been satisfied.
 
 | Component | Version | Terms and bundled documents |
 | --- | --- | --- |
+| Microsoft.Extensions.Caching.Memory, Caching.Abstractions, DependencyInjection.Abstractions, Logging.Abstractions, Options, and Primitives | 10.0.0 | MIT; [license](licenses/Microsoft.Extensions/10.0.0/LICENSE.TXT), [shared package notices](licenses/Microsoft.Extensions/10.0.0/THIRD-PARTY-NOTICES.TXT). All six packages declare MIT and contain identical third-party notices. |
 | Tomlyn | 2.10.1 | BSD-2-Clause; [copyright, conditions, and disclaimer](licenses/Tomlyn/2.10.1/LICENSE.txt) |
 | .NET Native AOT runtime | 10.0.11 | MIT and third-party terms; [license](licenses/microsoft.netcore.app.runtime.nativeaot.win-x64/10.0.11/LICENSE.TXT), [notices](licenses/microsoft.netcore.app.runtime.nativeaot.win-x64/10.0.11/THIRD-PARTY-NOTICES.TXT) |
 | .NET runtime (non-AOT self-contained builds) | 10.0.11 | MIT and third-party terms; [license](licenses/microsoft.netcore.app.runtime.win-x64/10.0.11/LICENSE.TXT), [notices](licenses/microsoft.netcore.app.runtime.win-x64/10.0.11/THIRD-PARTY-NOTICES.TXT) |

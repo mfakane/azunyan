@@ -10,13 +10,16 @@ internal static class ExternalToolEnvironmentResolver
 {
     public static ExternalToolEnvironmentSnapshot Resolve(
         ExternalToolDefinition definition,
-        ExternalToolContext context)
+        ExternalToolContext context,
+        ExternalToolAvailabilityCache? cache = null)
     {
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(context);
 
-        var values = LoadProcessEnvironment();
-        var dotenvValues = DotEnvFileLoader.Load(context.DocumentDirname);
+        var values = cache is null ? LoadProcessEnvironment()
+            : new Dictionary<string, string>(cache.ProcessEnvironment(), StringComparer.OrdinalIgnoreCase);
+        var dotenvValues = cache is null ? DotEnvFileLoader.Load(context.DocumentDirname)
+            : cache.DotEnv(context.DocumentDirname);
         foreach (var environmentVariable in dotenvValues)
         {
             values[environmentVariable.Key] = environmentVariable.Value;
@@ -41,7 +44,7 @@ internal static class ExternalToolEnvironmentResolver
         return new ExternalToolEnvironmentSnapshot(values, overrides);
     }
 
-    private static Dictionary<string, string> LoadProcessEnvironment()
+    internal static Dictionary<string, string> LoadProcessEnvironment()
     {
         using var measurement = ShellPerformance.Measure("environment.read");
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);

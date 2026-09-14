@@ -14,6 +14,7 @@ internal sealed class MainWindowRuntime : IDisposable
     private readonly DocumentWorkflow _documents;
     private readonly SettingsWorkflow _settings;
     private readonly LatestUiWork<ExternalToolEvaluationInput, Dictionary<ExternalToolSettings, ExternalToolMenuState>> _toolUpdates;
+    private readonly ExternalToolAvailabilityCache _toolCache = new();
     private readonly EditorCommandController _editorCommands;
     private readonly FindReplaceController _findReplace;
     private readonly GoToLineController _goToLine;
@@ -111,7 +112,7 @@ internal sealed class MainWindowRuntime : IDisposable
         _toolUpdates = new(_dispatcher,
             () => new(_view.Snapshot, _view.Selection, _session.State,
                 _languageModes.CurrentModeId, _settings.PreparedTools),
-            (input, isCurrent) => input.Evaluate(isCurrent),
+            (input, isCurrent) => input.Evaluate(isCurrent, _toolCache),
             states => _settings.ApplyExternalToolStates(states),
             exception => ErrorReporter.LogException("External tool availability", exception));
         _editorCommands = new EditorCommandController(_view, _viewModel);
@@ -421,6 +422,7 @@ internal sealed class MainWindowRuntime : IDisposable
 
         _disposed = true;
         _toolUpdates.Dispose();
+        _ = DisposeToolCacheAsync();
         _session.StateChanged -= Session_StateChanged;
         _languageModes.Changed -= LanguageModes_Changed;
         _documents.Changed -= Documents_Changed;
@@ -475,6 +477,12 @@ internal sealed class MainWindowRuntime : IDisposable
         {
             ErrorReporter.LogException("About dialog failure", exception);
         }
+    }
+
+    private async Task DisposeToolCacheAsync()
+    {
+        try { await _toolUpdates.Completion.ConfigureAwait(false); }
+        finally { _toolCache.Dispose(); }
     }
 
 

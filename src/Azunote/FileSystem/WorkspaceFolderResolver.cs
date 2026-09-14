@@ -16,6 +16,7 @@ internal static class WorkspaceFolderResolver
         string? filePath,
         string? patternExpression = null)
     {
+        using var measurement = ShellPerformance.Measure("workspace.search");
         if (string.IsNullOrWhiteSpace(filePath))
         {
             return null;

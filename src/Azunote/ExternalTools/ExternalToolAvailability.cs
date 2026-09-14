@@ -15,7 +15,8 @@ public static class ExternalToolAvailability
         ExternalToolContext context) => Evaluate(settings, context, definition: null);
 
     internal static ExternalToolMenuState Evaluate(
-        ExternalToolSettings settings, ExternalToolContext context, ExternalToolDefinition? definition)
+        ExternalToolSettings settings, ExternalToolContext context, ExternalToolDefinition? definition,
+        ExternalToolAvailabilityCache? cache = null)
     {
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(context);
@@ -44,12 +45,13 @@ public static class ExternalToolAvailability
                 : new ExternalToolMenuState(false, false, exception.Message);
         }
 
-        var environment = ExternalToolEnvironmentResolver.Resolve(definition, invocationContext);
+        var environment = ExternalToolEnvironmentResolver.Resolve(definition, invocationContext, cache);
         var command = invocationContext.Expand(definition.FileName, environment.Values);
-        var launchPlan = ExternalToolLaunchResolver.Resolve(
+        var launchPlan = cache is null ? ExternalToolLaunchResolver.Resolve(
             command,
             definition.CommandMode,
-            definition.DefinitionDirectory);
+            definition.DefinitionDirectory)
+            : cache.Launch(command, definition.CommandMode, definition.DefinitionDirectory);
         if (launchPlan is null)
         {
             var reason = $"Command '{command}' was not found.";
