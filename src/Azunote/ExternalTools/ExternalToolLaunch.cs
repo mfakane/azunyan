@@ -87,6 +87,58 @@ internal sealed record ExternalToolLaunchPlan(
         + "[Console]::OutputEncoding = $OutputEncoding; "
         + "Invoke-Expression $env:" + ShellCommandEnvironmentVariable;
 
+    /// <summary>
+    /// Arguments for a process started before its request is known. The
+    /// process sets up the same encoding as a cold launch, parks on the
+    /// handshake pipe, and then applies the working directory, environment
+    /// overrides and script it receives. Standard input is never touched, so
+    /// it stays available to the script itself. The syntax is limited to what
+    /// both PowerShell 7 and Windows PowerShell 5.1 accept.
+    /// </summary>
+    internal static string BuildPowerShellWarmArguments() =>
+        "-NoLogo -NoProfile -NonInteractive -EncodedCommand " + EncodeCommand(WarmBootstrapScript);
+
+    private const string WarmBootstrapScript = """
+        $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+        [Console]::OutputEncoding = $OutputEncoding
+        $azunoteScript = $null
+        try
+        {
+            $ErrorActionPreference = 'Stop'
+            $azunotePipeName = $env:AZUNOTE_EXTERNAL_TOOL_PIPE
+            $azunoteToken = $env:AZUNOTE_EXTERNAL_TOOL_TOKEN
+            [Environment]::SetEnvironmentVariable('AZUNOTE_EXTERNAL_TOOL_PIPE', $null)
+            [Environment]::SetEnvironmentVariable('AZUNOTE_EXTERNAL_TOOL_TOKEN', $null)
+            $azunotePipe = New-Object -TypeName System.IO.Pipes.NamedPipeClientStream -ArgumentList '.', $azunotePipeName, ([System.IO.Pipes.PipeDirection]::InOut)
+            $azunotePipe.Connect(60000)
+            $azunoteWriter = New-Object -TypeName System.IO.StreamWriter -ArgumentList $azunotePipe, ([System.Text.UTF8Encoding]::new($false))
+            $azunoteWriter.AutoFlush = $true
+            $azunoteWriter.WriteLine($azunoteToken)
+            $azunoteReader = New-Object -TypeName System.IO.StreamReader -ArgumentList $azunotePipe, ([System.Text.UTF8Encoding]::new($false))
+            $azunoteRequest = $azunoteReader.ReadLine() | ConvertFrom-Json
+            $azunotePipe.Dispose()
+            Set-Location -LiteralPath $azunoteRequest.cwd
+            [Environment]::CurrentDirectory = $azunoteRequest.cwd
+            foreach ($azunoteEntry in $azunoteRequest.env.PSObject.Properties)
+            {
+                [Environment]::SetEnvironmentVariable($azunoteEntry.Name, $azunoteEntry.Value)
+            }
+
+            $azunoteScript = [string]$azunoteRequest.script
+        }
+        catch
+        {
+            exit 199
+        }
+
+        $ErrorActionPreference = 'Continue'
+        Remove-Variable -Name azunotePipeName, azunoteToken, azunotePipe, azunoteWriter, azunoteReader, azunoteRequest, azunoteEntry -ErrorAction SilentlyContinue
+        Invoke-Expression $azunoteScript
+        """;
+
+    private static string EncodeCommand(string command) =>
+        Convert.ToBase64String(Encoding.Unicode.GetBytes(command));
+
     private static string QuoteCommandShellArgument(string value) =>
         $"\"{value.Replace("\"", "\\\"", StringComparison.Ordinal)}\"";
 }
@@ -270,7 +322,7 @@ internal static class ExternalToolLaunchResolver
             : ResolveExecutable("cmd.exe", null);
     }
 
-    private static string? ResolvePowerShell() =>
+    internal static string? ResolvePowerShell() =>
         ResolveExecutable("pwsh.exe", null)
         ?? ResolveExecutable("powershell.exe", null);
 }

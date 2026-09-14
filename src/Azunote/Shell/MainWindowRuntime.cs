@@ -15,6 +15,9 @@ internal sealed class MainWindowRuntime : IDisposable
     private readonly SettingsWorkflow _settings;
     private readonly LatestUiWork<ExternalToolEvaluationInput, Dictionary<ExternalToolSettings, ExternalToolMenuState>> _toolUpdates;
     private readonly ExternalToolAvailabilityCache _toolCache;
+    private readonly PowerShellWarmPool _powerShellWarmPool = new();
+    private IReadOnlyDictionary<ExternalToolSettings, PreparedExternalTool>? _warmPoolTools;
+    private bool _hasPowerShellTool;
     private readonly EditorCommandController _editorCommands;
     private readonly FindReplaceController _findReplace;
     private readonly GoToLineController _goToLine;
@@ -79,7 +82,8 @@ internal sealed class MainWindowRuntime : IDisposable
             files,
             _prompt,
             openTextInNewWindow,
-            () => _languageModes.CurrentModeId);
+            () => _languageModes.CurrentModeId,
+            _powerShellWarmPool);
 
         _documents = new DocumentWorkflow(
             _view,
@@ -400,7 +404,42 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public void RefreshStatus() => _status.Refresh();
 
-    public void RefreshExternalToolsMenu() => _toolUpdates?.Request();
+    public void RefreshExternalToolsMenu()
+    {
+        UpdatePowerShellWarmPool();
+        _toolUpdates?.Request();
+    }
+
+    /// <summary>
+    /// Keeps a PowerShell process waiting only while a `pwsh` tool is
+    /// configured. This also runs whenever the tool menus are refreshed, so a
+    /// process is warmed shortly before the menu is used. The definitions are
+    /// only scanned when settings replace the prepared tools.
+    /// </summary>
+    private void UpdatePowerShellWarmPool()
+    {
+        if (_disposed || _settings is null)
+        {
+            return;
+        }
+
+        var tools = _settings.PreparedTools;
+        if (!ReferenceEquals(tools, _warmPoolTools))
+        {
+            _warmPoolTools = tools;
+            _hasPowerShellTool = tools.Values.Any(
+                tool => tool.Definition.CommandMode == ExternalToolCommandMode.Pwsh);
+        }
+
+        if (_hasPowerShellTool)
+        {
+            _powerShellWarmPool.EnsureWarm();
+        }
+        else
+        {
+            _powerShellWarmPool.Cool();
+        }
+    }
 
     public void OpenDroppedFile(string path) => _documents.OpenDroppedFile(path);
 
@@ -422,6 +461,7 @@ internal sealed class MainWindowRuntime : IDisposable
         }
 
         _disposed = true;
+        _powerShellWarmPool.Dispose();
         _toolUpdates.Dispose();
         _ = DisposeToolCacheAsync();
         _session.StateChanged -= Session_StateChanged;

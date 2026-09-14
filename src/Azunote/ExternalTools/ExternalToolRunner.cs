@@ -25,9 +25,22 @@ public sealed class ExternalToolRunner
         encoderShouldEmitUTF8Identifier: false,
         throwOnInvalidBytes: false);
 
-    public static async Task<ExternalToolResult> RunAsync(
+    public static Task<ExternalToolResult> RunAsync(
         ExternalToolDefinition definition,
         ExternalToolContext context,
+        CancellationToken cancellationToken = default) =>
+        RunAsync(definition, context, warmPool: null, cancellationToken);
+
+    /// <summary>
+    /// Runs the tool, taking a waiting PowerShell process from
+    /// <paramref name="warmPool"/> when the launch is a `pwsh` command and one
+    /// is available. A null pool, or any failure to hand the request over,
+    /// launches the process the usual way instead.
+    /// </summary>
+    internal static async Task<ExternalToolResult> RunAsync(
+        ExternalToolDefinition definition,
+        ExternalToolContext context,
+        PowerShellWarmPool? warmPool,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(definition);
@@ -48,6 +61,7 @@ public sealed class ExternalToolRunner
             var result = await RunSingleAsync(
                 definition,
                 context.WithInput(inputPart.Value, inputPart.Captures),
+                warmPool,
                 cancellationToken);
             standardOutput.Append(result.StandardOutput);
             standardError.Append(result.StandardError);
@@ -75,6 +89,7 @@ public sealed class ExternalToolRunner
     private static async Task<ExternalToolResult> RunSingleAsync(
         ExternalToolDefinition definition,
         ExternalToolContext context,
+        PowerShellWarmPool? warmPool,
         CancellationToken cancellationToken)
     {
         var environment = ExternalToolEnvironmentResolver.Resolve(definition, context);
@@ -120,23 +135,33 @@ public sealed class ExternalToolRunner
 
         launchPlan.AddArguments(startInfo, arguments);
 
-        using var process = new Process { StartInfo = startInfo };
-        try
+        using var lease = await TryAcquireWarmAsync(
+            warmPool,
+            launchPlan,
+            startInfo,
+            environment.Overrides,
+            cancellationToken);
+        using var coldProcess = lease is null ? new Process { StartInfo = startInfo } : null;
+        var process = lease?.Process ?? coldProcess!;
+        if (coldProcess is not null)
         {
-            if (!process.Start())
+            try
             {
-                throw new InvalidOperationException(
-                    $"Could not start external tool: {startInfo.FileName}");
+                if (!coldProcess.Start())
+                {
+                    throw new InvalidOperationException(
+                        $"Could not start external tool: {startInfo.FileName}");
+                }
             }
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            ErrorReporter.LogException(
-                $"External tool launch failed: {startInfo.FileName}",
-                new InvalidOperationException(
-                    DescribeLaunch(definition, launchPlan, startInfo, arguments, context),
-                    exception));
-            throw;
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                ErrorReporter.LogException(
+                    $"External tool launch failed: {startInfo.FileName}",
+                    new InvalidOperationException(
+                        DescribeLaunch(definition, launchPlan, startInfo, arguments, context),
+                        exception));
+                throw;
+            }
         }
 
         try
@@ -185,6 +210,28 @@ public sealed class ExternalToolRunner
             TryKill(process);
             throw;
         }
+    }
+
+    private static async Task<PowerShellWarmLease?> TryAcquireWarmAsync(
+        PowerShellWarmPool? warmPool,
+        ExternalToolLaunchPlan launchPlan,
+        ProcessStartInfo startInfo,
+        IReadOnlyDictionary<string, string> environmentOverrides,
+        CancellationToken cancellationToken)
+    {
+        if (warmPool is null
+            || launchPlan.Kind != ExternalToolLaunchKind.PowerShellCommand)
+        {
+            return null;
+        }
+
+        return await warmPool.TryAcquireAsync(
+            launchPlan.LauncherPath,
+            new PowerShellWarmRequest(
+                startInfo.WorkingDirectory,
+                environmentOverrides,
+                launchPlan.ResolvedPath),
+            cancellationToken);
     }
 
     private static async Task<string> ReadStreamAsync(

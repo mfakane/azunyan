@@ -15,6 +15,7 @@ public sealed class ExternalToolController
     private readonly IUserPrompt _prompt;
     private readonly Func<string, Task> _openTextInNewWindow;
     private readonly Func<string> _languageModeId;
+    private readonly PowerShellWarmPool? _warmPool;
 
     public ExternalToolController(
         IEditorBuffer editor,
@@ -32,6 +33,17 @@ public sealed class ExternalToolController
             ?? throw new ArgumentNullException(nameof(openTextInNewWindow));
         _languageModeId = languageModeId ?? (() => string.Empty);
     }
+
+    internal ExternalToolController(
+        IEditorBuffer editor,
+        DocumentController documents,
+        ITextFileStore files,
+        IUserPrompt prompt,
+        Func<string, Task> openTextInNewWindow,
+        Func<string>? languageModeId,
+        PowerShellWarmPool? warmPool)
+        : this(editor, documents, files, prompt, openTextInNewWindow, languageModeId) =>
+        _warmPool = warmPool;
 
     public async Task<ExternalToolResult> RunAsync(
         ExternalToolDefinition definition,
@@ -74,6 +86,7 @@ public sealed class ExternalToolController
             var result = await ExternalToolRunner.RunAsync(
                 definition,
                 context,
+                _warmPool,
                 cancellationToken);
             var output = ExternalToolOutputInterpreter.Interpret(definition, result);
             foreach (var action in output.Actions)

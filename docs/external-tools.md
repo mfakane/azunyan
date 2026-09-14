@@ -111,6 +111,15 @@ respective shell with the configured value as one command string:
 cmd = "echo Hello"
 ```
 
+While at least one tool definition uses `pwsh`, Azunote keeps one PowerShell
+process started and waiting so that the interpreter start-up cost is paid
+before a run is requested. A waiting process serves exactly one run and then
+exits; processes are never reused, so exit codes, standard input, stream
+separation and `[env]` isolation are the same as a plain launch. The waiting
+process is replaced after each run, terminated when it stays unused, and
+terminated when Azunote exits. If no waiting process is available, the tool is
+launched the usual way and behaves identically.
+
 `command`, `args`, `cmd`, `pwsh`, and `workingDirectory` support substitution variables. The
 `[env]` values do as well; see the [substitution variable documentation](substitution-variables.md)
 for details.

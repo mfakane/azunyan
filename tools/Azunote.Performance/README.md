@@ -8,7 +8,8 @@ dotnet run --project tools/Azunote.Performance/Azunote.Performance.csproj -c Rel
 
 Both properties are required because the application project normally enables AOT and
 trimming. The harness is a managed console process and does not open an editor window.
-It creates and removes its own temporary workspace. It never launches an external tool.
+It creates and removes its own temporary workspace. Only the `--pwsh-warm` mode described
+below launches an external tool; the default and `--watch-cache` modes never do.
 
 The CSV contains 30 samples per case after three warm-up iterations, using CRLF text of
 10,000, 1,000,000 and 10,000,000 characters, 0/10/100 tools, and a 128-character selection.
@@ -129,6 +130,32 @@ Compare typing, selection dragging, caret movement, initial menu opening and set
 reload with 0/10/100 tools. Counts should show bounded batches and no repeated menu
 reconstruction when visibility is unchanged. Full input-to-present latency, real IME
 composition and slow/network filesystem behavior need a separate interactive trace.
+
+## PowerShell warm-start comparison
+
+```powershell
+dotnet run --project tools/Azunote.Performance/Azunote.Performance.csproj -c Release -p:PublishAot=false -p:PublishTrimmed=false -- --pwsh-warm
+```
+
+This mode measures one `[launch].pwsh` tool end to end through `ExternalToolRunner`: a
+small script that reads the document from standard input and reformats it with
+`ConvertFrom-Json`/`ConvertTo-Json`. `pwsh_cold` starts `pwsh.exe` per run, which is the
+behaviour without a pool. `pwsh_warm` takes a process that `PowerShellWarmPool` already
+started and parked on its handshake pipe. Because every sample starts a real process, this
+mode uses 15 samples after one warm-up instead of 30 after three, and the `characters` and
+`tools` columns are not meaningful.
+
+Each warm sample waits for a parked process before the stopwatch starts. That is the case
+the pool exists for: the process is warmed while the user edits, not while the tool runs.
+A run that finds no parked process falls back to a cold launch, so `pwsh_warm` is an upper
+bound on the benefit, not a guarantee for every invocation. Times include the interpreter,
+the script and the pipe handshake, but not menu evaluation or applying output to the editor.
+
+Same machine as above, SDK 10.0.401, PowerShell 7.6.6; 2026-09-15. `pwsh_cold` p50 / p95 was
+527.631 / 580.907 ms and `pwsh_warm` was 119.669 / 125.141 ms. That is about 408 ms
+(77%) less per invocation at the median. See [pwsh-warm-sample.csv](pwsh-warm-sample.csv).
+The saving is the interpreter start-up, so it repeats for every part of a `per` run, and it
+does not change how long the script itself takes.
 
 ## Verification
 

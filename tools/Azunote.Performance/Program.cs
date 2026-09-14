@@ -12,6 +12,11 @@ if (args.Contains("--watch-cache", StringComparer.Ordinal))
     CompareWatchedCache();
     return;
 }
+if (args.Contains("--pwsh-warm", StringComparer.Ordinal))
+{
+    ComparePowerShellWarmStart();
+    return;
+}
 var directory = Directory.CreateTempSubdirectory("azunote-performance-");
 try
 {
@@ -125,6 +130,74 @@ static void CompareWatchedCache()
         });
     }
     finally { directory.Delete(recursive: true); }
+}
+
+// The only mode that launches an external tool. It compares a cold pwsh launch with a
+// launch that takes a process the pool already started and parked. Each warm sample waits
+// for a parked process outside the measured region, which is the case the pool is for:
+// the process is warmed while the user is editing, not while the tool runs.
+static void ComparePowerShellWarmStart()
+{
+    if (ExternalToolLaunchResolver.ResolvePowerShell() is null)
+    {
+        Console.Error.WriteLine("No PowerShell interpreter was found.");
+        return;
+    }
+
+    var definition = new ExternalToolDefinition(
+        "$text = [Console]::In.ReadToEnd(); $text | ConvertFrom-Json | ConvertTo-Json -Depth 100",
+        inputMode: ExternalToolInputMode.Document,
+        stdin: "${input}",
+        commandMode: ExternalToolCommandMode.Pwsh);
+    var document = "{\"name\":\"azunote\",\"values\":[1,2,3],\"nested\":{\"a\":true}}";
+    var context = new ExternalToolContext(null, document, string.Empty);
+
+    Run(warmPool: null);
+    MeasureRuns("pwsh_cold", () => Run(warmPool: null));
+
+    using var pool = new PowerShellWarmPool();
+    pool.EnsureWarm();
+    MeasureRuns("pwsh_warm", () => Run(pool), before: () => WaitForWarm(pool));
+
+    ExternalToolResult Run(PowerShellWarmPool? warmPool)
+    {
+        var result = ExternalToolRunner.RunAsync(definition, context, warmPool)
+            .GetAwaiter().GetResult();
+        if (!result.Succeeded)
+        {
+            throw new InvalidOperationException(result.StandardError);
+        }
+
+        return result;
+    }
+
+    static void WaitForWarm(PowerShellWarmPool pool)
+    {
+        for (var attempt = 0; attempt < 200 && !pool.HasWarmProcess; attempt++)
+        {
+            Thread.Sleep(25);
+        }
+    }
+}
+
+// Fewer samples than Measure because every sample starts a real process.
+static void MeasureRuns(string operation, Func<ExternalToolResult> run, Action? before = null)
+{
+    before?.Invoke();
+    run();
+    var samples = new double[15];
+    for (var i = 0; i < samples.Length; i++)
+    {
+        // The wait for a parked process stays outside the measured region.
+        before?.Invoke();
+        var start = Stopwatch.GetTimestamp();
+        run();
+        samples[i] = Stopwatch.GetElapsedTime(start).TotalMilliseconds;
+    }
+
+    Array.Sort(samples);
+    Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+        $"{operation},{0},{1},{samples[7]:F3},{samples[13]:F3},{samples[14]:F3},0"));
 }
 
 sealed class BenchmarkClock : TimeProvider
