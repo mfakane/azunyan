@@ -40,6 +40,9 @@ public sealed partial class MainWindow
     private AzunyanEditorBuffer _editorBuffer = null!;
     private IntPtr _windowHandle;
     private readonly List<KeyboardAccelerator> _externalToolAccelerators = [];
+    private IReadOnlyList<ExternalToolMenuNode>? _renderedToolNodes;
+    private Dictionary<ExternalToolSettings, ExternalToolMenuState> _renderedToolStates = [];
+    private readonly Dictionary<ExternalToolSettings, List<MenuFlyoutItemBase>> _toolControls = [];
     private readonly List<MenuFlyoutItemBase> _externalToolMenuItems = [];
     private readonly List<MenuFlyoutItemBase> _externalToolContextMenuItems = [];
     private readonly List<MenuFlyoutItemBase> _recentFileMenuItems = [];
@@ -558,11 +561,32 @@ public sealed partial class MainWindow
         ArgumentNullException.ThrowIfNull(onEditDefinition);
         ArgumentNullException.ThrowIfNull(onShowInExplorer);
         using var measurement = ShellPerformance.Measure("tools.render");
+        var states = ExternalToolMenuBuilder.EnumerateTools(nodes).Distinct()
+            .ToDictionary(tool => tool, getState);
+        if (ReferenceEquals(nodes, _renderedToolNodes)
+            && states.Count == _renderedToolStates.Count
+            && states.All(pair => _renderedToolStates.TryGetValue(pair.Key, out var old)
+                && old.IsVisible == pair.Value.IsVisible))
+        {
+            foreach (var (tool, controls) in _toolControls)
+            {
+                if (_renderedToolStates[tool] == states[tool]) continue;
+                foreach (var control in controls) ApplyToolState(control, states[tool]);
+            }
+
+            _renderedToolStates = states;
+            return;
+        }
+
+        using var rebuild = ShellPerformance.Measure("tools.rebuild");
+        _renderedToolNodes = nodes;
+        _renderedToolStates = states;
+        _toolControls.Clear();
         ClearExternalToolAccelerators();
         ClearExternalToolMenuItems();
         ClearExternalToolContextMenuItems();
         _viewModel.SetExternalToolItems(
-            nodes, getState, onSelected, onEditDefinition, onShowInExplorer);
+            nodes, tool => states[tool], onSelected, onEditDefinition, onShowInExplorer);
         if (_viewModel.ExternalToolItems.Count > 0)
         {
             var menuItems = CreateExternalToolMenuItems(_viewModel.ExternalToolItems);
@@ -652,11 +676,6 @@ public sealed partial class MainWindow
 
         foreach (var (shortcut, candidates) in candidatesByShortcut)
         {
-            if (!candidates.Any(tool => getState(tool).IsEnabled))
-            {
-                continue;
-            }
-
             var accelerator = new KeyboardAccelerator
             {
                 Key = shortcut.Key,
@@ -847,6 +866,7 @@ public sealed partial class MainWindow
                 }
 
                 items.Add(menuItem);
+                TrackToolControl(tool, menuItem);
                 continue;
             }
 
@@ -862,7 +882,7 @@ public sealed partial class MainWindow
         return items;
     }
 
-    private static List<MenuFlyoutItemBase> CreateExternalToolContextMenuItems(
+    private List<MenuFlyoutItemBase> CreateExternalToolContextMenuItems(
         IReadOnlyList<ExternalToolMenuItemViewModel> entries)
     {
         var items = new List<MenuFlyoutItemBase>(entries.Count);
@@ -883,9 +903,26 @@ public sealed partial class MainWindow
             }
 
             items.Add(item);
+            TrackToolControl(entry.Tool!, item);
         }
 
         return items;
+    }
+
+    private void TrackToolControl(ExternalToolSettings tool, MenuFlyoutItemBase control)
+    {
+        if (!_toolControls.TryGetValue(tool, out var controls))
+        {
+            _toolControls.Add(tool, controls = []);
+        }
+        controls.Add(control);
+    }
+
+    private static void ApplyToolState(MenuFlyoutItemBase control, ExternalToolMenuState state)
+    {
+        control.IsEnabled = state.IsEnabled;
+        AutomationProperties.SetHelpText(control, state.DisabledReason ?? string.Empty);
+        ToolTipService.SetToolTip(control, state.DisabledReason);
     }
 
     private static void AddDefinitionActions(

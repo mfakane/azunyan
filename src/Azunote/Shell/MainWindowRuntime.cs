@@ -378,8 +378,14 @@ internal sealed class MainWindowRuntime : IDisposable
     public void ObserveTextChanged()
     {
         using var measurement = ShellPerformance.Measure("text.changed");
+        var previousState = _session.State;
         _documents.ObserveTextChanged();
-        RefreshDocumentView();
+        // StateChanged already refreshed the view when dirty/file state changed.
+        if (previousState == _session.State)
+        {
+            _status.Refresh();
+            RefreshExternalToolsMenu();
+        }
     }
 
     public void RefreshStatus() => _status.Refresh();
@@ -569,6 +575,5 @@ internal sealed class MainWindowRuntime : IDisposable
         _status.Refresh();
         _status.RefreshTitle();
         RefreshExternalToolsMenu();
-        _refreshWindowMenus();
     }
 }
