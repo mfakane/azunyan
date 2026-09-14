@@ -24,7 +24,7 @@ public sealed class AzunoteUiTests : IDisposable
     }
 
     [AzunoteUiFact]
-    public void Tool_menu_tracks_selection_without_recreating_the_menu_item()
+    public void Tool_menu_tracks_selection_when_other_tools_can_change_visibility()
     {
         // A unique definition in the test executable's portable data directory;
         // never edit the user's global settings or an existing tool definition.
@@ -44,25 +44,83 @@ public sealed class AzunoteUiTests : IDisposable
         {
             var window = _fixture.Window;
             var text = AzunoteUiFixture.WaitForTextPattern(_fixture.Editor);
+            AzunoteUiFixture.WaitForDocumentText(text, value => value.Contains("日本語", StringComparison.Ordinal));
             AzunoteUiFixture.OpenMenu(window, "Tools");
             var item = AzunoteUiFixture.WaitForElement(window, AutomationElement.NameProperty, name);
             Assert.False(item.Current.IsEnabled);
-            var identity = item.GetRuntimeId();
             var selection = text.DocumentRange.FindText("日本語", false, false)!;
             selection.Select();
-            AzunoteUiFixture.WaitFor(() => item.Current.IsEnabled ? item : null,
+            Assert.Equal("日本語", AzunoteUiFixture.WaitForSelectionText(text, value => value == "日本語"));
+            // Other configured tools may change visibility on selection, legitimately
+            // rebuilding the menu. Reacquire the current item instead of polling a
+            // detached control. The dotenv test below covers enabled-only identity.
+            AzunoteUiFixture.WaitFor(() =>
+                window.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, name))
+                    is { } current && current.Current.IsEnabled ? current : null,
                 "Selection did not enable the tool.");
-            Assert.Equal(identity, item.GetRuntimeId());
             selection.MoveEndpointByRange(TextPatternRangeEndpoint.End, selection, TextPatternRangeEndpoint.Start);
             selection.Select();
-            AzunoteUiFixture.WaitFor(() => !item.Current.IsEnabled ? item : null,
+            Assert.Equal("", AzunoteUiFixture.WaitForSelectionText(text, value => value == ""));
+            AzunoteUiFixture.WaitFor(() =>
+                window.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, name))
+                    is { } current && !current.Current.IsEnabled ? current : null,
                 "Clearing selection did not disable the tool.");
-            Assert.Equal(identity, item.GetRuntimeId());
         }
         finally
         {
             _fixture.Dispose();
             File.Delete(definition);
+        }
+    }
+
+    [AzunoteUiFact]
+    public void Open_tool_menu_tracks_dotenv_changes_without_editor_input()
+    {
+        var root = Directory.CreateTempSubdirectory("azunote-watched-menu-");
+        var document = Path.Combine(root.FullName, "test.txt");
+        File.WriteAllText(document, "日本語の環境変更テスト");
+        var tools = Path.Combine(Path.GetDirectoryName(AzunoteUiFixture.ResolveExecutablePath())!, "appdata", "tools");
+        Directory.CreateDirectory(tools);
+        var suffix = Guid.NewGuid().ToString("N");
+        var name = "Watched cache test " + suffix;
+        var variable = "AZUNOTE_WATCH_TEST_" + suffix;
+        var definition = Path.Combine(tools, name + ".tool.toml");
+        File.WriteAllText(definition, $$"""
+            name = "{{name}}"
+            visibility = "always"
+            [launch]
+            command = "${env:{{variable}}}"
+            """);
+        using var fixture = new AzunoteUiFixture(document);
+        try
+        {
+            var window = fixture.Window;
+            AzunoteUiFixture.WaitForDocumentText(AzunoteUiFixture.WaitForTextPattern(fixture.Editor),
+                value => value == "日本語の環境変更テスト");
+            AzunoteUiFixture.OpenMenu(window, "Tools");
+            var item = AzunoteUiFixture.WaitForElement(window, AutomationElement.NameProperty, name);
+            Assert.False(item.Current.IsEnabled);
+            var identity = item.GetRuntimeId();
+            var dotenv = Path.Combine(root.FullName, ".env");
+            File.WriteAllText(dotenv, variable + "=" + Path.Combine(Environment.SystemDirectory, "cmd.exe"));
+            AzunoteUiFixture.WaitFor(() => item.Current.IsEnabled ? item : null,
+                "Creating .env did not enable the open menu item without input.");
+            File.WriteAllText(dotenv, variable + "=" + Path.Combine(root.FullName, "missing.exe"));
+            AzunoteUiFixture.WaitFor(() => !item.Current.IsEnabled ? item : null,
+                "Changing .env did not disable the open menu item without input.");
+            File.WriteAllText(dotenv, variable + "=" + Path.Combine(Environment.SystemDirectory, "cmd.exe"));
+            AzunoteUiFixture.WaitFor(() => item.Current.IsEnabled ? item : null,
+                "Restoring .env did not enable the open menu item.");
+            File.Delete(dotenv);
+            AzunoteUiFixture.WaitFor(() => !item.Current.IsEnabled ? item : null,
+                "Deleting .env did not disable the open menu item.");
+            Assert.Equal(identity, item.GetRuntimeId());
+        }
+        finally
+        {
+            fixture.Dispose();
+            File.Delete(definition);
+            root.Delete(recursive: true);
         }
     }
 
@@ -499,6 +557,8 @@ public sealed class AzunoteUiTests : IDisposable
 
 public sealed class AzunoteUiFixture : IDisposable
 {
+    private readonly string? _verificationDocument;
+    public AzunoteUiFixture(string? verificationDocument = null) => _verificationDocument = verificationDocument;
     private const string EnabledVariable = "AZUNOTE_UI_TESTS";
     private const string ExecutableVariable = "AZUNOTE_EXE";
     private Process? _process;
@@ -715,7 +775,7 @@ public sealed class AzunoteUiFixture : IDisposable
         }
 
         var executablePath = ResolveExecutablePath();
-        var verificationDocument = ResolveVerificationDocument();
+        var verificationDocument = _verificationDocument ?? ResolveVerificationDocument();
         var startInfo = new ProcessStartInfo(executablePath)
         {
             UseShellExecute = true,

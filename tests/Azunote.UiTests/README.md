@@ -21,11 +21,15 @@ If the executable is in a non-default location, set `AZUNOTE_EXE` to its full pa
 Each test starts its own process and closes it when the test finishes, so document,
 window, and menu state cannot leak into subsequent tests.
 
-The external-tool selection test creates a uniquely named definition in the executable's
-portable `appdata/tools` directory and removes that definition afterwards. Use a writable
-test build directory. It verifies disabled/enabled/disabled transitions while a menu is
-open and checks that the UI Automation runtime ID of the item does not change. No external
-command is executed. To exercise the Native AOT build, set `AZUNOTE_EXE` to its executable.
+The external-tool tests create uniquely named definitions in the executable's portable
+`appdata/tools` directory and remove those definitions afterwards. Use a writable test
+build directory. The selection test verifies disabled/enabled/disabled transitions,
+reacquiring items because other tools can change visibility and rebuild the menu.
+The filesystem test creates, edits and deletes `.env` in a separate temporary document
+directory, outside the settings watcher. It verifies that an open menu updates without
+editor input and retains the item's UI Automation runtime ID for enabled-only changes.
+No external command is executed. To exercise the Native AOT build, set `AZUNOTE_EXE` to
+its executable.
 
 The current tests verify that the projected editor exposes TextPattern and a read/write
 ValuePattern, reports geometry for empty caret ranges, keeps ranges bound to the snapshot
