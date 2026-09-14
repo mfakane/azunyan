@@ -1,5 +1,6 @@
 using Xunit;
 using System.Windows.Input;
+using Microsoft.UI.Xaml;
 
 namespace Azunote.Tests.Shell;
 
@@ -57,6 +58,28 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("Ln 3, Col 5", viewModel.PositionStatus);
         Assert.Equal("file.cs", viewModel.FilePathStatus);
         Assert.True(viewModel.HasFilePath);
+    }
+
+    [Fact]
+    public void Running_external_tool_count_drives_the_status_indicator()
+    {
+        var viewModel = CreateViewModel();
+        var changed = new List<string?>();
+        viewModel.PropertyChanged += (_, args) => changed.Add(args.PropertyName);
+
+        Assert.Equal(Visibility.Collapsed, viewModel.RunningExternalToolVisibility);
+
+        viewModel.RunningExternalToolCount = 2;
+
+        Assert.Equal(Visibility.Visible, viewModel.RunningExternalToolVisibility);
+        Assert.Equal("2", viewModel.RunningExternalToolCountText);
+        Assert.Contains(nameof(MainWindowViewModel.RunningExternalToolCountText), changed);
+        Assert.Contains(nameof(MainWindowViewModel.RunningExternalToolVisibility), changed);
+
+        viewModel.RunningExternalToolCount = -1;
+
+        Assert.Equal(0, viewModel.RunningExternalToolCount);
+        Assert.Equal(Visibility.Collapsed, viewModel.RunningExternalToolVisibility);
     }
 
     [Fact]

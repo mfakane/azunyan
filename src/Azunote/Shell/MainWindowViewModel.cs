@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using Azunyan.Core;
@@ -30,6 +31,7 @@ internal sealed class MainWindowViewModel :
     private string _findResult = string.Empty;
     private bool _isReplaceMode;
     private bool _isReadOnly;
+    private int _runningExternalToolCount;
     private bool _isMatchCase;
     private bool _isMatchWholeWord;
     private bool _isRegularExpression;
@@ -215,6 +217,15 @@ internal sealed class MainWindowViewModel :
     }
 
     public bool CanEdit => !IsReadOnly;
+    public int RunningExternalToolCount
+    {
+        get => _runningExternalToolCount;
+        set => SetProperty(ref _runningExternalToolCount, Math.Max(0, value), dependentProperties:
+            [nameof(RunningExternalToolCountText), nameof(RunningExternalToolVisibility)]);
+    }
+    public string RunningExternalToolCountText => RunningExternalToolCount.ToString(CultureInfo.CurrentCulture);
+    public Visibility RunningExternalToolVisibility =>
+        RunningExternalToolCount > 0 ? Visibility.Visible : Visibility.Collapsed;
     public ICommand ViewLicenseCommand { get; }
     public ICommand ShowThirdPartyNoticesCommand { get; }
     public ICommand FindNextCommand { get; }

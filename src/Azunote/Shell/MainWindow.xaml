@@ -988,6 +988,7 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <TextBlock
@@ -1017,9 +1018,20 @@
                     Grid.Column="4"
                     Text="{x:Bind ViewModel.LanguageModeStatus, Mode=OneWay}"
                 />
+                <StackPanel
+                    x:Name="ExternalToolStatus"
+                    Grid.Column="5"
+                    Orientation="Horizontal"
+                    Spacing="4"
+                    ToolTipService.ToolTip="Running external tools"
+                    Visibility="{x:Bind ViewModel.RunningExternalToolVisibility, Mode=OneWay}"
+                >
+                    <FontIcon Glyph="&#xEC7A;" FontSize="14" />
+                    <TextBlock Text="{x:Bind ViewModel.RunningExternalToolCountText, Mode=OneWay}" />
+                </StackPanel>
                 <TextBlock
                     x:Name="FilePathStatus"
-                    Grid.Column="5"
+                    Grid.Column="6"
                     HorizontalAlignment="Right"
                     Text="{x:Bind ViewModel.FilePathStatus, Mode=OneWay}"
                     TextTrimming="CharacterEllipsis"

@@ -29,6 +29,7 @@ internal sealed class MainWindowRuntime : IDisposable
     private readonly Action<string> _recordRecentFile;
     private readonly Action<bool> _recordWordWrap;
     private readonly Action<bool> _recordStatusBarVisible;
+    private int _runningExternalToolCount;
     private bool _disposed;
 
     public MainWindowRuntime(
@@ -188,10 +189,24 @@ internal sealed class MainWindowRuntime : IDisposable
         int? column = null) =>
         _documents.OpenStartupTextAsync(text, line, column);
 
-    public Task<ExternalToolResult> RunExternalToolAsync(
+    public async Task<ExternalToolResult> RunExternalToolAsync(
         ExternalToolDefinition definition,
-        CancellationToken cancellationToken = default) =>
-        _documents.RunExternalToolAsync(definition, cancellationToken);
+        CancellationToken cancellationToken = default)
+    {
+        UpdateRunningExternalToolCount(1);
+        try
+        {
+            return await _documents.RunExternalToolAsync(definition, cancellationToken);
+        }
+        finally
+        {
+            UpdateRunningExternalToolCount(-1);
+        }
+    }
+
+    private void UpdateRunningExternalToolCount(int delta) =>
+        _viewModel.RunningExternalToolCount =
+            Interlocked.Add(ref _runningExternalToolCount, delta);
 
     public Task OpenFileAsync() => _documents.OpenFileAsync();
 
