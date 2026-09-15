@@ -119,6 +119,7 @@ internal sealed class SingleInstanceHost : IDisposable
             PipeDirection.InOut,
             PipeOptions.Asynchronous);
         await ConnectAsync(client, cancellationToken).ConfigureAwait(false);
+        ForegroundHandoff.AllowFor(client);
         await SingleInstanceProtocol.WriteCommandAsync(
             client,
             new SingleInstanceCommand(

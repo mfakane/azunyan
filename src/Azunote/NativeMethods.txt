@@ -10,3 +10,11 @@ IShellItem
 COMDLG_FILTERSPEC
 FILEOPENDIALOGOPTIONS
 SIGDN
+
+// Foreground activation when the running editor is asked to show a window.
+SetForegroundWindow
+GetForegroundWindow
+BringWindowToTop
+AttachThreadInput
+GetWindowThreadProcessId
+GetCurrentThreadId

@@ -41,6 +41,8 @@ public static class SingleInstanceClient
             return null;
         }
 
+        ForegroundHandoff.AllowFor(client);
+
         await SingleInstanceProtocol
             .WriteCommandAsync(client, arguments, workingDirectory, standardInput, cancellationToken)
             .ConfigureAwait(false);

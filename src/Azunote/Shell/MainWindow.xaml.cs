@@ -612,6 +612,7 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     {
         RestoreIfMinimizedView();
         Activate();
+        WindowForeground.BringToFront(WindowHandle);
     }
 
     internal void MinimizeWindow() => MinimizeView();
