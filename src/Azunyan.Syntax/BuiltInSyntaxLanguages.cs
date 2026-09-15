@@ -142,10 +142,16 @@ public static class BuiltInSyntaxLanguages
             new KeywordSyntaxRule(["true", "false", "null"]),
             new RegexSyntaxRule(@"(?<![\w.])-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?(?![\w.])", "number")
         ],
-        CommonCompletionTriggers);
+        CommonCompletionTriggers,
+        foldingProvider: new JsonFoldingProvider());
 
     private static SyntaxLanguageDefinition CreateYaml() =>
-        new("yaml", "YAML", [".yaml", ".yml"], [new YamlSyntaxProvider()]);
+        new(
+            "yaml",
+            "YAML",
+            [".yaml", ".yml"],
+            [new YamlSyntaxProvider()],
+            foldingProvider: new YamlFoldingProvider());
 
     private static SyntaxLanguageDefinition CreateToml() =>
         new("toml", "TOML", ["*.toml"],

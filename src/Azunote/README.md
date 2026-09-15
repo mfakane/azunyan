@@ -196,9 +196,17 @@ there and reconciles it with the native caret rectangle for IME candidate
 placement. Completion results and provider tooltips use the same caret geometry.
 
 Built-in language definitions are available for C#, JavaScript, TypeScript,
-Python, JSON, TOML, Markdown, and PowerShell. Azunote exposes them from
+Python, JSON, YAML, TOML, Markdown, and PowerShell. Azunote exposes them from
 View > Language Mode, alongside Plain Text and its Azunote note mode. Custom
 language modes are described in [Settings](../../docs/settings.md).
+
+Folding is offered by the language definitions that supply a folding provider.
+TOML and the Azunote note mode fold a table section up to the next header, JSON
+folds an object or an array between its brackets so the collapsed line still
+shows which one it is, and YAML folds the block indented under a key or a
+sequence entry, leaving trailing blank lines outside the fold. Each fold is
+named after the path of what it covers, such as `$/items/2` or `/jobs/build`,
+so a collapsed block stays collapsed while the text above it is edited.
 
 URLs are highlighted in every language mode. Azunote layers
 `Azunyan.Syntax.UrlSyntaxRule` over the selected mode with

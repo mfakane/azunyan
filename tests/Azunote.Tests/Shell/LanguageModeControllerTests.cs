@@ -63,6 +63,22 @@ public sealed class LanguageModeControllerTests
     }
 
     [Theory]
+    [InlineData("data.json")]
+    [InlineData("config.yml")]
+    [InlineData("settings.toml")]
+    public void Structured_document_modes_supply_a_folding_provider(string path)
+    {
+        var editor = new FakeEditorView();
+        var menu = new FakeLanguageModeMenuView();
+        var controller = new LanguageModeController(editor, menu, () => path);
+
+        controller.Initialize();
+        controller.DocumentOpened(path);
+
+        Assert.NotNull(editor.LanguageConfiguration?.Folding);
+    }
+
+    [Theory]
     [InlineData("notes.txt")]
     [InlineData("settings.toml")]
     [InlineData("program.cs")]
