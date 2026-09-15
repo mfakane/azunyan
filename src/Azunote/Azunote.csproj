@@ -33,6 +33,8 @@
     <Page Remove="Application\App.xaml" />
     <EmbeddedResource Include="Resources\DefaultAppData\**\*"
                       LogicalName="Azunote.DefaultAppData.%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="ExternalTools\PowerShellToolWrapper.ps1"
+                      LogicalName="Azunote.ExternalTools.PowerShellToolWrapper.ps1" />
   </ItemGroup>
 
   <ItemGroup>

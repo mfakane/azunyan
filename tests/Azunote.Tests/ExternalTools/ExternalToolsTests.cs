@@ -1114,6 +1114,24 @@ public sealed class ExternalToolsTests
     }
 
     [Fact]
+    public void Wrapper_script_is_embedded_and_handed_over_encoded()
+    {
+        // Every `pwsh` tool depends on the script being embedded under the name
+        // the loader asks for, and the tools that would notice do not run where
+        // PowerShell is missing.
+        const string prefix = "-NoLogo -NoProfile -NonInteractive -EncodedCommand ";
+        var script = PowerShellToolWrapper.Script;
+        var arguments = PowerShellToolWrapper.Arguments;
+
+        Assert.Contains("$azunoteScript", script, StringComparison.Ordinal);
+        Assert.StartsWith(prefix, arguments, StringComparison.Ordinal);
+        Assert.Equal(
+            script,
+            System.Text.Encoding.Unicode.GetString(
+                Convert.FromBase64String(arguments[prefix.Length..])));
+    }
+
+    [Fact]
     public async Task Runner_pipes_standard_input_into_pwsh_commands()
     {
         if (!PwshAvailable)

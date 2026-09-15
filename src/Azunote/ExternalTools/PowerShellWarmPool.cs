@@ -452,7 +452,7 @@ internal sealed class PowerShellWarmPool : IDisposable
                 StandardOutputEncoding = StandardIoEncoding,
                 StandardErrorEncoding = StandardIoEncoding,
                 WorkingDirectory = AppContext.BaseDirectory,
-                Arguments = ExternalToolLaunchPlan.BuildPowerShellWarmArguments()
+                Arguments = PowerShellToolWrapper.Arguments
             };
             startInfo.Environment[PipeEnvironmentVariable] = pipeName;
             startInfo.Environment[TokenEnvironmentVariable] = token;
