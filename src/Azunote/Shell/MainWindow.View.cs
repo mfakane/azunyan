@@ -59,6 +59,23 @@ public sealed partial class MainWindow
 
     internal Document Document => _editor.Document;
 
+    private async void Editor_LinkInvoked(object? sender, LinkInvokedEventArgs args)
+    {
+        if (!DocumentLinks.TryCreateNavigableUri(args.Text, out var uri))
+        {
+            return;
+        }
+
+        try
+        {
+            await Windows.System.Launcher.LaunchUriAsync(uri);
+        }
+        catch (Exception exception)
+        {
+            ErrorReporter.LogException($"Open link: {uri}", exception);
+        }
+    }
+
     internal void SetDocument(Document document) => _editor.SetDocument(document);
 
     private void InitializeView()
@@ -69,6 +86,7 @@ public sealed partial class MainWindow
         Editor.DiagnosticExceptionSink = (source, exception) => ErrorReporter.LogException(
             $"Editor exception/{source}",
             exception);
+        Editor.LinkInvoked += Editor_LinkInvoked;
         _editorBuffer = new AzunyanEditorBuffer(Editor);
         _findNotificationFlyout = FindNotificationFlyout;
         _findNotificationText = _findNotificationFlyout.Content as TextBlock

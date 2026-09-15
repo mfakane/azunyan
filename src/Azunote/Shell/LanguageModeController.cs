@@ -111,7 +111,7 @@ internal sealed class LanguageModeController
             : DocumentWordCompletion;
         _editor.ApplyLanguage(new EditorLanguageConfiguration(
             mode.CompletionTriggers,
-            isAzunote ? new AzunoteSyntaxProvider() : mode.Provider,
+            DocumentLinks.Attach(isAzunote ? new AzunoteSyntaxProvider() : mode.Provider),
             completion,
             mode.FoldingProvider));
         _menu.Select(id);

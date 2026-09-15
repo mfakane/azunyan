@@ -207,6 +207,13 @@ Syntax classification does not change projection geometry. Classification
 spans are resolved to theme styles while shaped runs are built. Adjacent runs
 with identical effective typography are merged before shaping.
 
+The `link` classification (`Azunyan.Core.SyntaxClassifications.Link`) is the
+one name the editor itself understands: link runs are underlined in addition to
+their palette color, and Ctrl+Click on one raises `LinkInvoked` instead of
+starting a selection. Detection stays in the syntax channel, so a host without
+a link-aware provider simply never reports one, and navigation stays with the
+host.
+
 Decorations such as underline, squiggle, background highlight, and diagnostic
 markers are separate drawing primitives. They reuse the glyph hit-test map and
 do not create duplicate text.

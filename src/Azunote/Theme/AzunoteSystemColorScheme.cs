@@ -88,6 +88,10 @@ internal static class AzunoteSystemColorScheme
                 isDark,
                 Color.FromArgb(0xff, 0x79, 0x5e, 0x26),
                 Color.FromArgb(0xff, 0x9c, 0xdc, 0xfe)),
+            LinkForeground = ThemeColor(
+                isDark,
+                Color.FromArgb(0xff, 0x0b, 0x53, 0x94),
+                Color.FromArgb(0xff, 0x4d, 0xa6, 0xff)),
             PopupBackground = popupBackground,
             PopupForeground = foreground,
             PopupBorder = border,

@@ -1,3 +1,4 @@
+using Azunyan.Core;
 using Windows.UI;
 
 namespace Azunyan.WinUI;
@@ -28,6 +29,7 @@ public sealed record AzunyanColorScheme
         TaskForeground = Color.FromArgb(0xff, 0xc2, 0x41, 0x0c),
         CodeForeground = Color.FromArgb(0xff, 0x26, 0x7f, 0x99),
         VariableForeground = Color.FromArgb(0xff, 0x79, 0x5e, 0x26),
+        LinkForeground = Color.FromArgb(0xff, 0x0b, 0x53, 0x94),
         PopupBackground = Color.FromArgb(0xff, 0xf4, 0xf4, 0xf4),
         PopupForeground = Color.FromArgb(0xff, 0x1a, 0x1a, 0x1a),
         PopupBorder = Color.FromArgb(0xff, 0x80, 0x80, 0x80),
@@ -74,6 +76,12 @@ public sealed record AzunyanColorScheme
     public Color VariableForeground { get; init; }
 
     /// <summary>
+    /// Foreground of a navigable link. The editor also underlines this
+    /// classification so a link stays recognizable in a monochrome palette.
+    /// </summary>
+    public Color LinkForeground { get; init; }
+
+    /// <summary>
     /// Optionally resolves a foreground for any syntax classification. Returning
     /// null retains Azunyan's built-in classification mapping and fallback.
     /// </summary>
@@ -109,6 +117,7 @@ public sealed record AzunyanColorScheme
             "comment" => CommentForeground,
             "task-marker" => TaskForeground,
             "variable" => VariableForeground,
+            SyntaxClassifications.Link => LinkForeground,
             _ => EditorForeground
         };
     }

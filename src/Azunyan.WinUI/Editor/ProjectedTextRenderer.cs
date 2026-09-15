@@ -1818,7 +1818,8 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
                 .Select(run => new DirectWriteTextRun(
                     run.Text,
                     GetForeground(context.ColorScheme, run),
-                    run.Kind == LayoutRunKind.InlineAdornment))
+                    run.Kind == LayoutRunKind.InlineAdornment,
+                    IsLink(run)))
                 .ToArray();
             textLayout = DirectWriteTextLayout.Create(
                 drawingSession,
@@ -2158,6 +2159,10 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
                 context.LineHeight),
             context.ColorScheme.CaretForeground);
     }
+
+    private static bool IsLink(LayoutRun run) =>
+        run.Kind == LayoutRunKind.Text
+        && run.Classification == SyntaxClassifications.Link;
 
     private static Color GetForeground(AzunyanColorScheme colors, LayoutRun run)
     {

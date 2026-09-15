@@ -200,6 +200,14 @@ Python, JSON, TOML, Markdown, and PowerShell. Azunote exposes them from
 View > Language Mode, alongside Plain Text and its Azunote note mode. Custom
 language modes are described in [Settings](../../docs/settings.md).
 
+URLs are highlighted in every language mode. Azunote layers
+`Azunyan.Syntax.UrlSyntaxRule` over the selected mode with
+`OverlaySyntaxProvider`, so a URL inside a comment or a string keeps the link
+appearance while the surrounding text keeps its own. Ctrl+Click opens a link
+with the Windows default handler; the pointer shows a hand cursor while Ctrl is
+held over one. Only `http`, `https`, `ftp`, `ftps`, `file`, and `mailto`
+targets are opened.
+
 Azunote's configuration mode uses the built-in TOML provider and a
 NativeAOT-safe schema catalog for completion candidates in settings, tool,
 manifest, and custom-mode definition files. The view can accept the selected

@@ -61,4 +61,29 @@ public sealed class LanguageModeControllerTests
         Assert.Equal("yaml", controller.CurrentModeId);
         Assert.IsType<DocumentWordCompletionProvider>(editor.LanguageConfiguration?.Completion);
     }
+
+    [Theory]
+    [InlineData("notes.txt")]
+    [InlineData("settings.toml")]
+    [InlineData("program.cs")]
+    public async Task Every_language_mode_highlights_urls(string path)
+    {
+        var editor = new FakeEditorView();
+        var menu = new FakeLanguageModeMenuView();
+        var controller = new LanguageModeController(editor, menu, () => path);
+
+        controller.Initialize();
+        controller.DocumentOpened(path);
+
+        const string text = "x https://example.com/page";
+        var syntax = editor.LanguageConfiguration?.Syntax;
+        Assert.NotNull(syntax);
+        var spans = await syntax!.GetSyntaxAsync(
+            new EditorProviderContext(new TextSnapshot(text), 0, TextSelection.Caret(0)));
+
+        Assert.Contains(
+            spans,
+            span => span.Classification == SyntaxClassifications.Link
+                && text[span.Range.Start..span.Range.End] == "https://example.com/page");
+    }
 }

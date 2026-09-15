@@ -83,6 +83,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private string[] _completionTriggerCharacters = Array.Empty<string>();
     private bool _disposed;
     private int _hoverPosition = -1;
+    private Point? _lastPointerPosition;
+    private bool _linkCursorActive;
     private TextBlockSelection? _blockSelection;
     private int? _pointerSelectionAnchor;
     private TextBlockPosition? _pointerBlockSelectionAnchor;
@@ -394,6 +396,12 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     /// or block adornment. The host owns command dispatch.
     /// </summary>
     public event EventHandler<AdornmentInvokedEventArgs>? AdornmentInvoked;
+
+    /// <summary>
+    /// Raised when the projected surface is Ctrl+Clicked on text a syntax
+    /// provider classified as a link. The host owns navigation.
+    /// </summary>
+    public event EventHandler<LinkInvokedEventArgs>? LinkInvoked;
 
     public IReadOnlySet<string> CollapsedFoldIds => _collapsedFoldIds;
 
@@ -2117,6 +2125,11 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private void OnInputKeyDown(object sender, KeyRoutedEventArgs args)
     {
         var isRepeat = !_nativeKeysDown.Add(args.Key);
+        if (args.Key == VirtualKey.Control && !isRepeat)
+        {
+            RefreshLinkCursor();
+        }
+
         LogDiagnostic(
             AzunyanDiagnosticCategory.Key,
             $"keydown key={args.Key}; repeat={isRepeat}; {DescribeDiagnosticState()}");
@@ -2602,6 +2615,11 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     {
         _nativeKeysDown.Remove(args.Key);
         _queuedNonRepeatingKeys.Remove(args.Key);
+        if (args.Key == VirtualKey.Control)
+        {
+            UpdateLinkCursor(false);
+        }
+
         LogDiagnostic(
             AzunyanDiagnosticCategory.Key,
             $"keyup key={args.Key}; {DescribeDiagnosticState()}");
@@ -2923,8 +2941,21 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 out var anchor,
                 out _,
                 out var adornmentId,
-                out var blockPosition))
+                out var blockPosition,
+                out var textPosition))
         {
+            return;
+        }
+
+        if (adornmentId is null
+            && GetPointerModifiers(args).HasFlag(VirtualKeyModifiers.Control)
+            && textPosition is int linkPosition
+            && TryGetLinkAt(linkPosition, out var linkRange, out var linkText))
+        {
+            SetDocumentSelection(TextSelection.Caret(anchor.Position.Offset));
+            InputWindow.Focus(FocusState.Pointer);
+            args.Handled = true;
+            LinkInvoked?.Invoke(this, new LinkInvokedEventArgs(linkText, linkRange));
             return;
         }
 
@@ -3245,6 +3276,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         var point = args.GetCurrentPoint(EditorPointerSurface);
+        _lastPointerPosition = point.Position;
         if (_selectionPointerId is uint selectionPointerId
             && point.PointerId == selectionPointerId
             && _pointerSelectingBlock
@@ -3332,11 +3364,19 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 GetVerticalOffset(),
                 _characterWidth,
                 out var anchor,
-                out _))
+                out _,
+                out _,
+                out _,
+                out var hoverTextPosition))
         {
             OnInputPointerExited(sender, args);
             return;
         }
+
+        UpdateLinkCursor(
+            IsKeyDown(VirtualKey.Control)
+            && hoverTextPosition is int hoverLinkPosition
+            && TryGetLinkAt(hoverLinkPosition, out _, out _));
 
         var position = anchor.Position.Offset;
         if (_hoverPosition == position)
@@ -3354,7 +3394,91 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private void OnInputPointerExited(object sender, PointerRoutedEventArgs args)
     {
         _hoverPosition = -1;
+        _lastPointerPosition = null;
+        UpdateLinkCursor(false);
         HideTooltipPopup();
+    }
+
+    /// <summary>
+    /// Finds the link classification that covers a document position. The
+    /// syntax channel owns link detection, so an editor without a link-aware
+    /// provider simply never reports one.
+    /// </summary>
+    private bool TryGetLinkAt(int position, out TextRange range, out string text)
+    {
+        range = TextRange.Empty(0);
+        text = string.Empty;
+        if (GetCurrentFrame()?.Document?.Syntax is not { } spans)
+        {
+            return false;
+        }
+
+        foreach (var span in spans)
+        {
+            if (!string.Equals(
+                    span.Classification,
+                    SyntaxClassifications.Link,
+                    StringComparison.Ordinal)
+                || position < span.Range.Start
+                || position >= span.Range.End
+                || span.Range.End > Snapshot.Length)
+            {
+                continue;
+            }
+
+            range = span.Range;
+            text = Snapshot.GetText(span.Range);
+            return text.Length > 0;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Ctrl is pressed and released without moving the pointer, so the link
+    /// cursor is refreshed from the last known pointer position as well.
+    /// </summary>
+    private void RefreshLinkCursor()
+    {
+        if (_disposed
+            || !IsProjectedTextSurface
+            || _selectionPointerId is not null
+            || _lastPointerPosition is not { } point
+            || !IsKeyDown(VirtualKey.Control)
+            || !_defaultRenderer.TextRenderer.TryHitTest(
+                point.X,
+                point.Y,
+                InputWindow.NativeTextBoxControl.Padding.Left,
+                InputWindow.NativeTextBoxControl.Padding.Top,
+                GetHorizontalOffset(),
+                GetVerticalOffset(),
+                _characterWidth,
+                out _,
+                out _,
+                out _,
+                out _,
+                out var textPosition))
+        {
+            UpdateLinkCursor(false);
+            return;
+        }
+
+        UpdateLinkCursor(
+            textPosition is int position
+            && TryGetLinkAt(position, out _, out _));
+    }
+
+    private void UpdateLinkCursor(bool overLink)
+    {
+        if (_linkCursorActive == overLink)
+        {
+            return;
+        }
+
+        _linkCursorActive = overLink;
+        ProtectedCursor = overLink
+            ? InputSystemCursor.Create(InputSystemCursorShape.Hand)
+            : null;
     }
 
     private void SetProjectedDocumentSelection(

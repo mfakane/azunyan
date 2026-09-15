@@ -1,3 +1,4 @@
+using Azunyan.Core;
 using Azunyan.WinUI;
 using Microsoft.UI.Xaml;
 using Windows.UI;
@@ -36,7 +37,8 @@ public sealed class AzunyanColorSchemeTests
             colors.ResolveSyntaxForeground("number"),
             colors.ResolveSyntaxForeground("comment"),
             colors.ResolveSyntaxForeground("task-marker"),
-            colors.ResolveSyntaxForeground("variable")
+            colors.ResolveSyntaxForeground("variable"),
+            colors.ResolveSyntaxForeground(SyntaxClassifications.Link)
         };
 
         Assert.Equal(syntaxColors.Length, syntaxColors.Distinct().Count());

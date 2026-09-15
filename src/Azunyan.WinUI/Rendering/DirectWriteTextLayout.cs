@@ -14,12 +14,17 @@ namespace Azunyan.WinUI;
 /// </summary>
 public sealed record DirectWriteTextRun
 {
-    public DirectWriteTextRun(string text, Color foreground, bool italic = false)
+    public DirectWriteTextRun(
+        string text,
+        Color foreground,
+        bool italic = false,
+        bool underline = false)
     {
         ArgumentNullException.ThrowIfNull(text);
         Text = text;
         Foreground = foreground;
         Italic = italic;
+        Underline = underline;
     }
 
     public string Text { get; }
@@ -27,6 +32,8 @@ public sealed record DirectWriteTextRun
     public Color Foreground { get; }
 
     public bool Italic { get; }
+
+    public bool Underline { get; }
 }
 
 /// <summary>
@@ -133,6 +140,11 @@ public sealed class DirectWriteTextLayout : IDisposable
             if (run.Italic)
             {
                 layout.SetFontStyle(textOffset, run.Text.Length, FontStyle.Italic);
+            }
+
+            if (run.Underline)
+            {
+                layout.SetUnderline(textOffset, run.Text.Length, true);
             }
 
             textOffset += run.Text.Length;
