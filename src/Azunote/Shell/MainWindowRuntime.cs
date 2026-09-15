@@ -23,6 +23,7 @@ internal sealed class MainWindowRuntime : IDisposable
     private readonly GoToLineController _goToLine;
     private readonly DocumentStatusPresenter _status;
     private readonly IFilePathActions _filePathActions;
+    private readonly Func<string, Task> _openFileInNewWindow;
     private readonly WinUiMessageDialog _messageDialog;
     private readonly WinUiExternalToolDialog _externalToolDialog;
     private readonly Action _refreshWindowMenus;
@@ -52,6 +53,7 @@ internal sealed class MainWindowRuntime : IDisposable
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _refreshWindowMenus = refreshWindowMenus ?? throw new ArgumentNullException(nameof(refreshWindowMenus));
         _filePathActions = filePathActions ?? throw new ArgumentNullException(nameof(filePathActions));
+        _openFileInNewWindow = openFileInNewWindow ?? throw new ArgumentNullException(nameof(openFileInNewWindow));
         _recordRecentFile = recordRecentFile ?? throw new ArgumentNullException(nameof(recordRecentFile));
         _recordWordWrap = recordWordWrap ?? throw new ArgumentNullException(nameof(recordWordWrap));
         _recordStatusBarVisible = recordStatusBarVisible ?? throw new ArgumentNullException(nameof(recordStatusBarVisible));
@@ -360,6 +362,41 @@ internal sealed class MainWindowRuntime : IDisposable
         catch (Exception exception)
         {
             await _prompt.ShowErrorAsync("Could not show file in Explorer", exception.Message);
+        }
+    }
+
+    /// <summary>
+    /// Opens a link the editor reported. A URL goes to the Windows default
+    /// handler; a relative Markdown destination is resolved against the folder
+    /// of the current document and, when the file exists, opened in Azunote if
+    /// it is one of its language modes and by Windows otherwise. A link that
+    /// resolves to nothing is left alone: the text stays selectable.
+    /// </summary>
+    public async Task OpenLinkAsync(string text)
+    {
+        var target = DocumentLinks.Resolve(
+            text,
+            _session.State.FilePath,
+            _languageModes.IsEditableDocument);
+        try
+        {
+            switch (target.Action)
+            {
+                case DocumentLinkAction.OpenUri:
+                    await _filePathActions.OpenWithDefaultApplicationAsync(
+                        target.Uri!.AbsoluteUri);
+                    break;
+                case DocumentLinkAction.OpenInEditor:
+                    await _openFileInNewWindow(target.Path!);
+                    break;
+                case DocumentLinkAction.OpenWithShell:
+                    await _filePathActions.OpenWithDefaultApplicationAsync(target.Path!);
+                    break;
+            }
+        }
+        catch (Exception exception)
+        {
+            await _prompt.ShowErrorAsync("Could not open link", exception.Message);
         }
     }
 

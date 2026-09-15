@@ -212,7 +212,9 @@ one name the editor itself understands: link runs are underlined in addition to
 their palette color, and Ctrl+Click on one raises `LinkInvoked` instead of
 starting a selection. Detection stays in the syntax channel, so a host without
 a link-aware provider simply never reports one, and navigation stays with the
-host.
+host. A provider can classify anything as a link, not only a URL: the Markdown
+rule reports the destination of an inline link, which is how a relative target
+such as `./other.md` becomes navigable.
 
 Decorations such as underline, squiggle, background highlight, and diagnostic
 markers are separate drawing primitives. They reuse the glyph hit-test map and

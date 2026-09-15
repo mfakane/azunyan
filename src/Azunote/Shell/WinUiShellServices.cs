@@ -101,6 +101,24 @@ internal sealed class WinUiFilePathActions : IFilePathActions
         return Task.CompletedTask;
     }
 
+    public Task OpenWithDefaultApplicationAsync(string target)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(target);
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = target,
+            UseShellExecute = true
+        };
+
+        if (Process.Start(startInfo) is null)
+        {
+            throw new InvalidOperationException($"Windows could not open '{target}'.");
+        }
+
+        return Task.CompletedTask;
+    }
+
     private static string QuoteCommandShellArgument(string value) =>
         $"\"{value.Replace("\"", "\\\"", StringComparison.Ordinal)}\"";
 }

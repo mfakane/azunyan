@@ -61,18 +61,13 @@ public sealed partial class MainWindow
 
     private async void Editor_LinkInvoked(object? sender, LinkInvokedEventArgs args)
     {
-        if (!DocumentLinks.TryCreateNavigableUri(args.Text, out var uri))
-        {
-            return;
-        }
-
         try
         {
-            await Windows.System.Launcher.LaunchUriAsync(uri);
+            await _runtime.OpenLinkAsync(args.Text);
         }
         catch (Exception exception)
         {
-            ErrorReporter.LogException($"Open link: {uri}", exception);
+            ErrorReporter.LogException($"Open link: {args.Text}", exception);
         }
     }
 

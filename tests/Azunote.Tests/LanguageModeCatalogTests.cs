@@ -45,4 +45,30 @@ public sealed class LanguageModeCatalogTests
         Assert.Equal("all", filters[^1].Id);
         Assert.Contains(".txt", filters.Single(filter => filter.Id == "plain-text").Extensions);
     }
+
+    [Theory]
+    [InlineData("notes.md", true)]
+    [InlineData("notes.txt", true)]
+    [InlineData("program.cs", true)]
+    [InlineData("icon.png", false)]
+    [InlineData("archive.zip", false)]
+    public void Known_files_are_the_ones_a_language_mode_covers(string path, bool expected)
+    {
+        var catalog = LanguageModeCatalog.Create();
+
+        Assert.Equal(expected, catalog.IsKnownFile(path));
+    }
+
+    [Fact]
+    public void A_custom_mode_extends_the_known_files()
+    {
+        var custom = new SyntaxLanguageDefinition(
+            "custom",
+            "Custom",
+            ["*.custom"],
+            [new LiteralSyntaxRule("true", "keyword")]);
+
+        Assert.False(LanguageModeCatalog.Create().IsKnownFile("notes.custom"));
+        Assert.True(LanguageModeCatalog.Create([custom]).IsKnownFile("notes.custom"));
+    }
 }

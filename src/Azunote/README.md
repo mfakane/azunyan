@@ -203,10 +203,19 @@ language modes are described in [Settings](../../docs/settings.md).
 URLs are highlighted in every language mode. Azunote layers
 `Azunyan.Syntax.UrlSyntaxRule` over the selected mode with
 `OverlaySyntaxProvider`, so a URL inside a comment or a string keeps the link
-appearance while the surrounding text keeps its own. Ctrl+Click opens a link
-with the Windows default handler; the pointer shows a hand cursor while Ctrl is
-held over one. Only `http`, `https`, `ftp`, `ftps`, `file`, and `mailto`
-targets are opened.
+appearance while the surrounding text keeps its own. In Markdown mode,
+`MarkdownLinkSyntaxRule` adds the destination of an inline link or image,
+including the relative ones a URL scan cannot recognize: `[note](./other.md)`,
+`[up](../index.md)`, `[same](other.md)`, and the `<...>` and titled forms.
+
+Ctrl+Click opens a link, and the pointer shows a hand cursor while Ctrl is held
+over one. An absolute `http`, `https`, `ftp`, `ftps`, or `mailto` target goes to
+the Windows default handler. Any other target is read as a path and resolved
+against the folder of the current document, so a relative link needs a saved
+document. The resolved file is opened in a new Azunote window when one of the
+language modes covers its name, including a custom mode, and handed to the
+Windows default handler otherwise; a link that resolves to no existing file
+does nothing.
 
 Azunote's configuration mode uses the built-in TOML provider and a
 NativeAOT-safe schema catalog for completion candidates in settings, tool,

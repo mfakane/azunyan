@@ -98,6 +98,12 @@ internal interface IFilePathActions
         string command,
         IReadOnlyList<string> arguments,
         string workingDirectory);
+
+    /// <summary>
+    /// Hands a URL or an existing file to the Windows default handler. The
+    /// caller decides what may be opened this way.
+    /// </summary>
+    Task OpenWithDefaultApplicationAsync(string target);
 }
 
 internal interface IWindowChromeView

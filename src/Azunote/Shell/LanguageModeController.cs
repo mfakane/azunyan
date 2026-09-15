@@ -45,6 +45,13 @@ internal sealed class LanguageModeController
     public IReadOnlyList<FileDialogFilter> GetFileDialogFilters() =>
         _catalog.GetFileDialogFilters();
 
+    /// <summary>
+    /// Reports whether a linked file is one Azunote itself edits. Custom
+    /// language modes count, so a workspace that defines its own mode keeps
+    /// its documents in the editor.
+    /// </summary>
+    public bool IsEditableDocument(string path) => _catalog.IsKnownFile(path);
+
     public void Initialize(IReadOnlyList<SyntaxLanguageDefinition>? customModes = null)
     {
         var selectedMode = _currentModeId;
@@ -111,7 +118,9 @@ internal sealed class LanguageModeController
             : DocumentWordCompletion;
         _editor.ApplyLanguage(new EditorLanguageConfiguration(
             mode.CompletionTriggers,
-            DocumentLinks.Attach(isAzunote ? new AzunoteSyntaxProvider() : mode.Provider),
+            DocumentLinks.Attach(
+                isAzunote ? new AzunoteSyntaxProvider() : mode.Provider,
+                id),
             completion,
             mode.FoldingProvider));
         _menu.Select(id);

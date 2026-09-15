@@ -54,6 +54,18 @@ public sealed class LanguageModeCatalog
         return selectedId;
     }
 
+    /// <summary>
+    /// Reports whether a path matches one of the language modes, which is how
+    /// Azunote decides that a linked file is one of its own documents rather
+    /// than something for the Windows default handler.
+    /// </summary>
+    public bool IsKnownFile(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        return _entries.Any(entry =>
+            SyntaxLanguageDefinition.GetPatternMatchScore(path, entry.Patterns) >= 0);
+    }
+
     public IReadOnlyList<FileDialogFilter> GetFileDialogFilters()
     {
         var modeFilters = _entries
