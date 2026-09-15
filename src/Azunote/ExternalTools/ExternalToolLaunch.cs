@@ -20,12 +20,15 @@ internal sealed record ExternalToolLaunchPlan(
 {
     private const string ShellCommandEnvironmentVariable =
         "AZUNOTE_EXTERNAL_TOOL_COMMAND";
+    private const string ShellStandardInputEnvironmentVariable =
+        "AZUNOTE_EXTERNAL_TOOL_STDIN";
     private static readonly UnicodeEncoding CommandShellOutputEncoding =
         new(bigEndian: false, byteOrderMark: false, throwOnInvalidBytes: false);
 
     public void AddArguments(
         ProcessStartInfo startInfo,
-        IReadOnlyList<string> arguments)
+        IReadOnlyList<string> arguments,
+        bool standardInputConfigured = false)
     {
         switch (Kind)
         {
@@ -48,8 +51,10 @@ internal sealed record ExternalToolLaunchPlan(
                 break;
             case ExternalToolLaunchKind.PowerShellCommand:
                 startInfo.Environment[ShellCommandEnvironmentVariable] = ResolvedPath;
-                startInfo.Arguments = "-NoLogo -NoProfile -NonInteractive -Command "
-                    + BuildPowerShellCommand();
+                startInfo.Environment[ShellStandardInputEnvironmentVariable] =
+                    standardInputConfigured ? "1" : "0";
+                startInfo.Arguments = "-NoLogo -NoProfile -NonInteractive -EncodedCommand "
+                    + EncodeCommand(BuildPowerShellCommand());
                 break;
             default:
                 throw new InvalidOperationException(
@@ -82,26 +87,42 @@ internal sealed record ExternalToolLaunchPlan(
         + ShellCommandEnvironmentVariable
         + "%";
 
+    /// <summary>
+    /// The script a `pwsh` tool is launched with. The command line itself
+    /// carries no part of the configured command: it travels in an environment
+    /// variable, and whether standard input is configured travels in another,
+    /// so that quoting never has to be reasoned about.
+    /// </summary>
     private static string BuildPowerShellCommand() =>
-        "$OutputEncoding = [System.Text.UTF8Encoding]::new($false); "
-        + "[Console]::OutputEncoding = $OutputEncoding; "
-        + "Invoke-Expression $env:" + ShellCommandEnvironmentVariable;
+        EncodingPrologue
+        + Environment.NewLine
+        + "$azunoteScript = [string]$env:" + ShellCommandEnvironmentVariable
+        + Environment.NewLine
+        + "$azunoteHasInput = $env:" + ShellStandardInputEnvironmentVariable + " -eq '1'"
+        + Environment.NewLine
+        + RunScript;
 
     /// <summary>
     /// Arguments for a process started before its request is known. The
     /// process sets up the same encoding as a cold launch, parks on the
     /// handshake pipe, and then applies the working directory, environment
-    /// overrides and script it receives. Standard input is never touched, so
-    /// it stays available to the script itself. The syntax is limited to what
-    /// both PowerShell 7 and Windows PowerShell 5.1 accept.
+    /// overrides and script it receives, and then runs it exactly the way a
+    /// cold launch does. The syntax is limited to what both PowerShell 7 and
+    /// Windows PowerShell 5.1 accept.
     /// </summary>
     internal static string BuildPowerShellWarmArguments() =>
         "-NoLogo -NoProfile -NonInteractive -EncodedCommand " + EncodeCommand(WarmBootstrapScript);
 
-    private const string WarmBootstrapScript = """
-        $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-        [Console]::OutputEncoding = $OutputEncoding
+    private static string WarmBootstrapScript =>
+        EncodingPrologue
+        + Environment.NewLine
+        + WarmHandshakeScript
+        + Environment.NewLine
+        + RunScript;
+
+    private const string WarmHandshakeScript = """
         $azunoteScript = $null
+        $azunoteHasInput = $false
         try
         {
             $ErrorActionPreference = 'Stop'
@@ -125,6 +146,7 @@ internal sealed record ExternalToolLaunchPlan(
             }
 
             $azunoteScript = [string]$azunoteRequest.script
+            $azunoteHasInput = [bool]$azunoteRequest.stdin
         }
         catch
         {
@@ -133,7 +155,184 @@ internal sealed record ExternalToolLaunchPlan(
 
         $ErrorActionPreference = 'Continue'
         Remove-Variable -Name azunotePipeName, azunoteToken, azunotePipe, azunoteWriter, azunoteReader, azunoteRequest, azunoteEntry -ErrorAction SilentlyContinue
-        Invoke-Expression $azunoteScript
+        """;
+
+    /// <summary>
+    /// The encoding both a cold and a waiting process set up before anything
+    /// is read or written. The input encoding matters because Azunote writes
+    /// standard input as UTF-8 while the console code page is whatever the
+    /// machine was installed with; setting it is best effort because a process
+    /// without a console cannot always change it.
+    /// </summary>
+    private const string EncodingPrologue = """
+        $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+        [Console]::OutputEncoding = $OutputEncoding
+        try
+        {
+            [Console]::InputEncoding = [System.Text.UTF8Encoding]::new($false)
+        }
+        catch
+        {
+        }
+        """;
+
+    /// <summary>
+    /// Runs the configured command in `$azunoteScript`, given whether standard
+    /// input was configured in `$azunoteHasInput`. The command is one command
+    /// line, and the semantics being reproduced are those of
+    /// `Get-Content document.txt | &lt;command line&gt;`: standard input is what
+    /// `Get-Content` would have produced, and it reaches the line as its lines.
+    ///
+    /// - A line that names `$input` gets the lines there as an array, whether
+    ///   it names it directly or wraps the work in `&amp; { ... }`. PowerShell
+    ///   would hand a script block its own one-shot enumerator, which neither
+    ///   `-join` nor `.Count` nor a second pass can work with, so the block is
+    ///   run with `$input` bound instead. Everything an enumerator supports,
+    ///   such as `$input | Sort-Object`, still works.
+    /// - A line that names no `$input` and is one pipeline starting with a
+    ///   command is stepped, so the lines flow into that pipeline exactly as
+    ///   they would in `Get-Content document.txt | Sort-Object`.
+    /// - Anything else runs with standard input unread, so a line that reads it
+    ///   itself with `[Console]::In.ReadToEnd()` sees every byte, line endings
+    ///   and a trailing newline included.
+    ///
+    /// What the line produces is written here rather than by the host, which
+    /// would end it with a newline the line never produced and which an output
+    /// action such as `replaceSelection` would then insert. Strings are written
+    /// as they are, joined by the newline standard input used; anything else is
+    /// formatted the way the host would format it, without the trailing newline.
+    /// A line that writes to `[Console]::Out` itself bypasses all of this and
+    /// keeps every byte it wrote, and what a line produced before it called
+    /// `exit` is still written.
+    ///
+    /// The syntax is limited to what both PowerShell 7 and Windows PowerShell
+    /// 5.1 accept, and avoids double quotes so that it survives every way it is
+    /// handed to the interpreter.
+    /// </summary>
+    private const string RunScript = """
+        $azunoteNewLine = [Environment]::NewLine
+        $azunoteBlock = [scriptblock]::Create($azunoteScript)
+        $azunoteWantsInput = $azunoteHasInput -and $azunoteScript -match '\$input'
+        $azunoteBody = $null
+        $azunotePipeline = $null
+        $azunoteStatement = $null
+        $azunoteAst = $azunoteBlock.Ast
+        if ($azunoteHasInput -and $null -eq $azunoteAst.ParamBlock -and $null -eq $azunoteAst.BeginBlock -and $null -eq $azunoteAst.ProcessBlock -and $null -ne $azunoteAst.EndBlock -and $azunoteAst.EndBlock.Statements.Count -eq 1 -and $azunoteAst.EndBlock.Statements[0] -is [System.Management.Automation.Language.PipelineAst])
+        {
+            $azunoteStatement = $azunoteAst.EndBlock.Statements[0]
+        }
+
+        if ($azunoteWantsInput)
+        {
+            # The line is run with $input bound to the lines. When it is only a
+            # call to a script block, that block is what runs, because a block
+            # invoked with & would get an $input of its own instead.
+            $azunoteBody = $azunoteScript
+            if ($null -ne $azunoteStatement -and $azunoteStatement.PipelineElements.Count -eq 1 -and $azunoteStatement.PipelineElements[0] -is [System.Management.Automation.Language.CommandAst])
+            {
+                $azunoteCommand = $azunoteStatement.PipelineElements[0]
+                if ($azunoteCommand.InvocationOperator -eq [System.Management.Automation.Language.TokenKind]::Ampersand -and $azunoteCommand.CommandElements.Count -eq 1 -and $azunoteCommand.CommandElements[0] -is [System.Management.Automation.Language.ScriptBlockExpressionAst])
+                {
+                    $azunoteInner = $azunoteCommand.CommandElements[0].ScriptBlock
+                    if ($null -eq $azunoteInner.ParamBlock -and $null -eq $azunoteInner.BeginBlock -and $null -eq $azunoteInner.ProcessBlock -and $null -ne $azunoteInner.EndBlock)
+                    {
+                        $azunoteBody = $azunoteInner.EndBlock.Extent.Text
+                    }
+                }
+            }
+        }
+        elseif ($azunoteHasInput -and $null -ne $azunoteStatement -and $azunoteStatement.PipelineElements[0] -is [System.Management.Automation.Language.CommandAst])
+        {
+            try
+            {
+                $azunotePipeline = $azunoteBlock.GetSteppablePipeline()
+            }
+            catch
+            {
+                $azunotePipeline = $null
+            }
+        }
+
+        $azunoteLines = New-Object -TypeName System.Collections.Generic.List[string]
+        if ($null -ne $azunotePipeline -or $null -ne $azunoteBody)
+        {
+            $azunoteStandardInput = New-Object -TypeName System.IO.StreamReader -ArgumentList ([Console]::OpenStandardInput()), ([System.Text.UTF8Encoding]::new($false))
+            $azunoteText = $azunoteStandardInput.ReadToEnd()
+            $azunoteStandardInput.Dispose()
+            foreach ($azunoteLine in [regex]::Split($azunoteText, '\r\n|\r|\n'))
+            {
+                $azunoteLines.Add($azunoteLine)
+            }
+
+            if ($azunoteLines.Count -gt 0 -and $azunoteLines[$azunoteLines.Count - 1] -eq '')
+            {
+                $azunoteLines.RemoveAt($azunoteLines.Count - 1)
+            }
+
+            $azunoteMatch = [regex]::Match($azunoteText, '\r\n|\r|\n')
+            if ($azunoteMatch.Success)
+            {
+                $azunoteNewLine = $azunoteMatch.Value
+            }
+        }
+
+        $azunoteInputLines = $azunoteLines.ToArray()
+        $azunoteResult = New-Object -TypeName System.Collections.Generic.List[object]
+        try
+        {
+            # The output is written here rather than by the host, which would end it
+            # with a newline the command never produced. A command that writes to
+            # [Console]::Out itself bypasses this and keeps every byte it wrote.
+            & {
+                if ($null -ne $azunotePipeline)
+                {
+                    $azunotePipeline.Begin($true)
+                    try
+                    {
+                        foreach ($azunoteItem in $azunoteInputLines)
+                        {
+                            $azunotePipeline.Process($azunoteItem)
+                        }
+                    }
+                    finally
+                    {
+                        $azunotePipeline.End()
+                    }
+                }
+                elseif ($null -ne $azunoteBody)
+                {
+                    & ([scriptblock]::Create('$input = $azunoteInputLines' + [Environment]::NewLine + $azunoteBody))
+                }
+                else
+                {
+                    & $azunoteBlock
+                }
+            } | ForEach-Object { $azunoteResult.Add($_) }
+        }
+        finally
+        {
+            if ($azunoteResult.Count -gt 0)
+            {
+                $azunoteStrings = $true
+                foreach ($azunoteItem in $azunoteResult)
+                {
+                    if ($azunoteItem -isnot [string])
+                    {
+                        $azunoteStrings = $false
+                        break
+                    }
+                }
+
+                if ($azunoteStrings)
+                {
+                    [Console]::Out.Write(($azunoteResult -join $azunoteNewLine))
+                }
+                else
+                {
+                    [Console]::Out.Write((($azunoteResult | Out-String -Width 4096) -replace '(\r\n|\r|\n)+$', ''))
+                }
+            }
+        }
         """;
 
     private static string EncodeCommand(string command) =>

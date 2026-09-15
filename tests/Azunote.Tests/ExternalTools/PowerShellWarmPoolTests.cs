@@ -63,7 +63,7 @@ public sealed class PowerShellWarmPoolTests
         }
 
         var definition = Pwsh(
-            "$text = [Console]::In.ReadToEnd(); Write-Output ($text.ToUpperInvariant())",
+            "$text = [Console]::In.ReadToEnd(); $text.ToUpperInvariant()",
             stdin: "${input}",
             inputMode: ExternalToolInputMode.Document);
         var (cold, warm) = await RunBothAsync(definition, Context(document: "hello warm start"));
@@ -73,6 +73,47 @@ public sealed class PowerShellWarmPoolTests
         Assert.Equal(cold.StandardOutput, warm.StandardOutput);
         Assert.Equal(cold.StandardError, warm.StandardError);
         Assert.Equal("HELLO WARM START", warm.StandardOutput.Trim());
+    }
+
+    [Fact]
+    public async Task Warm_run_matches_a_cold_run_for_a_piped_command()
+    {
+        if (!PowerShellAvailable)
+        {
+            return;
+        }
+
+        var definition = Pwsh(
+            "Sort-Object",
+            stdin: "${input}",
+            inputMode: ExternalToolInputMode.Document);
+        var (cold, warm) = await RunBothAsync(definition, Context(document: "c\r\na\r\nb"));
+
+        Assert.True(warm.Succeeded, warm.StandardError);
+        Assert.Equal(cold.StandardOutput, warm.StandardOutput);
+        Assert.Equal(
+            new[] { "a", "b", "c" },
+            warm.StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Select(line => line.Trim()));
+    }
+
+    [Fact]
+    public async Task Warm_run_matches_a_cold_run_for_the_input_variable()
+    {
+        if (!PowerShellAvailable)
+        {
+            return;
+        }
+
+        var definition = Pwsh(
+            "&{ $input -join [char]124 }",
+            stdin: "${input}",
+            inputMode: ExternalToolInputMode.Document);
+        var (cold, warm) = await RunBothAsync(definition, Context(document: "c\r\na\r\nb"));
+
+        Assert.True(warm.Succeeded, warm.StandardError);
+        Assert.Equal(cold.StandardOutput, warm.StandardOutput);
+        Assert.Equal("c|a|b", warm.StandardOutput.Trim());
     }
 
     [Fact]
@@ -179,7 +220,7 @@ public sealed class PowerShellWarmPoolTests
         }
 
         var definition = Pwsh(
-            "Write-Output ('[' + [Console]::In.ReadToEnd() + ']')",
+            "'[' + [Console]::In.ReadToEnd() + ']'",
             stdin: "${input}",
             inputMode: ExternalToolInputMode.Selection,
             per: "line");
@@ -390,7 +431,7 @@ public sealed class PowerShellWarmPoolTests
         await WaitForCountAsync(pool, 1);
 
         var definition = Pwsh(
-            "Write-Output ([Console]::In.ReadToEnd())",
+            "[Console]::In.ReadToEnd()",
             stdin: "${input}",
             inputMode: ExternalToolInputMode.Selection,
             per: "line");

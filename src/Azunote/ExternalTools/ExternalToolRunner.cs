@@ -121,6 +121,7 @@ public sealed class ExternalToolRunner
         }
 
         var arguments = context.Expand(definition.Arguments, environment.Values);
+        var standardInput = context.Expand(definition.Stdin, environment.Values);
         var startInfo = new ProcessStartInfo
         {
             FileName = launchPlan.LauncherPath,
@@ -142,13 +143,14 @@ public sealed class ExternalToolRunner
             startInfo.Environment[environmentVariable.Key] = environmentVariable.Value;
         }
 
-        launchPlan.AddArguments(startInfo, arguments);
+        launchPlan.AddArguments(startInfo, arguments, standardInput.Length > 0);
 
         using var lease = await TryAcquireWarmAsync(
             warmPool,
             launchPlan,
             startInfo,
             environment.Overrides,
+            standardInput.Length > 0,
             cancellationToken);
         using var coldProcess = lease is null ? new Process { StartInfo = startInfo } : null;
         var process = lease?.Process ?? coldProcess!;
@@ -193,8 +195,6 @@ public sealed class ExternalToolRunner
                 process.StandardError,
                 AppendMixed,
                 cancellationToken);
-            var standardInput = context.Expand(definition.Stdin, environment.Values);
-
             if (standardInput.Length == 0)
             {
                 process.StandardInput.Close();
@@ -226,6 +226,7 @@ public sealed class ExternalToolRunner
         ExternalToolLaunchPlan launchPlan,
         ProcessStartInfo startInfo,
         IReadOnlyDictionary<string, string> environmentOverrides,
+        bool standardInputConfigured,
         CancellationToken cancellationToken)
     {
         if (warmPool is null
@@ -239,7 +240,8 @@ public sealed class ExternalToolRunner
             new PowerShellWarmRequest(
                 startInfo.WorkingDirectory,
                 environmentOverrides,
-                launchPlan.ResolvedPath),
+                launchPlan.ResolvedPath,
+                standardInputConfigured),
             cancellationToken);
     }
 

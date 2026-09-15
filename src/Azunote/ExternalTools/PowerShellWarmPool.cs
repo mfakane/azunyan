@@ -13,7 +13,8 @@ namespace Azunote;
 internal sealed record PowerShellWarmRequest(
     string WorkingDirectory,
     IReadOnlyDictionary<string, string> Environment,
-    string Script);
+    string Script,
+    bool StandardInputConfigured = false);
 
 /// <summary>
 /// A waiting process that has been handed its request. The pipe stays open
@@ -630,6 +631,7 @@ internal sealed class PowerShellWarmPool : IDisposable
 
                 writer.WriteEndObject();
                 writer.WriteString("script", request.Script);
+                writer.WriteBoolean("stdin", request.StandardInputConfigured);
                 writer.WriteEndObject();
             }
 

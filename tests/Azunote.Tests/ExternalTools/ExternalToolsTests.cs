@@ -4,6 +4,10 @@ namespace Azunote.Tests;
 
 public sealed class ExternalToolsTests
 {
+    private static bool PwshAvailable =>
+        OperatingSystem.IsWindows()
+        && ExternalToolLaunchResolver.ResolvePowerShell() is not null;
+
     [Fact]
     public void Command_line_parses_wait_position_and_path()
     {
@@ -1107,6 +1111,215 @@ public sealed class ExternalToolsTests
                 Directory.Delete(root, recursive: true);
             }
         }
+    }
+
+    [Fact]
+    public async Task Runner_pipes_standard_input_into_pwsh_commands()
+    {
+        if (!PwshAvailable)
+        {
+            return;
+        }
+
+        var result = await ExternalToolRunner.RunAsync(
+            new ExternalToolDefinition(
+                "Sort-Object",
+                inputMode: ExternalToolInputMode.Document,
+                stdin: "${input}",
+                commandMode: ExternalToolCommandMode.Pwsh),
+            new ExternalToolContext(null, "c\r\na\r\nb", string.Empty));
+
+        Assert.True(result.Succeeded, result.StandardError);
+        Assert.Equal(
+            new[] { "a", "b", "c" },
+            result.StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Select(line => line.Trim()));
+    }
+
+    [Fact]
+    public async Task Runner_exposes_standard_input_as_the_input_variable()
+    {
+        if (!PwshAvailable)
+        {
+            return;
+        }
+
+        var result = await ExternalToolRunner.RunAsync(
+            new ExternalToolDefinition(
+                "$input -join [char]124",
+                inputMode: ExternalToolInputMode.Document,
+                stdin: "${input}",
+                commandMode: ExternalToolCommandMode.Pwsh),
+            new ExternalToolContext(null, "c\r\na\r\nb", string.Empty));
+
+        Assert.True(result.Succeeded, result.StandardError);
+        Assert.Equal("c|a|b", result.StandardOutput.Trim());
+    }
+
+    [Fact]
+    public async Task Runner_hands_the_whole_input_to_a_call_operator_block()
+    {
+        if (!PwshAvailable)
+        {
+            return;
+        }
+
+        var result = await ExternalToolRunner.RunAsync(
+            new ExternalToolDefinition(
+                "&{ $input -join [char]44 }",
+                inputMode: ExternalToolInputMode.Document,
+                stdin: "${input}",
+                commandMode: ExternalToolCommandMode.Pwsh),
+            new ExternalToolContext(null, "c\r\na\r\nb", string.Empty));
+
+        Assert.True(result.Succeeded, result.StandardError);
+        Assert.Equal("c,a,b", result.StandardOutput.Trim());
+    }
+
+    [Fact]
+    public async Task Runner_binds_the_input_variable_to_a_reusable_array()
+    {
+        if (!PwshAvailable)
+        {
+            return;
+        }
+
+        var result = await ExternalToolRunner.RunAsync(
+            new ExternalToolDefinition(
+                "&{ $input.Count; ($input | Sort-Object) -join [char]44 }",
+                inputMode: ExternalToolInputMode.Document,
+                stdin: "${input}",
+                commandMode: ExternalToolCommandMode.Pwsh),
+            new ExternalToolContext(null, "c\r\na\r\nb", string.Empty));
+
+        Assert.True(result.Succeeded, result.StandardError);
+        Assert.Equal(
+            new[] { "3", "a,b,c" },
+            result.StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Select(line => line.Trim()));
+    }
+
+    [Fact]
+    public async Task Runner_keeps_a_process_block_running_once_per_line()
+    {
+        if (!PwshAvailable)
+        {
+            return;
+        }
+
+        var result = await ExternalToolRunner.RunAsync(
+            new ExternalToolDefinition(
+                "&{ process { [char]91 + $_ + [char]93 } }",
+                inputMode: ExternalToolInputMode.Document,
+                stdin: "${input}",
+                commandMode: ExternalToolCommandMode.Pwsh),
+            new ExternalToolContext(null, "c\r\na\r\nb", string.Empty));
+
+        Assert.True(result.Succeeded, result.StandardError);
+        Assert.Equal(
+            new[] { "[c]", "[a]", "[b]" },
+            result.StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Select(line => line.Trim()));
+    }
+
+    [Fact]
+    public async Task Runner_writes_pwsh_output_without_a_trailing_newline()
+    {
+        if (!PwshAvailable)
+        {
+            return;
+        }
+
+        var result = await ExternalToolRunner.RunAsync(
+            new ExternalToolDefinition(
+                "Sort-Object",
+                inputMode: ExternalToolInputMode.Document,
+                stdin: "${input}",
+                commandMode: ExternalToolCommandMode.Pwsh),
+            new ExternalToolContext(null, "c\r\na\r\nb", string.Empty));
+
+        Assert.True(result.Succeeded, result.StandardError);
+        // The lines are joined with the newline the input used, and nothing
+        // follows the last one, so replacing a selection adds no blank line.
+        Assert.Equal("a\r\nb\r\nc", result.StandardOutput);
+    }
+
+    [Fact]
+    public async Task Runner_joins_pwsh_output_with_the_newline_of_the_input()
+    {
+        if (!PwshAvailable)
+        {
+            return;
+        }
+
+        var result = await ExternalToolRunner.RunAsync(
+            new ExternalToolDefinition(
+                "Sort-Object",
+                inputMode: ExternalToolInputMode.Document,
+                stdin: "${input}",
+                commandMode: ExternalToolCommandMode.Pwsh),
+            new ExternalToolContext(null, "c\na\nb", string.Empty));
+
+        Assert.True(result.Succeeded, result.StandardError);
+        Assert.Equal("a\nb\nc", result.StandardOutput);
+    }
+
+    [Fact]
+    public async Task Runner_keeps_what_a_pwsh_command_writes_to_the_console_itself()
+    {
+        if (!PwshAvailable)
+        {
+            return;
+        }
+
+        var result = await ExternalToolRunner.RunAsync(
+            new ExternalToolDefinition(
+                "$text = [Console]::In.ReadToEnd(); [Console]::Out.Write($text)",
+                inputMode: ExternalToolInputMode.Document,
+                stdin: "${input}",
+                commandMode: ExternalToolCommandMode.Pwsh),
+            new ExternalToolContext(null, "c\r\nb\r\n", string.Empty));
+
+        Assert.True(result.Succeeded, result.StandardError);
+        Assert.Equal("c\r\nb\r\n", result.StandardOutput);
+    }
+
+    [Fact]
+    public async Task Runner_leaves_standard_input_unread_for_pwsh_commands_that_read_it()
+    {
+        if (!PwshAvailable)
+        {
+            return;
+        }
+
+        var result = await ExternalToolRunner.RunAsync(
+            new ExternalToolDefinition(
+                "$text = [Console]::In.ReadToEnd(); [Console]::Out.Write($text.ToUpperInvariant())",
+                inputMode: ExternalToolInputMode.Document,
+                stdin: "${input}",
+                commandMode: ExternalToolCommandMode.Pwsh),
+            new ExternalToolContext(null, "日本語 abc", string.Empty));
+
+        Assert.True(result.Succeeded, result.StandardError);
+        Assert.Equal("日本語 ABC", result.StandardOutput);
+    }
+
+    [Fact]
+    public async Task Runner_runs_pwsh_commands_without_standard_input_untouched()
+    {
+        if (!PwshAvailable)
+        {
+            return;
+        }
+
+        var result = await ExternalToolRunner.RunAsync(
+            new ExternalToolDefinition(
+                "Get-Date -Date 2020-01-02 -Format yyyy-MM-dd",
+                commandMode: ExternalToolCommandMode.Pwsh),
+            new ExternalToolContext(null, string.Empty, string.Empty));
+
+        Assert.True(result.Succeeded, result.StandardError);
+        Assert.Equal("2020-01-02", result.StandardOutput.Trim());
     }
 
     [Fact]

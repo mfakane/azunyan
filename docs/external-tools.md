@@ -111,6 +111,59 @@ respective shell with the configured value as one command string:
 cmd = "echo Hello"
 ```
 
+A `pwsh` command is one command line, and it runs with the semantics of
+`Get-Content document.txt | <command line>`: the text configured in `stdin` is
+what `Get-Content` would have produced, and it reaches the line as its lines.
+The one deliberate difference from that pipeline is `$input`, which is bound as
+an array rather than the one-shot enumerator PowerShell hands a script block.
+
+- A line that names `$input` gets the lines there as an array, so it can work on
+  the input as a whole. Wrapping the work in `&{ ... }` reads the same way it
+  does at a prompt:
+
+  ```toml
+  [launch]
+  pwsh = '&{ ($input | Sort-Object -Unique) -join [Environment]::NewLine }'
+  input = "selection"
+  stdin = "${input}"
+  stdout = "replaceSelection"
+  ```
+
+  `$input` is an array rather than the one-shot enumerator PowerShell hands a
+  script block, so `$input -join ...`, `$input.Count`, `$input[0]` and a second
+  pass all work, as does everything an enumerator supports, such as
+  `$input | Sort-Object`.
+
+- A line that names no `$input` and is one pipeline starting with a command
+  receives the lines as that pipeline's input, exactly as in
+  `Get-Content document.txt | Sort-Object`:
+
+  ```toml
+  [launch]
+  pwsh = "Sort-Object -Unique"
+  ```
+
+  A `process` block works there the way it does at a prompt, running once per
+  line: `pwsh = '&{ process { $_.TrimEnd() } }'`.
+
+- Anything else runs with standard input unread. Read it to get the text exactly
+  as it was written, line endings and a trailing newline included, which line
+  splitting does not preserve:
+
+  ```toml
+  [launch]
+  pwsh = '$text = [Console]::In.ReadToEnd(); [Console]::Out.Write($text.TrimEnd())'
+  ```
+
+What the line produces is written without a trailing newline, so an output
+action such as `replaceSelection` inserts no blank line the input did not have.
+Strings are written as they are, joined by the same newline standard input used,
+so a line-wise command leaves the line endings of the document alone; anything
+else is formatted the way PowerShell would, again without the trailing newline.
+A line that writes to `[Console]::Out` itself keeps every byte it wrote, trailing
+newline included, and what a line produced before calling `exit` is still
+written. The text is written and read as UTF-8 throughout.
+
 While at least one tool definition uses `pwsh`, Azunote keeps PowerShell
 processes started and waiting so that the interpreter start-up cost is paid
 before a run is requested. A waiting process serves exactly one run and then
