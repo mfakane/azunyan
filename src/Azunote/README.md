@@ -208,8 +208,9 @@ appearance while the surrounding text keeps its own. In Markdown mode,
 including the relative ones a URL scan cannot recognize: `[note](./other.md)`,
 `[up](../index.md)`, `[same](other.md)`, and the `<...>` and titled forms.
 
-Ctrl+Click opens a link, and the pointer shows a hand cursor while Ctrl is held
-over one. An absolute `http`, `https`, `ftp`, `ftps`, or `mailto` target goes to
+Resting the pointer on a link shows the target and a "Ctrl + Click to open"
+hint. Ctrl+Click opens it, and the pointer shows a hand cursor while Ctrl is
+held over one. An absolute `http`, `https`, `ftp`, `ftps`, or `mailto` target goes to
 the Windows default handler. Any other target is read as a path and resolved
 against the folder of the current document, so a relative link needs a saved
 document. The resolved file is opened in a new Azunote window when one of the

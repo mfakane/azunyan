@@ -85,6 +85,16 @@ public sealed partial class AzunyanEditorView
             return;
         }
 
+        // The editor answers a link itself: the host learns how to open one
+        // without having to supply a tooltip provider for it.
+        if (_hoverLinkRange is { } linkRange
+            && linkRange.End <= Snapshot.Length
+            && !string.IsNullOrEmpty(LinkNavigationHint))
+        {
+            ShowTooltipPopup(_hoverLinkText, LinkNavigationHint, linkRange.Start);
+            return;
+        }
+
         var frame = GetCurrentFrame();
         var tooltip = frame?.Position?.Tooltip;
         if (frame is null
@@ -97,23 +107,40 @@ public sealed partial class AzunyanEditorView
             return;
         }
 
+        ShowTooltipPopup(tooltip.Title, tooltip.Content, _hoverPosition);
+    }
+
+    /// <summary>
+    /// Places the tooltip under the anchor position. A position scrolled out
+    /// of the realized rows has no geometry, so the tooltip is hidden instead
+    /// of left behind at a stale place.
+    /// </summary>
+    private void ShowTooltipPopup(string? title, string content, int anchorPosition)
+    {
         if (!TryGetRendererCaretRect(
+                DocumentAnchor.Before(anchorPosition),
+                out var anchorRect)
+            && !TryGetRendererCaretRect(
                 DocumentAnchor.Before(_hoverPosition),
-                out var anchorRect))
+                out anchorRect))
         {
             HideTooltipPopup();
             return;
         }
 
-        TooltipTitle.Text = tooltip.Title ?? string.Empty;
-        TooltipTitle.Visibility = string.IsNullOrEmpty(tooltip.Title)
+        TooltipTitle.Text = title ?? string.Empty;
+        TooltipTitle.Visibility = string.IsNullOrEmpty(title)
             ? Visibility.Collapsed
             : Visibility.Visible;
-        TooltipContent.Text = tooltip.Content;
+        TooltipContent.Text = content;
 
         var inputOrigin = ProjectedSurfaceHost.TransformToVisual(RootGrid)
             .TransformPoint(new Point(0, 0));
-        TooltipPopup.HorizontalOffset = inputOrigin.X + anchorRect.X;
+        // A link can begin left of the viewport, so keep the tooltip against
+        // the surface edge instead of letting it slide off the window.
+        TooltipPopup.HorizontalOffset = Math.Max(
+            inputOrigin.X,
+            inputOrigin.X + anchorRect.X);
         TooltipPopup.VerticalOffset = inputOrigin.Y + anchorRect.Y + anchorRect.Height + 4;
         TooltipPopup.IsOpen = true;
     }

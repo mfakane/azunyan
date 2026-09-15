@@ -85,6 +85,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private int _hoverPosition = -1;
     private Point? _lastPointerPosition;
     private bool _linkCursorActive;
+    private TextRange? _hoverLinkRange;
+    private string _hoverLinkText = string.Empty;
     private TextBlockSelection? _blockSelection;
     private int? _pointerSelectionAnchor;
     private TextBlockPosition? _pointerBlockSelectionAnchor;
@@ -402,6 +404,12 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     /// provider classified as a link. The host owns navigation.
     /// </summary>
     public event EventHandler<LinkInvokedEventArgs>? LinkInvoked;
+
+    /// <summary>
+    /// The hint shown while the pointer rests on a link. Setting it to an
+    /// empty value turns the link tooltip off.
+    /// </summary>
+    public string LinkNavigationHint { get; set; } = "Ctrl + Click to open";
 
     public IReadOnlySet<string> CollapsedFoldIds => _collapsedFoldIds;
 
@@ -2919,6 +2927,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         _completionRequested = false;
         HideCompletionPopup();
         _hoverPosition = -1;
+        _hoverLinkRange = null;
         HideTooltipPopup();
 
         var point = args.GetCurrentPoint(EditorPointerSurface);
@@ -3373,27 +3382,46 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             return;
         }
 
-        UpdateLinkCursor(
-            IsKeyDown(VirtualKey.Control)
-            && hoverTextPosition is int hoverLinkPosition
-            && TryGetLinkAt(hoverLinkPosition, out _, out _));
+        TextRange? link = null;
+        var linkText = string.Empty;
+        if (hoverTextPosition is int hoverLinkPosition
+            && TryGetLinkAt(hoverLinkPosition, out var hoverLinkRange, out var hoverLinkText))
+        {
+            link = hoverLinkRange;
+            linkText = hoverLinkText;
+        }
+
+        UpdateLinkCursor(link is not null && IsKeyDown(VirtualKey.Control));
 
         var position = anchor.Position.Offset;
-        if (_hoverPosition == position)
+        if (_hoverPosition == position && _hoverLinkRange == link)
         {
             return;
         }
 
         _hoverPosition = position;
+        _hoverLinkRange = link;
+        _hoverLinkText = linkText;
         _completionRequested = false;
         HideCompletionPopup();
         HideTooltipPopup();
-        RequestHoverProvider(position);
+
+        // A link answers its own tooltip, so the position channel is not
+        // asked for one and cannot replace it.
+        if (link is null)
+        {
+            RequestHoverProvider(position);
+        }
+        else
+        {
+            UpdateTooltipPopup();
+        }
     }
 
     private void OnInputPointerExited(object sender, PointerRoutedEventArgs args)
     {
         _hoverPosition = -1;
+        _hoverLinkRange = null;
         _lastPointerPosition = null;
         UpdateLinkCursor(false);
         HideTooltipPopup();
@@ -3912,6 +3940,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             _completionRequested = false;
             HideCompletionPopup();
             _hoverPosition = -1;
+            _hoverLinkRange = null;
             HideTooltipPopup();
             return;
         }
@@ -3952,6 +3981,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         _completionRequested = false;
         HideCompletionPopup();
         _hoverPosition = -1;
+        _hoverLinkRange = null;
         HideTooltipPopup();
     }
 

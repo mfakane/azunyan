@@ -209,8 +209,11 @@ with identical effective typography are merged before shaping.
 
 The `link` classification (`Azunyan.Core.SyntaxClassifications.Link`) is the
 one name the editor itself understands: link runs are underlined in addition to
-their palette color, and Ctrl+Click on one raises `LinkInvoked` instead of
-starting a selection. Detection stays in the syntax channel, so a host without
+their palette color, hovering one shows the target with the
+`LinkNavigationHint` text in the same tooltip popup the position channel uses,
+and Ctrl+Click on one raises `LinkInvoked` instead of starting a selection. The
+link tooltip is answered by the editor, so the position channel is not asked
+for one while the pointer rests on a link. Detection stays in the syntax channel, so a host without
 a link-aware provider simply never reports one, and navigation stays with the
 host. A provider can classify anything as a link, not only a URL: the Markdown
 rule reports the destination of an inline link, which is how a relative target
