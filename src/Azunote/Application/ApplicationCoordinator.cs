@@ -27,14 +27,14 @@ internal sealed class ApplicationCoordinator : IDisposable
         _ = ProcessInitialCommandLineAsync(registration, arguments);
     }
 
-    internal Task HandleForwardedCommandLineAsync(SingleInstanceCommand command)
+    internal Task<SingleInstanceResponse> HandleForwardedCommandLineAsync(SingleInstanceCommand command)
     {
         ArgumentNullException.ThrowIfNull(command);
         ObjectDisposedException.ThrowIf(_disposed, nameof(ApplicationCoordinator));
 
         var dispatcher = _dispatcherQueue
             ?? throw new InvalidOperationException("The application has not launched.");
-        var completion = new TaskCompletionSource<object?>(
+        var completion = new TaskCompletionSource<SingleInstanceResponse>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         if (dispatcher.HasThreadAccess)
         {
@@ -95,42 +95,49 @@ internal sealed class ApplicationCoordinator : IDisposable
 
     private async Task ProcessForwardedCommandLineAsync(
         SingleInstanceCommand command,
-        TaskCompletionSource<object?> completion)
+        TaskCompletionSource<SingleInstanceResponse> completion)
     {
         try
         {
             await _state.InitializeAsync().ConfigureAwait(true);
             RefreshRecentFileMenus();
             var options = ParseCommandLine(command.Arguments);
+            WindowRegistration? target = null;
+            var takesOutput = options.Output != CommandLineOutputTarget.None;
 
             if (options.ReadStandardInput)
             {
-                var registration = CreateWindowRegistration();
-                await registration.Window.Runtime.OpenStartupTextAsync(
+                target = TakeReusableWindow() ?? CreateWindowRegistration();
+                await target.Window.Runtime.OpenStartupTextAsync(
                     command.StandardInput ?? string.Empty,
                     options.Line,
                     options.Column);
-                ActivateWindow(registration);
-                await WaitForCloseIfRequestedAsync(registration, options);
+                if (takesOutput)
+                {
+                    target.Window.Runtime.AllowCommandLineClose();
+                }
+
+                ActivateWindow(target);
+                await WaitForCloseIfRequestedAsync(target, options);
             }
             else if (!string.IsNullOrWhiteSpace(options.FilePath))
             {
                 var path = ResolvePath(options.FilePath, command.WorkingDirectory);
-                var existing = FindWindowForFile(path);
-                if (existing is not null)
+                target = FindWindowForFile(path);
+                if (target is not null)
                 {
-                    existing.Window.ActivateWindow();
-                    await WaitForCloseIfRequestedAsync(existing, options);
+                    target.Window.ActivateWindow();
+                    await WaitForCloseIfRequestedAsync(target, options);
                 }
                 else
                 {
-                    var registration = CreateWindowRegistration();
-                    await registration.Window.Runtime.OpenStartupDocumentAsync(
+                    target = TakeReusableWindow() ?? CreateWindowRegistration();
+                    await target.Window.Runtime.OpenStartupDocumentAsync(
                         path,
                         options.Line,
                         options.Column);
-                    ActivateWindow(registration);
-                    await WaitForCloseIfRequestedAsync(registration, options);
+                    ActivateWindow(target);
+                    await WaitForCloseIfRequestedAsync(target, options);
                 }
             }
             else if (options.ShowHelp && _windows.Active is { } active)
@@ -139,12 +146,62 @@ internal sealed class ApplicationCoordinator : IDisposable
                 await active.Window.Runtime.ShowCommandLineHelpAsync();
             }
 
-            completion.TrySetResult(null);
+            completion.TrySetResult(CreateResponse(options, target));
         }
         catch (Exception exception)
         {
             completion.TrySetException(exception);
         }
+    }
+
+    /// <summary>
+    /// Builds the answer for a forwarded command line. A file-backed document
+    /// closed while it is still dirty was discarded by the user, which is how
+    /// the command line reports a cancelled edit. An untitled document has
+    /// nowhere to be saved to, so its buffer is the result.
+    /// </summary>
+    private static SingleInstanceResponse CreateResponse(
+        AzunoteCommandLineOptions options,
+        WindowRegistration? registration)
+    {
+        if (options.Output == CommandLineOutputTarget.None
+            || registration?.ClosedDocument is not { } document)
+        {
+            return SingleInstanceResponse.Completed();
+        }
+
+        if (document.IsDirty && document.FilePath is not null)
+        {
+            return SingleInstanceResponse.Canceled();
+        }
+
+        return SingleInstanceResponse.Completed(options.Output switch
+        {
+            CommandLineOutputTarget.FilePath => document.FilePath ?? string.Empty,
+            CommandLineOutputTarget.Document => document.Text,
+            CommandLineOutputTarget.Selection => document.SelectedText,
+            _ => string.Empty
+        });
+    }
+
+    /// <summary>
+    /// An empty, unmodified, untitled window can host the next document
+    /// instead of leaving a blank window behind. This is what lets a cold
+    /// start from the command-line client look like a warm one.
+    /// </summary>
+    private WindowRegistration? TakeReusableWindow()
+    {
+        static bool IsReusable(WindowRegistration registration) =>
+            registration.Window.Runtime.Session.State.FilePath is null
+            && !registration.Window.Runtime.IsDirty
+            && registration.Window.Runtime.IsEmptyDocument;
+
+        if (_windows.Active is { } active && IsReusable(active))
+        {
+            return active;
+        }
+
+        return _windows.Windows.FirstOrDefault(IsReusable);
     }
 
     internal Task CreateNewDocumentWindowAsync()
@@ -274,7 +331,7 @@ internal sealed class ApplicationCoordinator : IDisposable
 
         var session = window.Runtime.Session;
         _windows.Unregister(registration);
-        registration.MarkClosed();
+        registration.MarkClosed(window.Runtime.CaptureCommandLineOutput());
         var remainingViews = _windows.Windows.Where(candidate =>
             ReferenceEquals(candidate.Window.Runtime.Session, session)).ToArray();
         if (!remainingViews.Any(candidate => candidate.Window.Runtime.IsFileWatcherActive))
@@ -497,13 +554,19 @@ internal sealed class ApplicationCoordinator : IDisposable
             : Path.GetFullPath(path, workingDirectory);
     }
 
+    /// <summary>
+    /// Resumes off the dispatcher on purpose: what follows a close is the
+    /// answer written back to the waiting command-line client, and the
+    /// editor may already be shutting down with its dispatcher blocked
+    /// because that window was the last one.
+    /// </summary>
     private static async Task WaitForCloseIfRequestedAsync(
         WindowRegistration registration,
         AzunoteCommandLineOptions options)
     {
         if (options.WaitForExit)
         {
-            await registration.Closed.ConfigureAwait(true);
+            await registration.Closed.ConfigureAwait(false);
         }
     }
 
@@ -538,7 +601,13 @@ internal sealed class ApplicationCoordinator : IDisposable
 
         public bool IsClosed => _closed.Task.IsCompleted;
 
-        public void MarkClosed() => _closed.TrySetResult(null);
+        public CommandLineDocumentOutput? ClosedDocument { get; private set; }
+
+        public void MarkClosed(CommandLineDocumentOutput? document = null)
+        {
+            ClosedDocument ??= document;
+            _closed.TrySetResult(null);
+        }
 
         private readonly TaskCompletionSource<object?> _closed = new(
             TaskCreationOptions.RunContinuationsAsynchronously);

@@ -1,46 +1,41 @@
-using System.Buffers.Binary;
 using System.IO.Pipes;
-using System.Text;
 
 namespace Azunote;
 
-internal sealed record SingleInstanceCommand(
-    IReadOnlyList<string> Arguments,
-    string WorkingDirectory,
-    string? StandardInput);
-
 /// <summary>
-/// Owns the process-wide Azunote instance and forwards command-line requests
-/// from later launches over a named pipe.
+/// Owns the process-wide Azunote instance and serves command-line requests
+/// forwarded by later launches and by <c>azu.exe</c>. The wire format lives in
+/// <see cref="SingleInstanceProtocol"/> so that the command-line client can
+/// share it.
 /// </summary>
 internal sealed class SingleInstanceHost : IDisposable
 {
-    private const int MaxArgumentCount = 64;
-    private const int MaxStringBytes = 16 * 1024 * 1024;
     private const int ConnectionAttempts = 100;
     private const int ConnectionTimeoutMilliseconds = 250;
     private const int RetryDelayMilliseconds = 100;
-    private static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false);
+    private const int ClientDrainTimeoutMilliseconds = 2000;
 
     private readonly string _mutexName;
     private readonly string _pipeName;
+    private readonly object _clientsLock = new();
+    private readonly List<Task> _clients = [];
     private Mutex? _mutex;
     private CancellationTokenSource? _serverCancellation;
     private Task? _serverTask;
-    private Func<SingleInstanceCommand, Task>? _commandHandler;
+    private Func<SingleInstanceCommand, Task<SingleInstanceResponse>>? _commandHandler;
     private bool _ownsMutex;
     private bool _disposed;
 
     internal SingleInstanceHost()
-        : this("Azunote")
+        : this(SingleInstanceProtocol.DefaultInstanceName)
     {
     }
 
     internal SingleInstanceHost(string instanceName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(instanceName);
-        _mutexName = $@"Local\{instanceName}.SingleInstance";
-        _pipeName = $"{instanceName}.CommandLine";
+        _mutexName = SingleInstanceProtocol.GetMutexName(instanceName);
+        _pipeName = SingleInstanceProtocol.GetPipeName(instanceName);
     }
 
     internal bool TryAcquire()
@@ -81,7 +76,7 @@ internal sealed class SingleInstanceHost : IDisposable
         }
     }
 
-    internal void Start(Func<SingleInstanceCommand, Task> commandHandler)
+    internal void Start(Func<SingleInstanceCommand, Task<SingleInstanceResponse>> commandHandler)
     {
         ArgumentNullException.ThrowIfNull(commandHandler);
         ObjectDisposedException.ThrowIf(_disposed, nameof(SingleInstanceHost));
@@ -100,7 +95,12 @@ internal sealed class SingleInstanceHost : IDisposable
         _serverTask = RunServerAsync(_serverCancellation.Token);
     }
 
-    internal async Task ForwardAsync(
+    /// <summary>
+    /// Forwards a command line from a second launch of the editor itself.
+    /// Only the status is returned: a Windows subsystem executable has no
+    /// standard output a shell can read, so output belongs to azu.exe.
+    /// </summary>
+    internal async Task<SingleInstanceStatus> ForwardAsync(
         IReadOnlyList<string> arguments,
         string? standardInput,
         CancellationToken cancellationToken = default)
@@ -119,7 +119,7 @@ internal sealed class SingleInstanceHost : IDisposable
             PipeDirection.InOut,
             PipeOptions.Asynchronous);
         await ConnectAsync(client, cancellationToken).ConfigureAwait(false);
-        await WriteCommandAsync(
+        await SingleInstanceProtocol.WriteCommandAsync(
             client,
             new SingleInstanceCommand(
                 arguments,
@@ -127,12 +127,10 @@ internal sealed class SingleInstanceHost : IDisposable
                 standardInput),
             cancellationToken).ConfigureAwait(false);
 
-        var response = new byte[1];
-        await client.ReadExactlyAsync(response, cancellationToken).ConfigureAwait(false);
-        if (response[0] != 1)
-        {
-            throw new InvalidOperationException("The running Azunote instance rejected the command.");
-        }
+        var response = await SingleInstanceProtocol
+            .ReadResponseAsync(client, cancellationToken)
+            .ConfigureAwait(false);
+        return response.Status;
     }
 
     public void Dispose()
@@ -143,6 +141,11 @@ internal sealed class SingleInstanceHost : IDisposable
         }
 
         _disposed = true;
+        // A client is blocked waiting for its response, and the editor is
+        // often shutting down precisely because the window that client was
+        // waiting for has closed. Let the answers that are already on their
+        // way finish before the server goes down.
+        WaitForClients();
         _serverCancellation?.Cancel();
         if (_serverTask is not null)
         {
@@ -175,6 +178,43 @@ internal sealed class SingleInstanceHost : IDisposable
         GC.SuppressFinalize(this);
     }
 
+    private void TrackClient(Task client)
+    {
+        lock (_clientsLock)
+        {
+            _clients.RemoveAll(tracked => tracked.IsCompleted);
+            _clients.Add(client);
+        }
+    }
+
+    /// <summary>
+    /// Waits for the commands that are still being answered. The wait is
+    /// bounded so that shutdown cannot be held up by a client that stopped
+    /// reading.
+    /// </summary>
+    private void WaitForClients()
+    {
+        Task[] pending;
+        lock (_clientsLock)
+        {
+            pending = _clients.Where(tracked => !tracked.IsCompleted).ToArray();
+        }
+
+        if (pending.Length == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            Task.WaitAll(pending, ClientDrainTimeoutMilliseconds);
+        }
+        catch (Exception exception) when (exception is AggregateException
+            or OperationCanceledException)
+        {
+        }
+    }
+
     private async Task RunServerAsync(CancellationToken cancellationToken)
     {
         while (!cancellationToken.IsCancellationRequested)
@@ -189,7 +229,7 @@ internal sealed class SingleInstanceHost : IDisposable
                     PipeTransmissionMode.Byte,
                     PipeOptions.Asynchronous);
                 await server.WaitForConnectionAsync(cancellationToken).ConfigureAwait(false);
-                _ = HandleClientAsync(server);
+                TrackClient(HandleClientAsync(server));
                 server = null;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -224,24 +264,24 @@ internal sealed class SingleInstanceHost : IDisposable
         {
             try
             {
-                var command = await ReadCommandAsync(server).ConfigureAwait(false);
+                var command = await SingleInstanceProtocol.ReadCommandAsync(server).ConfigureAwait(false);
                 var handler = _commandHandler
                     ?? throw new InvalidOperationException("The command server is not initialized.");
-                await handler(command).ConfigureAwait(false);
-                await server.WriteAsync(new byte[] { 1 }).ConfigureAwait(false);
-                await server.FlushAsync().ConfigureAwait(false);
+                var response = await handler(command).ConfigureAwait(false);
+                await SingleInstanceProtocol.WriteResponseAsync(server, response).ConfigureAwait(false);
             }
             catch (IOException)
             {
-                // The secondary process may exit before the response is sent.
+                // The client may exit before the response is sent.
             }
             catch (Exception exception)
             {
                 ErrorReporter.LogException("Forwarded command-line processing failure", exception);
                 try
                 {
-                    await server.WriteAsync(new byte[] { 0 }).ConfigureAwait(false);
-                    await server.FlushAsync().ConfigureAwait(false);
+                    await SingleInstanceProtocol
+                        .WriteResponseAsync(server, SingleInstanceResponse.Failed())
+                        .ConfigureAwait(false);
                 }
                 catch (IOException)
                 {
@@ -277,109 +317,5 @@ internal sealed class SingleInstanceHost : IDisposable
         }
 
         throw new IOException("Could not connect to the running Azunote instance.", lastException);
-    }
-
-    private static async Task WriteCommandAsync(
-        Stream stream,
-        SingleInstanceCommand command,
-        CancellationToken cancellationToken)
-    {
-        if (command.Arguments.Count > MaxArgumentCount)
-        {
-            throw new InvalidOperationException("Too many command-line arguments.");
-        }
-
-        await WriteInt32Async(stream, command.Arguments.Count, cancellationToken).ConfigureAwait(false);
-        foreach (var argument in command.Arguments)
-        {
-            await WriteStringAsync(stream, argument, cancellationToken).ConfigureAwait(false);
-        }
-
-        await WriteStringAsync(stream, command.WorkingDirectory, cancellationToken).ConfigureAwait(false);
-        if (command.StandardInput is null)
-        {
-            await stream.WriteAsync(new byte[] { 0 }, cancellationToken).ConfigureAwait(false);
-        }
-        else
-        {
-            await stream.WriteAsync(new byte[] { 1 }, cancellationToken).ConfigureAwait(false);
-            await WriteStringAsync(stream, command.StandardInput, cancellationToken).ConfigureAwait(false);
-        }
-
-        await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
-    }
-
-    private static async Task<SingleInstanceCommand> ReadCommandAsync(Stream stream)
-    {
-        var count = await ReadInt32Async(stream).ConfigureAwait(false);
-        if (count < 0 || count > MaxArgumentCount)
-        {
-            throw new InvalidDataException("The forwarded command contains an invalid argument count.");
-        }
-
-        var arguments = new string[count];
-        for (var index = 0; index < count; index++)
-        {
-            arguments[index] = await ReadStringAsync(stream).ConfigureAwait(false);
-        }
-
-        var workingDirectory = await ReadStringAsync(stream).ConfigureAwait(false);
-        var hasStandardInput = new byte[1];
-        await stream.ReadExactlyAsync(hasStandardInput).ConfigureAwait(false);
-        return hasStandardInput[0] switch
-        {
-            0 => new SingleInstanceCommand(arguments, workingDirectory, null),
-            1 => new SingleInstanceCommand(
-                arguments,
-                workingDirectory,
-                await ReadStringAsync(stream).ConfigureAwait(false)),
-            _ => throw new InvalidDataException("The forwarded command contains an invalid standard-input flag.")
-        };
-    }
-
-    private static async Task WriteInt32Async(
-        Stream stream,
-        int value,
-        CancellationToken cancellationToken)
-    {
-        var buffer = new byte[sizeof(int)];
-        BinaryPrimitives.WriteInt32LittleEndian(buffer, value);
-        await stream.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
-    }
-
-    private static async Task<int> ReadInt32Async(Stream stream)
-    {
-        var buffer = new byte[sizeof(int)];
-        await stream.ReadExactlyAsync(buffer).ConfigureAwait(false);
-        return BinaryPrimitives.ReadInt32LittleEndian(buffer);
-    }
-
-    private static async Task WriteStringAsync(
-        Stream stream,
-        string value,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(value);
-        var bytes = Utf8.GetBytes(value);
-        if (bytes.Length > MaxStringBytes)
-        {
-            throw new InvalidOperationException("A forwarded command argument is too large.");
-        }
-
-        await WriteInt32Async(stream, bytes.Length, cancellationToken).ConfigureAwait(false);
-        await stream.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
-    }
-
-    private static async Task<string> ReadStringAsync(Stream stream)
-    {
-        var length = await ReadInt32Async(stream).ConfigureAwait(false);
-        if (length < 0 || length > MaxStringBytes)
-        {
-            throw new InvalidDataException("The forwarded command contains an invalid string length.");
-        }
-
-        var bytes = new byte[length];
-        await stream.ReadExactlyAsync(bytes).ConfigureAwait(false);
-        return Utf8.GetString(bytes);
     }
 }

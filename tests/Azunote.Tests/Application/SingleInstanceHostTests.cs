@@ -16,13 +16,16 @@ public sealed class SingleInstanceHostTests
         owner.Start(command =>
         {
             received.TrySetResult(command);
-            return Task.CompletedTask;
+            return Task.FromResult(SingleInstanceResponse.Completed("payload"));
         });
 
         using var secondary = new SingleInstanceHost(instanceName);
         Assert.False(await Task.Run(secondary.TryAcquire));
-        await secondary.ForwardAsync(["--stdin", "--line", "4"], "stdin payload");
+        var status = await secondary.ForwardAsync(
+            ["--stdin", "--line", "4"],
+            "stdin payload");
 
+        Assert.Equal(SingleInstanceStatus.Completed, status);
         var command = await received.Task.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Equal(["--stdin", "--line", "4"], command.Arguments);
         Assert.Equal(Environment.CurrentDirectory, command.WorkingDirectory);
@@ -44,6 +47,7 @@ public sealed class SingleInstanceHostTests
         {
             processingStarted.SetResult(null);
             await release.Task;
+            return SingleInstanceResponse.Completed();
         });
 
         using var secondary = new SingleInstanceHost(instanceName);
@@ -53,5 +57,38 @@ public sealed class SingleInstanceHostTests
         Assert.False(forwarding.IsCompleted);
         release.SetResult(null);
         await forwarding;
+    }
+    [Fact]
+    public async Task Disposing_the_owner_waits_for_an_answer_in_flight()
+    {
+        var instanceName = $"Azunote.Tests.{Guid.NewGuid():N}";
+        using var owner = new SingleInstanceHost(instanceName);
+        Assert.True(owner.TryAcquire());
+
+        var processingStarted = new TaskCompletionSource<object?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource<object?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        owner.Start(async _ =>
+        {
+            processingStarted.SetResult(null);
+            await release.Task;
+            return SingleInstanceResponse.Completed("late answer");
+        });
+
+        using var secondary = new SingleInstanceHost(instanceName);
+        Assert.False(await Task.Run(secondary.TryAcquire));
+        var forwarding = secondary.ForwardAsync(["--output", "document", "-"], "text");
+        await processingStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var disposing = Task.Run(owner.Dispose);
+        await Task.Delay(100);
+        Assert.False(disposing.IsCompleted);
+
+        release.SetResult(null);
+        await disposing.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.True(forwarding.IsCompleted);
+        Assert.Equal(SingleInstanceStatus.Completed, await forwarding);
     }
 }

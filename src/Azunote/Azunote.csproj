@@ -30,8 +30,6 @@
     <Content Include="..\..\LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="..\..\THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="..\..\licenses\**\*" Link="licenses\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <None Include="azu.cmd" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <None Include="azu.ps1" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Page Remove="Application\App.xaml" />
     <EmbeddedResource Include="Resources\DefaultAppData\**\*"
                       LogicalName="Azunote.DefaultAppData.%(RecursiveDir)%(Filename)%(Extension)" />
@@ -40,6 +38,14 @@
   <ItemGroup>
     <!-- WinApp CLI integration: enables 'dotnet run' support for packaged apps -->
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools.WinApp" Version="0.6.1" />
+    <ProjectReference Include="..\Azunote.Ipc\Azunote.Ipc.csproj" />
+    <!--
+      azu.exe is the console entry point. The editor does not link against
+      it, but it is built alongside and shipped next to Azunote.exe.
+    -->
+    <ProjectReference Include="..\Azunote.Cli\Azunote.Cli.csproj"
+                     ReferenceOutputAssembly="false"
+                     Private="false" />
     <ProjectReference Include="..\Azunyan.Core\Azunyan.Core.csproj" />
     <ProjectReference Include="..\Azunyan.Syntax\Azunyan.Syntax.csproj" />
     <ProjectReference Include="..\Azunyan.WinUI\Azunyan.WinUI.csproj" />
@@ -56,6 +62,38 @@
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
+
+  <PropertyGroup>
+    <AzunoteCliProject>$(MSBuildThisFileDirectory)..\Azunote.Cli\Azunote.Cli.csproj</AzunoteCliProject>
+    <AzunoteCliOutputPath>$(MSBuildThisFileDirectory)..\Azunote.Cli\bin\$(Configuration)\net10.0\win-x64\</AzunoteCliOutputPath>
+    <AzunoteCliPublishPath>$(AzunoteCliOutputPath)publish\</AzunoteCliPublishPath>
+  </PropertyGroup>
+
+  <!--
+    Development builds take the client as built, which still needs the
+    shared runtime. Publishing replaces it with the AOT-published single
+    executable so that the package keeps its no-runtime-required property.
+  -->
+  <Target Name="BundleAzunoteCliForBuild" AfterTargets="Build"
+          Condition="Exists('$(AzunoteCliOutputPath)azu.exe')">
+    <ItemGroup>
+      <_AzunoteCliBuildFiles Include="$(AzunoteCliOutputPath)azu.exe" />
+      <_AzunoteCliBuildFiles Include="$(AzunoteCliOutputPath)azu.dll" />
+      <_AzunoteCliBuildFiles Include="$(AzunoteCliOutputPath)azu.runtimeconfig.json" />
+      <_AzunoteCliBuildFiles Include="$(AzunoteCliOutputPath)Azunote.Ipc.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_AzunoteCliBuildFiles)"
+          DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true"
+          Condition="Exists('%(_AzunoteCliBuildFiles.FullPath)')" />
+  </Target>
+
+  <Target Name="BundleAzunoteCliForPublish" AfterTargets="Publish">
+    <Exec Command="dotnet publish &quot;$(AzunoteCliProject)&quot; -c $(Configuration) -r win-x64 --nologo" />
+    <Copy SourceFiles="$(AzunoteCliPublishPath)azu.exe"
+          DestinationFolder="$(PublishDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
 
   <!--
     Native AOT currently leaves compiled XAML resources in the intermediate

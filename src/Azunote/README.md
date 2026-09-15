@@ -82,20 +82,34 @@ dotnet test tests/Azunote.Tests/Azunote.Tests.csproj
 src/Azunote/
   Application/     application startup and error reporting
   Shell/           main window, menus, and file commands
-  CommandLine/     executable command-line parsing
   ExternalTools/   external process execution and discovery
   Settings/        TOML settings persistence and custom definitions
   FileSystem/      text-file I/O
   Language/        built-in and custom language providers
   Theme/           Azunote's default color scheme
+
+src/Azunote.Ipc/   command-line contract and single-instance wire format
+src/Azunote.Cli/   azu.exe, the console client
 ```
+
+The editor is a Windows subsystem executable, so a shell cannot capture its
+standard output. `azu.exe` owns the console side of the contract and talks to
+the editor over the single-instance named pipe; both halves share
+`Azunote.Ipc`. `Azunote.exe` therefore writes nothing to a console of its
+own: `Azunote.exe --help` shows the help in the editor, and `azu --help`
+prints it to standard output.
+
+Each message on that pipe is one length-prefixed frame, written with a
+single write and parsed in memory. A response frame is a status byte and
+the payload, and the status byte is the exit code `azu.exe` reports.
 
 ## Usage
 
-The published output includes `azu.cmd` and `azu.ps1` next to
-`Azunote.exe`. Add that directory to `PATH` to invoke Azunote as the `azu`
-command. Normal launches return the prompt immediately; `--wait` keeps it
-blocked until the opened document window is closed.
+The published output includes `azu.exe` next to `Azunote.exe`. Add that
+directory to `PATH` to invoke Azunote as the `azu` command; the packaged
+build registers it as an app execution alias instead. Normal launches return
+the prompt immediately; `--wait` keeps it blocked until the opened document
+window is closed.
 
 ```powershell
 azu path\to\file.txt
@@ -103,6 +117,38 @@ azu --wait --line 12 --column 4 path\to\file.txt
 Get-Content input.md | azu --stdin
 azu +12:4 path\to\file.txt
 ```
+
+### Editing in a pipeline
+
+`--output` asks the editor for one value when the document window closes and
+writes it to standard output. It names the same values as the external-tool
+`input` field: `none`, `filePath`, `document`, and `selection`. Because the
+value only exists once the window closes, `--output` implies `--wait`.
+
+```powershell
+$text = git log --oneline | azu --output document -
+$path = azu --output filePath notes.md
+git config core.editor "azu --wait"
+```
+
+The payload is written as UTF-8 without a byte-order mark and without an
+added line ending, so a caller receives the bytes the document holds. The
+exit code reports the outcome:
+
+| Code | Meaning |
+| --- | --- |
+| 0 | The document closed and the requested output was written. |
+| 1 | A file-backed document was closed with its unsaved changes discarded. Nothing is written. |
+| 2 | The command line was invalid, or the editor could not be reached. |
+
+An untitled document has nowhere to be saved to, so its buffer is the result:
+piped text closes without a save confirmation and is returned as it stands.
+A document backed by a file keeps the ordinary confirmation, and discarding
+its changes is how a caller learns the edit was cancelled.
+
+When no editor is running, `azu` starts one and then sends the command line
+to it, so a cold start and a warm start take the same path. An empty,
+unmodified, untitled window is reused rather than left behind.
 
 Line and column are one-based and are clamped to the opened document. Azunote
 uses one process per user session: launching `Azunote.exe` again activates the

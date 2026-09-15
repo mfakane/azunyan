@@ -157,6 +157,24 @@ internal sealed class MainWindowRuntime : IDisposable
 
     internal DocumentSession Session => _session;
 
+    internal bool IsEmptyDocument => _view.Snapshot.Length == 0;
+
+    internal void AllowCommandLineClose() => _documents.AllowUntitledCloseWithoutPrompt();
+
+    /// <summary>
+    /// Captures the document as it stands for a command line that asked for
+    /// output when its window closes.
+    /// </summary>
+    internal CommandLineDocumentOutput CaptureCommandLineOutput()
+    {
+        var snapshot = EditorBufferSnapshot.Capture(_view);
+        return new CommandLineDocumentOutput(
+            snapshot.Text,
+            snapshot.SelectedText,
+            _session.State.FilePath,
+            IsDirty);
+    }
+
     internal Document CreateDocumentView() => _view.Document.CreateView();
 
     internal void EnsureFileWatcher() => _documents.EnsureFileWatcher();

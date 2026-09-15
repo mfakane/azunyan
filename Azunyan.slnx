@@ -1,4 +1,6 @@
 <Solution>
+  <Project Path="src/Azunote.Cli/Azunote.Cli.csproj" />
+  <Project Path="src/Azunote.Ipc/Azunote.Ipc.csproj" />
   <Project Path="src/Azunyan.Core/Azunyan.Core.csproj" />
   <Project Path="src/Azunyan.Syntax/Azunyan.Syntax.csproj" />
   <Project Path="src/Azunyan.WinUI/Azunyan.WinUI.csproj" />

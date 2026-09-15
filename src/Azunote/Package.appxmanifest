@@ -5,12 +5,14 @@
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:uap2="http://schemas.microsoft.com/appx/manifest/uap/windows10/2"
   xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
   xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
   xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
   xmlns:desktop2="http://schemas.microsoft.com/appx/manifest/desktop/windows10/2"
+  xmlns:desktop4="http://schemas.microsoft.com/appx/manifest/desktop/windows10/4"
   xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap uap2 uap3 uap10 desktop desktop2 desktop6 rescap">
+  IgnorableNamespaces="uap uap2 uap3 uap5 uap10 desktop desktop2 desktop4 desktop6 rescap">
 
   <Identity
     Name="Azunote"
@@ -35,9 +37,15 @@
   </Resources>
 
   <Applications>
+    <!--
+      Subsystem="console" on the azu.exe alias requires this: the shell
+      starts a client process per invocation, and Azunote keeps its own
+      single-instance behaviour through its mutex and command pipe.
+    -->
     <Application Id="azunote"
       Executable="$targetnametoken$.exe"
-      EntryPoint="Windows.FullTrustApplication">
+      EntryPoint="Windows.FullTrustApplication"
+      desktop4:SupportsMultipleInstances="true">
       <uap:VisualElements
         DisplayName="Azunote"
         Description="SDI style minimal code editor"
@@ -65,6 +73,18 @@
             </uap:SupportedFileTypes>
           </uap3:FileTypeAssociation>
         </uap:Extension>
+        <!--
+          Puts azu.exe on PATH. Subsystem="console" is what makes the shell
+          wait for it and keep its standard output.
+        -->
+        <uap5:Extension
+          Category="windows.appExecutionAlias"
+          Executable="azu.exe"
+          EntryPoint="Windows.FullTrustApplication">
+          <uap5:AppExecutionAlias desktop4:Subsystem="console">
+            <uap5:ExecutionAlias Alias="azu.exe" />
+          </uap5:AppExecutionAlias>
+        </uap5:Extension>
       </Extensions>
     </Application>
   </Applications>

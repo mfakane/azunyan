@@ -20,20 +20,17 @@ public sealed class ExternalToolsTests
     [Fact]
     public void Command_line_detects_help_before_the_end_of_options()
     {
-        Assert.True(AzunoteCommandLine.IsHelpRequested(new[] { "notes.md", "--help" }));
-        Assert.True(AzunoteCommandLine.IsHelpRequested(new[] { "-h" }));
-        Assert.False(AzunoteCommandLine.IsHelpRequested(new[] { "--", "--help" }));
+        Assert.True(AzunoteCommandLine.Parse(new[] { "notes.md", "--help" }).ShowHelp);
+        Assert.True(AzunoteCommandLine.Parse(new[] { "-h" }).ShowHelp);
+        Assert.False(AzunoteCommandLine.Parse(new[] { "--", "--help" }).ShowHelp);
     }
 
     [Fact]
-    public void Command_line_writes_help_for_the_supported_options()
+    public void Command_line_help_lists_the_supported_options()
     {
-        using var writer = new StringWriter();
+        var output = AzunoteCommandLine.Usage;
 
-        AzunoteCommandLine.WriteUsage(writer);
-
-        var output = writer.ToString();
-        Assert.Equal(AzunoteCommandLine.Usage + Environment.NewLine, output);
+        Assert.Contains("-o, --output TARGET", output, StringComparison.Ordinal);
         Assert.Contains("-h, --help", output, StringComparison.Ordinal);
         Assert.Contains("-w, --wait", output, StringComparison.Ordinal);
         Assert.Contains("-l, --line N", output, StringComparison.Ordinal);

@@ -38,6 +38,7 @@ internal sealed class DocumentWorkflow : IDisposable
     private bool _isApplying;
     private bool _externalChangeDialogOpen;
     private bool _allowClose;
+    private bool _allowUntitledClose;
     private bool _disposed;
 
     public DocumentWorkflow(
@@ -299,9 +300,19 @@ internal sealed class DocumentWorkflow : IDisposable
     public async Task<bool> ConfirmPendingChangesAsync() =>
         await _documents.ConfirmPendingChangesAsync(SaveAsync);
 
+    /// <summary>
+    /// A command line that asked for output takes the buffer as its result,
+    /// so an untitled document opened that way has nothing left to confirm
+    /// when its window closes. A document that gained a file keeps the
+    /// ordinary confirmation.
+    /// </summary>
+    public void AllowUntitledCloseWithoutPrompt() => _allowUntitledClose = true;
+
     public async Task<bool> TryConfirmCloseAsync()
     {
-        if (_allowClose || !IsDirty)
+        if (_allowClose
+            || !IsDirty
+            || (_allowUntitledClose && CurrentFilePath is null))
         {
             return true;
         }

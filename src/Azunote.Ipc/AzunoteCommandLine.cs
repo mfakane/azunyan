@@ -18,6 +18,25 @@ public sealed record AzunoteCommandLineOptions
     public bool ReadStandardInput { get; init; }
 
     public bool ShowHelp { get; init; }
+
+    /// <summary>
+    /// What the command line asks the editor to write to standard output when
+    /// the document window closes. The vocabulary matches the external-tool
+    /// <c>input</c> field so that both sides name the same values.
+    /// </summary>
+    public CommandLineOutputTarget Output { get; init; }
+}
+
+/// <summary>
+/// The value selected by <c>--output</c>. The names mirror the external-tool
+/// <c>[launch].input</c> values.
+/// </summary>
+public enum CommandLineOutputTarget
+{
+    None,
+    FilePath,
+    Document,
+    Selection
 }
 
 public sealed class CommandLineParseException : ArgumentException
@@ -42,38 +61,14 @@ public static class AzunoteCommandLine
         "  -c, --column N          Open at one-based column N.",
         "      --column=N          Equivalent form of --column N.",
         "      --stdin, -          Read the document from standard input.",
+        "  -o, --output TARGET     Write TARGET to standard output when the",
+        "                          document closes, and wait for it. TARGET is",
+        "                          none, filePath, document, or selection.",
+        "      --output=TARGET     Equivalent form of --output TARGET.",
         "      +N[:M]              Open at one-based line N and optional column M.",
         "      --                  Treat remaining arguments as a document path.",
         "  path                    Open one document path.",
     ];
-
-    internal static bool IsHelpRequested(IEnumerable<string> arguments)
-    {
-        ArgumentNullException.ThrowIfNull(arguments);
-
-        var positionalsAllowed = true;
-        foreach (var argument in arguments)
-        {
-            if (positionalsAllowed && argument == "--")
-            {
-                positionalsAllowed = false;
-                continue;
-            }
-
-            if (positionalsAllowed && (argument == "-h" || argument == "--help"))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    internal static void WriteUsage(TextWriter writer)
-    {
-        ArgumentNullException.ThrowIfNull(writer);
-        writer.WriteLine(Usage);
-    }
 
     public static AzunoteCommandLineOptions Parse(IEnumerable<string> arguments)
     {
@@ -134,6 +129,23 @@ public static class AzunoteCommandLine
                 continue;
             }
 
+            if (positionalsAllowed && TryReadOptionValue(argument, "--output", out var outputValue))
+            {
+                options = options with { Output = ParseOutputTarget(outputValue) };
+                continue;
+            }
+
+            if (positionalsAllowed && (argument == "--output" || argument == "-o"))
+            {
+                if (++index >= values.Length)
+                {
+                    throw new CommandLineParseException($"Missing value for {argument}.");
+                }
+
+                options = options with { Output = ParseOutputTarget(values[index]) };
+                continue;
+            }
+
             if (positionalsAllowed && (argument == "-l" || argument == "-c"))
             {
                 if (++index >= values.Length)
@@ -175,8 +187,22 @@ public static class AzunoteCommandLine
                 "A document path and standard input cannot be used together.");
         }
 
-        return options;
+        // Output can only be produced once the document closes, so asking for
+        // it always waits.
+        return options.Output == CommandLineOutputTarget.None
+            ? options
+            : options with { WaitForExit = true };
     }
+
+    private static CommandLineOutputTarget ParseOutputTarget(string value) => value switch
+    {
+        "none" => CommandLineOutputTarget.None,
+        "filePath" => CommandLineOutputTarget.FilePath,
+        "document" => CommandLineOutputTarget.Document,
+        "selection" => CommandLineOutputTarget.Selection,
+        _ => throw new CommandLineParseException(
+            $"The output must be none, filePath, document, or selection: {value}")
+    };
 
     public static string Usage => string.Join(Environment.NewLine, UsageLines);
 
