@@ -4,10 +4,11 @@ using Azunyan.Core;
 namespace Azunyan.Syntax;
 
 /// <summary>
-/// Finds foldable JSON objects and arrays. A fold hides everything between a
-/// bracket and its match, so a collapsed container still shows the brackets
-/// that say what it is. A container written on one line has nothing to gain
-/// from folding and is skipped.
+/// Finds foldable JSON objects and arrays. A collapsed container reads as one
+/// line, <c>"items": [ … ],</c>, because the fold takes in the closing bracket
+/// and the line it sits on and puts them back through its placeholder. A
+/// container written on one line has nothing to gain from folding and is
+/// skipped.
 /// </summary>
 /// <remarks>
 /// A fold keeps its identity across edits through the path of the container,
@@ -102,14 +103,43 @@ public sealed class JsonFoldingProvider : IFoldingProvider
             return false;
         }
 
+        var (end, placeholder) = MeasureClosingLine(snapshot, closePosition);
         var key = (frame.IsObject ? "object:" : "array:") + frame.Path;
         occurrences.TryGetValue(key, out var occurrence);
         occurrences[key] = occurrence + 1;
         fold = new FoldRange(
             $"json-{key}:{occurrence}",
-            TextRange.FromBounds(start, closePosition),
-            " … ");
+            TextRange.FromBounds(start, end),
+            placeholder);
         return true;
+    }
+
+    /// <summary>
+    /// Decides how much of the closing bracket's line the fold takes in. When
+    /// only a comma follows the bracket, the fold swallows the whole line,
+    /// including its line break, and the placeholder restores what it hid so
+    /// the collapsed container stays on one line. Anything else on that line,
+    /// such as the <c>{</c> of the next element, belongs to another fold and
+    /// is left visible on its own line.
+    /// </summary>
+    private static (int End, string Placeholder) MeasureClosingLine(
+        TextSnapshot snapshot,
+        int closePosition)
+    {
+        var line = snapshot.Lines.GetLine(closePosition);
+        var lineEnd = snapshot.Lines.GetLineEnd(line);
+        var tail = snapshot
+            .GetText(TextRange.FromBounds(closePosition + 1, lineEnd))
+            .Trim();
+        if (tail.Length > 0 && tail != ",")
+        {
+            return (closePosition, " … ");
+        }
+
+        var end = line + 1 < snapshot.Lines.LineCount
+            ? snapshot.Lines.GetLineStart(line + 1)
+            : snapshot.Length;
+        return (end, $" … {snapshot.GetText(new TextRange(closePosition, 1))}{tail}");
     }
 
     /// <summary>

@@ -480,6 +480,17 @@ public sealed class TextProjection
         var visualLine = IsPlain
             ? logicalLine
             : _logicalToVisual[logicalLine];
+
+        // A position at the very end of a fold belongs to no fold, but the
+        // line holding it can be hidden by that fold all the same. It is shown
+        // by the placeholder, which lives on the line the fold started on.
+        if (visualLine < 0
+            && !IsPlain
+            && FindContainingFold(offset, AnchorAffinity.Before) is { } endingFold)
+        {
+            visualLine = _logicalToVisual[Snapshot.Lines.GetLine(endingFold.Range.Start)];
+        }
+
         if (visualLine < 0)
         {
             throw new InvalidOperationException("The projection has no visible line for the requested position.");
@@ -694,12 +705,21 @@ public sealed class TextProjectionBuilder
         var newLines = snapshot.Lines;
         var delta = change.NewText.Length - change.OldRange.Length;
         var chunks = new List<ProjectedLineChunk>();
-        previous.LineTable.AddRange(chunks, 0, oldWindow.StartLine);
+
+        // The line table is indexed by visual line, and a fold can hide a
+        // logical line completely, so the reused prefix and suffix are counted
+        // in visual lines rather than in logical ones.
+        var prefixVisualCount = CountVisibleLines(previous, oldWindow.StartLine);
+        var oldChangedVisualCount = CountVisibleLines(
+            previous,
+            oldWindow.StartLine,
+            oldWindow.EndLine);
+        var suffixVisualStart = prefixVisualCount + oldChangedVisualCount;
+        previous.LineTable.AddRange(chunks, 0, prefixVisualCount);
 
         var changedLines = new List<ProjectedLine>(newWindow.EndLine - newWindow.StartLine);
         var logicalToVisual = Enumerable.Repeat(-1, newLines.LineCount).ToArray();
         CopyPrefixVisualLines(previous, logicalToVisual, oldWindow.StartLine);
-        var prefixVisualCount = CountVisibleLines(previous, oldWindow.StartLine);
         for (var logicalLine = newWindow.StartLine; logicalLine < newWindow.EndLine; logicalLine++)
         {
             var sourceRange = newLines.GetLineRange(logicalLine);
@@ -719,15 +739,11 @@ public sealed class TextProjectionBuilder
             changedLines.Count);
         previous.LineTable.AddRange(
             chunks,
-            oldWindow.EndLine,
-            oldLines.LineCount - oldWindow.EndLine,
+            suffixVisualStart,
+            previous.LineTable.Count - suffixVisualStart,
             newWindow.EndLine - oldWindow.EndLine,
             delta);
 
-        var oldChangedVisualCount = CountVisibleLines(
-            previous,
-            oldWindow.StartLine,
-            oldWindow.EndLine);
         var visualDelta = changedLines.Count - oldChangedVisualCount;
         var logicalDelta = newWindow.EndLine - oldWindow.EndLine;
         for (var logicalLine = newWindow.EndLine; logicalLine < newLines.LineCount; logicalLine++)
@@ -1055,7 +1071,11 @@ public sealed class TextProjectionBuilder
             ? folds[firstFold - 1]
             : null;
         var cursor = coveringFold?.Range.End ?? line.Start;
-        if (cursor > line.End)
+
+        // A fold that covers this line up to its end leaves nothing to show.
+        // Keeping the line would draw an empty row where the fold placeholder
+        // already stands on the line the fold started on.
+        if (coveringFold is not null && cursor >= line.End)
         {
             return null;
         }

@@ -6,7 +6,7 @@ namespace Azunyan.Syntax.Tests;
 public sealed class JsonFoldingProviderTests
 {
     [Fact]
-    public async Task Objects_and_arrays_fold_between_their_brackets()
+    public async Task Objects_and_arrays_fold_from_their_bracket_through_the_closing_line()
     {
         const string text =
             "{\n"
@@ -20,11 +20,72 @@ public sealed class JsonFoldingProviderTests
 
         var folds = await GetAsync(snapshot);
 
-        Assert.Equal(
-            ["\n    1,\n    2\n  ", "\n  \"name\": \"azunote\",\n  \"items\": [\n    1,\n    2\n  ]\n"],
-            folds.Select(fold => snapshot.GetText(fold.Range)));
         Assert.Equal(["json-array:$/items:0", "json-object:$:0"], folds.Select(fold => fold.Id));
-        Assert.All(folds, fold => Assert.Equal(" … ", fold.Placeholder));
+        Assert.Equal(
+            [
+                "\n    1,\n    2\n  ]\n",
+                "\n  \"name\": \"azunote\",\n  \"items\": [\n    1,\n    2\n  ]\n}"
+            ],
+            folds.Select(fold => snapshot.GetText(fold.Range)));
+        Assert.Equal([" … ]", " … }"], folds.Select(fold => fold.Placeholder));
+    }
+
+    [Fact]
+    public async Task A_collapsed_container_reads_as_one_line()
+    {
+        const string text =
+            "{\n"
+            + "  \"items\": [\n"
+            + "    1,\n"
+            + "    2\n"
+            + "  ],\n"
+            + "  \"debug\": true\n"
+            + "}\n";
+        var snapshot = new TextSnapshot(text);
+        var folds = await GetAsync(snapshot);
+
+        var lines = Render(snapshot, folds.Single(fold => fold.Id == "json-array:$/items:0"));
+
+        Assert.Equal(
+            ["{", "  \"items\": [ … ],", "  \"debug\": true", "}", ""],
+            lines);
+    }
+
+    [Fact]
+    public async Task A_collapsed_container_ending_the_document_leaves_no_empty_row()
+    {
+        const string text =
+            "{\n"
+            + "  \"a\": 1\n"
+            + "}";
+        var snapshot = new TextSnapshot(text);
+        var folds = await GetAsync(snapshot);
+
+        Assert.Equal(["{ … }"], Render(snapshot, [.. folds]));
+    }
+
+    [Fact]
+    public async Task A_closing_bracket_sharing_its_line_keeps_its_own_row()
+    {
+        const string text =
+            "[\n"
+            + "  {\n"
+            + "    \"a\": 1\n"
+            + "  }, {\n"
+            + "    \"b\": 2\n"
+            + "  }\n"
+            + "]\n";
+        var snapshot = new TextSnapshot(text);
+        var folds = await GetAsync(snapshot);
+        var first = folds.Single(fold => fold.Id == "json-object:$/0:0");
+
+        Assert.Equal(" … ", first.Placeholder);
+        Assert.Equal(
+            ["[", "  { … ", "}, {", "    \"b\": 2", "  }", "]", ""],
+            Render(snapshot, first));
+        Assert.Equal(
+            " … }",
+            folds.Single(fold => fold.Id == "json-object:$/1:0").Placeholder);
     }
 
     [Fact]
@@ -83,7 +144,7 @@ public sealed class JsonFoldingProviderTests
         var fold = Assert.Single(await GetAsync(snapshot));
 
         Assert.Equal("json-object:$:0", fold.Id);
-        Assert.Equal(text[1..^1], snapshot.GetText(fold.Range));
+        Assert.Equal(text[1..], snapshot.GetText(fold.Range));
     }
 
     [Fact]
@@ -107,6 +168,16 @@ public sealed class JsonFoldingProviderTests
     {
         Assert.IsType<JsonFoldingProvider>(BuiltInSyntaxLanguages.Json.FoldingProvider);
     }
+
+    /// <summary>Renders what the editor shows with the given folds collapsed.</summary>
+    private static string[] Render(TextSnapshot snapshot, params FoldRange[] folds) =>
+        [.. TextProjectionBuilder.Build(snapshot, folds).Lines
+            .Select(line => string.Concat(line.Inlines.Select(inline => inline switch
+            {
+                ProjectedText projected => snapshot.GetText(projected.Source),
+                FoldPlaceholder placeholder => placeholder.DisplayText,
+                _ => string.Empty
+            })))];
 
     private static async Task<IReadOnlyList<FoldRange>> GetAsync(TextSnapshot snapshot) =>
         await new JsonFoldingProvider().GetFoldsAsync(

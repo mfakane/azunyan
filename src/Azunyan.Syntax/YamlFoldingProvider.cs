@@ -5,9 +5,10 @@ namespace Azunyan.Syntax;
 /// <summary>
 /// Finds foldable YAML blocks. YAML states its structure through indentation,
 /// so a line that is followed by more deeply indented lines opens a block, and
-/// the block ends at the last line that stays inside it. Blank lines and
-/// comment-only lines do not open or close a block, and a block that ends in
-/// blank lines keeps them outside the fold.
+/// the block ends at the last line that stays inside it. The fold takes in the
+/// line break of that last line, so a collapsed block leaves no empty row
+/// behind. Blank lines and comment-only lines do not open or close a block,
+/// and a block that ends in blank lines keeps them outside the fold.
 /// </summary>
 /// <remarks>
 /// A fold keeps its identity across edits through the path of its block, such
@@ -41,7 +42,7 @@ public sealed class YamlFoldingProvider : IFoldingProvider
 
             while (frames[^1].Indent >= indent)
             {
-                Close(frames, folds, occurrences);
+                Close(snapshot, frames, folds, occurrences);
             }
 
             var parent = frames[^1];
@@ -58,7 +59,7 @@ public sealed class YamlFoldingProvider : IFoldingProvider
 
         while (frames.Count > 1)
         {
-            Close(frames, folds, occurrences);
+            Close(snapshot, frames, folds, occurrences);
         }
 
         folds.Sort(static (left, right) => left.Range.Start.CompareTo(right.Range.Start));
@@ -66,6 +67,7 @@ public sealed class YamlFoldingProvider : IFoldingProvider
     }
 
     private static void Close(
+        TextSnapshot snapshot,
         List<YamlFrame> frames,
         List<FoldRange> folds,
         Dictionary<string, int> occurrences)
@@ -82,8 +84,21 @@ public sealed class YamlFoldingProvider : IFoldingProvider
         occurrences[frame.Path] = occurrence + 1;
         folds.Add(new FoldRange(
             $"yaml-block:{frame.Path}:{occurrence}",
-            TextRange.FromBounds(start, frame.LastDescendantEnd),
+            TextRange.FromBounds(start, EndOfBlock(snapshot, frame.LastDescendantEnd)),
             " …"));
+    }
+
+    /// <summary>
+    /// Ends the fold after the line break of the block's last line. Leaving
+    /// that break visible would draw the emptied line as a blank row under the
+    /// collapsed block.
+    /// </summary>
+    private static int EndOfBlock(TextSnapshot snapshot, int lastDescendantEnd)
+    {
+        var line = snapshot.Lines.GetLine(lastDescendantEnd);
+        return line + 1 < snapshot.Lines.LineCount
+            ? snapshot.Lines.GetLineStart(line + 1)
+            : snapshot.Length;
     }
 
     /// <summary>

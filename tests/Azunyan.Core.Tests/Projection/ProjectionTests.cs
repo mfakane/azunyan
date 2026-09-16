@@ -288,6 +288,46 @@ public sealed class ProjectionTests
     }
 
     [Fact]
+    public void Incremental_projection_stays_aligned_when_a_fold_hides_whole_lines()
+    {
+        var document = new Document("aa\nbb\ncc\ndd\nee\n");
+        var oldSnapshot = document.Snapshot;
+        var folds = new[] { new FoldRange("body", TextRange.FromBounds(2, 11), " …") };
+        var previous = TextProjectionBuilder.Build(oldSnapshot, folds);
+
+        var change = document.Insert(13, "X");
+        var incremental = TextProjectionBuilder.BuildIncremental(
+            oldSnapshot,
+            document.Snapshot,
+            previous,
+            change,
+            folds,
+            inlays: null);
+        var expected = TextProjectionBuilder.Build(document.Snapshot, folds);
+
+        Assert.Equal(3, previous.VisualLineCount);
+        AssertProjectionEquivalent(expected, incremental, document.Snapshot);
+    }
+
+    [Fact]
+    public void A_fold_covering_a_line_to_its_end_hides_that_line()
+    {
+        var snapshot = new TextSnapshot("a\nb\nc");
+        var projection = TextProjectionBuilder.Build(
+            snapshot,
+            folds: new[] { new FoldRange("body", TextRange.FromBounds(1, 5), " …") });
+
+        Assert.Equal(3, snapshot.Lines.LineCount);
+        Assert.Equal(1, projection.VisualLineCount);
+        Assert.Equal(
+            new VisualPosition(0, 1),
+            projection.MapDocumentPosition(DocumentAnchor.Before(3)));
+        Assert.Equal(
+            new VisualPosition(0, 3),
+            projection.MapDocumentPosition(DocumentAnchor.After(5)));
+    }
+
+    [Fact]
     public void Overlapping_folds_are_normalized_deterministically()
     {
         var snapshot = new TextSnapshot("0123456789");

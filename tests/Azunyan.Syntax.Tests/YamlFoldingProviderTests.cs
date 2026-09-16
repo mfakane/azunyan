@@ -19,8 +19,34 @@ public sealed class YamlFoldingProviderTests
         var fold = Assert.Single(await GetAsync(snapshot));
 
         Assert.Equal("yaml-block:/server:0", fold.Id);
-        Assert.Equal("\n  host: localhost\n  port: 8080", snapshot.GetText(fold.Range));
+        Assert.Equal("\n  host: localhost\n  port: 8080\n", snapshot.GetText(fold.Range));
         Assert.Equal(" …", fold.Placeholder);
+    }
+
+    [Fact]
+    public async Task A_collapsed_block_leaves_no_empty_row_behind()
+    {
+        const string text =
+            "name: app\n"
+            + "server:\n"
+            + "  host: localhost\n"
+            + "  port: 8080\n"
+            + "debug: true\n";
+        var snapshot = new TextSnapshot(text);
+        var folds = await GetAsync(snapshot);
+
+        var lines = Render(snapshot, [.. folds]);
+
+        Assert.Equal(["name: app", "server: …", "debug: true", ""], lines);
+    }
+
+    [Fact]
+    public async Task A_collapsed_block_ending_the_document_leaves_no_empty_row()
+    {
+        var snapshot = new TextSnapshot("server:\n  host: localhost");
+        var folds = await GetAsync(snapshot);
+
+        Assert.Equal(["server: …"], Render(snapshot, [.. folds]));
     }
 
     [Fact]
@@ -46,7 +72,7 @@ public sealed class YamlFoldingProviderTests
             ],
             folds.Select(fold => fold.Id));
         Assert.Equal(
-            "\n        uses: actions/checkout",
+            "\n        uses: actions/checkout\n",
             snapshot.GetText(folds.Single(fold => fold.Id.EndsWith("[0]:0", StringComparison.Ordinal)).Range));
     }
 
@@ -63,7 +89,10 @@ public sealed class YamlFoldingProviderTests
 
         var fold = Assert.Single(await GetAsync(snapshot));
 
-        Assert.Equal("\n  host: localhost", snapshot.GetText(fold.Range));
+        Assert.Equal("\n  host: localhost\n", snapshot.GetText(fold.Range));
+        Assert.Equal(
+            ["server: …", "", "", "debug: true", ""],
+            Render(snapshot, fold));
     }
 
     [Fact]
@@ -79,7 +108,7 @@ public sealed class YamlFoldingProviderTests
 
         Assert.Equal("yaml-block:/server:0", fold.Id);
         Assert.Equal(
-            "\n# a comment at column zero\n  host: localhost",
+            "\n# a comment at column zero\n  host: localhost\n",
             snapshot.GetText(fold.Range));
     }
 
@@ -127,6 +156,16 @@ public sealed class YamlFoldingProviderTests
     {
         Assert.IsType<YamlFoldingProvider>(BuiltInSyntaxLanguages.Yaml.FoldingProvider);
     }
+
+    /// <summary>Renders what the editor shows with the given folds collapsed.</summary>
+    private static string[] Render(TextSnapshot snapshot, params FoldRange[] folds) =>
+        [.. TextProjectionBuilder.Build(snapshot, folds).Lines
+            .Select(line => string.Concat(line.Inlines.Select(inline => inline switch
+            {
+                ProjectedText projected => snapshot.GetText(projected.Source),
+                FoldPlaceholder placeholder => placeholder.DisplayText,
+                _ => string.Empty
+            })))];
 
     private static async Task<IReadOnlyList<FoldRange>> GetAsync(TextSnapshot snapshot) =>
         await new YamlFoldingProvider().GetFoldsAsync(

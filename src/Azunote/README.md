@@ -225,9 +225,10 @@ language modes are described in [Settings](../../docs/settings.md).
 
 Folding is offered by the language definitions that supply a folding provider.
 TOML and the Azunote note mode fold a table section up to the next header, JSON
-folds an object or an array between its brackets so the collapsed line still
-shows which one it is, and YAML folds the block indented under a key or a
-sequence entry, leaving trailing blank lines outside the fold. Each fold is
+folds an object or an array so that a collapsed container reads as one line,
+`"items": [ … ],`, and YAML folds the block indented under a key or a sequence
+entry, taking in the line break of its last line so no empty row is left behind
+and leaving trailing blank lines outside the fold. Each fold is
 named after the path of what it covers, such as `$/items/2` or `/jobs/build`,
 so a collapsed block stays collapsed while the text above it is edited.
 
