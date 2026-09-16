@@ -27,6 +27,25 @@ public sealed class LanguageModeControllerTests
     }
 
     [Fact]
+    public void Selected_mode_reports_the_extensions_an_untitled_document_matches()
+    {
+        // An untitled document has no extension of its own, so this is what
+        // a tool's `[when].extensions` is matched against.
+        var editor = new FakeEditorView();
+        var menu = new FakeLanguageModeMenuView();
+        var controller = new LanguageModeController(
+            editor,
+            menu,
+            () => null);
+
+        controller.Initialize();
+        menu.SelectFromMenu("json");
+
+        Assert.Equal("json", controller.CurrentModeId);
+        Assert.Contains(".json", controller.CurrentModeFileExtensions);
+    }
+
+    [Fact]
     public void Manual_selection_prevents_later_path_auto_selection()
     {
         var editor = new FakeEditorView();

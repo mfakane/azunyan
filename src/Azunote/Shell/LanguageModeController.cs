@@ -33,6 +33,15 @@ internal sealed class LanguageModeController
 
     public string CurrentModeId => _currentModeId;
 
+    /// <summary>
+    /// The file extensions of the current mode. An untitled document has no
+    /// extension of its own, so this is what `[when].extensions` reads.
+    /// </summary>
+    public IReadOnlyList<string> CurrentModeFileExtensions =>
+        _catalog.TryGet(_currentModeId, out var currentMode)
+            ? currentMode.FileExtensions
+            : [];
+
     public string CurrentModeDisplayName =>
         _catalog.TryGet(_currentModeId, out var mode)
             ? mode.DisplayName

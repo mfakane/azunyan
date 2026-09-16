@@ -86,7 +86,8 @@ internal sealed class MainWindowRuntime : IDisposable
             _prompt,
             openTextInNewWindow,
             () => _languageModes.CurrentModeId,
-            _powerShellWarmPool);
+            _powerShellWarmPool,
+            () => _languageModes.CurrentModeFileExtensions);
 
         _documents = new DocumentWorkflow(
             _view,
@@ -119,7 +120,8 @@ internal sealed class MainWindowRuntime : IDisposable
         _toolCache = new(watches: SharedFileWatchRegistry.Shared, invalidated: RefreshExternalToolsMenu);
         _toolUpdates = new(_dispatcher,
             () => new(_view.Snapshot, _view.Selection, _session.State,
-                _languageModes.CurrentModeId, _settings.PreparedTools),
+                _languageModes.CurrentModeId, _languageModes.CurrentModeFileExtensions,
+                _settings.PreparedTools),
             (input, isCurrent) => input.Evaluate(isCurrent, _toolCache),
             states => _settings.ApplyExternalToolStates(states),
             exception => ErrorReporter.LogException("External tool availability", exception));
@@ -669,7 +671,8 @@ internal sealed class MainWindowRuntime : IDisposable
             state.LineEnding,
             state.IsDirty,
             editorSnapshot.SelectionStart,
-            editorSnapshot.SelectionEnd);
+            editorSnapshot.SelectionEnd,
+            languageExtensions: _languageModes.CurrentModeFileExtensions);
     }
 
     private static ShellCommandInvocation ResolveShellCommand(

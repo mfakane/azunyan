@@ -15,6 +15,7 @@ public sealed class ExternalToolController
     private readonly IUserPrompt _prompt;
     private readonly Func<string, Task> _openTextInNewWindow;
     private readonly Func<string> _languageModeId;
+    private readonly Func<IReadOnlyList<string>> _languageExtensions;
     private readonly PowerShellWarmPool? _warmPool;
 
     public ExternalToolController(
@@ -23,7 +24,8 @@ public sealed class ExternalToolController
         ITextFileStore files,
         IUserPrompt prompt,
         Func<string, Task> openTextInNewWindow,
-        Func<string>? languageModeId = null)
+        Func<string>? languageModeId = null,
+        Func<IReadOnlyList<string>>? languageExtensions = null)
     {
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
         _documents = documents ?? throw new ArgumentNullException(nameof(documents));
@@ -32,6 +34,7 @@ public sealed class ExternalToolController
         _openTextInNewWindow = openTextInNewWindow
             ?? throw new ArgumentNullException(nameof(openTextInNewWindow));
         _languageModeId = languageModeId ?? (() => string.Empty);
+        _languageExtensions = languageExtensions ?? (() => []);
     }
 
     internal ExternalToolController(
@@ -41,8 +44,9 @@ public sealed class ExternalToolController
         IUserPrompt prompt,
         Func<string, Task> openTextInNewWindow,
         Func<string>? languageModeId,
-        PowerShellWarmPool? warmPool)
-        : this(editor, documents, files, prompt, openTextInNewWindow, languageModeId) =>
+        PowerShellWarmPool? warmPool,
+        Func<IReadOnlyList<string>>? languageExtensions = null)
+        : this(editor, documents, files, prompt, openTextInNewWindow, languageModeId, languageExtensions) =>
         _warmPool = warmPool;
 
     public async Task<ExternalToolResult> RunAsync(
@@ -82,7 +86,8 @@ public sealed class ExternalToolController
                 _documents.Session.State.LineEnding,
                 _documents.Session.State.IsDirty,
                 editorSnapshot.SelectionStart,
-                editorSnapshot.SelectionEnd);
+                editorSnapshot.SelectionEnd,
+                languageExtensions: _languageExtensions());
             var result = await ExternalToolRunner.RunAsync(
                 definition,
                 context,

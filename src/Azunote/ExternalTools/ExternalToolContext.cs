@@ -43,7 +43,8 @@ public sealed partial record ExternalToolContext
         bool isDirty = false,
         LineColumn? selectionStart = null,
         LineColumn? selectionEnd = null,
-        Func<string?, string?, string?>? workspaceResolver = null)
+        Func<string?, string?, string?>? workspaceResolver = null,
+        IReadOnlyList<string>? languageExtensions = null)
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(selection);
@@ -66,6 +67,7 @@ public sealed partial record ExternalToolContext
         LineNumber = lineNumber;
         ColumnNumber = columnNumber;
         LanguageId = languageId ?? string.Empty;
+        LanguageExtensions = languageExtensions ?? [];
         Encoding = encoding;
         LineEnding = lineEnding;
         IsDirty = isDirty;
@@ -156,6 +158,14 @@ public sealed partial record ExternalToolContext
     public int ColumnNumber { get; }
 
     public string LanguageId { get; }
+
+    /// <summary>
+    /// The file extensions of the current language mode. An untitled document
+    /// has no extension of its own, so `[when].extensions` reads these
+    /// instead: choosing the JSON mode in an untitled document is what makes
+    /// the tools for `.json` apply to it.
+    /// </summary>
+    public IReadOnlyList<string> LanguageExtensions { get; }
 
     public TextEncodingKind Encoding { get; }
 

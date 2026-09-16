@@ -534,6 +534,84 @@ public sealed class ExternalToolsTests
     }
 
     [Fact]
+    public void Availability_reads_the_language_mode_extensions_for_an_untitled_document()
+    {
+        var settings = new ExternalToolSettings
+        {
+            Name = "Format JSON",
+            Launch = new ExternalToolLaunchSettings { Command = "cmd.exe" },
+            Visibility = "whenAvailable",
+            When = new ExternalToolWhenSettings { Extensions = [".json"] }
+        };
+        var context = new ExternalToolContext(
+            null,
+            null,
+            "document",
+            string.Empty,
+            languageId: "json",
+            languageExtensions: [".json"]);
+
+        var state = ExternalToolAvailability.Evaluate(settings, context);
+
+        Assert.True(state.IsVisible);
+        Assert.True(state.IsEnabled);
+    }
+
+    [Fact]
+    public void Availability_hides_a_tool_an_untitled_language_mode_does_not_cover()
+    {
+        var settings = new ExternalToolSettings
+        {
+            Name = "Format JSON",
+            Launch = new ExternalToolLaunchSettings { Command = "cmd.exe" },
+            Visibility = "whenAvailable",
+            When = new ExternalToolWhenSettings { Extensions = [".json"] }
+        };
+        var context = new ExternalToolContext(
+            null,
+            null,
+            "document",
+            string.Empty,
+            languageId: "markdown",
+            languageExtensions: [".md", ".markdown"]);
+
+        var state = ExternalToolAvailability.Evaluate(settings, context);
+
+        Assert.False(state.IsVisible);
+        Assert.Equal(
+            "The current language mode is not one this tool supports.",
+            state.DisabledReason);
+    }
+
+    [Fact]
+    public void Availability_keeps_reading_the_file_extension_of_a_saved_document()
+    {
+        // A saved document has an extension of its own, and it stays the
+        // answer even where a language mode was chosen by hand.
+        var settings = new ExternalToolSettings
+        {
+            Name = "Format JSON",
+            Launch = new ExternalToolLaunchSettings { Command = "cmd.exe" },
+            Visibility = "whenAvailable",
+            When = new ExternalToolWhenSettings { Extensions = [".json"] }
+        };
+        var context = new ExternalToolContext(
+            Path.Combine("folder", "notes.txt"),
+            Path.Combine("folder", "notes.txt"),
+            "document",
+            string.Empty,
+            languageId: "json",
+            languageExtensions: [".json"]);
+
+        var state = ExternalToolAvailability.Evaluate(settings, context);
+
+        Assert.False(state.IsVisible);
+        Assert.Equal(
+            "The current document has an unsupported file extension.",
+            state.DisabledReason);
+    }
+
+    [Fact]
     public void Output_interpreter_selects_actions_for_the_mixed_and_individual_streams()
     {
         var replace = ExternalToolOutputInterpreter.Interpret(

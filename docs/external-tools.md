@@ -202,13 +202,19 @@ specified conditions must match.
 
 | Field | Description |
 | --- | --- |
-| `extensions` | File extensions, such as `.md` or `.cs`. |
+| `extensions` | File extensions, such as `.md` or `.cs`. An untitled document has none of its own, so the extensions of its language mode are matched instead. |
 | `patterns` | File-name patterns. |
 | `languages` | Language-mode identifiers. |
 | `file` | `any`, `backed`, or `untitled`. |
 | `selection` | `any`, `empty`, or `nonEmpty`. |
 | `document` | `any`, `clean`, or `dirty`. |
 | `os` | Operating-system identifiers, such as `windows`. |
+
+An untitled document is matched by `extensions` through its language mode:
+choosing the JSON mode in an untitled document makes the tools for `.json`
+apply to it. `patterns` is about file names, so it still needs a saved
+document, and a document that has been saved is always matched by its own
+extension, whichever mode was chosen for it.
 
 With `visibility = "whenAvailable"`, a tool is hidden when its conditions do
 not match or its command cannot be resolved. With `visibility = "always"`, it

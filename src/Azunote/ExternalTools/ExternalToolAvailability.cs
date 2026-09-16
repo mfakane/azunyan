@@ -71,14 +71,11 @@ public static class ExternalToolAvailability
         var extensions = when.Extensions ?? [];
         var patterns = when.Patterns ?? [];
 
-        if (extensions.Length > 0
-            && (documentPath is null || !extensions.Any(extension =>
-                string.Equals(
-                    NormalizeExtension(extension),
-                    context.DocumentExtension,
-                    StringComparison.OrdinalIgnoreCase))))
+        if (extensions.Length > 0 && !MatchesExtension(extensions, context))
         {
-            return "The current document has an unsupported file extension.";
+            return documentPath is null
+                ? "The current language mode is not one this tool supports."
+                : "The current document has an unsupported file extension.";
         }
 
         if (patterns.Length > 0
@@ -142,6 +139,27 @@ public static class ExternalToolAvailability
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Whether the document is one of the extensions the tool asks for. An
+    /// untitled document has no extension of its own, so the extensions of its
+    /// language mode answer instead: choosing the JSON mode in an untitled
+    /// document is what makes the tools for `.json` apply to it.
+    /// </summary>
+    private static bool MatchesExtension(
+        string[] extensions,
+        ExternalToolContext context)
+    {
+        var documentExtensions = context.DocumentFilePath is null
+            ? context.LanguageExtensions
+            : [context.DocumentExtension ?? string.Empty];
+
+        return extensions.Any(extension => documentExtensions.Any(documentExtension =>
+            string.Equals(
+                NormalizeExtension(extension),
+                documentExtension,
+                StringComparison.OrdinalIgnoreCase)));
     }
 
     private static string NormalizeExtension(string extension)
