@@ -118,6 +118,29 @@ Get-Content input.md | azu --stdin
 azu +12:4 path\to\file.txt
 ```
 
+### Tab completion
+
+`azu` answers completion requests for its own command line, so the suggestions
+come from the grammar the editor parses rather than a separate list. In
+PowerShell 7, dot-source the shipped registration script, and add the same line
+to `$PROFILE` to keep it:
+
+```powershell
+. 'C:\Program Files\Azunote\Register-AzunoteCompletion.ps1'
+```
+
+Option names and `--output` values are completed. A document path is left to
+the shell's own file completion, which takes over as soon as the word being
+completed is not an option.
+
+A registration through [dotnet-suggest](https://github.com/dotnet/command-line-api)
+works as well, for a shell that is already set up for it:
+
+```powershell
+dotnet tool install -g dotnet-suggest
+dotnet-suggest register --command-path 'C:\Program Files\Azunote\azu.exe'
+```
+
 ### Editing in a pipeline
 
 `--output` asks the editor for one value when the document window closes and

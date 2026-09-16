@@ -34,13 +34,13 @@ Existing output files are not overwritten. Neither script installs the app.
 ```
 
 The ZIP contains a top-level `Azunote-<version>-win-x64` folder. Its visible
-top level contains `Azunote.exe`, `README.md`, `LICENSE`,
-`THIRD-PARTY-NOTICES.md`, the `azu.cmd`/`azu.ps1` launchers, and an empty
-`appdata/` directory. The
+top level contains `Azunote.exe`, the `azu.exe` console client,
+`Register-AzunoteCompletion.ps1`, `README.md`, `LICENSE`,
+`THIRD-PARTY-NOTICES.md`, and an empty `appdata/` directory. The
 redistribution-required `licenses/` directory is kept with the notices; build
 artifacts such as DLLs, WinMDs, PRI files, satellite resources, manifests, and
 PDBs are not placed in the ZIP. Extract the entire folder and run
-`Azunote.exe` or the adjacent `azu` launchers. Here "portable" means no
+`Azunote.exe` or the adjacent `azu.exe` client. Here "portable" means no
 installer or separately installed .NET/Windows App SDK runtime is required;
 the first launch extracts the bundled runtime under `%TEMP%/.net`. Because the
 ZIP includes `appdata/`, settings, application state, custom modes, and external

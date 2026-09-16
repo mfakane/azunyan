@@ -18,6 +18,17 @@ internal static class Program
 
     private static async Task<int> Main(string[] arguments)
     {
+        // A completion request describes a command line the shell is still
+        // editing, so it is answered here and never forwarded to the editor.
+        if (AzunoteCommandLine.TryCompleteArguments(
+            arguments,
+            Console.Out,
+            Console.Error,
+            out var completionExitCode))
+        {
+            return completionExitCode;
+        }
+
         AzunoteCommandLineOptions options;
         try
         {

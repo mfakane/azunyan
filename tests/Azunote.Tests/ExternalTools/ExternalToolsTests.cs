@@ -34,12 +34,15 @@ public sealed class ExternalToolsTests
     {
         var output = AzunoteCommandLine.Usage;
 
-        Assert.Contains("-o, --output TARGET", output, StringComparison.Ordinal);
+        Assert.Contains(
+            "-o, --output <document|filePath|none|selection>",
+            output,
+            StringComparison.Ordinal);
         Assert.Contains("-h, --help", output, StringComparison.Ordinal);
         Assert.Contains("-w, --wait", output, StringComparison.Ordinal);
-        Assert.Contains("-l, --line N", output, StringComparison.Ordinal);
-        Assert.Contains("-c, --column N", output, StringComparison.Ordinal);
-        Assert.Contains("--stdin, -", output, StringComparison.Ordinal);
+        Assert.Contains("-l, --line <N>", output, StringComparison.Ordinal);
+        Assert.Contains("-c, --column <N>", output, StringComparison.Ordinal);
+        Assert.Contains("--stdin", output, StringComparison.Ordinal);
         Assert.Contains("+N[:M]", output, StringComparison.Ordinal);
         Assert.Contains("--", output, StringComparison.Ordinal);
     }

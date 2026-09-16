@@ -207,6 +207,12 @@
     "sha256": "572b43d41dea717dae7dc5de69acb20a74df025e8f5a3c0aa6f7bca02615e23c"
   },
   {
+    "component": "System.CommandLine/2.0.12",
+    "file": "licenses/System.CommandLine/2.0.12/LICENSE.TXT",
+    "source": "https://raw.githubusercontent.com/dotnet/dotnet/95017c711e6afc1085133d440e42b4bd78155701/LICENSE.TXT",
+    "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
+  },
+  {
     "component": "System.Numerics.Tensors/9.0.0",
     "file": "licenses/System.Numerics.Tensors/9.0.0/LICENSE.TXT",
     "source": "https://www.nuget.org/packages/System.Numerics.Tensors/9.0.0",

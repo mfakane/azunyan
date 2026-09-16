@@ -8,5 +8,11 @@
     <IsAotCompatible>true</IsAotCompatible>
     <!-- Required by the LibraryImport source generator. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Keep the parser's diagnostics in the language the rest of the UI uses. -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" Version="2.0.12" />
+  </ItemGroup>
 </Project>

@@ -1,3 +1,8 @@
+using System.CommandLine;
+using System.CommandLine.Completions;
+using System.CommandLine.Help;
+using System.CommandLine.Parsing;
+
 namespace Azunote;
 
 /// <summary>
@@ -47,236 +52,342 @@ public sealed class CommandLineParseException : ArgumentException
     }
 }
 
+/// <summary>
+/// The grammar shared by the editor and its console client, described with
+/// System.CommandLine so that the parser, the help text, and shell completion
+/// all come from one definition.
+/// </summary>
+/// <remarks>
+/// Two short forms predate this grammar and cannot be written as options:
+/// <c>+N[:M]</c> and a bare <c>-</c>. They are rewritten into the options they
+/// stand for before parsing, which keeps them working without teaching the
+/// rest of the grammar about them. Tokens after <c>--</c> are left alone.
+/// </remarks>
 public static class AzunoteCommandLine
 {
-    private static readonly string[] UsageLines =
+    private const int HelpWidth = 100;
+
+    private static readonly string[] ExtraUsageLines =
     [
-        "Usage: Azunote [options] [path]",
-        "",
-        "Options:",
-        "  -h, --help              Show this help and exit.",
-        "  -w, --wait              Wait until the opened document window closes.",
-        "  -l, --line N            Open at one-based line N.",
-        "      --line=N            Equivalent form of --line N.",
-        "  -c, --column N          Open at one-based column N.",
-        "      --column=N          Equivalent form of --column N.",
-        "      --stdin, -          Read the document from standard input.",
-        "  -o, --output TARGET     Write TARGET to standard output when the",
-        "                          document closes, and wait for it. TARGET is",
-        "                          none, filePath, document, or selection.",
-        "      --output=TARGET     Equivalent form of --output TARGET.",
-        "      +N[:M]              Open at one-based line N and optional column M.",
-        "      --                  Treat remaining arguments as a document path.",
-        "  path                    Open one document path.",
+        "Short forms:",
+        "  +N[:M]        Open at one-based line N and optional column M.",
+        "  -             Read the document from standard input.",
+        "  --            Treat the remaining argument as a document path.",
     ];
 
     public static AzunoteCommandLineOptions Parse(IEnumerable<string> arguments)
     {
         ArgumentNullException.ThrowIfNull(arguments);
 
-        var values = arguments.ToArray();
-        var options = new AzunoteCommandLineOptions();
-        var positionalsAllowed = true;
-
-        for (var index = 0; index < values.Length; index++)
+        var tokens = RewriteShortForms(arguments.ToArray(), out var rewriteError);
+        if (rewriteError is not null)
         {
-            var argument = values[index];
-            if (positionalsAllowed && argument == "--")
-            {
-                positionalsAllowed = false;
-                continue;
-            }
-
-            if (positionalsAllowed && (argument == "-h" || argument == "--help"))
-            {
-                options = options with { ShowHelp = true };
-                continue;
-            }
-
-            if (positionalsAllowed && (argument == "-w" || argument == "--wait"))
-            {
-                options = options with { WaitForExit = true };
-                continue;
-            }
-
-            if (positionalsAllowed && (argument == "--stdin" || argument == "-"))
-            {
-                options = options with { ReadStandardInput = true };
-                continue;
-            }
-
-            if (positionalsAllowed && TryReadOptionValue(argument, "--line", out var lineValue))
-            {
-                options = options with { Line = ParsePositiveValue("line", lineValue) };
-                continue;
-            }
-
-            if (positionalsAllowed && argument == "--line")
-            {
-                options = options with { Line = ParseFollowingValue("line", values, ref index) };
-                continue;
-            }
-
-            if (positionalsAllowed && TryReadOptionValue(argument, "--column", out var columnValue))
-            {
-                options = options with { Column = ParsePositiveValue("column", columnValue) };
-                continue;
-            }
-
-            if (positionalsAllowed && argument == "--column")
-            {
-                options = options with { Column = ParseFollowingValue("column", values, ref index) };
-                continue;
-            }
-
-            if (positionalsAllowed && TryReadOptionValue(argument, "--output", out var outputValue))
-            {
-                options = options with { Output = ParseOutputTarget(outputValue) };
-                continue;
-            }
-
-            if (positionalsAllowed && (argument == "--output" || argument == "-o"))
-            {
-                if (++index >= values.Length)
-                {
-                    throw new CommandLineParseException($"Missing value for {argument}.");
-                }
-
-                options = options with { Output = ParseOutputTarget(values[index]) };
-                continue;
-            }
-
-            if (positionalsAllowed && (argument == "-l" || argument == "-c"))
-            {
-                if (++index >= values.Length)
-                {
-                    throw new CommandLineParseException($"Missing value for {argument}.");
-                }
-
-                var name = argument == "-l" ? "line" : "column";
-                var value = ParsePositiveValue(name, values[index]);
-                options = argument == "-l"
-                    ? options with { Line = value }
-                    : options with { Column = value };
-                continue;
-            }
-
-            if (positionalsAllowed && TryParseGoto(argument, out var gotoLine, out var gotoColumn))
-            {
-                options = options with { Line = gotoLine, Column = gotoColumn };
-                continue;
-            }
-
-            if (positionalsAllowed && argument.StartsWith('-'))
-            {
-                throw new CommandLineParseException($"Unknown option: {argument}");
-            }
-
-            if (options.FilePath is not null)
-            {
-                throw new CommandLineParseException(
-                    "Only one document path can be supplied.");
-            }
-
-            options = options with { FilePath = argument };
+            throw new CommandLineParseException(rewriteError);
         }
 
-        if (options.FilePath is not null && options.ReadStandardInput)
+        var grammar = CommandLineGrammar.Create();
+        var result = grammar.Command.Parse(tokens);
+        if (result.Errors.Count > 0)
+        {
+            throw new CommandLineParseException(
+                string.Join(Environment.NewLine, result.Errors.Select(error => error.Message)));
+        }
+
+        return Bind(grammar, result, tokens);
+    }
+
+    /// <summary>
+    /// Answers the shell completion request carried by the <c>[suggest]</c>
+    /// directive, and reports whether the command line was one. The console
+    /// client asks first, because a completion request is answered here and is
+    /// never forwarded to the editor.
+    /// </summary>
+    public static bool TryCompleteArguments(
+        IReadOnlyList<string> arguments,
+        TextWriter output,
+        TextWriter error,
+        out int exitCode)
+    {
+        ArgumentNullException.ThrowIfNull(arguments);
+        ArgumentNullException.ThrowIfNull(output);
+        ArgumentNullException.ThrowIfNull(error);
+
+        var grammar = CommandLineGrammar.Create();
+        var result = grammar.Command.Parse(arguments);
+        if (result.GetResult(grammar.Suggest) is null)
+        {
+            exitCode = 0;
+            return false;
+        }
+
+        exitCode = result.Invoke(new InvocationConfiguration
+        {
+            Output = output,
+            Error = error
+        });
+        return true;
+    }
+
+    /// <summary>
+    /// The help text, rendered at a fixed width so that the console client and
+    /// the editor's dialog show the same lines.
+    /// </summary>
+    public static string Usage => RenderUsage();
+
+    private static string RenderUsage()
+    {
+        var grammar = CommandLineGrammar.Create();
+        using var writer = new StringWriter();
+        grammar.Command.Parse(["--help"]).Invoke(new InvocationConfiguration
+        {
+            Output = writer,
+            Error = writer
+        });
+        return string.Join(
+            Environment.NewLine,
+            writer.ToString().TrimEnd(),
+            string.Empty,
+            string.Join(Environment.NewLine, ExtraUsageLines));
+    }
+
+    private static AzunoteCommandLineOptions Bind(
+        CommandLineGrammar grammar,
+        ParseResult result,
+        IReadOnlyList<string> tokens)
+    {
+        // A positional value is the document path, so System.CommandLine has no
+        // reason to reject an unknown option. Everything before a "--" that
+        // looks like one still is one.
+        var path = result.GetValue(grammar.Path);
+        if (path is not null
+            && path.StartsWith('-')
+            && !tokens.Contains("--", StringComparer.Ordinal))
+        {
+            throw new CommandLineParseException($"Unknown option: {path}");
+        }
+
+        var readStandardInput = result.GetValue(grammar.StandardInput);
+        if (path is not null && readStandardInput)
         {
             throw new CommandLineParseException(
                 "A document path and standard input cannot be used together.");
         }
 
-        // Output can only be produced once the document closes, so asking for
-        // it always waits.
-        return options.Output == CommandLineOutputTarget.None
-            ? options
-            : options with { WaitForExit = true };
+        var output = result.GetValue(grammar.Output);
+        return new AzunoteCommandLineOptions
+        {
+            FilePath = path,
+            Line = result.GetResult(grammar.Line) is null ? null : result.GetValue(grammar.Line),
+            Column = result.GetResult(grammar.Column) is null ? null : result.GetValue(grammar.Column),
+            ReadStandardInput = readStandardInput,
+            ShowHelp = result.GetResult(grammar.Help) is not null,
+            Output = output,
+            // Output can only be produced once the document closes, so asking
+            // for it always waits.
+            WaitForExit = result.GetValue(grammar.Wait) || output != CommandLineOutputTarget.None
+        };
     }
 
-    private static CommandLineOutputTarget ParseOutputTarget(string value) => value switch
+    /// <summary>
+    /// Expands <c>+N[:M]</c> and a bare <c>-</c> into the options they stand
+    /// for. Tokens after <c>--</c> are a document path and are left untouched.
+    /// </summary>
+    private static string[] RewriteShortForms(string[] arguments, out string? error)
     {
-        "none" => CommandLineOutputTarget.None,
-        "filePath" => CommandLineOutputTarget.FilePath,
-        "document" => CommandLineOutputTarget.Document,
-        "selection" => CommandLineOutputTarget.Selection,
-        _ => throw new CommandLineParseException(
-            $"The output must be none, filePath, document, or selection: {value}")
-    };
-
-    public static string Usage => string.Join(Environment.NewLine, UsageLines);
-
-    private static bool TryReadOptionValue(
-        string argument,
-        string option,
-        out string value)
-    {
-        var prefix = option + "=";
-        if (argument.StartsWith(prefix, StringComparison.Ordinal))
+        error = null;
+        var rewritten = new List<string>(arguments.Length);
+        var optionsAllowed = true;
+        foreach (var argument in arguments)
         {
-            value = argument[prefix.Length..];
-            return true;
+            if (!optionsAllowed)
+            {
+                rewritten.Add(argument);
+                continue;
+            }
+
+            if (argument == "--")
+            {
+                optionsAllowed = false;
+                rewritten.Add(argument);
+                continue;
+            }
+
+            if (argument == "-")
+            {
+                rewritten.Add("--stdin");
+                continue;
+            }
+
+            if (argument.Length < 2 || argument[0] != '+' || argument[1] is < '0' or > '9')
+            {
+                rewritten.Add(argument);
+                continue;
+            }
+
+            var parts = argument[1..].Split(':');
+            if (parts.Length > 2 || Array.Exists(parts, part => !int.TryParse(part, out _)))
+            {
+                error = $"Invalid document position: {argument}";
+                return arguments;
+            }
+
+            rewritten.Add("--line");
+            rewritten.Add(parts[0]);
+            if (parts.Length == 2)
+            {
+                rewritten.Add("--column");
+                rewritten.Add(parts[1]);
+            }
         }
 
-        if (argument == option)
-        {
-            value = string.Empty;
-            return false;
-        }
-
-        value = string.Empty;
-        return false;
+        return [.. rewritten];
     }
 
-    private static int ParsePositiveValue(string name, string value)
+    /// <summary>
+    /// One instance of the grammar. Each caller builds its own, so that help
+    /// rendering and completion cannot observe another parse in progress.
+    /// </summary>
+    private sealed class CommandLineGrammar
     {
-        if (!int.TryParse(value, out var parsed) || parsed < 1)
+        private static readonly Dictionary<string, CommandLineOutputTarget> OutputTargetNames =
+            new(StringComparer.Ordinal)
+            {
+                ["none"] = CommandLineOutputTarget.None,
+                ["filePath"] = CommandLineOutputTarget.FilePath,
+                ["document"] = CommandLineOutputTarget.Document,
+                ["selection"] = CommandLineOutputTarget.Selection
+            };
+
+        private CommandLineGrammar(
+            RootCommand command,
+            SuggestDirective suggest,
+            Argument<string> path,
+            Option<bool> wait,
+            Option<bool> standardInput,
+            HelpOption help,
+            Option<int> line,
+            Option<int> column,
+            Option<CommandLineOutputTarget> output)
         {
-            throw new CommandLineParseException(
-                $"The {name} must be a positive integer: {value}");
+            Command = command;
+            Suggest = suggest;
+            Path = path;
+            Wait = wait;
+            StandardInput = standardInput;
+            Help = help;
+            Line = line;
+            Column = column;
+            Output = output;
         }
 
-        return parsed;
-    }
+        public RootCommand Command { get; }
 
-    private static int ParseFollowingValue(
-        string name,
-        string[] values,
-        ref int index)
-    {
-        if (++index >= values.Length)
+        public SuggestDirective Suggest { get; }
+
+        public Argument<string> Path { get; }
+
+        public Option<bool> Wait { get; }
+
+        public Option<bool> StandardInput { get; }
+
+        public HelpOption Help { get; }
+
+        public Option<int> Line { get; }
+
+        public Option<int> Column { get; }
+
+        public Option<CommandLineOutputTarget> Output { get; }
+
+        public static CommandLineGrammar Create()
         {
-            throw new CommandLineParseException($"Missing value for --{name}.");
+            var path = new Argument<string>("path")
+            {
+                Arity = ArgumentArity.ZeroOrOne,
+                Description = "Open one document path."
+            };
+            var wait = new Option<bool>("--wait", "-w")
+            {
+                Description = "Wait until the opened document window closes."
+            };
+            var standardInput = new Option<bool>("--stdin")
+            {
+                Description = "Read the document from standard input."
+            };
+            var line = CreatePositionOption("--line", "-l", "line", "Open at one-based line N.");
+            var column = CreatePositionOption(
+                "--column",
+                "-c",
+                "column",
+                "Open at one-based column N.");
+            var output = new Option<CommandLineOutputTarget>("--output", "-o")
+            {
+                Description = "Write this to standard output when the document closes, "
+                    + "and wait for it.",
+                CustomParser = ParseOutputTarget
+            };
+            output.CompletionSources.Clear();
+            output.CompletionSources.Add([.. OutputTargetNames.Keys]);
+
+            var command = new RootCommand("Azunote, a Windows text editor.")
+            {
+                path,
+                wait,
+                standardInput,
+                line,
+                column,
+                output
+            };
+            // The editor reports its version in its about dialog, and the
+            // command line has nothing of its own to add.
+            command.Options.Remove(command.Options.OfType<VersionOption>().Single());
+            var help = command.Options.OfType<HelpOption>().Single();
+            help.Action = new HelpAction { MaxWidth = HelpWidth };
+
+            return new CommandLineGrammar(
+                command,
+                command.Directives.OfType<SuggestDirective>().Single(),
+                path,
+                wait,
+                standardInput,
+                help,
+                line,
+                column,
+                output);
         }
 
-        return ParsePositiveValue(name, values[index]);
-    }
+        private static Option<int> CreatePositionOption(
+            string name,
+            string alias,
+            string label,
+            string description) =>
+            new(name, alias)
+            {
+                Description = description,
+                HelpName = "N",
+                CustomParser = result =>
+                {
+                    var value = result.Tokens[0].Value;
+                    if (!int.TryParse(value, out var parsed) || parsed < 1)
+                    {
+                        result.AddError($"The {label} must be a positive integer: {value}");
+                        return 0;
+                    }
 
-    private static bool TryParseGoto(
-        string argument,
-        out int line,
-        out int? column)
-    {
-        line = 0;
-        column = null;
-        if (argument.Length < 2 || argument[0] != '+' || argument[1] is < '0' or > '9')
+                    return parsed;
+                }
+            };
+
+        private static CommandLineOutputTarget ParseOutputTarget(ArgumentResult result)
         {
-            return false;
-        }
+            var value = result.Tokens[0].Value;
+            if (OutputTargetNames.TryGetValue(value, out var target))
+            {
+                return target;
+            }
 
-        var parts = argument[1..].Split(':', StringSplitOptions.None);
-        if (parts.Length is < 1 or > 2
-            || !int.TryParse(parts[0], out line)
-            || line < 1)
-        {
-            throw new CommandLineParseException($"Invalid document position: {argument}");
+            result.AddError(
+                $"The output must be none, filePath, document, or selection: {value}");
+            return CommandLineOutputTarget.None;
         }
-
-        if (parts.Length == 2)
-        {
-            column = ParsePositiveValue("column", parts[1]);
-        }
-
-        return true;
     }
 }

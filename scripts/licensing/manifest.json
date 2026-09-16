@@ -1,5 +1,5 @@
 {
-  "reviewDate": "2026-09-14",
+  "reviewDate": "2026-09-16",
   "targetFramework": "net10.0-windows10.0.19041.0",
   "runtimeIdentifier": "win-x64",
   "components": [
@@ -12,6 +12,11 @@
       "name": "Tomlyn",
       "version": "2.10.1",
       "notice": "BSD-2-Clause; [copyright, conditions, and disclaimer](licenses/Tomlyn/2.10.1/LICENSE.txt)"
+    },
+    {
+      "name": "System.CommandLine",
+      "version": "2.0.12",
+      "notice": "MIT; [license](licenses/System.CommandLine/2.0.12/LICENSE.TXT). The package carries no license document; the text is the one its dotnet/dotnet build commit publishes."
     },
     {
       "name": ".NET Native AOT runtime",
@@ -336,6 +341,12 @@
       "source": "https://www.nuget.org/packages/Microsoft.Extensions.FileSystemGlobbing/9.0.4",
       "packageFile": "THIRD-PARTY-NOTICES.TXT",
       "sha256": "40686c6447a7d5b5d3693068e4571b5f483d7ed335aeee773ef662440de4c5d5"
+    },
+    {
+      "component": "System.CommandLine/2.0.12",
+      "file": "licenses/System.CommandLine/2.0.12/LICENSE.TXT",
+      "source": "https://raw.githubusercontent.com/dotnet/dotnet/95017c711e6afc1085133d440e42b4bd78155701/LICENSE.TXT",
+      "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b"
     }
   ]
 }

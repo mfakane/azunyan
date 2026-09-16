@@ -153,8 +153,8 @@ function Copy-AzunotePortablePayload($Context, [string] $Destination) {
         @{ Source = Join-Path $Context.Repo 'src/Azunote/README.md'; Name = 'README.md' }
         @{ Source = Join-Path $Context.Repo 'LICENSE'; Name = 'LICENSE' }
         @{ Source = Join-Path $Context.Repo 'THIRD-PARTY-NOTICES.md'; Name = 'THIRD-PARTY-NOTICES.md' }
-        @{ Source = Join-Path $Context.Repo 'src/Azunote/azu.cmd'; Name = 'azu.cmd' }
-        @{ Source = Join-Path $Context.Repo 'src/Azunote/azu.ps1'; Name = 'azu.ps1' }
+        @{ Source = Join-Path $Context.Repo 'src/Azunote/Register-AzunoteCompletion.ps1'
+           Name = 'Register-AzunoteCompletion.ps1' }
     )
     foreach ($file in $files) {
         if (!(Test-Path -LiteralPath $file.Source -PathType Leaf)) {
@@ -168,8 +168,10 @@ function Copy-AzunotePortablePayload($Context, [string] $Destination) {
         throw 'Portable distribution source is missing licenses/.'
     }
     Copy-Item -LiteralPath $licenses -Destination (Join-Path $Destination 'licenses') -Recurse
-    Copy-Item -LiteralPath (Join-Path $Context.Publish 'Azunote.exe') `
-        -Destination (Join-Path $Destination 'Azunote.exe')
+    foreach ($executable in 'Azunote.exe', 'azu.exe') {
+        Copy-Item -LiteralPath (Join-Path $Context.Publish $executable) `
+            -Destination (Join-Path $Destination $executable)
+    }
 }
 
 function Find-AzunoteWinApp($Context, [string] $PreferredPath) {
