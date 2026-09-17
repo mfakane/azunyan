@@ -325,6 +325,7 @@
                                         <TextBlock
                                             x:Name="KeyboardAcceleratorTextBlock"
                                             Grid.Column="1"
+                                            Style="{ThemeResource CaptionTextBlockStyle}"
                                             Text="{TemplateBinding KeyboardAcceleratorTextOverride}"
                                             Margin="24,0,0,0"
                                             Foreground="{ThemeResource MenuFlyoutItemKeyboardAcceleratorTextForeground}"
