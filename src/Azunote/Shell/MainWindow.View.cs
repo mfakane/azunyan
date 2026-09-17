@@ -147,7 +147,11 @@ public sealed partial class MainWindow
 
     private void OnActualThemeChanged(FrameworkElement sender, object args) => ApplyTheme();
 
-    private void OnRootGridLoaded(object sender, RoutedEventArgs args) => ApplyTheme();
+    private void OnRootGridLoaded(object sender, RoutedEventArgs args)
+    {
+        WindowMenuBeepSuppressor.Install(_windowHandle);
+        ApplyTheme();
+    }
 
     private void OnColorValuesChanged(UISettings sender, object args)
     {
