@@ -12,12 +12,16 @@ internal sealed class DebouncedFileChangeMonitor : IFileChangeMonitor
     private readonly FileSystemWatcher _watcher;
     private readonly string _monitoredPath;
     private readonly bool _includeSubdirectories;
+    private readonly Func<string?, bool>? _ignore;
     private readonly object _gate = new();
     private Timer? _timer;
     private string? _changedPath;
     private bool _disposed;
 
-    public DebouncedFileChangeMonitor(string path, bool includeSubdirectories)
+    public DebouncedFileChangeMonitor(
+        string path,
+        bool includeSubdirectories,
+        Func<string?, bool>? ignore = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         var fullPath = Path.GetFullPath(path);
@@ -30,6 +34,7 @@ internal sealed class DebouncedFileChangeMonitor : IFileChangeMonitor
 
         _monitoredPath = fullPath;
         _includeSubdirectories = includeSubdirectories;
+        _ignore = ignore;
         _watcher = new FileSystemWatcher(directory, filter)
         {
             IncludeSubdirectories = includeSubdirectories,
@@ -85,6 +90,14 @@ internal sealed class DebouncedFileChangeMonitor : IFileChangeMonitor
             return;
         }
 
+        // The window remembers one path, so a path nobody acts on must not
+        // enter it: the change that arrived alongside it is the one the
+        // subscriber is waiting for.
+        if (_ignore?.Invoke(changedPath) == true)
+        {
+            return;
+        }
+
         lock (_gate)
         {
             if (_disposed)
@@ -131,6 +144,9 @@ internal sealed class FileChangeDetectedEventArgs : EventArgs
 
 internal sealed class DefaultFileChangeMonitorFactory : IFileChangeMonitorFactory
 {
-    public IFileChangeMonitor Create(string path, bool includeSubdirectories) =>
-        new DebouncedFileChangeMonitor(path, includeSubdirectories);
+    public IFileChangeMonitor Create(
+        string path,
+        bool includeSubdirectories,
+        Func<string?, bool>? ignore = null) =>
+        new DebouncedFileChangeMonitor(path, includeSubdirectories, ignore);
 }

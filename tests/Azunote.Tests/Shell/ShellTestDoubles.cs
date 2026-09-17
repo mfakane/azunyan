@@ -290,10 +290,34 @@ internal sealed class FakeFileDialogService : IFileDialogService
 
 internal sealed class FakeFileChangeMonitor : IFileChangeMonitor
 {
+    public FakeFileChangeMonitor(Func<string?, bool>? ignore = null) => Ignore = ignore;
+
     public event EventHandler<FileChangeDetectedEventArgs>? Changed;
 
-    public void Trigger(string path) =>
-        Changed?.Invoke(this, new FileChangeDetectedEventArgs(path));
+    public Func<string?, bool>? Ignore { get; }
+
+    public void Trigger(string path) => Trigger([path]);
+
+    /// <summary>
+    /// Reports one debounce window. The paths it ignores take no part in it,
+    /// so the last of the others is the one that arrives.
+    /// </summary>
+    public void Trigger(params string[] paths)
+    {
+        string? changedPath = null;
+        foreach (var path in paths)
+        {
+            if (Ignore?.Invoke(path) != true)
+            {
+                changedPath = path;
+            }
+        }
+
+        if (changedPath is not null)
+        {
+            Changed?.Invoke(this, new FileChangeDetectedEventArgs(changedPath));
+        }
+    }
 
     public void Dispose()
     {
@@ -304,9 +328,12 @@ internal sealed class FakeFileChangeMonitorFactory : IFileChangeMonitorFactory
 {
     public List<FakeFileChangeMonitor> Monitors { get; } = [];
 
-    public IFileChangeMonitor Create(string path, bool includeSubdirectories)
+    public IFileChangeMonitor Create(
+        string path,
+        bool includeSubdirectories,
+        Func<string?, bool>? ignore = null)
     {
-        var monitor = new FakeFileChangeMonitor();
+        var monitor = new FakeFileChangeMonitor(ignore);
         Monitors.Add(monitor);
         return monitor;
     }

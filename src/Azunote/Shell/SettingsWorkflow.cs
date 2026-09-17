@@ -159,7 +159,10 @@ internal sealed class SettingsWorkflow : IDisposable
             return;
         }
 
-        _settingsMonitor = _monitorFactory.Create(directory, includeSubdirectories: true);
+        _settingsMonitor = _monitorFactory.Create(
+            directory,
+            includeSubdirectories: true,
+            IsApplicationStateChange);
         _settingsMonitor.Changed += SettingsMonitor_Changed;
     }
 
@@ -179,8 +182,7 @@ internal sealed class SettingsWorkflow : IDisposable
         object? sender,
         FileChangeDetectedEventArgs args)
     {
-        if (ReferenceEquals(sender, _settingsMonitor)
-            && !IsApplicationStateChange(args.ChangedPath))
+        if (ReferenceEquals(sender, _settingsMonitor))
         {
             _dispatcher.TryEnqueue(() => _ = HandleSettingsChangedAsync());
         }

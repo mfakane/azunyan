@@ -233,5 +233,13 @@ internal interface IFileChangeMonitor : IDisposable
 
 internal interface IFileChangeMonitorFactory
 {
-    IFileChangeMonitor Create(string path, bool includeSubdirectories);
+    /// <param name="ignore">
+    /// Decides, for one changed path, whether the subscriber has anything to
+    /// do about it. A path it rejects neither opens nor extends a debounce
+    /// window, so it cannot displace a path that came with it.
+    /// </param>
+    IFileChangeMonitor Create(
+        string path,
+        bool includeSubdirectories,
+        Func<string?, bool>? ignore = null);
 }
