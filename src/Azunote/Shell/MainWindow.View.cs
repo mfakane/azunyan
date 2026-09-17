@@ -874,12 +874,14 @@ public sealed partial class MainWindow
                 {
                     ToolTipService.SetToolTip(menuItem, reason);
                 }
-                if (ExternalToolShortcut.TryParse(tool.Shortcut, out _))
+                // Accelerators are registered on the window rather than on the
+                // items, so the text beside a tool has to be set explicitly.
+                // SplitMenuFlyoutItem is a MenuFlyoutItem, so both shapes of
+                // item take it.
+                if (menuItem is MenuFlyoutItem acceleratorItem
+                    && ExternalToolShortcut.TryParse(tool.Shortcut, out _))
                 {
-                    if (menuItem is MenuFlyoutItem regularItem)
-                    {
-                        regularItem.KeyboardAcceleratorTextOverride = tool.Shortcut;
-                    }
+                    acceleratorItem.KeyboardAcceleratorTextOverride = tool.Shortcut;
                 }
 
                 items.Add(menuItem);
@@ -919,8 +921,13 @@ public sealed partial class MainWindow
                 ToolTipService.SetToolTip(item, reason);
             }
 
+            if (ExternalToolShortcut.TryParse(entry.Tool!.Shortcut, out _))
+            {
+                item.KeyboardAcceleratorTextOverride = entry.Tool.Shortcut;
+            }
+
             items.Add(item);
-            TrackToolControl(entry.Tool!, item);
+            TrackToolControl(entry.Tool, item);
         }
 
         return items;
