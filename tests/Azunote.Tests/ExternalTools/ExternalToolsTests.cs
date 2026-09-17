@@ -1,4 +1,4 @@
-using Xunit;
+﻿using Xunit;
 
 namespace Azunote.Tests;
 
@@ -1749,5 +1749,113 @@ public sealed class ExternalToolsTests
                 Directory.Delete(root, recursive: true);
             }
         }
+    }
+
+    [Fact]
+    public async Task Settings_service_skips_hidden_and_system_entries()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"azunyan-settings-{Guid.NewGuid():N}");
+        var tools = Path.Combine(root, SettingsFileService.ToolsDirectoryName);
+        var repository = Path.Combine(tools, ".git");
+        var hiddenToolPath = Path.Combine(tools, "Hidden.tool.toml");
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(repository, "hooks"));
+            await File.WriteAllTextAsync(
+                Path.Combine(repository, "hooks", "Hook.tool.toml"),
+                MinimalToolText);
+            await File.WriteAllTextAsync(hiddenToolPath, MinimalToolText);
+            await File.WriteAllTextAsync(
+                Path.Combine(tools, "Visible.tool.toml"),
+                MinimalToolText);
+            File.SetAttributes(
+                repository,
+                File.GetAttributes(repository) | FileAttributes.Hidden);
+            File.SetAttributes(
+                hiddenToolPath,
+                File.GetAttributes(hiddenToolPath) | FileAttributes.Hidden);
+
+            var settings = await SettingsFileService.LoadAsync(root);
+
+            Assert.Equal("Visible", Assert.Single(settings.ExternalTools).Name);
+            Assert.Equal("Visible", Assert.Single(settings.ExternalToolMenu).Name);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Settings_service_does_not_follow_directory_junctions()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var root = Path.Combine(Path.GetTempPath(), $"azunyan-settings-{Guid.NewGuid():N}");
+        var tools = Path.Combine(root, SettingsFileService.ToolsDirectoryName);
+        var nested = Path.Combine(tools, "Nested");
+        var loop = Path.Combine(nested, "Loop");
+        try
+        {
+            Directory.CreateDirectory(nested);
+            await File.WriteAllTextAsync(
+                Path.Combine(nested, "Nested.tool.toml"),
+                MinimalToolText);
+            if (!CreateJunction(loop, tools))
+            {
+                return;
+            }
+
+            // Without the reparse-point guard the junction points the scan
+            // back at the tools folder and the recursion never ends.
+            var settings = await SettingsFileService.LoadAsync(root);
+
+            Assert.Equal("Nested", Assert.Single(settings.ExternalTools).Name);
+        }
+        finally
+        {
+            // A recursive delete refuses the junction itself, so the
+            // reparse point goes first.
+            if (Directory.Exists(loop))
+            {
+                Directory.Delete(loop);
+            }
+
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    private const string MinimalToolText = """
+        [launch]
+        command = "cmd.exe"
+        """;
+
+    private static bool CreateJunction(string link, string target)
+    {
+        using var process = System.Diagnostics.Process.Start(
+            new System.Diagnostics.ProcessStartInfo("cmd.exe")
+            {
+                ArgumentList = { "/c", "mklink", "/J", link, target },
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            });
+        if (process is null)
+        {
+            return false;
+        }
+
+        process.WaitForExit();
+        return process.ExitCode == 0 && Directory.Exists(link);
     }
 }

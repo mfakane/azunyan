@@ -21,6 +21,18 @@ External tools are discovered below `%LOCALAPPDATA%\Azunote\tools`:
   Tools > External Tools > Formatting > CSharp.
 - A directory ending in `.tool` with a `manifest.toml` file is one bundled
   tool. It appears as a tool leaf and is not traversed as a submenu.
+- Hidden and system entries are skipped, and directories are skipped when
+  they are a reparse point such as a junction or a directory symbolic
+  link.
+
+Skipping hidden entries keeps a cloned tool collection cheap to scan. Git
+for Windows marks the `.git` directory hidden, so cloning a repository of
+tool definitions directly into the tools folder works without further
+configuration. It also gives a way to disable part of the tools folder
+without moving it: `attrib +h` on a directory or definition file removes it
+and anything below it from the menu, and `attrib -h` brings it back. A tool
+that has gone missing from the menu is worth checking for the hidden
+attribute.
 
 Each Tools-menu external-tool item is a split item. Its main area runs the
 tool; the `...` area provides `Edit...` and `Show in Explorer` for the
