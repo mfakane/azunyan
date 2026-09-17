@@ -2,13 +2,16 @@ namespace Azunote;
 
 /// <summary>
 /// Owns FileSystemWatcher lifetime and notification coalescing. UI dispatch
-/// remains the responsibility of the subscriber.
+/// remains the responsibility of the subscriber. A recursive watch reports
+/// only the entries a scan rooted at the same directory would visit; see
+/// <see cref="FileSystemScanPolicy"/>.
 /// </summary>
 internal sealed class DebouncedFileChangeMonitor : IFileChangeMonitor
 {
     private const int DebounceMilliseconds = 150;
     private readonly FileSystemWatcher _watcher;
     private readonly string _monitoredPath;
+    private readonly bool _includeSubdirectories;
     private readonly object _gate = new();
     private Timer? _timer;
     private string? _changedPath;
@@ -26,6 +29,7 @@ internal sealed class DebouncedFileChangeMonitor : IFileChangeMonitor
         }
 
         _monitoredPath = fullPath;
+        _includeSubdirectories = includeSubdirectories;
         _watcher = new FileSystemWatcher(directory, filter)
         {
             IncludeSubdirectories = includeSubdirectories,
@@ -71,6 +75,16 @@ internal sealed class DebouncedFileChangeMonitor : IFileChangeMonitor
 
     private void QueueNotification(string? changedPath)
     {
+        // A recursive watch reports everything below the monitored
+        // directory, including the trees a scan of it would never walk.
+        // Letting those through starts a debounce window and, at the end
+        // of it, a reload that has nothing to read.
+        if (_includeSubdirectories
+            && FileSystemScanPolicy.IsSkipped(changedPath, _monitoredPath))
+        {
+            return;
+        }
+
         lock (_gate)
         {
             if (_disposed)

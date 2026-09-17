@@ -13,19 +13,6 @@ public static class ExternalToolDiscovery
     private const string ToolDirectorySuffix = ".tool";
     private const string ManifestFileName = "manifest.toml";
 
-    /// <summary>
-    /// Attributes that keep a directory out of the scan. Hidden covers the
-    /// .git directory Git for Windows creates when a tool collection is
-    /// cloned into the tools folder, whose contents are both irrelevant and
-    /// expensive to walk. Reparse points are skipped because the scan has no
-    /// other guard against a junction that points back at an ancestor.
-    /// </summary>
-    private const FileAttributes SkippedDirectoryAttributes =
-        FileAttributes.Hidden | FileAttributes.System | FileAttributes.ReparsePoint;
-
-    private const FileAttributes SkippedFileAttributes =
-        FileAttributes.Hidden | FileAttributes.System;
-
     public static async Task<ExternalToolCatalog> LoadAsync(
         string toolsDirectory,
         CancellationToken cancellationToken = default)
@@ -55,7 +42,7 @@ public static class ExternalToolDiscovery
         var directoryInfo = new DirectoryInfo(directory);
         var nodes = new List<ExternalToolMenuNode>();
         foreach (var childDirectory in directoryInfo.EnumerateDirectories()
-                     .Where(child => (child.Attributes & SkippedDirectoryAttributes) == 0)
+                     .Where(child => !FileSystemScanPolicy.IsSkippedDirectory(child.Attributes))
                      .OrderBy(child => child.Name, StringComparer.OrdinalIgnoreCase))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -86,7 +73,7 @@ public static class ExternalToolDiscovery
         }
 
         foreach (var toolFile in directoryInfo.EnumerateFiles()
-                     .Where(file => (file.Attributes & SkippedFileAttributes) == 0
+                     .Where(file => !FileSystemScanPolicy.IsSkippedFile(file.Attributes)
                          && file.Name.EndsWith(
                              ToolFileSuffix,
                              StringComparison.OrdinalIgnoreCase))

@@ -45,8 +45,9 @@ such as `Formatting: CSharp: Format`. Context-menu entries run the tool
 directly and do not include the definition-file actions.
 
 The settings watcher reloads tool definitions when files are added, edited, or
-removed. Invalid definitions are reported and do not replace the last valid
-tool menu.
+removed. It ignores the entries the scan skips, so work below a hidden
+directory, such as a `git pull` writing to `.git`, does not reload anything.
+Invalid definitions are reported and do not replace the last valid tool menu.
 
 ## Definition format
 
