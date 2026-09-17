@@ -17,6 +17,7 @@ internal sealed class SettingsWorkflow : IDisposable
     private readonly Action<AzunoteSettings> _applySettings;
     private IReadOnlyList<ExternalToolMenuNode> _externalToolMenu = [];
     private IFileChangeMonitor? _settingsMonitor;
+    private CancellationTokenSource? _reloadCancellation;
     private bool _disposed;
     private readonly Action? _requestToolRefresh;
     internal IReadOnlyList<ExternalToolMenuNode> ExternalToolMenu => _externalToolMenu;
@@ -61,8 +62,9 @@ internal sealed class SettingsWorkflow : IDisposable
     {
         try
         {
-            await _settings.EnsureExistsAsync();
-            await ReloadAsync(showError: true);
+            var cancellationToken = BeginReload();
+            await _settings.EnsureExistsAsync(cancellationToken);
+            await ReloadAsync(showError: true, cancellationToken);
             StartWatcher();
         }
         catch (Exception exception)
@@ -93,6 +95,9 @@ internal sealed class SettingsWorkflow : IDisposable
 
         _disposed = true;
         StopWatcher();
+        _reloadCancellation?.Cancel();
+        _reloadCancellation?.Dispose();
+        _reloadCancellation = null;
     }
 
     public void RefreshExternalToolsMenu()
@@ -105,13 +110,17 @@ internal sealed class SettingsWorkflow : IDisposable
         _externalToolsMenu.Render(_externalToolMenu, tool => states[tool],
             _runConfiguredTool, _editDefinition, _showDefinitionInExplorer);
 
-    private async Task<bool> ReloadAsync(bool showError)
+    private async Task<bool> ReloadAsync(bool showError, CancellationToken cancellationToken)
     {
         try
         {
-            var settings = await _settings.LoadAsync();
+            var settings = await _settings.LoadAsync(cancellationToken);
             var preparedTools = ExternalToolMenuBuilder.EnumerateTools(settings.ExternalToolMenu).Distinct()
                 .ToDictionary(tool => tool, tool => new PreparedExternalTool(tool));
+
+            // A newer change has read a newer folder. Applying what this one
+            // found would put the menu back the way it was.
+            cancellationToken.ThrowIfCancellationRequested();
             _applySettings(settings);
             _languageModes.Initialize(settings.CustomSyntaxModes);
             if (!_languageModes.IsManuallySelected
@@ -125,6 +134,10 @@ internal sealed class SettingsWorkflow : IDisposable
             RefreshExternalToolsMenu();
 
             return true;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
         }
         catch (Exception exception)
         {
@@ -144,6 +157,20 @@ internal sealed class SettingsWorkflow : IDisposable
             _runConfiguredTool,
             _editDefinition,
             _showDefinitionInExplorer);
+
+    /// <summary>
+    /// Cancels the reload in flight, if any, and returns the token of the one
+    /// replacing it. A reload reads the whole settings folder, so one that a
+    /// newer change has overtaken has nothing left to say.
+    /// </summary>
+    private CancellationToken BeginReload()
+    {
+        // The superseded source is left to the garbage collector: the reload
+        // it belongs to may still hold a registration on its token.
+        _reloadCancellation?.Cancel();
+        _reloadCancellation = new CancellationTokenSource();
+        return _reloadCancellation.Token;
+    }
 
     private void StartWatcher()
     {
@@ -204,8 +231,9 @@ internal sealed class SettingsWorkflow : IDisposable
                 return;
             }
 
-            await _settings.EnsureExistsAsync();
-            await ReloadAsync(showError: true);
+            var cancellationToken = BeginReload();
+            await _settings.EnsureExistsAsync(cancellationToken);
+            await ReloadAsync(showError: true, cancellationToken);
         }
         catch (OperationCanceledException)
         {

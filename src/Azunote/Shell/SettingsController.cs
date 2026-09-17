@@ -22,6 +22,10 @@ public sealed class SettingsController
     public async Task<AzunoteSettings> LoadAsync(CancellationToken cancellationToken = default)
     {
         var settings = await SettingsFileService.LoadAsync(Directory, cancellationToken);
+
+        // A load that has been superseded must not become the current
+        // settings: the one that superseded it read a newer folder.
+        cancellationToken.ThrowIfCancellationRequested();
         Current = settings;
         return settings;
     }
