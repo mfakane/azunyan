@@ -322,12 +322,23 @@
                                             VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                             IsHitTestVisible="False"
                                         />
+                                        <!--
+                                            The top margin is two to move the
+                                            text down by one: the element is
+                                            centred, so half of any margin is
+                                            taken back by the centring. That
+                                            one closes the gap against a stock
+                                            menu item, whose row is a little
+                                            taller than this one, leaving its
+                                            accelerator text a pixel lower
+                                            once each is centred.
+                                        -->
                                         <TextBlock
                                             x:Name="KeyboardAcceleratorTextBlock"
                                             Grid.Column="1"
                                             Style="{ThemeResource CaptionTextBlockStyle}"
                                             Text="{TemplateBinding KeyboardAcceleratorTextOverride}"
-                                            Margin="24,0,0,0"
+                                            Margin="24,2,0,0"
                                             Foreground="{ThemeResource MenuFlyoutItemKeyboardAcceleratorTextForeground}"
                                             HorizontalAlignment="Right"
                                             VerticalAlignment="Center"
