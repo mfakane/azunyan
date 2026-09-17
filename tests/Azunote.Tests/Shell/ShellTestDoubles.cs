@@ -264,12 +264,18 @@ internal sealed class FakeExternalToolMenuView : IExternalToolMenuView
 {
     public IReadOnlyList<ExternalToolMenuNode> Nodes { get; private set; } = [];
 
+    public int RenderCount { get; private set; }
+
     public void Render(
         IReadOnlyList<ExternalToolMenuNode> nodes,
         Func<ExternalToolSettings, ExternalToolMenuState> getState,
         Func<ExternalToolSettings, Task> onSelected,
         Func<string, Task> onEditDefinition,
-        Func<string, Task> onShowInExplorer) => Nodes = nodes;
+        Func<string, Task> onShowInExplorer)
+    {
+        Nodes = nodes;
+        RenderCount++;
+    }
 }
 
 internal sealed class FakeFileDialogService : IFileDialogService

@@ -464,6 +464,7 @@ internal sealed class ApplicationCoordinator : IDisposable
         }
 
         _state.Dispose();
+        SettingsService.Shared.Dispose();
     }
 
     private WindowRegistration CreateWindowRegistration(

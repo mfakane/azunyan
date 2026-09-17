@@ -66,7 +66,6 @@ internal sealed class MainWindowRuntime : IDisposable
         _dispatcher = new DispatcherQueueUiDispatcher(_view.DispatcherQueue);
         var files = new TextFileStore();
         var documents = new DocumentController(_view, _session, files, _prompt);
-        var settings = new SettingsController(SettingsFileService.GetDefaultDirectory());
         _languageModes = new LanguageModeController(
             _view,
             _view,
@@ -103,10 +102,9 @@ internal sealed class MainWindowRuntime : IDisposable
             openFileInNewWindow,
             openFileRequest: openFileRequest);
         _settings = new SettingsWorkflow(
-            settings,
+            SettingsService.Shared,
             _languageModes,
             _view,
-            new DefaultFileChangeMonitorFactory(),
             _dispatcher,
             _prompt,
             new WinUiSettingsFolderOpener(),

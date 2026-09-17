@@ -1,11 +1,14 @@
 namespace Azunote;
 
+/// <summary>
+/// Shows one window what <see cref="SettingsService"/> has read. The reading
+/// itself is shared: this renders it into the window's menus and editor.
+/// </summary>
 internal sealed class SettingsWorkflow : IDisposable
 {
-    private readonly SettingsController _settings;
+    private readonly SettingsService _service;
     private readonly LanguageModeController _languageModes;
     private readonly IExternalToolMenuView _externalToolsMenu;
-    private readonly IFileChangeMonitorFactory _monitorFactory;
     private readonly IUiDispatcher _dispatcher;
     private readonly IUserPrompt _prompt;
     private readonly ISettingsFolderOpener _folderOpener;
@@ -16,8 +19,9 @@ internal sealed class SettingsWorkflow : IDisposable
     private readonly Func<string, Task> _showDefinitionInExplorer;
     private readonly Action<AzunoteSettings> _applySettings;
     private IReadOnlyList<ExternalToolMenuNode> _externalToolMenu = [];
-    private IFileChangeMonitor? _settingsMonitor;
-    private CancellationTokenSource? _reloadCancellation;
+    private AzunoteSettings _current = new();
+    private SettingsSnapshot? _applied;
+    private bool _subscribed;
     private bool _disposed;
     private readonly Action? _requestToolRefresh;
     internal IReadOnlyList<ExternalToolMenuNode> ExternalToolMenu => _externalToolMenu;
@@ -25,10 +29,9 @@ internal sealed class SettingsWorkflow : IDisposable
         = new Dictionary<ExternalToolSettings, PreparedExternalTool>();
 
     public SettingsWorkflow(
-        SettingsController settings,
+        SettingsService service,
         LanguageModeController languageModes,
         IExternalToolMenuView externalToolsMenu,
-        IFileChangeMonitorFactory monitorFactory,
         IUiDispatcher dispatcher,
         IUserPrompt prompt,
         ISettingsFolderOpener folderOpener,
@@ -40,10 +43,9 @@ internal sealed class SettingsWorkflow : IDisposable
         Action<AzunoteSettings>? applySettings = null,
         Action? requestToolRefresh = null)
     {
-        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _service = service ?? throw new ArgumentNullException(nameof(service));
         _languageModes = languageModes ?? throw new ArgumentNullException(nameof(languageModes));
         _externalToolsMenu = externalToolsMenu ?? throw new ArgumentNullException(nameof(externalToolsMenu));
-        _monitorFactory = monitorFactory ?? throw new ArgumentNullException(nameof(monitorFactory));
         _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
         _prompt = prompt ?? throw new ArgumentNullException(nameof(prompt));
         _folderOpener = folderOpener ?? throw new ArgumentNullException(nameof(folderOpener));
@@ -56,16 +58,22 @@ internal sealed class SettingsWorkflow : IDisposable
         _requestToolRefresh = requestToolRefresh;
     }
 
-    public AzunoteSettings Current => _settings.Current;
+    public AzunoteSettings Current => _current;
 
     public async Task InitializeAsync()
     {
         try
         {
-            var cancellationToken = BeginReload();
-            await _settings.EnsureExistsAsync(cancellationToken);
-            await ReloadAsync(showError: true, cancellationToken);
-            StartWatcher();
+            // Subscribing first: a reading that lands before the one below is
+            // read arrives as an event instead, and neither is missed.
+            _service.Loaded += Service_Loaded;
+            _service.LoadFailed += Service_LoadFailed;
+            _subscribed = true;
+            await _service.EnsureInitializedAsync();
+            if (_service.Current is { } snapshot)
+            {
+                Apply(snapshot);
+            }
         }
         catch (Exception exception)
         {
@@ -77,8 +85,8 @@ internal sealed class SettingsWorkflow : IDisposable
     {
         try
         {
-            await _settings.EnsureExistsAsync();
-            await _folderOpener.OpenAsync(_settings.Directory);
+            await _service.EnsureExistsAsync();
+            await _folderOpener.OpenAsync(_service.Directory);
         }
         catch (Exception exception)
         {
@@ -94,10 +102,12 @@ internal sealed class SettingsWorkflow : IDisposable
         }
 
         _disposed = true;
-        StopWatcher();
-        _reloadCancellation?.Cancel();
-        _reloadCancellation?.Dispose();
-        _reloadCancellation = null;
+        if (_subscribed)
+        {
+            _service.Loaded -= Service_Loaded;
+            _service.LoadFailed -= Service_LoadFailed;
+            _subscribed = false;
+        }
     }
 
     public void RefreshExternalToolsMenu()
@@ -110,44 +120,39 @@ internal sealed class SettingsWorkflow : IDisposable
         _externalToolsMenu.Render(_externalToolMenu, tool => states[tool],
             _runConfiguredTool, _editDefinition, _showDefinitionInExplorer);
 
-    private async Task<bool> ReloadAsync(bool showError, CancellationToken cancellationToken)
+    private void Service_Loaded(object? sender, SettingsSnapshot snapshot) =>
+        _dispatcher.TryEnqueue(() => Apply(snapshot));
+
+    private void Service_LoadFailed(object? sender, Exception exception) =>
+        _dispatcher.TryEnqueue(() => _ = _prompt.ShowErrorAsync(
+            "Could not load settings",
+            exception.Message));
+
+    /// <summary>
+    /// Renders one reading into this window. The same reading can arrive both
+    /// as an event and as the current one when the window joins, so applying
+    /// it twice has to be free.
+    /// </summary>
+    private void Apply(SettingsSnapshot snapshot)
     {
-        try
+        if (_disposed || ReferenceEquals(_applied, snapshot))
         {
-            var settings = await _settings.LoadAsync(cancellationToken);
-            var preparedTools = ExternalToolMenuBuilder.EnumerateTools(settings.ExternalToolMenu).Distinct()
-                .ToDictionary(tool => tool, tool => new PreparedExternalTool(tool));
-
-            // A newer change has read a newer folder. Applying what this one
-            // found would put the menu back the way it was.
-            cancellationToken.ThrowIfCancellationRequested();
-            _applySettings(settings);
-            _languageModes.Initialize(settings.CustomSyntaxModes);
-            if (!_languageModes.IsManuallySelected
-                && _currentFilePath() is { } path)
-            {
-                _languageModes.SelectForPath(path);
-            }
-
-            _externalToolMenu = settings.ExternalToolMenu;
-            PreparedTools = preparedTools;
-            RefreshExternalToolsMenu();
-
-            return true;
+            return;
         }
-        catch (OperationCanceledException)
+
+        _applied = snapshot;
+        _current = snapshot.Settings;
+        _applySettings(snapshot.Settings);
+        _languageModes.Initialize(snapshot.Settings.CustomSyntaxModes);
+        if (!_languageModes.IsManuallySelected
+            && _currentFilePath() is { } path)
         {
-            return false;
+            _languageModes.SelectForPath(path);
         }
-        catch (Exception exception)
-        {
-            if (showError)
-            {
-                await _prompt.ShowErrorAsync("Could not load settings", exception.Message);
-            }
 
-            return false;
-        }
+        _externalToolMenu = snapshot.Settings.ExternalToolMenu;
+        PreparedTools = snapshot.PreparedTools;
+        RefreshExternalToolsMenu();
     }
 
     private void RenderExternalTools() =>
@@ -157,91 +162,4 @@ internal sealed class SettingsWorkflow : IDisposable
             _runConfiguredTool,
             _editDefinition,
             _showDefinitionInExplorer);
-
-    /// <summary>
-    /// Cancels the reload in flight, if any, and returns the token of the one
-    /// replacing it. A reload reads the whole settings folder, so one that a
-    /// newer change has overtaken has nothing left to say.
-    /// </summary>
-    private CancellationToken BeginReload()
-    {
-        // The superseded source is left to the garbage collector: the reload
-        // it belongs to may still hold a registration on its token.
-        _reloadCancellation?.Cancel();
-        _reloadCancellation = new CancellationTokenSource();
-        return _reloadCancellation.Token;
-    }
-
-    private void StartWatcher()
-    {
-        StopWatcher();
-        if (_disposed)
-        {
-            return;
-        }
-
-        var directory = Path.GetFullPath(_settings.Directory);
-        if (!Directory.Exists(directory))
-        {
-            return;
-        }
-
-        _settingsMonitor = _monitorFactory.Create(
-            directory,
-            includeSubdirectories: true,
-            IsApplicationStateChange);
-        _settingsMonitor.Changed += SettingsMonitor_Changed;
-    }
-
-    private void StopWatcher()
-    {
-        if (_settingsMonitor is null)
-        {
-            return;
-        }
-
-        _settingsMonitor.Changed -= SettingsMonitor_Changed;
-        _settingsMonitor.Dispose();
-        _settingsMonitor = null;
-    }
-
-    private void SettingsMonitor_Changed(
-        object? sender,
-        FileChangeDetectedEventArgs args)
-    {
-        if (ReferenceEquals(sender, _settingsMonitor))
-        {
-            _dispatcher.TryEnqueue(() => _ = HandleSettingsChangedAsync());
-        }
-    }
-
-    private bool IsApplicationStateChange(string? changedPath) =>
-        changedPath is not null
-        && string.Equals(
-            Path.GetFullPath(changedPath),
-            StateFileService.GetStateFilePath(_settings.Directory),
-            StringComparison.OrdinalIgnoreCase);
-
-    private async Task HandleSettingsChangedAsync()
-    {
-        try
-        {
-            if (_disposed)
-            {
-                return;
-            }
-
-            var cancellationToken = BeginReload();
-            await _settings.EnsureExistsAsync(cancellationToken);
-            await ReloadAsync(showError: true, cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            // A burst of settings notifications was superseded by a newer one.
-        }
-        catch (Exception exception)
-        {
-            await _prompt.ShowErrorAsync("Could not reload settings", exception.Message);
-        }
-    }
 }

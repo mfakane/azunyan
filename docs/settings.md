@@ -15,6 +15,10 @@ Azunote watches this directory recursively and reloads valid external changes.
 If a tool or language-mode definition is invalid, the previous menu remains in
 place until a valid definition is available.
 
+The directory is watched once and read once for the whole application, however
+many windows are open, and every window shows the same reading. A change that
+arrives while a reading is still in progress cancels it rather than racing it.
+
 ## settings.toml
 
 The file uses TOML syntax. The top-level settings are:
