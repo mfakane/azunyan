@@ -71,8 +71,7 @@ association icons before packing.
 
 To regenerate icons, run `./scripts/Set-AzunoteIconWithWinApp.ps1`. It derives
 small SVGs from the master geometry, generates the PNG families, then combines
-the exact-size AppList PNGs into a 14-frame `app.ico`. It also creates the
-scale-qualified `TitleBarIcon` family used by the custom title bar. Rebuild and
+the exact-size AppList PNGs into a 14-frame `app.ico`. Rebuild and
 reinstall the package to update shell assets; regeneration alone does not update
 an installed app.
 

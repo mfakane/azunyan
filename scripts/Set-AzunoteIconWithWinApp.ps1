@@ -84,30 +84,6 @@ function Copy-SmallAppListAssets([string] $SourceAssets) {
     }
 }
 
-function Copy-TitleBarAssets([string] $SourceAssets) {
-    # TitleBar.IconSource is a 16-DIP XAML element. Use scale-qualified
-    # physical sizes so MRT can select a sharp source on each monitor.
-    $scaleTargetSizes = [ordered] @{
-        100 = 16
-        125 = 20
-        150 = 24
-        200 = 32
-        250 = 40
-        300 = 48
-        400 = 64
-        450 = 72
-    }
-    foreach ($entry in $scaleTargetSizes.GetEnumerator()) {
-        $scale = $entry.Key
-        $targetSize = $entry.Value
-        $source = Join-Path $SourceAssets "AppList.targetsize-$targetSize.png"
-        if (!(Test-Path -LiteralPath $source)) {
-            throw "Missing AppList target-size asset for title bar scale $scale`: $source"
-        }
-        $name = if ($scale -eq 100) { 'TitleBarIcon.png' } else { "TitleBarIcon.scale-$scale.png" }
-        Copy-Item -LiteralPath $source -Destination (Join-Path $assetsDir $name)
-    }
-}
 
 if (!(Test-Path -LiteralPath $fullIconSvg)) {
     throw "Missing full-size icon SVG: $fullIconSvg"
@@ -141,7 +117,6 @@ try {
         Copy-Item -LiteralPath $source.FullName -Destination (Join-Path $assetsDir $source.Name)
     }
 
-    Copy-TitleBarAssets $assetsDir
 
     $smallAssociationManifest = New-TemporaryIconManifest 'Assets\FileAssociation.png' 'Assets\FileAssociation.png'
     $temporaryManifests.Add($smallAssociationManifest.Directory)

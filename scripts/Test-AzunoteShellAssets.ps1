@@ -31,30 +31,6 @@ for ($i = 0; $i -lt $sizes.Count; $i++) {
 }
 Write-Host 'PASS: all 14 ICO frames contain the exact-size shell PNGs.'
 
-$titleBarScales = [ordered] @{
-    100 = 16
-    125 = 20
-    150 = 24
-    200 = 32
-    250 = 40
-    300 = 48
-    400 = 64
-    450 = 72
-}
-foreach ($entry in $titleBarScales.GetEnumerator()) {
-    $scale = $entry.Key
-    $targetSize = $entry.Value
-    $name = if ($scale -eq 100) { 'TitleBarIcon.png' } else { "TitleBarIcon.scale-$scale.png" }
-    $path = Join-Path $assets $name
-    $bytes = [IO.File]::ReadAllBytes($path)
-    $width = ($bytes[16] * 16777216) + ($bytes[17] * 65536) + ($bytes[18] * 256) + $bytes[19]
-    $height = ($bytes[20] * 16777216) + ($bytes[21] * 65536) + ($bytes[22] * 256) + $bytes[23]
-    if ($width -ne $targetSize -or $height -ne $targetSize) {
-        throw "Wrong title-bar dimensions for scale $scale`: expected ${targetSize}x${targetSize}."
-    }
-}
-Write-Host 'PASS: title-bar assets contain exact physical sizes for all configured scales.'
-
 if (!$PublishedDirectory) {
     Write-Host 'PRI tests not run. Pass -PublishedDirectory with a compiled Azunote.pri and Assets folder.'
     return

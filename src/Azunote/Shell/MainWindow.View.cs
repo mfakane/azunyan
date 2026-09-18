@@ -91,19 +91,8 @@ public sealed partial class MainWindow
         var windowId = Win32Interop.GetWindowIdFromWindow(_windowHandle);
         _appWindow = AppWindow.GetFromWindowId(windowId);
         _appWindow?.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "app.ico"));
-        if (_appWindow?.TitleBar is not { } titleBar
-            || !AppWindowTitleBar.IsCustomizationSupported())
-        {
-            return;
-        }
-
         _uiSettings = new UISettings();
         _uiSettings.ColorValuesChanged += OnColorValuesChanged;
-        ExtendsContentIntoTitleBar = true;
-        SetTitleBar(TitleBarControl);
-        var titleBarHeight = titleBar.Height > 0 ? titleBar.Height : 32;
-        TitleBarRow.Height = new GridLength(titleBarHeight);
-        AppTitleBar.Height = titleBarHeight;
     }
 
     internal IntPtr WindowHandle => _windowHandle;
