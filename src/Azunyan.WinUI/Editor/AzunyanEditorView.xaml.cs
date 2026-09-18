@@ -84,7 +84,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private bool _disposed;
     private int _hoverPosition = -1;
     private Point? _lastPointerPosition;
-    private bool _linkCursorActive;
+    private InputSystemCursorShape? _cursorShape;
     private TextRange? _hoverLinkRange;
     private string _hoverLinkText = string.Empty;
     private TextBlockSelection? _blockSelection;
@@ -2133,9 +2133,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private void OnInputKeyDown(object sender, KeyRoutedEventArgs args)
     {
         var isRepeat = !_nativeKeysDown.Add(args.Key);
-        if (args.Key == VirtualKey.Control && !isRepeat)
+        if (args.Key is VirtualKey.Control or VirtualKey.Menu && !isRepeat)
         {
-            RefreshLinkCursor();
+            RefreshPointerCursor();
         }
 
         LogDiagnostic(
@@ -2623,9 +2623,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     {
         _nativeKeysDown.Remove(args.Key);
         _queuedNonRepeatingKeys.Remove(args.Key);
-        if (args.Key == VirtualKey.Control)
+        if (args.Key is VirtualKey.Control or VirtualKey.Menu)
         {
-            UpdateLinkCursor(false);
+            RefreshPointerCursor();
         }
 
         LogDiagnostic(
@@ -3391,7 +3391,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             linkText = hoverLinkText;
         }
 
-        UpdateLinkCursor(link is not null && IsKeyDown(VirtualKey.Control));
+        UpdateCursor(GetTextSurfaceCursorShape(
+            link is not null && IsKeyDown(VirtualKey.Control)));
 
         var position = anchor.Position.Offset;
         if (_hoverPosition == position && _hoverLinkRange == link)
@@ -3423,7 +3424,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         _hoverPosition = -1;
         _hoverLinkRange = null;
         _lastPointerPosition = null;
-        UpdateLinkCursor(false);
+        UpdateCursor(null);
         HideTooltipPopup();
     }
 
@@ -3463,17 +3464,21 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     }
 
     /// <summary>
-    /// Ctrl is pressed and released without moving the pointer, so the link
-    /// cursor is refreshed from the last known pointer position as well.
+    /// Ctrl or Alt is pressed and released without moving the pointer, so the
+    /// cursor is refreshed from the last known pointer position as well. A
+    /// pointer that is away or driving a selection keeps the shape it has.
     /// </summary>
-    private void RefreshLinkCursor()
+    private void RefreshPointerCursor()
     {
         if (_disposed
             || !IsProjectedTextSurface
             || _selectionPointerId is not null
-            || _lastPointerPosition is not { } point
-            || !IsKeyDown(VirtualKey.Control)
-            || !_defaultRenderer.TextRenderer.TryHitTest(
+            || _lastPointerPosition is not { } point)
+        {
+            return;
+        }
+
+        if (!_defaultRenderer.TextRenderer.TryHitTest(
                 point.X,
                 point.Y,
                 InputWindow.NativeTextBoxControl.Padding.Left,
@@ -3487,25 +3492,42 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 out _,
                 out var textPosition))
         {
-            UpdateLinkCursor(false);
+            UpdateCursor(null);
             return;
         }
 
-        UpdateLinkCursor(
-            textPosition is int position
-            && TryGetLinkAt(position, out _, out _));
+        UpdateCursor(GetTextSurfaceCursorShape(
+            IsKeyDown(VirtualKey.Control)
+            && textPosition is int position
+            && TryGetLinkAt(position, out _, out _)));
     }
 
-    private void UpdateLinkCursor(bool overLink)
+    /// <summary>
+    /// The pointer shows what a press is about to do: Ctrl over a link opens
+    /// it, and Alt drags a block selection out. Plain text keeps the I-beam
+    /// that text editing is read from.
+    /// </summary>
+    private static InputSystemCursorShape GetTextSurfaceCursorShape(
+        bool overLink) => overLink
+            ? InputSystemCursorShape.Hand
+            : IsKeyDown(VirtualKey.Menu)
+                ? InputSystemCursorShape.Cross
+                : InputSystemCursorShape.IBeam;
+
+    /// <summary>
+    /// Null hands the shape back to the shell, which is what the pointer
+    /// leaving the text surface asks for.
+    /// </summary>
+    private void UpdateCursor(InputSystemCursorShape? shape)
     {
-        if (_linkCursorActive == overLink)
+        if (_cursorShape == shape)
         {
             return;
         }
 
-        _linkCursorActive = overLink;
-        ProtectedCursor = overLink
-            ? InputSystemCursor.Create(InputSystemCursorShape.Hand)
+        _cursorShape = shape;
+        ProtectedCursor = shape is { } cursorShape
+            ? InputSystemCursor.Create(cursorShape)
             : null;
     }
 
