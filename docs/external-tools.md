@@ -337,10 +337,10 @@ One run is one undo step, including a `per` run that launched several
 processes, and including a run that was cancelled or exited non-zero: what had
 already been applied stays in the document, and one undo removes all of it.
 
-Editing the document while a streamed run is writing to it is allowed. Azunote
-follows its own insertion point through those edits, and stops streaming with an
-error when the document changed so much that the insertion point no longer
-exists.
+A streamed run appends at the end of what it has already written, and that
+position is not moved by an edit made elsewhere in the document while the tool
+is running, so editing a document a tool is writing to is best avoided. A run
+whose insertion point no longer exists stops and reports it.
 
 A `pwsh` tool streams as well. Its output is still written without the trailing
 newline the host would add, and strings are still joined by the newline standard

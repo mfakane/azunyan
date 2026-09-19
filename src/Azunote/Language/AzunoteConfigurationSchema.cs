@@ -109,7 +109,12 @@ public static class AzunoteSchemaCatalog
                     Field("stdin", AzunoteSchemaValueKind.String, supportsPlaceholders: true),
                     OutputActionField("output"),
                     OutputActionField("stdout"),
-                    OutputActionField("stderr")
+                    OutputActionField("stderr"),
+                    new AzunoteSchemaField(
+                        "stream",
+                        AzunoteSchemaValueKind.Enum,
+                        AllowedValues: ["output", "stdout", "stderr"],
+                        Documentation: "Channels applied while the tool runs, as a name or an array.")
                 ]),
             new AzunoteSchemaTable(
                 "when",

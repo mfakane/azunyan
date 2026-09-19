@@ -37,10 +37,24 @@ public sealed class ExternalToolRunner
     /// is available. A null pool, or any failure to hand the request over,
     /// launches the process the usual way instead.
     /// </summary>
+    internal static Task<ExternalToolResult> RunAsync(
+        ExternalToolDefinition definition,
+        ExternalToolContext context,
+        PowerShellWarmPool? warmPool,
+        CancellationToken cancellationToken = default) =>
+        RunAsync(definition, context, warmPool, streamSink: null, cancellationToken);
+
+    /// <summary>
+    /// Runs the tool, handing <paramref name="streamSink"/> the output of the
+    /// channels the definition streams as it arrives. One relay serves every
+    /// part of a <c>per</c> run, so the parts reach the sink concatenated the
+    /// way a buffered run concatenates them.
+    /// </summary>
     internal static async Task<ExternalToolResult> RunAsync(
         ExternalToolDefinition definition,
         ExternalToolContext context,
         PowerShellWarmPool? warmPool,
+        IExternalToolStreamSink? streamSink,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(definition);
@@ -58,6 +72,10 @@ public sealed class ExternalToolRunner
         // that launches several processes can raise the waiting count for
         // exactly as long as it needs it.
         var inputParts = definition.Per.GetInputParts(sourceInput);
+        using var relay = streamSink is not null
+            && definition.Stream != ExternalToolStreamChannels.None
+            ? new ExternalToolStreamRelay(streamSink, definition.Stream)
+            : null;
         using var reservation = inputParts.Count > 1
             && definition.CommandMode == ExternalToolCommandMode.Pwsh
             ? warmPool?.Reserve(inputParts.Count)
@@ -71,6 +89,7 @@ public sealed class ExternalToolRunner
                 definition,
                 context.WithInput(inputPart.Value, inputPart.Captures),
                 warmPool,
+                relay,
                 cancellationToken);
             standardOutput.Append(result.StandardOutput);
             standardError.Append(result.StandardError);
@@ -87,6 +106,7 @@ public sealed class ExternalToolRunner
             }
         }
 
+        relay?.Complete();
         return new ExternalToolResult(
             succeeded ? 0 : exitCode,
             standardOutput.ToString(),
@@ -99,6 +119,7 @@ public sealed class ExternalToolRunner
         ExternalToolDefinition definition,
         ExternalToolContext context,
         PowerShellWarmPool? warmPool,
+        ExternalToolStreamRelay? relay,
         CancellationToken cancellationToken)
     {
         var environment = ExternalToolEnvironmentResolver.Resolve(definition, context);
@@ -179,21 +200,28 @@ public sealed class ExternalToolRunner
         {
             var mixedBuilder = new StringBuilder();
             var mixedLock = new object();
-            void AppendMixed(string chunk)
+            // The lock keeps the mixed stream in the order the reads arrived
+            // and hands the relay its chunks in that same order.
+            void AppendChunk(ExternalToolOutputChannel channel, string chunk)
             {
                 lock (mixedLock)
                 {
                     mixedBuilder.Append(chunk);
+                    if (relay is not null)
+                    {
+                        relay.Append(channel, chunk);
+                        relay.Append(ExternalToolOutputChannel.Mixed, chunk);
+                    }
                 }
             }
 
             var outputTask = ReadStreamAsync(
                 process.StandardOutput,
-                AppendMixed,
+                chunk => AppendChunk(ExternalToolOutputChannel.Stdout, chunk),
                 cancellationToken);
             var errorTask = ReadStreamAsync(
                 process.StandardError,
-                AppendMixed,
+                chunk => AppendChunk(ExternalToolOutputChannel.Stderr, chunk),
                 cancellationToken);
             if (standardInput.Length == 0)
             {

@@ -66,6 +66,17 @@ public interface IEditorBuffer
     void Replace(TextRange range, string replacement);
 }
 
+/// <summary>
+/// A document that the output of a streamed external-tool channel is appended
+/// to while the tool is still running.
+/// </summary>
+public interface IExternalToolDocument
+{
+    void Append(string text);
+
+    void Complete();
+}
+
 public enum PendingChangesDecision
 {
     Save,

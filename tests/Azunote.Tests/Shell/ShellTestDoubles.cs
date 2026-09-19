@@ -58,6 +58,10 @@ internal sealed class FakeEditorView : IEditorView
 
     public void Focus() => FocusCount++;
 
+    public void BeginUndoGroup() => _document.BeginUndoGroup();
+
+    public void EndUndoGroup() => _document.EndUndoGroup();
+
     public void Undo()
     {
     }

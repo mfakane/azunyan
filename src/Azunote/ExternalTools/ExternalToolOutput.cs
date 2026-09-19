@@ -48,20 +48,24 @@ public static partial class ExternalToolOutputInterpreter
             return new ExternalToolOutput([]);
         }
 
+        // A streamed channel was applied while the tool ran, so there is
+        // nothing left here for it to do.
+        ExternalToolOutputAction Action(
+            ExternalToolOutputChannel channel,
+            ExternalToolOutputActions actions,
+            string text) =>
+            new(
+                channel,
+                ExternalToolStreaming.Streams(definition.Stream, channel)
+                    ? ExternalToolOutputMode.Ignore
+                    : actions.Select(result.Succeeded),
+                text);
+
         var actions = new[]
         {
-            new ExternalToolOutputAction(
-                ExternalToolOutputChannel.Mixed,
-                definition.Output.Select(result.Succeeded),
-                result.MixedOutput),
-            new ExternalToolOutputAction(
-                ExternalToolOutputChannel.Stdout,
-                definition.Stdout.Select(result.Succeeded),
-                result.StandardOutput),
-            new ExternalToolOutputAction(
-                ExternalToolOutputChannel.Stderr,
-                definition.Stderr.Select(result.Succeeded),
-                result.StandardError)
+            Action(ExternalToolOutputChannel.Mixed, definition.Output, result.MixedOutput),
+            Action(ExternalToolOutputChannel.Stdout, definition.Stdout, result.StandardOutput),
+            Action(ExternalToolOutputChannel.Stderr, definition.Stderr, result.StandardError)
         };
 
         return new ExternalToolOutput(

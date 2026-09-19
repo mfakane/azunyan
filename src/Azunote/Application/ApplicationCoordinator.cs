@@ -227,6 +227,18 @@ internal sealed class ApplicationCoordinator : IDisposable
         ActivateWindow(registration);
     }
 
+    /// <summary>
+    /// Opens an empty window and returns the document a streamed external-tool
+    /// channel appends to, so its output appears as the tool produces it.
+    /// </summary>
+    internal async Task<IExternalToolDocument> OpenStreamedTextInNewWindowAsync()
+    {
+        var registration = CreateWindowRegistration();
+        await registration.Window.Runtime.OpenStartupTextAsync(string.Empty);
+        ActivateWindow(registration);
+        return registration.Window.Runtime.CreateStreamedDocument();
+    }
+
     internal async Task OpenFileAsync(MainWindow source, string path)
     {
         ArgumentNullException.ThrowIfNull(source);

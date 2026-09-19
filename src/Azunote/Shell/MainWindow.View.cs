@@ -206,6 +206,10 @@ public sealed partial class MainWindow
 
     private void Focus() => _editor.Focus(FocusState.Programmatic);
 
+    private void BeginUndoGroup() => _editor.BeginUndoGroup();
+
+    private void EndUndoGroup() => _editor.EndUndoGroup();
+
     private void Undo() => _editor.UndoDocument();
 
     private void Redo() => _editor.RedoDocument();
@@ -1000,6 +1004,8 @@ public sealed partial class MainWindow
         public void SetSelection(TextSelection selection) => _window.SetSelection(selection);
         public void Replace(TextRange range, string replacement) => _window.Replace(range, replacement);
         public void Focus() => _window.Focus();
+        public void BeginUndoGroup() => _window.BeginUndoGroup();
+        public void EndUndoGroup() => _window.EndUndoGroup();
         public void Undo() => _window.Undo();
         public void Redo() => _window.Redo();
         public void Cut() => _window.Cut();

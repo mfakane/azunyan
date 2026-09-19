@@ -39,6 +39,14 @@ internal interface IEditorView : IEditorBuffer
 
     void Redo();
 
+    /// <summary>
+    /// Starts a group of edits that one undo reverses. Streamed external-tool
+    /// output uses it so that a run applied over many chunks stays one step.
+    /// </summary>
+    void BeginUndoGroup();
+
+    void EndUndoGroup();
+
     void Cut();
 
     void Copy();

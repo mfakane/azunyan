@@ -700,6 +700,21 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         });
     }
 
+    /// <summary>
+    /// Starts a group of edits that one undo reverses. It runs through the
+    /// same queue the edits themselves do, so a group opened while an IME
+    /// composition is active still encloses them.
+    /// </summary>
+    public void BeginUndoGroup() =>
+        RunAfterComposition(() =>
+        {
+            EndTypedInputUndoGroup();
+            _document.BeginUndoGroup();
+        });
+
+    public void EndUndoGroup() =>
+        RunAfterComposition(() => _document.EndUndoGroup());
+
     public void ReplaceDocumentRange(TextRange range, string replacement) =>
         RunAfterComposition(() =>
         {

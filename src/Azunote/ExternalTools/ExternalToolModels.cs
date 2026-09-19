@@ -231,7 +231,8 @@ public sealed record ExternalToolDefinition
         string? workingDirectory = null,
         IReadOnlyDictionary<string, string>? environment = null,
         string? definitionDirectory = null,
-        ExternalToolCommandMode commandMode = ExternalToolCommandMode.Executable)
+        ExternalToolCommandMode commandMode = ExternalToolCommandMode.Executable,
+        ExternalToolStreamChannels stream = ExternalToolStreamChannels.None)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
         if (commandMode is not ExternalToolCommandMode.Executable
@@ -251,6 +252,12 @@ public sealed record ExternalToolDefinition
         Output = output ?? ExternalToolOutputActions.Ignore;
         Stdout = stdout ?? ExternalToolOutputActions.Ignore;
         Stderr = stderr ?? ExternalToolOutputActions.Ignore;
+        Stream = stream;
+        if (ExternalToolStreaming.Describe(Stream, Output, Stdout, Stderr) is { } streamError)
+        {
+            throw new ArgumentException(streamError, nameof(stream));
+        }
+
         WorkingDirectory = workingDirectory;
         Environment = environment ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         DefinitionDirectory = string.IsNullOrWhiteSpace(definitionDirectory)
@@ -275,6 +282,11 @@ public sealed record ExternalToolDefinition
     public ExternalToolOutputActions Stdout { get; }
 
     public ExternalToolOutputActions Stderr { get; }
+
+    /// <summary>
+    /// The channels applied while the tool runs rather than after it exits.
+    /// </summary>
+    public ExternalToolStreamChannels Stream { get; }
 
     public string? WorkingDirectory { get; }
 

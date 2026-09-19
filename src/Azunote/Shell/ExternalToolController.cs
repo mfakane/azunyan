@@ -7,7 +7,7 @@ namespace Azunote;
 /// a new window. Process execution and output interpretation remain in
 /// ExternalTools.cs.
 /// </summary>
-public sealed class ExternalToolController
+public sealed partial class ExternalToolController
 {
     private readonly IEditorBuffer _editor;
     private readonly DocumentController _documents;
@@ -17,6 +17,8 @@ public sealed class ExternalToolController
     private readonly Func<string> _languageModeId;
     private readonly Func<IReadOnlyList<string>> _languageExtensions;
     private readonly PowerShellWarmPool? _warmPool;
+    private readonly IUiDispatcher? _dispatcher;
+    private readonly Func<Task<IExternalToolDocument>>? _openStreamedDocument;
 
     public ExternalToolController(
         IEditorBuffer editor,
@@ -45,9 +47,15 @@ public sealed class ExternalToolController
         Func<string, Task> openTextInNewWindow,
         Func<string>? languageModeId,
         PowerShellWarmPool? warmPool,
-        Func<IReadOnlyList<string>>? languageExtensions = null)
-        : this(editor, documents, files, prompt, openTextInNewWindow, languageModeId, languageExtensions) =>
+        Func<IReadOnlyList<string>>? languageExtensions = null,
+        IUiDispatcher? dispatcher = null,
+        Func<Task<IExternalToolDocument>>? openStreamedDocument = null)
+        : this(editor, documents, files, prompt, openTextInNewWindow, languageModeId, languageExtensions)
+    {
         _warmPool = warmPool;
+        _dispatcher = dispatcher;
+        _openStreamedDocument = openStreamedDocument;
+    }
 
     public async Task<ExternalToolResult> RunAsync(
         ExternalToolDefinition definition,
@@ -88,11 +96,18 @@ public sealed class ExternalToolController
                 editorSnapshot.SelectionStart,
                 editorSnapshot.SelectionEnd,
                 languageExtensions: _languageExtensions());
+            using var streaming = ExternalToolStreamingRun.TryCreate(this, definition, selection);
             var result = await ExternalToolRunner.RunAsync(
                 definition,
                 context,
                 _warmPool,
+                streaming,
                 cancellationToken);
+            if (streaming is not null)
+            {
+                await streaming.FinishAsync(result.InvocationCount > 0);
+            }
+
             var output = ExternalToolOutputInterpreter.Interpret(definition, result);
             foreach (var action in output.Actions)
             {

@@ -46,7 +46,8 @@ internal sealed class MainWindowRuntime : IDisposable
         Action<bool> recordStatusBarVisible,
         DocumentSession? session = null,
         Document? document = null,
-        Func<string, Task>? openFileRequest = null)
+        Func<string, Task>? openFileRequest = null,
+        Func<Task<IExternalToolDocument>>? openStreamedTextInNewWindow = null)
     {
         _window = window ?? throw new ArgumentNullException(nameof(window));
         _view = new MainWindow.ViewBoundary(window);
@@ -86,7 +87,9 @@ internal sealed class MainWindowRuntime : IDisposable
             openTextInNewWindow,
             () => _languageModes.CurrentModeId,
             _powerShellWarmPool,
-            () => _languageModes.CurrentModeFileExtensions);
+            () => _languageModes.CurrentModeFileExtensions,
+            _dispatcher,
+            openStreamedTextInNewWindow);
 
         _documents = new DocumentWorkflow(
             _view,
@@ -202,6 +205,13 @@ internal sealed class MainWindowRuntime : IDisposable
         int? line = null,
         int? column = null) =>
         _documents.OpenStartupDocumentAsync(path, line, column);
+
+    /// <summary>
+    /// The document streamed external-tool output is appended to when this
+    /// window was opened to receive it.
+    /// </summary>
+    internal IExternalToolDocument CreateStreamedDocument() =>
+        new EditorStreamedDocument(_view, _session);
 
     public Task OpenStartupTextAsync(
         string text,

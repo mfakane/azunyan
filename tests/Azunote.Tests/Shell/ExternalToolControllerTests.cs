@@ -228,4 +228,184 @@ public sealed class ExternalToolControllerTests
             }
         }
     }
+
+    [Fact]
+    public async Task Streamed_replace_selection_applies_the_same_text_it_would_have_buffered()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            $"azunote external controller stream selection {Guid.NewGuid():N}");
+        var scriptPath = Path.Combine(root, "write lines.cmd");
+        try
+        {
+            Directory.CreateDirectory(root);
+            await File.WriteAllTextAsync(
+                scriptPath,
+                "@echo off\r\necho A\r\necho B\r\n");
+
+            var editor = new FakeEditorView("one two three");
+            var session = new DocumentSession();
+            var files = new FakeTextFileStore();
+            var prompt = new FakeUserPrompt();
+            var documents = new DocumentController(editor, session, files, prompt);
+            var controller = new ExternalToolController(
+                editor,
+                documents,
+                files,
+                prompt,
+                _ => Task.CompletedTask);
+            var definition = new ExternalToolDefinition(
+                scriptPath,
+                stdout: new ExternalToolOutputActions(
+                    ExternalToolOutputMode.ReplaceSelection,
+                    ExternalToolOutputMode.ReplaceSelection),
+                stream: ExternalToolStreamChannels.Stdout);
+
+            editor.SetSelection(new TextSelection(4, 7));
+            var result = await controller.RunAsync(definition);
+
+            Assert.True(result.Succeeded, result.StandardError);
+            Assert.Equal("one A\r\nB\r\n three", editor.Text);
+            Assert.Equal(result.StandardOutput, editor.SelectedText);
+            Assert.Empty(prompt.Errors);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Streamed_new_document_appends_to_a_window_opened_for_the_run()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            $"azunote external controller stream document {Guid.NewGuid():N}");
+        var scriptPath = Path.Combine(root, "write lines.cmd");
+        try
+        {
+            Directory.CreateDirectory(root);
+            await File.WriteAllTextAsync(
+                scriptPath,
+                "@echo off\r\necho A\r\necho B\r\n");
+
+            var editor = new FakeEditorView("before");
+            var session = new DocumentSession();
+            var files = new FakeTextFileStore();
+            var prompt = new FakeUserPrompt();
+            var documents = new DocumentController(editor, session, files, prompt);
+            var streamed = new FakeStreamedDocument();
+            var controller = new ExternalToolController(
+                editor,
+                documents,
+                files,
+                prompt,
+                _ => throw new InvalidOperationException("The streamed window should have been used."),
+                languageModeId: null,
+                warmPool: null,
+                languageExtensions: null,
+                dispatcher: null,
+                openStreamedDocument: () => Task.FromResult<IExternalToolDocument>(streamed));
+
+            var result = await controller.RunAsync(
+                new ExternalToolDefinition(
+                    scriptPath,
+                    stdout: new ExternalToolOutputActions(
+                        ExternalToolOutputMode.NewDocument,
+                        ExternalToolOutputMode.NewDocument),
+                    stream: ExternalToolStreamChannels.Stdout));
+
+            Assert.True(result.Succeeded, result.StandardError);
+            Assert.Equal(result.StandardOutput, streamed.Text);
+            Assert.True(streamed.Completed);
+            Assert.Equal("before", editor.Text);
+            Assert.Empty(prompt.Errors);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task A_streamed_run_that_never_invoked_the_tool_leaves_the_document_alone()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            $"azunote external controller stream empty {Guid.NewGuid():N}");
+        var scriptPath = Path.Combine(root, "write lines.cmd");
+        try
+        {
+            Directory.CreateDirectory(root);
+            await File.WriteAllTextAsync(scriptPath, "@echo off\r\necho A\r\n");
+
+            var editor = new FakeEditorView("one two three");
+            var session = new DocumentSession();
+            var files = new FakeTextFileStore();
+            var prompt = new FakeUserPrompt();
+            var documents = new DocumentController(editor, session, files, prompt);
+            var controller = new ExternalToolController(
+                editor,
+                documents,
+                files,
+                prompt,
+                _ => Task.CompletedTask);
+
+            editor.SetSelection(new TextSelection(4, 7));
+            var result = await controller.RunAsync(
+                new ExternalToolDefinition(
+                    scriptPath,
+                    inputMode: ExternalToolInputMode.Selection,
+                    per: "regex:zzz",
+                    stdout: new ExternalToolOutputActions(
+                        ExternalToolOutputMode.ReplaceSelection,
+                        ExternalToolOutputMode.ReplaceSelection),
+                    stream: ExternalToolStreamChannels.Stdout));
+
+            Assert.Equal(0, result.InvocationCount);
+            Assert.Equal("one two three", editor.Text);
+            Assert.Empty(prompt.Errors);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+}
+
+internal sealed class FakeStreamedDocument : IExternalToolDocument
+{
+    private readonly System.Text.StringBuilder _text = new();
+
+    public string Text => _text.ToString();
+
+    public bool Completed { get; private set; }
+
+    public void Append(string text) => _text.Append(text);
+
+    public void Complete() => Completed = true;
 }

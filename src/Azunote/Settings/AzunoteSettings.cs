@@ -157,6 +157,7 @@ public sealed class AzunoteDebugSettings
     WriteIndented = true,
     Converters = [
         typeof(ExternalToolOutputActionsTomlConverter),
+        typeof(ExternalToolStreamChannelsTomlConverter),
         typeof(ExternalToolCommandTomlConverter)])]
 [TomlSerializable(typeof(AzunoteSettings))]
 [TomlSerializable(typeof(AzunoteDebugSettings))]
@@ -247,6 +248,85 @@ public sealed class ExternalToolOutputActionsTomlConverter
         {
             throw reader.CreateException(exception.Message);
         }
+    }
+}
+
+public sealed class ExternalToolStreamChannelsTomlConverter
+    : TomlConverter<ExternalToolStreamChannels>
+{
+    public override ExternalToolStreamChannels Read(TomlReader reader)
+    {
+        if (reader.TokenType == TomlTokenType.String)
+        {
+            return Parse([reader.GetString()], reader);
+        }
+
+        if (reader.TokenType != TomlTokenType.StartArray)
+        {
+            throw reader.CreateException(
+                "Expected an external-tool stream channel or an array of them.");
+        }
+
+        var values = new List<string>();
+        while (reader.Read() && reader.TokenType != TomlTokenType.EndArray)
+        {
+            if (reader.TokenType != TomlTokenType.String)
+            {
+                throw reader.CreateException(
+                    "External-tool stream channel arrays may contain only strings.");
+            }
+
+            values.Add(reader.GetString());
+        }
+
+        if (reader.TokenType != TomlTokenType.EndArray)
+        {
+            throw reader.CreateException("The external-tool stream channel array was not closed.");
+        }
+
+        var result = Parse(values, reader);
+        reader.Read();
+        return result;
+    }
+
+    public override void Write(
+        TomlWriter writer,
+        ExternalToolStreamChannels value)
+    {
+        writer.WriteStartArray();
+        foreach (var channel in new[]
+                 {
+                     ExternalToolOutputChannel.Mixed,
+                     ExternalToolOutputChannel.Stdout,
+                     ExternalToolOutputChannel.Stderr
+                 })
+        {
+            if (ExternalToolStreaming.Streams(value, channel))
+            {
+                writer.WriteStringValue(ExternalToolStreaming.ToTomlValue(channel));
+            }
+        }
+
+        writer.WriteEndArray();
+    }
+
+    private static ExternalToolStreamChannels Parse(
+        List<string> values,
+        TomlReader reader)
+    {
+        var channels = ExternalToolStreamChannels.None;
+        foreach (var value in values)
+        {
+            if (!ExternalToolStreaming.TryParseChannel(value, out var channel))
+            {
+                throw reader.CreateException(
+                    $"Invalid stream channel '{value}'. Expected output, stdout, or stderr.");
+            }
+
+            channels |= ExternalToolStreaming.ToFlag(channel);
+        }
+
+        return channels;
     }
 }
 
@@ -433,6 +513,9 @@ public sealed class ExternalToolLaunchSettings
 
     [TomlConverter(typeof(ExternalToolOutputActionsTomlConverter))]
     public ExternalToolOutputActions Stderr { get; set; } = ExternalToolOutputActions.Ignore;
+
+    [TomlConverter(typeof(ExternalToolStreamChannelsTomlConverter))]
+    public ExternalToolStreamChannels Stream { get; set; } = ExternalToolStreamChannels.None;
 }
 
 public sealed class ExternalToolWhenSettings
@@ -512,7 +595,8 @@ public sealed class ExternalToolSettings
             Launch.WorkingDirectory,
             Environment,
             DefinitionDirectory,
-            commandMode);
+            commandMode,
+            Launch.Stream);
     }
 
     internal void Validate()
@@ -565,6 +649,16 @@ public sealed class ExternalToolSettings
         {
             throw new SettingsFileException(
                 $"External tool '{Name}' cannot specify args with cmd or pwsh.");
+        }
+
+        if (ExternalToolStreaming.Describe(
+                Launch.Stream,
+                Launch.Output,
+                Launch.Stdout,
+                Launch.Stderr) is { } streamError)
+        {
+            throw new SettingsFileException(
+                $"External tool '{Name}': {streamError}");
         }
 
         _ = ExternalToolEnumValues.Parse<ExternalToolInputMode>(Launch.Input, "launch.input");

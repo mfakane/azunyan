@@ -52,7 +52,8 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
             application.RecordStatusBarVisible,
             session,
             document,
-            path => application.OpenFileAsync(this, path));
+            path => application.OpenFileAsync(this, path),
+            application.OpenStreamedTextInNewWindowAsync);
         ViewModel.Attach(this);
         // MenuBarItem does not expose its internal flyout's Opening event.
         // Cover pointer and keyboard entry, including reopening an already focused item.
