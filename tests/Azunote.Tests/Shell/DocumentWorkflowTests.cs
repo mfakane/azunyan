@@ -381,6 +381,67 @@ public sealed class DocumentWorkflowTests
         }
     }
 
+    [Fact]
+    public async Task File_change_reloads_a_clean_document_and_only_asks_once_dirty()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            var editor = new FakeEditorView();
+            var session = new DocumentSession();
+            var files = new FakeTextFileStore();
+            var prompt = new FakeUserPrompt
+            {
+                ExternalDecision = ExternalChangeDecision.Keep
+            };
+            var dialogs = new FakeFileDialogService { OpenPath = path };
+            var fullPath = Path.GetFullPath(path);
+            files.Files[fullPath] = new TextFileData(
+                "before",
+                TextEncodingKind.Utf8,
+                LineEndingKind.Lf);
+            var factory = new FakeFileChangeMonitorFactory();
+            var workflow = CreateWorkflow(
+                editor,
+                session,
+                files,
+                prompt,
+                dialogs,
+                factory);
+
+            await workflow.OpenFileAsync();
+            files.Files[fullPath] = new TextFileData(
+                "after",
+                TextEncodingKind.Utf8,
+                LineEndingKind.Lf);
+            factory.Monitors[^1].Trigger(path);
+            await Task.Delay(30);
+
+            // Nothing was at stake, so the reload happened on its own.
+            Assert.Equal("after", editor.Text);
+            Assert.Equal(0, prompt.ExternalDecisionCount);
+            Assert.False(workflow.IsDirty);
+
+            editor.Replace(new TextRange(5, 0), "!");
+            workflow.ObserveTextChanged();
+            Assert.True(workflow.IsDirty);
+            files.Files[fullPath] = new TextFileData(
+                "third",
+                TextEncodingKind.Utf8,
+                LineEndingKind.Lf);
+            factory.Monitors[^1].Trigger(path);
+            await Task.Delay(30);
+
+            Assert.Equal(1, prompt.ExternalDecisionCount);
+            Assert.Equal("after!", editor.Text);
+            Assert.True(workflow.IsDirty);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     private static DocumentWorkflow CreateWorkflow(
         FakeEditorView editor,
         DocumentSession session,

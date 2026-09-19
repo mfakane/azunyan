@@ -176,10 +176,8 @@ public sealed class DocumentController
         }
 
         var data = await _files.ReadAsync(path, encodingHint, cancellationToken);
-        var selection = _editor.Selection;
-        ReplaceEditorText(data.Text);
+        ReplaceEditorTextAsEdit(data.Text);
         _session.ApplyDiskReload(path, data);
-        RestoreSelection(selection, data.Text.Length);
         return true;
     }
 
@@ -198,10 +196,8 @@ public sealed class DocumentController
     {
         if (_session.State.IsReadOnly) return false;
         var data = await _files.ReadAsync(path, encodingHint, cancellationToken);
-        var selection = _editor.Selection;
-        ReplaceEditorText(data.Text);
+        ReplaceEditorTextAsEdit(data.Text);
         _session.ApplyTemporaryReload(data, data.Text);
-        RestoreSelection(selection, data.Text.Length);
         return true;
     }
 
@@ -222,10 +218,8 @@ public sealed class DocumentController
             return false;
         }
 
-        var selection = _editor.Selection;
-        ReplaceEditorText(data.Text);
+        ReplaceEditorTextAsEdit(data.Text);
         _session.ApplyDiskReload(path, data);
-        RestoreSelection(selection, data.Text.Length);
         return true;
     }
 
@@ -242,10 +236,24 @@ public sealed class DocumentController
             Math.Min(selection.Active, textLength)));
     }
 
-    private void ApplySavedText(string text)
+    private void ApplySavedText(string text) => ReplaceEditorTextAsEdit(text);
+
+    /// <summary>
+    /// Replaces the whole buffer through an ordinary edit, so every reload --
+    /// the one a changed file triggers, an external tool's reloadFile, and the
+    /// text a save normalized -- stays reachable through undo. A read-only
+    /// document takes no edit, so its contents are reset instead.
+    /// </summary>
+    private void ReplaceEditorTextAsEdit(string text)
     {
         if (string.Equals(_editor.Text, text, StringComparison.Ordinal))
         {
+            return;
+        }
+
+        if (_session.State.IsReadOnly)
+        {
+            ReplaceEditorText(text);
             return;
         }
 

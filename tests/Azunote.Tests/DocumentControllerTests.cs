@@ -189,6 +189,64 @@ public sealed class DocumentControllerTests
         Assert.Equal(LineEndingKind.Lf, session.State.LineEnding);
     }
 
+    [Fact]
+    public async Task External_change_reload_joins_the_undo_history()
+    {
+        var editor = new FakeEditorBuffer();
+        var session = new DocumentSession();
+        var files = new FakeTextFileStore();
+        var controller = new DocumentController(editor, session, files, new FakeUserPrompt());
+        session.Load(
+            "notes.txt",
+            new TextFileData("saved", TextEncodingKind.Utf8, LineEndingKind.Lf));
+        editor.SetText("saved");
+        session.ObserveText(editor.Text);
+        Assert.False(session.State.IsDirty);
+
+        Assert.True(await controller.ApplyExternalChangeAsync(
+            new TextFileData("external", TextEncodingKind.Utf8, LineEndingKind.Lf)));
+        Assert.Equal("external", editor.Text);
+        Assert.False(session.State.IsDirty);
+
+        Assert.True(editor.Undo());
+        Assert.Equal("saved", editor.Text);
+        session.ObserveText(editor.Text);
+        Assert.True(session.State.IsDirty);
+    }
+
+    [Fact]
+    public async Task Disk_and_tool_reloads_join_the_undo_history()
+    {
+        var editor = new FakeEditorBuffer();
+        var session = new DocumentSession();
+        var files = new FakeTextFileStore();
+        var controller = new DocumentController(editor, session, files, new FakeUserPrompt());
+        files.Files[Path.GetFullPath("notes.txt")] = new TextFileData(
+            "saved",
+            TextEncodingKind.Utf8,
+            LineEndingKind.Lf);
+        files.Files[Path.GetFullPath("tool-output.txt")] = new TextFileData(
+            "tooled",
+            TextEncodingKind.Utf8,
+            LineEndingKind.Lf);
+        await controller.OpenAsync("notes.txt");
+
+        files.Files[Path.GetFullPath("notes.txt")] = new TextFileData(
+            "changed",
+            TextEncodingKind.Utf8,
+            LineEndingKind.Lf);
+        Assert.True(await controller.ReloadFromDiskAsync());
+        Assert.Equal("changed", editor.Text);
+        Assert.True(editor.Undo());
+        Assert.Equal("saved", editor.Text);
+
+        // An external tool's reloadFile leaves its result on the same stack.
+        Assert.True(await controller.ReloadFromTemporaryFileAsync("tool-output.txt"));
+        Assert.Equal("tooled", editor.Text);
+        Assert.True(editor.Undo());
+        Assert.Equal("saved", editor.Text);
+    }
+
     private sealed class FakeEditorBuffer : IEditorBuffer
     {
         private Document _document = new();
@@ -208,6 +266,8 @@ public sealed class DocumentControllerTests
         public void SetSelection(TextSelection selection) => _document.Selection = selection;
 
         public void Replace(TextRange range, string replacement) => _document.Replace(range, replacement);
+
+        public bool Undo() => _document.Undo();
     }
 
     private sealed class FakeTextFileStore : ITextFileStore

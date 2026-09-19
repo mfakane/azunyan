@@ -371,13 +371,18 @@ internal sealed class FakeUserPrompt : IUserPrompt
 
     public ExternalChangeDecision ExternalDecision { get; set; } = ExternalChangeDecision.Reload;
 
+    public int ExternalDecisionCount { get; private set; }
+
     public List<(string Title, string Message)> Errors { get; } = [];
 
     public Task<PendingChangesDecision> ConfirmPendingChangesAsync() =>
         Task.FromResult(PendingDecision);
 
-    public Task<ExternalChangeDecision> ResolveExternalChangeAsync() =>
-        Task.FromResult(ExternalDecision);
+    public Task<ExternalChangeDecision> ResolveExternalChangeAsync()
+    {
+        ExternalDecisionCount++;
+        return Task.FromResult(ExternalDecision);
+    }
 
     public Task ShowErrorAsync(string title, string message)
     {
