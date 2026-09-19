@@ -22,7 +22,10 @@ internal static class ShellPerformance
         {
             _operation = operation;
             _start = Duration.Enabled ? Stopwatch.GetTimestamp() : 0;
-            Operations.Add(1, new KeyValuePair<string, object?>("operation", operation));
+            if (Operations.Enabled)
+            {
+                Operations.Add(1, new KeyValuePair<string, object?>("operation", operation));
+            }
         }
 
         public void Dispose()
