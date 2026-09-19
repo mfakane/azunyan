@@ -59,6 +59,13 @@ public interface IEditorBuffer
 
     int CaretPosition { get; }
 
+    /// <summary>
+    /// Raised after each edit with the change that produced it. Streamed
+    /// external-tool output follows it to keep writing where it left off when
+    /// the document is edited underneath it.
+    /// </summary>
+    event EventHandler<TextChange>? Edited;
+
     void SetText(string text);
 
     void SetSelection(TextSelection selection);

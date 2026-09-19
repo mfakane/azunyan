@@ -133,7 +133,14 @@ public sealed partial class ExternalToolController
         /// Closes the undo group a cancelled or failed run left open, so that
         /// what was already applied is still one undo step.
         /// </summary>
-        public void Dispose() => EndUndoGroup();
+        public void Dispose()
+        {
+            EndUndoGroup();
+            foreach (var target in _targets.Values)
+            {
+                target.Dispose();
+            }
+        }
 
         private async Task DrainAsync()
         {
@@ -201,23 +208,30 @@ public sealed partial class ExternalToolController
             public abstract Task AppendAsync(string text);
 
             public abstract Task FinishAsync();
+
+            public virtual void Dispose()
+            {
+            }
         }
 
         /// <summary>
         /// Applies output to the running document, replacing the selection or
         /// the whole text with the first output and appending what follows.
-        /// The insertion point is the end of what this run has written; an edit
-        /// made elsewhere while the tool runs moves the text around it rather
-        /// than the insertion point itself.
+        /// The run owns a region of the document: the selection until the first
+        /// output arrives, and the output itself after that. An edit made
+        /// elsewhere while the tool runs moves that region, so the next output
+        /// still lands where the earlier output ended.
         /// </summary>
         private sealed class EditorStreamTarget : StreamTarget
         {
             private readonly ExternalToolStreamingRun _run;
             private readonly TextSelection _selection;
             private readonly bool _wholeDocument;
-            private int _start;
-            private int _written;
+            private int _regionStart;
+            private int _regionLength;
+            private int _expectedLength;
             private bool _started;
+            private bool _applying;
 
             public EditorStreamTarget(
                 ExternalToolStreamingRun run,
@@ -227,6 +241,13 @@ public sealed partial class ExternalToolController
                 _run = run;
                 _selection = selection;
                 _wholeDocument = wholeDocument;
+                var editor = run._owner._editor;
+                _expectedLength = editor.Text.Length;
+                _regionStart = wholeDocument ? 0 : Math.Min(selection.Start, _expectedLength);
+                _regionLength = wholeDocument
+                    ? _expectedLength
+                    : Math.Min(selection.Length, _expectedLength - _regionStart);
+                editor.Edited += OnEdited;
             }
 
             public override Task AppendAsync(string text)
@@ -254,13 +275,57 @@ public sealed partial class ExternalToolController
                 }
 
                 var editor = _run._owner._editor;
-                if (!_wholeDocument && _start + _written <= editor.Text.Length)
+                if (!_wholeDocument && editor.Text.Length == _expectedLength)
                 {
-                    editor.SetSelection(SelectReplacement(_selection, _written));
+                    var end = _regionStart + _regionLength;
+                    editor.SetSelection(_selection.IsReversed
+                        ? new TextSelection(end, _regionStart)
+                        : new TextSelection(_regionStart, end));
                 }
 
                 _run._owner._documents.Session.ObserveText(editor.Text);
                 return Task.CompletedTask;
+            }
+
+            public override void Dispose() => _run._owner._editor.Edited -= OnEdited;
+
+            /// <summary>
+            /// Moves the region an edit made elsewhere in the document shifted,
+            /// and gives up when the edit took part of the region with it.
+            /// </summary>
+            private void OnEdited(object? sender, TextChange change)
+            {
+                if (_applying)
+                {
+                    // Applying keeps the bookkeeping for the edits it makes.
+                    return;
+                }
+
+                var delta = change.NewText.Length - change.OldRange.Length;
+                _expectedLength += delta;
+                if (Error is not null)
+                {
+                    return;
+                }
+
+                var end = _regionStart + _regionLength;
+                if (change.OldRange.End <= _regionStart)
+                {
+                    _regionStart += delta;
+                }
+                else if (change.OldRange.Start >= end)
+                {
+                    // After the region: nothing of ours moved.
+                }
+                else if (change.OldRange.Start >= _regionStart
+                    && change.OldRange.End <= end)
+                {
+                    _regionLength += delta;
+                }
+                else
+                {
+                    Error = "The document changed while the tool was running.";
+                }
             }
 
             private void Apply(string text)
@@ -271,39 +336,42 @@ public sealed partial class ExternalToolController
                 }
 
                 var editor = _run._owner._editor;
-                if (!_started)
+                // An edit that did not reach the region, such as the whole
+                // document being replaced at once, leaves the length disagreeing
+                // with what the region says it should be.
+                if (editor.Text.Length != _expectedLength
+                    || _regionStart + _regionLength > editor.Text.Length)
                 {
-                    var range = _wholeDocument
-                        ? new TextRange(0, editor.Text.Length)
-                        : _selection.Range;
-                    if (range.End > editor.Text.Length)
-                    {
-                        Error = "The selection changed while the tool was running.";
-                        return;
-                    }
-
-                    _run.BeginUndoGroup();
-                    _start = range.Start;
-                    _started = true;
-                }
-                else if (_start + _written > editor.Text.Length)
-                {
-                    Error = "The document changed while the tool was running.";
+                    Error = _started
+                        ? "The document changed while the tool was running."
+                        : "The selection changed while the tool was running.";
                     return;
                 }
 
-                var target = _started && _written > 0
-                    ? new TextRange(_start + _written, 0)
-                    : FirstRange(editor);
-                editor.Replace(target, text);
-                _written += text.Length;
+                var target = _started
+                    ? new TextRange(_regionStart + _regionLength, 0)
+                    : new TextRange(_regionStart, _regionLength);
+                if (!_started)
+                {
+                    _run.BeginUndoGroup();
+                    _started = true;
+                    _regionLength = 0;
+                }
+
+                _applying = true;
+                try
+                {
+                    editor.Replace(target, text);
+                }
+                finally
+                {
+                    _applying = false;
+                }
+
+                _expectedLength += text.Length - target.Length;
+                _regionLength += text.Length;
                 _run._owner._documents.Session.ObserveText(editor.Text);
             }
-
-            private TextRange FirstRange(IEditorBuffer editor) =>
-                _wholeDocument
-                    ? new TextRange(0, editor.Text.Length)
-                    : _selection.Range;
         }
 
         /// <summary>

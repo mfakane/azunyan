@@ -261,6 +261,12 @@ public sealed class DocumentControllerTests
 
         public int CaretPosition => _document.CaretPosition;
 
+        public event EventHandler<TextChange>? Edited
+        {
+            add { }
+            remove { }
+        }
+
         public void SetText(string text) => _document = new Document(text);
 
         public void SetSelection(TextSelection selection) => _document.Selection = selection;

@@ -10,7 +10,10 @@ internal sealed class AzunyanEditorBuffer : IEditorBuffer
     public AzunyanEditorBuffer(AzunyanEditorView editor)
     {
         _editor = editor ?? throw new ArgumentNullException(nameof(editor));
+        _editor.DocumentChanged += (_, e) => Edited?.Invoke(this, e.Change);
     }
+
+    public event EventHandler<TextChange>? Edited;
 
     public string Text => _editor.Text;
 

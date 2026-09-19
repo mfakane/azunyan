@@ -395,6 +395,70 @@ public sealed class ExternalToolControllerTests
             }
         }
     }
+
+    [Fact]
+    public async Task A_streamed_run_keeps_writing_where_it_left_off_when_the_document_is_edited()
+    {
+        if (!OperatingSystem.IsWindows()
+            || ExternalToolLaunchResolver.ResolvePowerShell() is null)
+        {
+            return;
+        }
+
+        var editor = new FakeEditorView("one two three");
+        var session = new DocumentSession();
+        var files = new FakeTextFileStore();
+        var prompt = new FakeUserPrompt();
+        var documents = new DocumentController(editor, session, files, prompt);
+        var dispatcher = new QueuedUiDispatcher();
+        var controller = new ExternalToolController(
+            editor,
+            documents,
+            files,
+            prompt,
+            _ => Task.CompletedTask,
+            languageModeId: null,
+            warmPool: null,
+            languageExtensions: null,
+            dispatcher: dispatcher);
+        var replaceSelection = new ExternalToolOutputActions(
+            ExternalToolOutputMode.ReplaceSelection,
+            ExternalToolOutputMode.ReplaceSelection);
+
+        editor.SetSelection(new TextSelection(4, 7));
+        var run = controller.RunAsync(
+            new ExternalToolDefinition(
+                "'A'; Start-Sleep -Milliseconds 1500; 'B'",
+                commandMode: ExternalToolCommandMode.Pwsh,
+                stdout: replaceSelection,
+                stream: ExternalToolStreamChannels.Stdout));
+
+        // Everything the run applies goes through the dispatcher, so draining
+        // it here is what puts the edits and this test on one thread.
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        var edited = false;
+        while (!run.IsCompleted && DateTime.UtcNow < deadline)
+        {
+            dispatcher.Drain();
+            if (!edited && editor.Text != "one two three")
+            {
+                editor.Replace(new TextRange(0, 0), "XX");
+                edited = true;
+            }
+
+            await Task.Delay(10);
+        }
+
+        dispatcher.Drain();
+        var result = await run;
+
+        Assert.True(edited, "The run applied nothing before the tool exited.");
+        Assert.True(result.Succeeded, result.StandardError);
+        var expected = "A" + Environment.NewLine + "B";
+        Assert.Equal("XXone " + expected + " three", editor.Text);
+        Assert.Equal(expected, editor.SelectedText);
+        Assert.Empty(prompt.Errors);
+    }
 }
 
 internal sealed class FakeStreamedDocument : IExternalToolDocument
@@ -408,4 +472,23 @@ internal sealed class FakeStreamedDocument : IExternalToolDocument
     public void Append(string text) => _text.Append(text);
 
     public void Complete() => Completed = true;
+}
+
+internal sealed class QueuedUiDispatcher : IUiDispatcher
+{
+    private readonly System.Collections.Concurrent.ConcurrentQueue<Action> _queue = new();
+
+    public bool TryEnqueue(Action action)
+    {
+        _queue.Enqueue(action);
+        return true;
+    }
+
+    public void Drain()
+    {
+        while (_queue.TryDequeue(out var action))
+        {
+            action();
+        }
+    }
 }

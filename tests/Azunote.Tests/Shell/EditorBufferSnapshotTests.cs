@@ -34,6 +34,12 @@ public sealed class EditorBufferSnapshotTests
 
         public int CaretPosition => selection.CaretPosition;
 
+        public event EventHandler<TextChange>? Edited
+        {
+            add { }
+            remove { }
+        }
+
         public void SetText(string text) => throw new NotSupportedException();
 
         public void SetSelection(TextSelection selection) => throw new NotSupportedException();

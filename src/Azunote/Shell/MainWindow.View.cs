@@ -1000,6 +1000,12 @@ public sealed partial class MainWindow
         public TextSelection Selection => _window.Selection;
         public int CaretPosition => _window.CaretPosition;
 
+        public event EventHandler<TextChange>? Edited
+        {
+            add => _window._editorBuffer.Edited += value;
+            remove => _window._editorBuffer.Edited -= value;
+        }
+
         public void SetText(string text) => _window.SetText(text);
         public void SetSelection(TextSelection selection) => _window.SetSelection(selection);
         public void Replace(TextRange range, string replacement) => _window.Replace(range, replacement);

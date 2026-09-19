@@ -335,12 +335,16 @@ output once the tool has exited, exactly as it does without `stream`.
 
 One run is one undo step, including a `per` run that launched several
 processes, and including a run that was cancelled or exited non-zero: what had
-already been applied stays in the document, and one undo removes all of it.
+already been applied stays in the document, and one undo removes all of it. An
+edit made between two of a run's own writes ends that step, so a document
+edited while a tool streams into it takes more than one undo to get back.
 
-A streamed run appends at the end of what it has already written, and that
-position is not moved by an edit made elsewhere in the document while the tool
-is running, so editing a document a tool is writing to is best avoided. A run
-whose insertion point no longer exists stops and reports it.
+Editing the document while a streamed run writes to it is allowed. The run owns
+the part of the document it is writing: the selection until its first output
+arrives, and its own output after that. An edit made before that part moves it,
+so the next output still lands where the last output ended, and an edit made
+inside it becomes part of what the run owns. An edit that takes part of it away,
+such as replacing the whole document, stops the run and reports it.
 
 A `pwsh` tool streams as well. Its output is still written without the trailing
 newline the host would add, and strings are still joined by the newline standard

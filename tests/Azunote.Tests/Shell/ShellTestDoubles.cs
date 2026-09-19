@@ -10,7 +10,10 @@ internal sealed class FakeEditorView : IEditorView
     public FakeEditorView(string text = "")
     {
         _document = new Document(text);
+        _document.Changed += OnDocumentChanged;
     }
+
+    public event EventHandler<TextChange>? Edited;
 
     public string Text => _document.Text;
 
@@ -50,7 +53,15 @@ internal sealed class FakeEditorView : IEditorView
 
     public CompletionResult? LastCompletion { get; private set; }
 
-    public void SetText(string text) => _document = new Document(text);
+    public void SetText(string text)
+    {
+        _document.Changed -= OnDocumentChanged;
+        _document = new Document(text);
+        _document.Changed += OnDocumentChanged;
+    }
+
+    private void OnDocumentChanged(object? sender, DocumentChangedEventArgs e) =>
+        Edited?.Invoke(this, e.Change);
 
     public void SetSelection(TextSelection selection) => _document.Selection = selection;
 
