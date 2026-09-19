@@ -102,6 +102,7 @@ NODE_ENV = "development"
 | `output` | Action or two-item array | Handles the mixed stdout/stderr stream. An array is `[zero, non-zero]`. |
 | `stdout` | Action or two-item array | Handles stdout only. An array is `[zero, non-zero]`. |
 | `stderr` | Action or two-item array | Handles stderr only. An array is `[zero, non-zero]`. |
+| `stream` | Optional channel name or array | Channels whose output is applied while the tool runs instead of after it exits. Empty by default. |
 
 The defaults are:
 
@@ -114,6 +115,7 @@ The defaults are:
 - `stdin` is empty, so nothing is sent to standard input.
 - `output = "ignore"`, `stdout = "ignore"`, and `stderr = "ignore"` for both
   zero and non-zero exit codes.
+- `stream` is empty, so every channel is applied after the tool exits.
 
 Exactly one of `command`, `cmd`, or `pwsh` is required. `command` and `args`
 launch an executable without a shell. `cmd` and `pwsh` each launch their
@@ -285,5 +287,66 @@ applied in the order `output`, `stdout`, `stderr`.
 
 For `per` runs, each stream is concatenated without adding a separator. The
 default for all three output fields is `ignore`.
+
+## Streaming output
+
+By default a channel's output is applied once the tool has exited. `stream`
+names the channels that are applied while the tool is still running, so a slow
+tool fills the document as it produces text rather than in one step at the end.
+It takes one channel name or an array of them, and the names are the output
+fields themselves:
+
+```toml
+[launch]
+pwsh = "Get-Content .\build.log -Wait -Tail 0"
+stdout = "newDocument"
+stream = "stdout"
+```
+
+Streaming is opt-in per channel because it changes what a tool can be relied on
+to do, not only when its output appears:
+
+- The output is applied before the exit code is known, so a streamed channel
+  cannot choose its action by exit status. A streamed channel's action must be
+  a single action rather than a `[zero, non-zero]` array.
+- Only `replaceDocument`, `replaceSelection`, and `newDocument` can stream.
+  `reloadFile` has no output to apply, and `showCompletion` needs the whole
+  candidate list before it opens a window; `stream` naming a channel that uses
+  either of them is an error.
+- `output` carries the same text as `stdout` and `stderr`, so `stream` may name
+  `output`, or `stdout` and `stderr`, but not both at once.
+- Two streamed channels may not use the same action, since their text would be
+  interleaved into one place.
+
+A definition that breaks one of those rules is reported the way any other
+invalid definition is, and does not replace the last valid tool menu.
+
+What finally lands in the document is the same text a non-streaming run would
+have applied. Output is applied a line at a time; a line that is still being
+written appears once the tool has produced nothing for a moment, so a tool that
+reports progress without newlines is still visible. A line ending is never split
+across two applications, and neither is a surrogate pair.
+
+`newDocument` opens its window when the first output arrives rather than when
+the tool starts, so a tool that produces nothing opens no window. The other two
+actions apply their first output as the replacement they describe and append
+what follows, so `replaceSelection` leaves the selection covering the whole
+output once the tool has exited, exactly as it does without `stream`.
+
+One run is one undo step, including a `per` run that launched several
+processes, and including a run that was cancelled or exited non-zero: what had
+already been applied stays in the document, and one undo removes all of it.
+
+Editing the document while a streamed run is writing to it is allowed. Azunote
+follows its own insertion point through those edits, and stops streaming with an
+error when the document changed so much that the insertion point no longer
+exists.
+
+A `pwsh` tool streams as well. Its output is still written without the trailing
+newline the host would add, and strings are still joined by the newline standard
+input used. The one difference from a buffered run is that a command producing
+values that are not strings has each value formatted on its own, rather than the
+whole sequence formatted together, so a tool that streams is best written to
+produce strings.
 
 No migration is provided for the changed input semantics.
