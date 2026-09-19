@@ -90,7 +90,7 @@ public sealed partial class MainWindow
         _windowHandle = WindowNative.GetWindowHandle(this);
         var windowId = Win32Interop.GetWindowIdFromWindow(_windowHandle);
         _appWindow = AppWindow.GetFromWindowId(windowId);
-        _appWindow?.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "app.ico"));
+        _appWindow?.SetIcon(Path.Combine(ApplicationLocation.BundleDirectory, "Assets", "app.ico"));
         _uiSettings = new UISettings();
         _uiSettings.ColorValuesChanged += OnColorValuesChanged;
     }

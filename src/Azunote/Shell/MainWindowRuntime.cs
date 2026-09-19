@@ -258,10 +258,13 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public Task ShowAboutAsync() => ShowAboutDialogAsync();
 
-    public Task ViewLicenseAsync() => OpenRecentFileAsync(Path.Combine(AppContext.BaseDirectory, "LICENSE"));
+    public Task ViewLicenseAsync() =>
+        OpenRecentFileAsync(
+            Path.Combine(ApplicationLocation.DistributionDirectory, "LICENSE"));
 
     public Task ShowThirdPartyNoticesAsync() =>
-        OpenRecentFileAsync(Path.Combine(AppContext.BaseDirectory, "THIRD-PARTY-NOTICES.md"));
+        OpenRecentFileAsync(
+            Path.Combine(ApplicationLocation.DistributionDirectory, "THIRD-PARTY-NOTICES.md"));
 
     public Task ShowCommandLineHelpAsync() => _prompt.ShowErrorAsync(
         "Azunote command line",

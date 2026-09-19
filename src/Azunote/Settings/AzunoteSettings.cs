@@ -754,7 +754,8 @@ public static class SettingsFileService
     public const string ToolsDirectoryName = "tools";
     public const string ModesDirectoryName = "modes";
 
-    public static string GetDefaultDirectory() => GetDefaultDirectory(AppContext.BaseDirectory);
+    public static string GetDefaultDirectory() =>
+        GetDefaultDirectory(ApplicationLocation.DistributionDirectory);
 
     internal static string GetDefaultDirectory(string applicationBaseDirectory)
     {

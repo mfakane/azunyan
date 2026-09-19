@@ -37,7 +37,7 @@ internal static class BundledDefaultAppData
     }
 
     private static string GetDiskPath(string relativePath) => Path.Combine(
-        AppContext.BaseDirectory,
+        ApplicationLocation.BundleDirectory,
         "Resources",
         "DefaultAppData",
         relativePath);
