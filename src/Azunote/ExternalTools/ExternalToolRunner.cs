@@ -164,7 +164,11 @@ public sealed class ExternalToolRunner
             startInfo.Environment[environmentVariable.Key] = environmentVariable.Value;
         }
 
-        launchPlan.AddArguments(startInfo, arguments, standardInput.Length > 0);
+        launchPlan.AddArguments(
+            startInfo,
+            arguments,
+            standardInput.Length > 0,
+            streaming: relay is not null);
 
         using var lease = await TryAcquireWarmAsync(
             warmPool,
@@ -172,6 +176,7 @@ public sealed class ExternalToolRunner
             startInfo,
             environment.Overrides,
             standardInput.Length > 0,
+            relay is not null,
             cancellationToken);
         using var coldProcess = lease is null ? new Process { StartInfo = startInfo } : null;
         var process = lease?.Process ?? coldProcess!;
@@ -255,6 +260,7 @@ public sealed class ExternalToolRunner
         ProcessStartInfo startInfo,
         IReadOnlyDictionary<string, string> environmentOverrides,
         bool standardInputConfigured,
+        bool streaming,
         CancellationToken cancellationToken)
     {
         if (warmPool is null
@@ -269,7 +275,8 @@ public sealed class ExternalToolRunner
                 startInfo.WorkingDirectory,
                 environmentOverrides,
                 launchPlan.ResolvedPath,
-                standardInputConfigured),
+                standardInputConfigured,
+                streaming),
             cancellationToken);
     }
 

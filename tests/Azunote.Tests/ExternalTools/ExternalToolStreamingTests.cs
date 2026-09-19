@@ -257,4 +257,83 @@ public sealed class ExternalToolStreamingTests
         Assert.Equal(ExternalToolOutputChannel.Stderr, action.Stream);
         Assert.Equal(ExternalToolOutputMode.ReplaceSelection, action.Mode);
     }
+
+    [Fact]
+    public async Task A_streamed_pwsh_tool_applies_its_values_as_it_produces_them()
+    {
+        if (!OperatingSystem.IsWindows()
+            || ExternalToolLaunchResolver.ResolvePowerShell() is null)
+        {
+            return;
+        }
+
+        var newDocument = new ExternalToolOutputActions(
+            ExternalToolOutputMode.NewDocument,
+            ExternalToolOutputMode.NewDocument);
+        var definition = new ExternalToolDefinition(
+            "'A'; Start-Sleep -Milliseconds 400; 'B'",
+            commandMode: ExternalToolCommandMode.Pwsh,
+            stdout: newDocument,
+            stream: ExternalToolStreamChannels.Stdout);
+        var sink = new CollectingStreamSink();
+
+        var result = await ExternalToolRunner.RunAsync(
+            definition,
+            new ExternalToolContext(null, string.Empty, string.Empty),
+            warmPool: null,
+            sink);
+
+        Assert.True(result.Succeeded, result.StandardError);
+        Assert.Equal("A" + Environment.NewLine + "B", result.StandardOutput);
+        Assert.Equal(result.StandardOutput, sink.Text);
+        // A buffered run would have arrived as one write once the tool exited.
+        Assert.True(sink.Writes > 1, $"Expected more than one write, got {sink.Writes}.");
+    }
+
+    [Fact]
+    public async Task A_buffered_pwsh_tool_still_joins_its_values_without_a_trailing_newline()
+    {
+        if (!OperatingSystem.IsWindows()
+            || ExternalToolLaunchResolver.ResolvePowerShell() is null)
+        {
+            return;
+        }
+
+        var result = await ExternalToolRunner.RunAsync(
+            new ExternalToolDefinition(
+                "'A'; 'B'",
+                commandMode: ExternalToolCommandMode.Pwsh),
+            new ExternalToolContext(null, string.Empty, string.Empty));
+
+        Assert.True(result.Succeeded, result.StandardError);
+        Assert.Equal("A" + Environment.NewLine + "B", result.StandardOutput);
+    }
+
+    private sealed class CollectingStreamSink : IExternalToolStreamSink
+    {
+        private readonly System.Text.StringBuilder _text = new();
+
+        public string Text
+        {
+            get
+            {
+                lock (_text)
+                {
+                    return _text.ToString();
+                }
+            }
+        }
+
+        public int Writes { get; private set; }
+
+        public void Write(ExternalToolOutputChannel channel, string text)
+        {
+            Assert.Equal(ExternalToolOutputChannel.Stdout, channel);
+            lock (_text)
+            {
+                Writes++;
+                _text.Append(text);
+            }
+        }
+    }
 }

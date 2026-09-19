@@ -26,6 +26,7 @@ catch
 
 $azunoteScript = $null
 $azunoteHasInput = $false
+$azunoteStreaming = $false
 if ($env:AZUNOTE_EXTERNAL_TOOL_PIPE)
 {
     try
@@ -52,6 +53,7 @@ if ($env:AZUNOTE_EXTERNAL_TOOL_PIPE)
 
         $azunoteScript = [string]$azunoteRequest.script
         $azunoteHasInput = [bool]$azunoteRequest.stdin
+        $azunoteStreaming = [bool]$azunoteRequest.stream
     }
     catch
     {
@@ -65,10 +67,12 @@ else
 {
     $azunoteScript = [string]$env:AZUNOTE_EXTERNAL_TOOL_COMMAND
     $azunoteHasInput = $env:AZUNOTE_EXTERNAL_TOOL_STDIN -eq '1'
+    $azunoteStreaming = $env:AZUNOTE_EXTERNAL_TOOL_STREAM -eq '1'
     # Cleared so that the command runs with the environment a waiting
     # process leaves behind, which is the one the tool was configured with.
     [Environment]::SetEnvironmentVariable('AZUNOTE_EXTERNAL_TOOL_COMMAND', $null)
     [Environment]::SetEnvironmentVariable('AZUNOTE_EXTERNAL_TOOL_STDIN', $null)
+    [Environment]::SetEnvironmentVariable('AZUNOTE_EXTERNAL_TOOL_STREAM', $null)
 }
 
 $azunoteNewLine = [Environment]::NewLine
@@ -139,6 +143,13 @@ if ($null -ne $azunotePipeline -or $null -ne $azunoteBody)
 
 $azunoteInputLines = $azunoteLines.ToArray()
 $azunoteResult = New-Object -TypeName System.Collections.Generic.List[object]
+# A streamed run writes each value as it is produced, so that Azunote can
+# apply it while the command is still running. The separator is written
+# before the next value rather than after the last one, which is what keeps
+# a streamed run free of the trailing newline a buffered run also omits.
+# A value that is not a string is formatted on its own, because the whole
+# sequence is never in hand at once.
+$azunoteStream = @{ Wrote = $false }
 try
 {
     # The output is written here rather than by the host, which would end it
@@ -168,7 +179,31 @@ try
         {
             & $azunoteBlock
         }
-    } | ForEach-Object { $azunoteResult.Add($_) }
+    } | ForEach-Object {
+        if ($azunoteStreaming)
+        {
+            if ($azunoteStream.Wrote)
+            {
+                [Console]::Out.Write($azunoteNewLine)
+            }
+
+            if ($_ -is [string])
+            {
+                [Console]::Out.Write($_)
+            }
+            else
+            {
+                [Console]::Out.Write((($_ | Out-String -Width 4096) -replace '(\r\n|\r|\n)+$', ''))
+            }
+
+            [Console]::Out.Flush()
+            $azunoteStream.Wrote = $true
+        }
+        else
+        {
+            $azunoteResult.Add($_)
+        }
+    }
 }
 finally
 {

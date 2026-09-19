@@ -14,7 +14,8 @@ internal sealed record PowerShellWarmRequest(
     string WorkingDirectory,
     IReadOnlyDictionary<string, string> Environment,
     string Script,
-    bool StandardInputConfigured = false);
+    bool StandardInputConfigured = false,
+    bool Streaming = false);
 
 /// <summary>
 /// A waiting process that has been handed its request. The pipe stays open
@@ -632,6 +633,7 @@ internal sealed class PowerShellWarmPool : IDisposable
                 writer.WriteEndObject();
                 writer.WriteString("script", request.Script);
                 writer.WriteBoolean("stdin", request.StandardInputConfigured);
+                writer.WriteBoolean("stream", request.Streaming);
                 writer.WriteEndObject();
             }
 

@@ -22,13 +22,16 @@ internal sealed record ExternalToolLaunchPlan(
         "AZUNOTE_EXTERNAL_TOOL_COMMAND";
     private const string ShellStandardInputEnvironmentVariable =
         "AZUNOTE_EXTERNAL_TOOL_STDIN";
+    private const string ShellStreamEnvironmentVariable =
+        "AZUNOTE_EXTERNAL_TOOL_STREAM";
     private static readonly UnicodeEncoding CommandShellOutputEncoding =
         new(bigEndian: false, byteOrderMark: false, throwOnInvalidBytes: false);
 
     public void AddArguments(
         ProcessStartInfo startInfo,
         IReadOnlyList<string> arguments,
-        bool standardInputConfigured = false)
+        bool standardInputConfigured = false,
+        bool streaming = false)
     {
         switch (Kind)
         {
@@ -53,6 +56,8 @@ internal sealed record ExternalToolLaunchPlan(
                 startInfo.Environment[ShellCommandEnvironmentVariable] = ResolvedPath;
                 startInfo.Environment[ShellStandardInputEnvironmentVariable] =
                     standardInputConfigured ? "1" : "0";
+                startInfo.Environment[ShellStreamEnvironmentVariable] =
+                    streaming ? "1" : "0";
                 startInfo.Arguments = PowerShellToolWrapper.Arguments;
                 break;
             default:
