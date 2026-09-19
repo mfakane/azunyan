@@ -57,7 +57,10 @@ function Publish-AzunoteDistribution($Context, [switch] $SingleFile) {
             "-p:Version=$($Context.Version)" -o $Context.Publish
         if ($LASTEXITCODE) { throw "Azunote publish failed ($LASTEXITCODE)." }
     } finally { $env:PATH = $previousPath }
-    $requiredFiles = @('Azunote.exe')
+    # The console client is published as its own executable and bundled next
+    # to the editor, so both distribution modes carry the two of them.
+    $executables = @('Azunote.exe', 'azu.exe')
+    $requiredFiles = $executables
     if (!$SingleFile) {
         $requiredFiles += @('LICENSE', 'THIRD-PARTY-NOTICES.md', 'licenses/sources.json')
     }
@@ -70,7 +73,7 @@ function Publish-AzunoteDistribution($Context, [switch] $SingleFile) {
         $unexpectedFiles = @(Get-ChildItem -LiteralPath $Context.Publish -File -Recurse |
             Where-Object {
                 $_.Extension -ne '.pdb' -and
-                [IO.Path]::GetRelativePath($Context.Publish, $_.FullName) -ne 'Azunote.exe'
+                [IO.Path]::GetRelativePath($Context.Publish, $_.FullName) -notin $executables
             })
         if ($unexpectedFiles.Count) {
             $names = $unexpectedFiles |
