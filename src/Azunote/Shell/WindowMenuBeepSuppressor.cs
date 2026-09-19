@@ -32,7 +32,7 @@ internal static unsafe partial class WindowMenuBeepSuppressor
     internal static void Install(nint windowHandle)
     {
         SetWindowSubclass(windowHandle, &OnMessage, SubclassId, 0);
-        EnumChildWindows(windowHandle, &OnChildWindow, 0);
+        _ = EnumChildWindows(windowHandle, &OnChildWindow, 0);
     }
 
     [UnmanagedCallersOnly]
