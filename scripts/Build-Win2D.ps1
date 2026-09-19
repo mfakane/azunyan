@@ -8,7 +8,10 @@ $commit = '25680382dd2136779e10ea6084f0c5ba437ae288'
 $version = '1.4.0-azunyan.25680382dd21'
 $feed = Join-Path $repo 'artifacts/packages'
 $nuget = Join-Path $source 'build/nuget/nuget.exe'
-$msbuild = & "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe" -latest -products '*' -requires Microsoft.VisualStudio.ComponentGroup.UWP.VC.v143 -find 'MSBuild\Current\Bin\MSBuild.exe'
+$msbuild = & "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe" `
+    -latest -products '*' -requiresAny `
+    -requires Microsoft.VisualStudio.ComponentGroup.UWP.VC.v143 Microsoft.VisualStudio.ComponentGroup.UWP.VC `
+    -find 'MSBuild\Current\Bin\MSBuild.exe'
 if (!$msbuild) { throw 'Install scripts/win2d.vsconfig and Windows SDK 19041 first.' }
 if ((& git -C $source rev-parse HEAD) -ne $commit) { throw 'Initialize the pinned Win2D submodule first.' }
 if (& git -C $source status --porcelain --untracked-files=no) { throw 'Win2D source has local changes.' }

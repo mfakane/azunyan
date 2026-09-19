@@ -18,7 +18,9 @@ permissions:
 
 jobs:
   build-test-package:
-    runs-on: windows-latest
+    # Win2D requires the Windows 10 SDK 19041, which is not present on the
+    # Windows Server 2025 image currently selected by windows-latest.
+    runs-on: windows-2022
     timeout-minutes: 60
 
     steps:
@@ -26,6 +28,45 @@ jobs:
         uses: actions/checkout@v7
         with:
           submodules: recursive
+
+      - name: Install Win2D Visual Studio components
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
+          $installer = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/setup.exe'
+          $installPath = & $vswhere -latest -products '*' -property installationPath
+          if ([string]::IsNullOrWhiteSpace($installPath)) {
+              throw 'Visual Studio installation was not found.'
+          }
+
+          $configPath = Join-Path $env:GITHUB_WORKSPACE 'scripts/win2d.vsconfig'
+          $arguments = @(
+              'modify'
+              '--installPath'
+              "`"$installPath`""
+              '--config'
+              "`"$configPath`""
+              '--passive'
+              '--norestart'
+          )
+          $process = Start-Process -FilePath $installer -ArgumentList $arguments -WorkingDirectory $env:GITHUB_WORKSPACE -Wait -PassThru
+          if ($process.ExitCode) {
+              throw "Visual Studio component installation failed with exit code $($process.ExitCode)."
+          }
+
+          $deadline = (Get-Date).AddMinutes(10)
+          do {
+              $msbuild = & $vswhere -latest -products '*' -requiresAny `
+                  -requires Microsoft.VisualStudio.ComponentGroup.UWP.VC.v143 Microsoft.VisualStudio.ComponentGroup.UWP.VC `
+                  -find 'MSBuild\Current\Bin\MSBuild.exe'
+              if ($msbuild) {
+                  break
+              }
+              Start-Sleep -Seconds 5
+          } while ((Get-Date) -lt $deadline)
+          if (!$msbuild) {
+              throw 'Visual Studio UWP C++ components were not available after installation.'
+          }
 
       - name: Set up .NET 10
         uses: actions/setup-dotnet@v6
