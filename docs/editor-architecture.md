@@ -15,9 +15,10 @@ limited to `AzunyanTextInputWindow`, a bounded IME context window; it is not a
 second visible document renderer. Final input ownership, accessibility, and
 large-document performance gates remain.
 
-This document defines the target architecture for Azunyan as a practical code
-editor engine. Azunote remains a lightweight example application that enables
-only a small subset of the engine.
+This document defines the target architecture for Azunyan, the editor engine
+Azunote is built from. Azunote's editing experience defines what the engine
+must support; Azunyan keeps that capability reusable and independent of the
+application shell.
 
 ## 1. Goals
 
@@ -33,6 +34,13 @@ Azunyan must support, without changing document text:
   presence of those projections;
 - IME input and UI Automation;
 - large documents without creating one XAML element per token or line.
+
+These requirements come from Azunote's roadmap rather than from a general
+engine ambition. Diagnostics, inlay hints, and CodeLens-like block adornments
+have no Azunote UI today; they are planned for LSP support and for results fed
+back from external tools. They are engine requirements now because each of them
+changes projection, layout, and hit testing at their core, and retrofitting a
+coordinate model that assumes none of them exist is not a local change.
 
 `Azunyan.Core` does not embed language knowledge, an LSP client, or a parser.
 The optional `Azunyan.Syntax` library supplies composable lexical rules and
@@ -112,8 +120,9 @@ Theme ownership follows the same boundary. `Azunyan.WinUI` defines the
 `AzunyanColorScheme` shape and passes it through each render context, while the
 application supplies concrete colors. Azunote's default scheme is assembled
 from WinUI system brush resources for the light theme, so the projected text,
-gutter, selection marks, and transient popups share one palette. Other hosts
-may assign their own scheme through `AzunyanEditorView.ColorScheme`.
+gutter, selection marks, and transient popups share one palette. The palette
+stays an `AzunyanEditorView.ColorScheme` assignment so that the colors remain
+the application's rather than the engine's.
 
 ## 4. Coordinate spaces
 

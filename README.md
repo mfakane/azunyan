@@ -2,10 +2,10 @@
 
 # Azunyan
 
-Azunyan is a set of reusable text-editor components together with Azunote, a
-small document-per-window text editor built with WinUI 3. Azunote-specific
-build, usage, configuration, and runtime documentation is maintained in
-[src/Azunote/README.md](src/Azunote/README.md).
+Azunote is a small document-per-window text editor built with WinUI 3, and
+Azunyan is the set of reusable text-editor components it is built from.
+Azunote-specific build, usage, configuration, and runtime documentation is
+maintained in [src/Azunote/README.md](src/Azunote/README.md).
 
 ## License
 

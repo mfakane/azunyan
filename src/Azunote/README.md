@@ -23,8 +23,10 @@ Its non-goals are:
   external commands, not project or workspace management.
 - Providing an integrated build or debugging environment. Such workflows
   belong in external tools invoked through Azunote's external-tool integration.
-- Exposing every editor feature supported by Azunyan. Azunote uses a selected
-  subset; these non-goals do not limit the reusable Azunyan components.
+- Exposing every editor capability Azunyan implements. Azunyan is factored out
+  of Azunote, and a few capabilities — diagnostics, inlay hints, block
+  adornments — are built into the engine ahead of the UI that will surface
+  them, for planned LSP and external-tool integration.
 
 Language modes, syntax highlighting, and configuration completion remain part
 of Azunote's lightweight editing experience.
