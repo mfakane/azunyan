@@ -89,6 +89,15 @@
           DestinationFolder="$(OutDir)"
           SkipUnchangedFiles="true"
           Condition="Exists('%(_AzunoteCliBuildFiles.FullPath)')" />
+    <!--
+      The MSIX layout is built from a recipe computed before this copy, so the
+      client would be missing from a development registration and its azu
+      execution alias would name a file the package does not have.
+    -->
+    <Copy SourceFiles="@(_AzunoteCliBuildFiles)"
+          DestinationFolder="$(LayoutDir)"
+          SkipUnchangedFiles="true"
+          Condition="'$(LayoutDir)' != '' and Exists('$(LayoutDir)') and Exists('%(_AzunoteCliBuildFiles.FullPath)')" />
   </Target>
 
   <Target Name="BundleAzunoteCliForPublish" AfterTargets="Publish">
