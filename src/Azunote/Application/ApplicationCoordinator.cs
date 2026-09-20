@@ -145,6 +145,21 @@ internal sealed class ApplicationCoordinator : IDisposable
                 active.Window.ActivateWindow();
                 await active.Window.Runtime.ShowCommandLineHelpAsync();
             }
+            else if (!options.ShowHelp)
+            {
+                // A command line that names no document still asks for a
+                // window, which is what a cold start gives it. Without one
+                // there is nothing for --wait to wait on and nothing for
+                // --output to read.
+                target = TakeReusableWindow() ?? CreateWindowRegistration();
+                if (takesOutput)
+                {
+                    target.Window.Runtime.AllowCommandLineClose();
+                }
+
+                ActivateWindow(target);
+                await WaitForCloseIfRequestedAsync(target, options);
+            }
 
             completion.TrySetResult(CreateResponse(options, target));
         }
