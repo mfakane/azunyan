@@ -134,7 +134,8 @@ to `$PROFILE` to keep it:
 . 'C:\Program Files\Azunote\Register-AzunoteCompletion.ps1'
 ```
 
-Option names and `--output` values are completed. A document path is left to
+Option names and `--output` values are completed, including the value after a
+comma in a list. A document path is left to
 the shell's own file completion, which takes over as soon as the word being
 completed is not an option.
 
@@ -148,7 +149,7 @@ dotnet-suggest register --command-path 'C:\Program Files\Azunote\azu.exe'
 
 ### Editing in a pipeline
 
-`--output` asks the editor for one value when the document window closes and
+`--output` asks the editor for a value when the document window closes and
 writes it to standard output. It names the same values as the external-tool
 `input` field: `none`, `filePath`, `document`, and `selection`. Because the
 value only exists once the window closes, `--output` implies `--wait`.
@@ -173,6 +174,44 @@ An untitled document has nowhere to be saved to, so its buffer is the result:
 piped text closes without a save confirmation and is returned as it stands.
 A document backed by a file keeps the ordinary confirmation, and discarding
 its changes is how a caller learns the edit was cancelled.
+
+#### Asking for more than one value
+
+`--output` takes several values separated by commas, and then needs `--json`:
+
+```powershell
+$result = azu --output filePath,document --json notes.md | ConvertFrom-Json
+$result.document | Set-Content $result.filePath
+```
+
+A document is free to contain any line ending, and a shell hands native output
+on as lines, so there is no separator that could hold two documents apart in
+one stream. The JSON object escapes them instead: it is written as one line,
+keyed by the value names, with each field holding exactly what the same value
+would have written on its own. An untitled document therefore reports an empty
+`filePath` rather than a missing one, and a document keeps its own line
+endings exactly. Only the characters JSON must escape are escaped, so
+text stays readable.
+
+`--json` is accepted with a single value as well, which is how a script that
+always parses its answer pins the format:
+
+```powershell
+$text = (azu --output document --json - | ConvertFrom-Json).document
+```
+
+`none` asks for no output and cannot be combined with another value, no value
+may be named twice, and `--json` on its own has nothing to write. Each of
+these is a command-line error.
+
+In PowerShell, write the list as one literal word. A comma between variables
+is not what it looks like: `-o $a,$b` is passed through literally and an array
+variable arrives as separate arguments, where the second would be taken for a
+document path. Join it first instead:
+
+```powershell
+azu --output ($values -join ',') --json notes.md
+```
 
 When no editor is running, `azu` starts one and then sends the command line
 to it, so a cold start and a warm start take the same path. An empty,

@@ -103,7 +103,7 @@ internal sealed class ApplicationCoordinator : IDisposable
             RefreshRecentFileMenus();
             var options = ParseCommandLine(command.Arguments);
             WindowRegistration? target = null;
-            var takesOutput = options.Output != CommandLineOutputTarget.None;
+            var takesOutput = options.Output.Count > 0;
 
             if (options.ReadStandardInput)
             {
@@ -179,7 +179,7 @@ internal sealed class ApplicationCoordinator : IDisposable
         AzunoteCommandLineOptions options,
         WindowRegistration? registration)
     {
-        if (options.Output == CommandLineOutputTarget.None
+        if (options.Output.Count == 0
             || registration?.ClosedDocument is not { } document)
         {
             return SingleInstanceResponse.Completed();
@@ -190,13 +190,8 @@ internal sealed class ApplicationCoordinator : IDisposable
             return SingleInstanceResponse.Canceled();
         }
 
-        return SingleInstanceResponse.Completed(options.Output switch
-        {
-            CommandLineOutputTarget.FilePath => document.FilePath ?? string.Empty,
-            CommandLineOutputTarget.Document => document.Text,
-            CommandLineOutputTarget.Selection => document.SelectedText,
-            _ => string.Empty
-        });
+        return SingleInstanceResponse.Completed(
+            CommandLineOutput.Create(options.Output, options.Json, document));
     }
 
     /// <summary>

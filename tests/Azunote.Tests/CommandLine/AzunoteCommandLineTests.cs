@@ -5,7 +5,6 @@ namespace Azunote.Tests.CommandLine;
 public sealed class AzunoteCommandLineTests
 {
     [Theory]
-    [InlineData("none", CommandLineOutputTarget.None)]
     [InlineData("filePath", CommandLineOutputTarget.FilePath)]
     [InlineData("document", CommandLineOutputTarget.Document)]
     [InlineData("selection", CommandLineOutputTarget.Selection)]
@@ -13,9 +12,84 @@ public sealed class AzunoteCommandLineTests
         string value,
         CommandLineOutputTarget expected)
     {
-        Assert.Equal(expected, AzunoteCommandLine.Parse(["--output", value]).Output);
-        Assert.Equal(expected, AzunoteCommandLine.Parse([$"--output={value}"]).Output);
-        Assert.Equal(expected, AzunoteCommandLine.Parse(["-o", value]).Output);
+        Assert.Equal([expected], AzunoteCommandLine.Parse(["--output", value]).Output);
+        Assert.Equal([expected], AzunoteCommandLine.Parse([$"--output={value}"]).Output);
+        Assert.Equal([expected], AzunoteCommandLine.Parse(["-o", value]).Output);
+    }
+
+    [Fact]
+    public void Output_keeps_the_order_a_comma_separated_list_asked_for()
+    {
+        var options = AzunoteCommandLine.Parse(["--output", "selection,filePath", "--json"]);
+
+        Assert.Equal(
+            [CommandLineOutputTarget.Selection, CommandLineOutputTarget.FilePath],
+            options.Output);
+        Assert.True(options.Json);
+        Assert.True(options.WaitForExit);
+    }
+
+    [Fact]
+    public void More_than_one_output_value_needs_json()
+    {
+        var exception = Assert.Throws<CommandLineParseException>(
+            () => AzunoteCommandLine.Parse(["--output", "filePath,document"]));
+
+        Assert.Contains("--json", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Json_needs_something_to_write()
+    {
+        Assert.Throws<CommandLineParseException>(
+            () => AzunoteCommandLine.Parse(["--json", "notes.txt"]));
+        Assert.Throws<CommandLineParseException>(
+            () => AzunoteCommandLine.Parse(["--output", "none", "--json"]));
+    }
+
+    [Fact]
+    public void Json_can_pin_the_format_of_a_single_output_value()
+    {
+        var options = AzunoteCommandLine.Parse(["--output", "document", "--json", "-"]);
+
+        Assert.Equal([CommandLineOutputTarget.Document], options.Output);
+        Assert.True(options.Json);
+    }
+
+    [Fact]
+    public void No_output_cannot_be_asked_for_alongside_a_value()
+    {
+        var exception = Assert.Throws<CommandLineParseException>(
+            () => AzunoteCommandLine.Parse(["--output", "none,document", "--json"]));
+
+        Assert.Contains("none", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_output_value_is_not_accepted_twice()
+    {
+        var exception = Assert.Throws<CommandLineParseException>(
+            () => AzunoteCommandLine.Parse(["--output", "document,document", "--json"]));
+
+        Assert.Contains("document", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_empty_output_value_is_rejected()
+    {
+        var exception = Assert.Throws<CommandLineParseException>(
+            () => AzunoteCommandLine.Parse(["--output", "filePath,", "--json"]));
+
+        Assert.Contains("filePath,", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_output_value_never_swallows_the_document_path()
+    {
+        var options = AzunoteCommandLine.Parse(["--output", "document", "notes.txt"]);
+
+        Assert.Equal([CommandLineOutputTarget.Document], options.Output);
+        Assert.Equal("notes.txt", options.FilePath);
     }
 
     [Fact]
@@ -25,7 +99,8 @@ public sealed class AzunoteCommandLineTests
 
         Assert.True(options.WaitForExit);
         Assert.True(options.ReadStandardInput);
-        Assert.Equal(CommandLineOutputTarget.Document, options.Output);
+        Assert.Equal([CommandLineOutputTarget.Document], options.Output);
+        Assert.False(options.Json);
     }
 
     [Fact]
@@ -34,7 +109,7 @@ public sealed class AzunoteCommandLineTests
         var options = AzunoteCommandLine.Parse(["--output", "none", "notes.txt"]);
 
         Assert.False(options.WaitForExit);
-        Assert.Equal(CommandLineOutputTarget.None, options.Output);
+        Assert.Empty(options.Output);
         Assert.Equal("notes.txt", options.FilePath);
     }
 
@@ -60,7 +135,7 @@ public sealed class AzunoteCommandLineTests
         var options = AzunoteCommandLine.Parse(["--", "--output"]);
 
         Assert.Equal("--output", options.FilePath);
-        Assert.Equal(CommandLineOutputTarget.None, options.Output);
+        Assert.Empty(options.Output);
     }
 
     [Fact]
@@ -148,6 +223,17 @@ public sealed class AzunoteCommandLineTests
         Assert.True(handled);
         Assert.Equal(
             ["document", "filePath", "none", "selection"],
+            completions);
+    }
+
+    [Fact]
+    public void An_output_target_is_completed_after_a_comma()
+    {
+        var completions = Complete("azu --output filePath,", out var handled);
+
+        Assert.True(handled);
+        Assert.Equal(
+            ["filePath,document", "filePath,selection"],
             completions);
     }
 

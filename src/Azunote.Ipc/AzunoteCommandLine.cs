@@ -26,19 +26,25 @@ public sealed record AzunoteCommandLineOptions
 
     /// <summary>
     /// What the command line asks the editor to write to standard output when
-    /// the document window closes. The vocabulary matches the external-tool
-    /// <c>input</c> field so that both sides name the same values.
+    /// the document window closes, in the order it asked for it. The
+    /// vocabulary matches the external-tool <c>input</c> field so that both
+    /// sides name the same values, and <c>none</c> is an empty list.
     /// </summary>
-    public CommandLineOutputTarget Output { get; init; }
+    public IReadOnlyList<CommandLineOutputTarget> Output { get; init; } = [];
+
+    /// <summary>
+    /// Whether the output is written as a JSON object rather than as the text
+    /// it names. More than one value has no textual form, so it requires this.
+    /// </summary>
+    public bool Json { get; init; }
 }
 
 /// <summary>
-/// The value selected by <c>--output</c>. The names mirror the external-tool
+/// A value selected by <c>--output</c>. The names mirror the external-tool
 /// <c>[launch].input</c> values.
 /// </summary>
 public enum CommandLineOutputTarget
 {
-    None,
     FilePath,
     Document,
     Selection
@@ -173,7 +179,24 @@ public static class AzunoteCommandLine
                 "A document path and standard input cannot be used together.");
         }
 
-        var output = result.GetValue(grammar.Output);
+        var output = result.GetValue(grammar.Output) ?? [];
+        var json = result.GetValue(grammar.Json);
+        // Several values cannot be told apart in a stream of document text:
+        // the document is free to contain any line ending, and a shell hands
+        // the bytes on as lines. Asking for the object explicitly keeps the
+        // format of an answer readable from the command line that asked for it.
+        if (output.Length > 1 && !json)
+        {
+            throw new CommandLineParseException(
+                "More than one output value must be written as JSON: add --json.");
+        }
+
+        if (json && output.Length == 0)
+        {
+            throw new CommandLineParseException(
+                "There is nothing to write as JSON: --json needs --output.");
+        }
+
         return new AzunoteCommandLineOptions
         {
             FilePath = path,
@@ -182,9 +205,10 @@ public static class AzunoteCommandLine
             ReadStandardInput = readStandardInput,
             ShowHelp = result.GetResult(grammar.Help) is not null,
             Output = output,
+            Json = json,
             // Output can only be produced once the document closes, so asking
             // for it always waits.
-            WaitForExit = result.GetValue(grammar.Wait) || output != CommandLineOutputTarget.None
+            WaitForExit = result.GetValue(grammar.Wait) || output.Length > 0
         };
     }
 
@@ -249,15 +273,6 @@ public static class AzunoteCommandLine
     /// </summary>
     private sealed class CommandLineGrammar
     {
-        private static readonly Dictionary<string, CommandLineOutputTarget> OutputTargetNames =
-            new(StringComparer.Ordinal)
-            {
-                ["none"] = CommandLineOutputTarget.None,
-                ["filePath"] = CommandLineOutputTarget.FilePath,
-                ["document"] = CommandLineOutputTarget.Document,
-                ["selection"] = CommandLineOutputTarget.Selection
-            };
-
         private CommandLineGrammar(
             RootCommand command,
             SuggestDirective suggest,
@@ -267,7 +282,8 @@ public static class AzunoteCommandLine
             HelpOption help,
             Option<int> line,
             Option<int> column,
-            Option<CommandLineOutputTarget> output)
+            Option<CommandLineOutputTarget[]> output,
+            Option<bool> json)
         {
             Command = command;
             Suggest = suggest;
@@ -278,6 +294,7 @@ public static class AzunoteCommandLine
             Line = line;
             Column = column;
             Output = output;
+            Json = json;
         }
 
         public RootCommand Command { get; }
@@ -296,7 +313,9 @@ public static class AzunoteCommandLine
 
         public Option<int> Column { get; }
 
-        public Option<CommandLineOutputTarget> Output { get; }
+        public Option<CommandLineOutputTarget[]> Output { get; }
+
+        public Option<bool> Json { get; }
 
         public static CommandLineGrammar Create()
         {
@@ -319,14 +338,22 @@ public static class AzunoteCommandLine
                 "-c",
                 "column",
                 "Open at one-based column N.");
-            var output = new Option<CommandLineOutputTarget>("--output", "-o")
+            var output = new Option<CommandLineOutputTarget[]>("--output", "-o")
             {
                 Description = "Write this to standard output when the document closes, "
-                    + "and wait for it.",
-                CustomParser = ParseOutputTarget
+                    + "and wait for it. Several values, separated by commas, need --json.",
+                HelpName = string.Join('|', CommandLineOutput.Names),
+                // One token, so that a list is written as one word and an
+                // unrelated document path is never taken for another value.
+                Arity = ArgumentArity.ExactlyOne,
+                CustomParser = ParseOutputTargets
             };
             output.CompletionSources.Clear();
-            output.CompletionSources.Add([.. OutputTargetNames.Keys]);
+            output.CompletionSources.Add(CompleteOutputTargets);
+            var json = new Option<bool>("--json")
+            {
+                Description = "Write the output as one line of JSON, keyed by value name."
+            };
 
             var command = new RootCommand("Azunote, a Windows text editor.")
             {
@@ -335,7 +362,8 @@ public static class AzunoteCommandLine
                 standardInput,
                 line,
                 column,
-                output
+                output,
+                json
             };
             // The editor reports its version in its about dialog, and the
             // command line has nothing of its own to add.
@@ -352,7 +380,8 @@ public static class AzunoteCommandLine
                 help,
                 line,
                 column,
-                output);
+                output,
+                json);
         }
 
         private static Option<int> CreatePositionOption(
@@ -377,17 +406,69 @@ public static class AzunoteCommandLine
                 }
             };
 
-        private static CommandLineOutputTarget ParseOutputTarget(ArgumentResult result)
+        /// <summary>
+        /// Reads the comma-separated value list. <c>none</c> stands for the
+        /// empty list and cannot share it with a value that asks for output.
+        /// </summary>
+        private static CommandLineOutputTarget[] ParseOutputTargets(ArgumentResult result)
         {
             var value = result.Tokens[0].Value;
-            if (OutputTargetNames.TryGetValue(value, out var target))
+            var names = value.Split(',');
+            var targets = new List<CommandLineOutputTarget>(names.Length);
+            foreach (var name in names)
             {
-                return target;
+                if (name == CommandLineOutput.NoneName)
+                {
+                    if (names.Length > 1)
+                    {
+                        result.AddError(
+                            $"The output {CommandLineOutput.NoneName} cannot be combined "
+                                + $"with another value: {value}");
+                    }
+
+                    return [];
+                }
+
+                if (!CommandLineOutput.TryParseName(name, out var target))
+                {
+                    result.AddError(
+                        "The output must be none, filePath, document, or selection: "
+                            + (name.Length == 0 ? value : name));
+                    return [];
+                }
+
+                if (targets.Contains(target))
+                {
+                    result.AddError($"The output names {name} more than once: {value}");
+                    return [];
+                }
+
+                targets.Add(target);
             }
 
-            result.AddError(
-                $"The output must be none, filePath, document, or selection: {value}");
-            return CommandLineOutputTarget.None;
+            return [.. targets];
+        }
+
+        /// <summary>
+        /// Completes one value, or the value after the last comma. A value
+        /// already in the list is not offered again, and neither is
+        /// <c>none</c>, which cannot be part of a list.
+        /// </summary>
+        private static IEnumerable<CompletionItem> CompleteOutputTargets(CompletionContext context)
+        {
+            var word = context.WordToComplete ?? string.Empty;
+            var separator = word.LastIndexOf(',');
+            if (separator < 0)
+            {
+                return CommandLineOutput.Names.Select(name => new CompletionItem(name));
+            }
+
+            var prefix = word[..(separator + 1)];
+            var chosen = prefix.Split(',', StringSplitOptions.RemoveEmptyEntries);
+            return CommandLineOutput.Names
+                .Where(name => name != CommandLineOutput.NoneName
+                    && !chosen.Contains(name, StringComparer.Ordinal))
+                .Select(name => new CompletionItem(prefix + name));
         }
     }
 }

@@ -35,7 +35,7 @@ public sealed class ExternalToolsTests
         var output = AzunoteCommandLine.Usage;
 
         Assert.Contains(
-            "-o, --output <document|filePath|none|selection>",
+            "-o, --output <none|filePath|document|selection>",
             output,
             StringComparison.Ordinal);
         Assert.Contains("-h, --help", output, StringComparison.Ordinal);
@@ -43,6 +43,7 @@ public sealed class ExternalToolsTests
         Assert.Contains("-l, --line <N>", output, StringComparison.Ordinal);
         Assert.Contains("-c, --column <N>", output, StringComparison.Ordinal);
         Assert.Contains("--stdin", output, StringComparison.Ordinal);
+        Assert.Contains("--json", output, StringComparison.Ordinal);
         Assert.Contains("+N[:M]", output, StringComparison.Ordinal);
         Assert.Contains("--", output, StringComparison.Ordinal);
     }
