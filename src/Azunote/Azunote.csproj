@@ -55,7 +55,7 @@
     <PackageReference Include="PublishShim.MSBuild" Version="0.1.0" PrivateAssets="all" />
     <PackageReference Include="Microsoft.Windows.CsWin32" Version="0.3.333" PrivateAssets="all" />
     <!-- Windows App SDK: provides WinUI 3, app lifecycle, windowing, and other modern Windows APIs -->
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.4.0" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
     <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" Version="10.0.12" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.12" />
     <PackageReference Include="Tomlyn" Version="2.10.1" />
