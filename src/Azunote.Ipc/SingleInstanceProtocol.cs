@@ -65,7 +65,9 @@ public sealed class SingleInstanceResponse
 public static class SingleInstanceProtocol
 {
     public const string DefaultInstanceName = "Azunote";
-    public const int MaxArgumentCount = 64;
+    // A command line can name a document for every file in a folder, so the
+    // guard against a nonsense frame has to leave room for a real one.
+    public const int MaxArgumentCount = 1024;
     public const int MaxFrameBytes = 64 * 1024 * 1024;
 
     internal static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false);

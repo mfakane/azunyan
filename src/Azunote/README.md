@@ -118,10 +118,21 @@ the exit code pass straight through.
 
 ```powershell
 azu path\to\file.txt
+azu notes.md todo.md log.txt
 azu --wait --line 12 --column 4 path\to\file.txt
 Get-Content input.md | azu --stdin
 azu +12:4 path\to\file.txt
 ```
+
+Several document paths open one window each, in the order they were named,
+which leaves the document named last in front. A path that is already open
+raises its window instead of opening a second copy of the document.
+
+More than one path takes no other option. `--line`, `--column`, `--output`,
+`--json` and `--wait` each speak about a single document — where to put the
+caret in it, what to read back out of it, what to wait for — and a list
+answers none of those, so naming one alongside several paths is an error
+rather than a rule to remember about which document it applied to.
 
 ### Tab completion
 

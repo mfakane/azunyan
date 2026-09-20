@@ -12,7 +12,12 @@ namespace Azunote;
 /// </summary>
 public sealed record AzunoteCommandLineOptions
 {
-    public string? FilePath { get; init; }
+    /// <summary>
+    /// The documents the command line named, in the order it named them. More
+    /// than one is only accepted on its own, because every other option speaks
+    /// about a single document.
+    /// </summary>
+    public IReadOnlyList<string> FilePaths { get; init; } = [];
 
     public int? Line { get; init; }
 
@@ -78,7 +83,7 @@ public static class AzunoteCommandLine
         "Short forms:",
         "  +N[:M]        Open at one-based line N and optional column M.",
         "  -             Read the document from standard input.",
-        "  --            Treat the remaining argument as a document path.",
+        "  --            Treat the remaining arguments as document paths.",
     ];
 
     public static AzunoteCommandLineOptions Parse(IEnumerable<string> arguments)
@@ -161,22 +166,32 @@ public static class AzunoteCommandLine
         ParseResult result,
         IReadOnlyList<string> tokens)
     {
-        // A positional value is the document path, so System.CommandLine has no
+        // A positional value is a document path, so System.CommandLine has no
         // reason to reject an unknown option. Everything before a "--" that
-        // looks like one still is one.
-        var path = result.GetValue(grammar.Path);
-        if (path is not null
-            && path.StartsWith('-')
-            && !tokens.Contains("--", StringComparer.Ordinal))
+        // looks like one still is one. A path that is only whitespace names no
+        // document, which is what an empty argument from a script looks like.
+        var named = result.GetValue(grammar.Paths) ?? [];
+        if (!tokens.Contains("--", StringComparer.Ordinal)
+            && Array.Find(named, value => value.StartsWith('-')) is { } unknown)
         {
-            throw new CommandLineParseException($"Unknown option: {path}");
+            throw new CommandLineParseException($"Unknown option: {unknown}");
         }
 
+        var paths = Array.FindAll(named, value => !string.IsNullOrWhiteSpace(value));
         var readStandardInput = result.GetValue(grammar.StandardInput);
-        if (path is not null && readStandardInput)
+        if (paths.Length > 0 && readStandardInput)
         {
             throw new CommandLineParseException(
                 "A document path and standard input cannot be used together.");
+        }
+
+        // Every other option says something about one document: where to put
+        // the caret in it, what to read back out of it, what to wait for. A
+        // list of documents answers none of those, so it is opened on its own.
+        if (paths.Length > 1 && FindSingleDocumentOption(grammar, result) is { } single)
+        {
+            throw new CommandLineParseException(
+                $"More than one document path cannot be opened with {single}.");
         }
 
         var output = result.GetValue(grammar.Output) ?? [];
@@ -199,7 +214,7 @@ public static class AzunoteCommandLine
 
         return new AzunoteCommandLineOptions
         {
-            FilePath = path,
+            FilePaths = paths,
             Line = result.GetResult(grammar.Line) is null ? null : result.GetValue(grammar.Line),
             Column = result.GetResult(grammar.Column) is null ? null : result.GetValue(grammar.Column),
             ReadStandardInput = readStandardInput,
@@ -213,8 +228,47 @@ public static class AzunoteCommandLine
     }
 
     /// <summary>
+    /// Names the first option that only makes sense for a single document, so
+    /// that a list of documents can be refused with the option that refused it.
+    /// </summary>
+    private static string? FindSingleDocumentOption(
+        CommandLineGrammar grammar,
+        ParseResult result)
+    {
+        // A flag that was not written still has a result, carrying the value
+        // it defaults to, so a flag is read by its value and an option that
+        // takes one by whether it has a result at all.
+        if (result.GetResult(grammar.Line) is not null)
+        {
+            return "--line";
+        }
+
+        if (result.GetResult(grammar.Column) is not null)
+        {
+            return "--column";
+        }
+
+        if (result.GetValue(grammar.Output) is { Length: > 0 })
+        {
+            return "--output";
+        }
+
+        if (result.GetValue(grammar.Json))
+        {
+            return "--json";
+        }
+
+        if (result.GetValue(grammar.Wait))
+        {
+            return "--wait";
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Expands <c>+N[:M]</c> and a bare <c>-</c> into the options they stand
-    /// for. Tokens after <c>--</c> are a document path and are left untouched.
+    /// for. Tokens after <c>--</c> are document paths and are left untouched.
     /// </summary>
     private static string[] RewriteShortForms(string[] arguments, out string? error)
     {
@@ -276,7 +330,7 @@ public static class AzunoteCommandLine
         private CommandLineGrammar(
             RootCommand command,
             SuggestDirective suggest,
-            Argument<string> path,
+            Argument<string[]> paths,
             Option<bool> wait,
             Option<bool> standardInput,
             HelpOption help,
@@ -287,7 +341,7 @@ public static class AzunoteCommandLine
         {
             Command = command;
             Suggest = suggest;
-            Path = path;
+            Paths = paths;
             Wait = wait;
             StandardInput = standardInput;
             Help = help;
@@ -301,7 +355,7 @@ public static class AzunoteCommandLine
 
         public SuggestDirective Suggest { get; }
 
-        public Argument<string> Path { get; }
+        public Argument<string[]> Paths { get; }
 
         public Option<bool> Wait { get; }
 
@@ -319,10 +373,10 @@ public static class AzunoteCommandLine
 
         public static CommandLineGrammar Create()
         {
-            var path = new Argument<string>("path")
+            var paths = new Argument<string[]>("path")
             {
-                Arity = ArgumentArity.ZeroOrOne,
-                Description = "Open one document path."
+                Arity = ArgumentArity.ZeroOrMore,
+                Description = "Open these document paths. More than one takes no other option."
             };
             var wait = new Option<bool>("--wait", "-w")
             {
@@ -357,7 +411,7 @@ public static class AzunoteCommandLine
 
             var command = new RootCommand("Azunote, a Windows text editor.")
             {
-                path,
+                paths,
                 wait,
                 standardInput,
                 line,
@@ -374,7 +428,7 @@ public static class AzunoteCommandLine
             return new CommandLineGrammar(
                 command,
                 command.Directives.OfType<SuggestDirective>().Single(),
-                path,
+                paths,
                 wait,
                 standardInput,
                 help,

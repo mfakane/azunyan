@@ -47,6 +47,17 @@ internal static class Program
             return 0;
         }
 
+        // Said here rather than left to the frame the editor would refuse, so
+        // that a command line naming a folder full of documents is answered
+        // with what is wrong with it.
+        if (arguments.Length > SingleInstanceProtocol.MaxArgumentCount)
+        {
+            await Console.Error.WriteLineAsync(
+                "Too many command-line arguments: at most "
+                    + $"{SingleInstanceProtocol.MaxArgumentCount} can be sent to Azunote.");
+            return ExitCodeError;
+        }
+
         try
         {
             var response = await SendAsync(

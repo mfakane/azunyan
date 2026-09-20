@@ -89,7 +89,7 @@ public sealed class AzunoteCommandLineTests
         var options = AzunoteCommandLine.Parse(["--output", "document", "notes.txt"]);
 
         Assert.Equal([CommandLineOutputTarget.Document], options.Output);
-        Assert.Equal("notes.txt", options.FilePath);
+        Assert.Equal(["notes.txt"], options.FilePaths);
     }
 
     [Fact]
@@ -110,7 +110,7 @@ public sealed class AzunoteCommandLineTests
 
         Assert.False(options.WaitForExit);
         Assert.Empty(options.Output);
-        Assert.Equal("notes.txt", options.FilePath);
+        Assert.Equal(["notes.txt"], options.FilePaths);
     }
 
     [Fact]
@@ -134,7 +134,7 @@ public sealed class AzunoteCommandLineTests
     {
         var options = AzunoteCommandLine.Parse(["--", "--output"]);
 
-        Assert.Equal("--output", options.FilePath);
+        Assert.Equal(["--output"], options.FilePaths);
         Assert.Empty(options.Output);
     }
 
@@ -145,7 +145,7 @@ public sealed class AzunoteCommandLineTests
 
         Assert.Equal(12, options.Line);
         Assert.Equal(3, options.Column);
-        Assert.Equal("notes.txt", options.FilePath);
+        Assert.Equal(["notes.txt"], options.FilePaths);
     }
 
     [Fact]
@@ -179,12 +179,80 @@ public sealed class AzunoteCommandLineTests
     }
 
     [Fact]
+    public void Several_document_paths_open_in_the_order_they_were_named()
+    {
+        var options = AzunoteCommandLine.Parse(["notes.txt", "todo.md", "log.txt"]);
+
+        Assert.Equal(["notes.txt", "todo.md", "log.txt"], options.FilePaths);
+        Assert.False(options.WaitForExit);
+    }
+
+    [Theory]
+    [InlineData("--line", "2")]
+    [InlineData("--column", "2")]
+    [InlineData("--output", "document")]
+    public void Several_document_paths_take_no_option_about_one_document(
+        string option,
+        string value)
+    {
+        var exception = Assert.Throws<CommandLineParseException>(
+            () => AzunoteCommandLine.Parse([option, value, "notes.txt", "todo.md"]));
+
+        Assert.Contains(option, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Several_document_paths_are_not_waited_on()
+    {
+        var exception = Assert.Throws<CommandLineParseException>(
+            () => AzunoteCommandLine.Parse(["--wait", "notes.txt", "todo.md"]));
+
+        Assert.Contains("--wait", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void One_document_path_still_takes_every_option()
+    {
+        var options = AzunoteCommandLine.Parse(
+            ["--wait", "+12:3", "--output", "document", "notes.txt"]);
+
+        Assert.Equal(["notes.txt"], options.FilePaths);
+        Assert.Equal(12, options.Line);
+        Assert.True(options.WaitForExit);
+    }
+
+    [Fact]
+    public void Everything_after_the_argument_separator_is_a_document_path()
+    {
+        var options = AzunoteCommandLine.Parse(["--", "--output", "-w"]);
+
+        Assert.Equal(["--output", "-w"], options.FilePaths);
+    }
+
+    [Fact]
+    public void A_document_path_that_is_only_whitespace_names_no_document()
+    {
+        var options = AzunoteCommandLine.Parse(["   "]);
+
+        Assert.Empty(options.FilePaths);
+    }
+
+    [Fact]
+    public void An_unknown_option_is_not_taken_for_one_of_several_paths()
+    {
+        var exception = Assert.Throws<CommandLineParseException>(
+            () => AzunoteCommandLine.Parse(["notes.txt", "--verbose"]));
+
+        Assert.Contains("--verbose", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void A_bare_dash_reads_standard_input()
     {
         var options = AzunoteCommandLine.Parse(["-"]);
 
         Assert.True(options.ReadStandardInput);
-        Assert.Null(options.FilePath);
+        Assert.Empty(options.FilePaths);
     }
 
     [Fact]

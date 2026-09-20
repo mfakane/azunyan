@@ -17,7 +17,7 @@ public sealed class ExternalToolsTests
         Assert.True(options.WaitForExit);
         Assert.Equal(12, options.Line);
         Assert.Equal(7, options.Column);
-        Assert.Equal("notes.md", options.FilePath);
+        Assert.Equal(["notes.md"], options.FilePaths);
         Assert.False(options.ReadStandardInput);
     }
 

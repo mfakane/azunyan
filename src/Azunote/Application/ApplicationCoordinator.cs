@@ -66,30 +66,36 @@ internal sealed class ApplicationCoordinator : IDisposable
         var options = ParseCommandLine(arguments);
         var runtime = registration.Window.Runtime;
 
+        var target = registration;
         if (options.ReadStandardInput)
         {
             await OpenStandardInputAsync(runtime, options);
         }
-        else if (!string.IsNullOrWhiteSpace(options.FilePath))
+        else if (options.FilePaths.Count > 0)
         {
-            await runtime.OpenStartupDocumentAsync(
-                options.FilePath,
-                options.Line,
-                options.Column);
+            // The window this launch already made hosts the first document,
+            // the way it did when a command line named only one.
+            var opened = await OpenCommandLineDocumentsAsync(
+                options,
+                Environment.CurrentDirectory,
+                registration);
+            target = opened.Registration ?? registration;
         }
 
-        if (!registration.IsClosed)
+        if (!target.IsClosed)
         {
-            ActivateWindow(registration);
+            ActivateWindow(target);
         }
 
         if (options.WaitForExit)
         {
-            await WaitForCloseIfRequestedAsync(registration, options);
+            await WaitForCloseIfRequestedAsync(target, options);
         }
         else if (options.ShowHelp)
         {
-            _ = runtime.ShowCommandLineHelpAsync();
+            // The window in front is the one the help belongs in, which is not
+            // the window this launch made when a command line named documents.
+            _ = target.Window.Runtime.ShowCommandLineHelpAsync();
         }
     }
 
@@ -120,23 +126,16 @@ internal sealed class ApplicationCoordinator : IDisposable
                 ActivateWindow(target);
                 await WaitForCloseIfRequestedAsync(target, options);
             }
-            else if (!string.IsNullOrWhiteSpace(options.FilePath))
+            else if (options.FilePaths.Count > 0)
             {
-                var path = ResolvePath(options.FilePath, command.WorkingDirectory);
-                target = FindWindowForFile(path);
+                var opened = await OpenCommandLineDocumentsAsync(
+                    options,
+                    command.WorkingDirectory,
+                    initial: null);
+                target = opened.Registration;
                 if (target is not null)
                 {
-                    target.Window.ActivateWindow();
-                    await WaitForCloseIfRequestedAsync(target, options);
-                }
-                else
-                {
-                    target = TakeReusableWindow() ?? CreateWindowRegistration();
-                    await target.Window.Runtime.OpenStartupDocumentAsync(
-                        path,
-                        options.Line,
-                        options.Column);
-                    ActivateWindow(target);
+                    ShowWindow(target, opened.IsNew);
                     await WaitForCloseIfRequestedAsync(target, options);
                 }
             }
@@ -192,6 +191,69 @@ internal sealed class ApplicationCoordinator : IDisposable
 
         return SingleInstanceResponse.Completed(
             CommandLineOutput.Create(options.Output, options.Json, document));
+    }
+
+    /// <summary>
+    /// Opens every document a command line named, each in its own window and
+    /// in the order it was named, and answers with the last of them. A window
+    /// is not shown until it is activated, so they appear in that order and
+    /// the document named last is the one left in front. A path that is
+    /// already open raises its window rather than opening a second copy, which
+    /// is also what keeps a path named twice from opening twice. Showing the
+    /// last window is left to the caller, which has a command line to answer
+    /// with it.
+    /// </summary>
+    private async Task<(WindowRegistration? Registration, bool IsNew)> OpenCommandLineDocumentsAsync(
+        AzunoteCommandLineOptions options,
+        string workingDirectory,
+        WindowRegistration? initial)
+    {
+        WindowRegistration? last = null;
+        var isNew = false;
+        foreach (var named in options.FilePaths)
+        {
+            var path = ResolvePath(named, workingDirectory);
+            // A launch fills the window it was given; nothing else is open yet
+            // for that first document to be found in.
+            var existing = initial is null ? FindWindowForFile(path) : null;
+            var target = existing;
+            if (target is null)
+            {
+                target = initial ?? TakeReusableWindow() ?? CreateWindowRegistration();
+                initial = null;
+                await target.Window.Runtime.OpenStartupDocumentAsync(
+                    path,
+                    options.Line,
+                    options.Column);
+            }
+
+            if (last is not null && !ReferenceEquals(last, target))
+            {
+                ShowWindow(last, isNew);
+            }
+
+            last = target;
+            isNew = existing is null;
+        }
+
+        return (last, isNew);
+    }
+
+    /// <summary>
+    /// Brings a window a command line asked for to the front. A window that
+    /// was already showing the document keeps whatever the user was doing in
+    /// it, so it is raised without taking the focus off what it holds.
+    /// </summary>
+    private static void ShowWindow(WindowRegistration registration, bool isNew)
+    {
+        if (isNew)
+        {
+            ActivateWindow(registration);
+        }
+        else
+        {
+            registration.Window.ActivateWindow();
+        }
     }
 
     /// <summary>
