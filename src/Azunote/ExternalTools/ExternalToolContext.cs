@@ -74,7 +74,7 @@ public sealed partial record ExternalToolContext
         SelectionStart = selectionStart ?? new LineColumn(lineNumber - 1, columnNumber - 1);
         SelectionEnd = selectionEnd ?? SelectionStart;
         Cwd = Environment.CurrentDirectory;
-        ExecPath = Environment.ProcessPath ?? string.Empty;
+        ExecPath = ApplicationLocation.ExecutablePath;
         PathSeparator = Path.DirectorySeparatorChar.ToString();
     }
 

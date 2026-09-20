@@ -6,7 +6,7 @@ Azunyan and Azunote's original code is licensed under the [zlib license](LICENSE
 Dependencies are licensed separately. The zlib license does not replace or
 grant additional rights to third-party components.
 
-This inventory was reviewed on 2026-09-16 against Azunote's restored
+This inventory was reviewed on 2026-09-21 against Azunote's restored
 `net10.0-windows10.0.19041.0` / `win-x64` dependencies, with Native AOT and
 self-contained Windows App SDK deployment enabled. It conservatively includes
 notices for runtime dependencies even when trimming or unused SDK features may
@@ -19,6 +19,7 @@ binary, or that all redistribution conditions have been satisfied.
 | --- | --- | --- |
 | Microsoft.Extensions.Caching.Memory, Caching.Abstractions, DependencyInjection.Abstractions, Logging.Abstractions, Options, and Primitives | 10.0.0 | MIT; [license](licenses/Microsoft.Extensions/10.0.0/LICENSE.TXT), [shared package notices](licenses/Microsoft.Extensions/10.0.0/THIRD-PARTY-NOTICES.TXT). All six packages declare MIT and contain identical third-party notices. |
 | Tomlyn | 2.10.1 | BSD-2-Clause; [copyright, conditions, and disclaimer](licenses/Tomlyn/2.10.1/LICENSE.txt) |
+| PublishShim.MSBuild | 0.1.0 | 0BSD, declared as a [license expression](https://licenses.nuget.org/0BSD) with no document in the package. The native shim it generates carries the name of each executable in the portable distribution and starts the application beside it. |
 | System.CommandLine | 2.0.12 | MIT; [license](licenses/System.CommandLine/2.0.12/LICENSE.TXT). The package carries no license document; the text is the one its dotnet/dotnet build commit publishes. |
 | .NET Native AOT runtime | 10.0.11 | MIT and third-party terms; [license](licenses/microsoft.netcore.app.runtime.nativeaot.win-x64/10.0.11/LICENSE.TXT), [notices](licenses/microsoft.netcore.app.runtime.nativeaot.win-x64/10.0.11/THIRD-PARTY-NOTICES.TXT) |
 | .NET runtime (non-AOT self-contained builds) | 10.0.11 | MIT and third-party terms; [license](licenses/microsoft.netcore.app.runtime.win-x64/10.0.11/LICENSE.TXT), [notices](licenses/microsoft.netcore.app.runtime.win-x64/10.0.11/THIRD-PARTY-NOTICES.TXT) |

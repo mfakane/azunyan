@@ -111,6 +111,11 @@ build registers it as an app execution alias instead. Normal launches return
 the prompt immediately; `--wait` keeps it blocked until the opened document
 window is closed.
 
+In the portable ZIP both are shims that start the application from the `.app`
+subdirectory beside them, which is where the published files live. They behave
+as the executables they stand for: arguments, standard input and output, and
+the exit code pass straight through.
+
 ```powershell
 azu path\to\file.txt
 azu --wait --line 12 --column 4 path\to\file.txt

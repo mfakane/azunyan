@@ -2,6 +2,10 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+# Where the portable distribution keeps the published application, matching
+# PublishShimDirectory in src/Azunote/Azunote.csproj.
+$AzunoteShimDirectory = '.app'
+
 function New-AzunoteDistribution([string] $OutputDirectory, [string] $Version) {
     $repo = Split-Path $PSScriptRoot -Parent
     [xml] $manifest = Get-Content (Join-Path $repo 'src/Azunote/Package.appxmanifest') -Raw
@@ -21,31 +25,23 @@ function New-AzunoteDistribution([string] $OutputDirectory, [string] $Version) {
     }
 }
 
-function Publish-AzunoteDistribution($Context, [switch] $SingleFile) {
+function Publish-AzunoteDistribution($Context, [switch] $Portable) {
     & (Join-Path $PSScriptRoot 'Generate-ThirdPartyNotices.ps1') -Check
     $project = Join-Path $Context.Repo 'src/Azunote/Azunote.csproj'
     $publishProperties = @(
         '-p:WindowsPackageType=None'
-        # PublishSingleFile is evaluated for the referenced WinUI project too.
         '-p:EnableMsixTooling=true'
+        '-p:PublishAot=true'
+        '-p:PublishTrimmed=true'
     )
-    if ($SingleFile) {
-        # Windows App SDK supports single-file only for unpackaged,
-        # self-contained apps. Its auto-initializer locates the extracted
-        # native runtime before WinUI starts.
+    if ($Portable) {
+        # Native AOT leaves the Windows App SDK native payload as loose files.
+        # The portable distribution keeps them, and everything else the publish
+        # produced, in a subdirectory that shims named after the executables
+        # start, so the folder a user opens holds what they came for.
         $publishProperties += @(
-            # Native AOT leaves the Windows App SDK native payload as loose
-            # files. The managed single-file host can bundle that payload.
-            '-p:PublishAot=false'
-            '-p:PublishTrimmed=false'
-            '-p:PublishSingleFile=true'
-            '-p:IncludeAllContentForSelfExtract=true'
+            '-p:AzunotePortableShim=true'
             '-p:WindowsAppSdkUndockedRegFreeWinRTInitialize=true'
-        )
-    } else {
-        $publishProperties += @(
-            '-p:PublishAot=true'
-            '-p:PublishTrimmed=true'
         )
     }
     $previousPath = $env:PATH
@@ -58,34 +54,33 @@ function Publish-AzunoteDistribution($Context, [switch] $SingleFile) {
         if ($LASTEXITCODE) { throw "Azunote publish failed ($LASTEXITCODE)." }
     } finally { $env:PATH = $previousPath }
     # The console client is published as its own executable and bundled next
-    # to the editor, so both distribution modes carry the two of them.
+    # to the editor, so both distribution modes carry the two of them. The
+    # legal documents are read from beside the executable a user launched, so
+    # they stay in the publish root even when the application does not.
     $executables = @('Azunote.exe', 'azu.exe')
-    $requiredFiles = $executables
-    if (!$SingleFile) {
-        $requiredFiles += @('LICENSE', 'THIRD-PARTY-NOTICES.md', 'licenses/sources.json')
+    $rootFiles = $executables + @('LICENSE', 'THIRD-PARTY-NOTICES.md', 'licenses/sources.json')
+    $application = $Context.Publish
+    $requiredFiles = $rootFiles
+    if ($Portable) {
+        $application = Join-Path $Context.Publish $AzunoteShimDirectory
+        $requiredFiles += $executables | ForEach-Object { Join-Path $AzunoteShimDirectory $_ }
     }
     foreach ($file in $requiredFiles) {
         if (!(Test-Path -LiteralPath (Join-Path $Context.Publish $file))) {
             throw "Publish output is missing $file."
         }
     }
-    if ($SingleFile) {
-        $unexpectedFiles = @(Get-ChildItem -LiteralPath $Context.Publish -File -Recurse |
-            Where-Object {
-                $_.Extension -ne '.pdb' -and
-                [IO.Path]::GetRelativePath($Context.Publish, $_.FullName) -notin $executables
-            })
+    if ($Portable) {
+        # Nothing but the shims and the documents they are read beside may be
+        # left where a user looks; the publish output belongs behind them.
+        $unexpectedFiles = @(Get-ChildItem -LiteralPath $Context.Publish -File |
+            Where-Object { $_.Extension -ne '.pdb' -and $_.Name -notin $rootFiles })
         if ($unexpectedFiles.Count) {
-            $names = $unexpectedFiles |
-                ForEach-Object { [IO.Path]::GetRelativePath($Context.Publish, $_.FullName) }
-            throw "Single-file publish left loose non-PDB files: $($names -join ', ')"
+            throw "Portable publish left loose files beside the shims: $(($unexpectedFiles.Name) -join ', ')"
         }
     }
-    # Both distribution modes must produce an executable, not a loose apphost.
-    if (Test-Path (Join-Path $Context.Publish 'Azunote.dll')) {
-        if ($SingleFile) {
-            throw 'Managed Azunote.dll found in single-file output.'
-        }
+    # Every distribution mode must produce an executable, not a loose apphost.
+    if (Test-Path (Join-Path $application 'Azunote.dll')) {
         throw 'Managed Azunote.dll found in Native AOT output.'
     }
 }
@@ -146,16 +141,14 @@ function New-AzunotePackageResources($Context, [string] $Payload, [string] $WinA
 }
 
 function Copy-AzunotePortablePayload($Context, [string] $Destination) {
-    New-Item -ItemType Directory -Force $Destination | Out-Null
+    # The publish output already has the shape the distribution wants: the
+    # shims and the legal texts that must accompany a redistribution at the
+    # top, everything the publish produced behind them.
+    Copy-AzunotePayload $Context $Destination
     New-Item -ItemType Directory -Force (Join-Path $Destination 'appdata') | Out-Null
 
-    # PublishSingleFile embeds the native runtime, WinUI resources, and the
-    # application's generated content. Keep only the files users need to see
-    # and the legal texts that must accompany a redistribution.
     $files = @(
         @{ Source = Join-Path $Context.Repo 'src/Azunote/README.md'; Name = 'README.md' }
-        @{ Source = Join-Path $Context.Repo 'LICENSE'; Name = 'LICENSE' }
-        @{ Source = Join-Path $Context.Repo 'THIRD-PARTY-NOTICES.md'; Name = 'THIRD-PARTY-NOTICES.md' }
         @{ Source = Join-Path $Context.Repo 'src/Azunote/Register-AzunoteCompletion.ps1'
            Name = 'Register-AzunoteCompletion.ps1' }
     )
@@ -164,16 +157,6 @@ function Copy-AzunotePortablePayload($Context, [string] $Destination) {
             throw "Portable distribution source is missing $($file.Name)."
         }
         Copy-Item -LiteralPath $file.Source -Destination (Join-Path $Destination $file.Name)
-    }
-
-    $licenses = Join-Path $Context.Repo 'licenses'
-    if (!(Test-Path -LiteralPath $licenses -PathType Container)) {
-        throw 'Portable distribution source is missing licenses/.'
-    }
-    Copy-Item -LiteralPath $licenses -Destination (Join-Path $Destination 'licenses') -Recurse
-    foreach ($executable in 'Azunote.exe', 'azu.exe') {
-        Copy-Item -LiteralPath (Join-Path $Context.Publish $executable) `
-            -Destination (Join-Path $Destination $executable)
     }
 }
 

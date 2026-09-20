@@ -15,14 +15,14 @@ git submodule update --init external/Win2D
 ./scripts/Package-AzunoteMsix.ps1
 ```
 
-Both scripts publish Release/win-x64 as self-contained deployments. The
-MSIX/APPX script uses Native AOT and keeps the self-contained Windows App SDK
-runtime as loose package files. The ZIP script uses the managed Windows App SDK
-single-file mode (without Native AOT), so the native runtime, WinUI resources,
-and application content are bundled into `Azunote.exe` and extracted to a
-temporary directory when it starts. Each run uses a new staging directory
-under `artifacts/packaging` to avoid including stale files. PDBs remain in
-staging but are omitted from distributions.
+Both scripts publish Release/win-x64 as self-contained Native AOT deployments
+and keep the self-contained Windows App SDK runtime as loose files. The ZIP
+script additionally moves the published application into an `.app`
+subdirectory and leaves a [publish shim](https://www.nuget.org/packages/PublishShim.MSBuild/)
+named after each executable in its place, so the folder a user opens holds the
+program and its documents rather than the runtime. Each run uses a new staging
+directory under `artifacts/packaging` to avoid including stale files. PDBs
+remain in staging but are omitted from distributions.
 
 Outputs default to `artifacts/distributions`, with a SHA-256 sidecar for each
 archive. The default version comes from `src/Azunote/Package.appxmanifest`.
@@ -34,15 +34,16 @@ Existing output files are not overwritten. Neither script installs the app.
 ```
 
 The ZIP contains a top-level `Azunote-<version>-win-x64` folder. Its visible
-top level contains `Azunote.exe`, the `azu.exe` console client,
+top level contains the `Azunote.exe` and `azu.exe` shims,
 `Register-AzunoteCompletion.ps1`, `README.md`, `LICENSE`,
 `THIRD-PARTY-NOTICES.md`, and an empty `appdata/` directory. The
-redistribution-required `licenses/` directory is kept with the notices; build
-artifacts such as DLLs, WinMDs, PRI files, satellite resources, manifests, and
-PDBs are not placed in the ZIP. Extract the entire folder and run
-`Azunote.exe` or the adjacent `azu.exe` client. Here "portable" means no
-installer or separately installed .NET/Windows App SDK runtime is required;
-the first launch extracts the bundled runtime under `%TEMP%/.net`. Because the
+redistribution-required `licenses/` directory is kept with the notices. Build
+artifacts such as DLLs, WinMDs, PRI files, satellite resources, and manifests
+are in `.app` with the application the shims start; PDBs are not placed in the
+ZIP at all. Extract the entire folder and run `Azunote.exe` or the adjacent
+`azu.exe` client. Here "portable" means no installer or separately installed
+.NET/Windows App SDK runtime is required, and nothing is extracted at
+startup. Because the
 ZIP includes `appdata/`, settings, application state, custom modes, and external
 tools are stored below that directory instead of the normal
 `%LOCALAPPDATA%/Azunote` directory. Removing `appdata/` before launching again

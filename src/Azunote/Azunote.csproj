@@ -52,6 +52,7 @@
     <ProjectReference Include="..\Azunyan.Syntax\Azunyan.Syntax.csproj" />
     <ProjectReference Include="..\Azunyan.WinUI\Azunyan.WinUI.csproj" />
     <PackageReference Include="Microsoft.Graphics.Win2D" Version="[1.4.0-azunyan.25680382dd21]" />
+    <PackageReference Include="PublishShim.MSBuild" Version="0.1.0" PrivateAssets="all" />
     <PackageReference Include="Microsoft.Windows.CsWin32" Version="0.3.321" PrivateAssets="all" />
     <!-- Windows App SDK: provides WinUI 3, app lifecycle, windowing, and other modern Windows APIs -->
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.4.0" />
@@ -95,6 +96,62 @@
     <Copy SourceFiles="$(AzunoteCliPublishPath)azu.exe"
           DestinationFolder="$(PublishDir)"
           SkipUnchangedFiles="true" />
+  </Target>
+
+  <!--
+    The portable distribution keeps the published files out of the folder a
+    user sees: the application moves into a subdirectory and small shims
+    carrying its name stay behind. The package's own target generates one
+    shim, and would run before the console client and the compiled XAML are
+    in place, so the relocation is driven here instead. Native AOT writes the
+    editor into the publish directory after Publish has run, which is why this
+    waits for that copy and asks for the rest by name.
+  -->
+  <PropertyGroup>
+    <PublishShim>false</PublishShim>
+    <PublishShimIconPath>$(MSBuildProjectDirectory)\Assets\app.ico</PublishShimIconPath>
+  </PropertyGroup>
+
+  <Target Name="GenerateAzunotePublishShims" AfterTargets="CopyNativeBinary"
+          DependsOnTargets="BundleAzunoteCliForPublish;CopyXamlResourcesForAot"
+          Condition="'$(AzunotePortableShim)' == 'true'">
+    <PropertyGroup>
+      <!--
+        The legal documents are read from beside the shim, so they stay in
+        the publish root rather than moving in with the application.
+      -->
+      <_AzunoteShimRelocationExclude>$(PublishDir)$(PublishShimDirectory)\**;$(PublishDir)LICENSE;$(PublishDir)THIRD-PARTY-NOTICES.md;$(PublishDir)licenses\**</_AzunoteShimRelocationExclude>
+    </PropertyGroup>
+    <ItemGroup>
+      <_AzunoteShimRelocationFiles Include="$(PublishDir)**\*"
+                                   Exclude="$(_AzunoteShimRelocationExclude)" />
+    </ItemGroup>
+
+    <RelocatePublishArtifactsTask PublishDirectory="$(PublishDir)"
+                                  Files="@(_AzunoteShimRelocationFiles)"
+                                  TargetExecutableName="Azunote.exe"
+                                  ShimDirectory="$(PublishShimDirectory)">
+      <Output TaskParameter="ActualApplicationRelativePath"
+              PropertyName="_AzunoteShimApplicationPath" />
+    </RelocatePublishArtifactsTask>
+
+    <!-- The editor is a GUI entry point; the console client is not. -->
+    <GeneratePublishShimTask PublishDirectory="$(PublishDir)"
+                             ShimExecutableName="Azunote.exe"
+                             TargetRelativePath="$(_AzunoteShimApplicationPath)"
+                             PublishShimKind="WinExe"
+                             IconPath="$(PublishShimIconPath)"
+                             RuntimeIdentifier="$(RuntimeIdentifier)"
+                             NativeShimPath="$(PublishShimNativeShimPath)"
+                             NativeShimDirectory="$(PublishShimNativeShimDirectory)" />
+    <GeneratePublishShimTask PublishDirectory="$(PublishDir)"
+                             ShimExecutableName="azu.exe"
+                             TargetRelativePath="$(PublishShimDirectory)\azu.exe"
+                             PublishShimKind="Exe"
+                             IconPath="$(PublishShimIconPath)"
+                             RuntimeIdentifier="$(RuntimeIdentifier)"
+                             NativeShimPath="$(PublishShimNativeShimPath)"
+                             NativeShimDirectory="$(PublishShimNativeShimDirectory)" />
   </Target>
 
   <!--
