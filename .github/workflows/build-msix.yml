@@ -74,7 +74,7 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Set up WinApp CLI
-        uses: microsoft/setup-WinAppCli@v0.1
+        uses: microsoft/setup-WinAppCli@v0.2
         with:
           version: v0.6.1
 
