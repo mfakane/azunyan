@@ -20,7 +20,7 @@ public sealed class SingleInstanceHostTests
         });
 
         using var secondary = new SingleInstanceHost(instanceName);
-        Assert.False(await Task.Run(secondary.TryAcquire));
+        Assert.False(await TryAcquireFromAnotherThreadAsync(secondary));
         var status = await secondary.ForwardAsync(
             ["--stdin", "--line", "4"],
             "stdin payload");
@@ -77,7 +77,7 @@ public sealed class SingleInstanceHostTests
         });
 
         using var secondary = new SingleInstanceHost(instanceName);
-        Assert.False(await Task.Run(secondary.TryAcquire));
+        Assert.False(await TryAcquireFromAnotherThreadAsync(secondary));
         var forwarding = secondary.ForwardAsync(["--output", "document", "-"], "text");
         await processingStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
@@ -91,4 +91,11 @@ public sealed class SingleInstanceHostTests
         Assert.True(forwarding.IsCompleted);
         Assert.Equal(SingleInstanceStatus.Completed, await forwarding);
     }
+
+    private static Task<bool> TryAcquireFromAnotherThreadAsync(SingleInstanceHost host) =>
+        Task.Factory.StartNew(
+            host.TryAcquire,
+            CancellationToken.None,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default);
 }
