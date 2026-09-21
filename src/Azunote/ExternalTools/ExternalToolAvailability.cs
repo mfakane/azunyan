@@ -145,7 +145,8 @@ public static class ExternalToolAvailability
     /// Whether the document is one of the extensions the tool asks for. An
     /// untitled document has no extension of its own, so the extensions of its
     /// language mode answer instead: choosing the JSON mode in an untitled
-    /// document is what makes the tools for `.json` apply to it.
+    /// document is what makes the tools for `.json`, `.jsonc`, and `.json5`
+    /// apply to it.
     /// </summary>
     private static bool MatchesExtension(
         string[] extensions,

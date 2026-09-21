@@ -33,12 +33,41 @@ public sealed class JsonFoldingProvider : IFoldingProvider
         {
             cancellationToken.ThrowIfCancellationRequested();
             var character = text[position];
+            if (character == '/' && position + 1 < text.Length)
+            {
+                if (text[position + 1] == '/')
+                {
+                    position = SkipLineComment(text, position);
+                    continue;
+                }
+
+                if (text[position + 1] == '*')
+                {
+                    position = SkipBlockComment(text, position);
+                    continue;
+                }
+            }
+
+            if (frames.Count > 0 && frames[^1].IsObject && IsBareKeyStart(character))
+            {
+                var bareEnd = SkipBareKey(text, position);
+                if (IsKey(text, bareEnd))
+                {
+                    frames[^1].PendingKey = text[position..bareEnd];
+                    position = bareEnd;
+                    continue;
+                }
+            }
+
             switch (character)
             {
                 case '"':
-                    var stringEnd = SkipString(text, position);
+                case '\'':
+                    var stringEnd = SkipString(text, position, character);
                     if (frames.Count > 0
                         && frames[^1].IsObject
+                        && stringEnd > position
+                        && text[stringEnd - 1] == character
                         && IsKey(text, stringEnd))
                     {
                         frames[^1].PendingKey = text[(position + 1)..(stringEnd - 1)];
@@ -162,7 +191,7 @@ public sealed class JsonFoldingProvider : IFoldingProvider
     }
 
     /// <summary>Reports the position after the closing quote.</summary>
-    private static int SkipString(string text, int position)
+    private static int SkipString(string text, int position, char quote)
     {
         position++;
         while (position < text.Length)
@@ -174,7 +203,7 @@ public sealed class JsonFoldingProvider : IFoldingProvider
                 continue;
             }
 
-            if (character == '"')
+            if (character == quote)
             {
                 break;
             }
@@ -183,11 +212,61 @@ public sealed class JsonFoldingProvider : IFoldingProvider
         return position;
     }
 
-    private static bool IsKey(string text, int position)
+    private static int SkipLineComment(string text, int position)
     {
-        while (position < text.Length && char.IsWhiteSpace(text[position]))
+        var newline = text.IndexOfAny(['\r', '\n'], position + 2);
+        return newline < 0 ? text.Length : newline;
+    }
+
+    private static int SkipBlockComment(string text, int position)
+    {
+        var end = text.IndexOf("*/", position + 2, StringComparison.Ordinal);
+        return end < 0 ? text.Length : end + 2;
+    }
+
+    private static int SkipBareKey(string text, int position)
+    {
+        position++;
+        while (position < text.Length && IsBareKeyPart(text[position]))
         {
             position++;
+        }
+
+        return position;
+    }
+
+    private static bool IsBareKeyStart(char character) =>
+        character == '_' || character == '$' || char.IsLetter(character);
+
+    private static bool IsBareKeyPart(char character) =>
+        character == '_' || character == '$' || char.IsLetterOrDigit(character);
+
+    private static bool IsKey(string text, int position)
+    {
+        while (position < text.Length)
+        {
+            if (char.IsWhiteSpace(text[position]))
+            {
+                position++;
+                continue;
+            }
+
+            if (text[position] == '/' && position + 1 < text.Length)
+            {
+                if (text[position + 1] == '/')
+                {
+                    position = SkipLineComment(text, position);
+                    continue;
+                }
+
+                if (text[position + 1] == '*')
+                {
+                    position = SkipBlockComment(text, position);
+                    continue;
+                }
+            }
+
+            break;
         }
 
         return position < text.Length && text[position] == ':';

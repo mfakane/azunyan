@@ -43,6 +43,8 @@ public sealed class LanguageModeControllerTests
 
         Assert.Equal("json", controller.CurrentModeId);
         Assert.Contains(".json", controller.CurrentModeFileExtensions);
+        Assert.Contains(".jsonc", controller.CurrentModeFileExtensions);
+        Assert.Contains(".json5", controller.CurrentModeFileExtensions);
     }
 
     [Fact]
@@ -83,6 +85,8 @@ public sealed class LanguageModeControllerTests
 
     [Theory]
     [InlineData("data.json")]
+    [InlineData("config.jsonc")]
+    [InlineData("settings.json5")]
     [InlineData("config.yml")]
     [InlineData("settings.toml")]
     public void Structured_document_modes_supply_a_folding_provider(string path)

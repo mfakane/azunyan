@@ -163,7 +163,7 @@ public sealed partial record ExternalToolContext
     /// The file extensions of the current language mode. An untitled document
     /// has no extension of its own, so `[when].extensions` reads these
     /// instead: choosing the JSON mode in an untitled document is what makes
-    /// the tools for `.json` apply to it.
+    /// the tools for `.json`, `.jsonc`, and `.json5` apply to it.
     /// </summary>
     public IReadOnlyList<string> LanguageExtensions { get; }
 

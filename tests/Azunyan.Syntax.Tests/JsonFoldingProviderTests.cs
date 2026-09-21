@@ -148,6 +148,28 @@ public sealed class JsonFoldingProviderTests
     }
 
     [Fact]
+    public async Task Comments_and_json5_strings_are_not_structure()
+    {
+        const string text =
+            "{\n"
+            + "  // fake { [ ] }\n"
+            + "  \"double\": \"// /* { [ ] }\",\n"
+            + "  'single': '/* { [ ] }',\n"
+            + "  bare /* key */: [\n"
+            + "    1,\n"
+            + "    2\n"
+            + "  ], // trailing comment { }\n"
+            + "}\n";
+        var snapshot = new TextSnapshot(text);
+
+        var folds = await GetAsync(snapshot);
+
+        Assert.Equal(
+            ["json-array:$/bare:0", "json-object:$:0"],
+            folds.Select(fold => fold.Id));
+    }
+
+    [Fact]
     public async Task An_empty_container_spanning_lines_is_not_folded()
     {
         var snapshot = new TextSnapshot("{\n}\n");
@@ -159,6 +181,14 @@ public sealed class JsonFoldingProviderTests
     public async Task Unbalanced_text_does_not_throw()
     {
         var snapshot = new TextSnapshot("{\n  \"a\": [1,\n");
+
+        Assert.Empty(await GetAsync(snapshot));
+    }
+
+    [Fact]
+    public async Task An_unclosed_comment_does_not_make_brackets_inside_it_structure()
+    {
+        var snapshot = new TextSnapshot("{\n  /* } ]\n");
 
         Assert.Empty(await GetAsync(snapshot));
     }

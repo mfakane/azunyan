@@ -136,11 +136,15 @@ public static class BuiltInSyntaxLanguages
     }
 
     private static SyntaxLanguageDefinition CreateJson() =>
-        new("json", "JSON", [".json"],
+        new("json", "JSON", [".json", ".jsonc", ".json5"],
         [
+            new DelimitedSyntaxRule("/*", "*/", "comment"),
+            new LineRemainderSyntaxRule("//", "comment"),
             new DelimitedSyntaxRule("\"", "\"", "string", allowLineBreaks: false, escapePrefix: "\\"),
+            new DelimitedSyntaxRule("'", "'", "string", allowLineBreaks: false, escapePrefix: "\\"),
+            new RegexSyntaxRule(@"(?<![\w.$])[$_\p{L}\p{Nl}][$\p{L}\p{Nl}\p{Mn}\p{Mc}\p{Nd}\p{Pc}\u200C\u200D]*(?=\s*:)", "property"),
             new KeywordSyntaxRule(["true", "false", "null"]),
-            new RegexSyntaxRule(@"(?<![\w.])-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?(?![\w.])", "number")
+            new RegexSyntaxRule(@"(?<![\w.$])(?:[+-]?(?:(?:0[xX][0-9a-fA-F]+)|(?:(?:0|[1-9]\d*)(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|Infinity|NaN))(?![\w.$])", "number")
         ],
         CommonCompletionTriggers,
         foldingProvider: new JsonFoldingProvider());

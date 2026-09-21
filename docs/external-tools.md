@@ -72,7 +72,7 @@ stdout = "ignore"
 stderr = "ignore"
 
 [when]
-extensions = [".js", ".jsx", ".ts", ".tsx", ".json", ".css", ".scss", ".html"]
+extensions = [".js", ".jsx", ".ts", ".tsx", ".json", ".jsonc", ".json5", ".css", ".scss", ".html"]
 
 [env]
 NODE_ENV = "development"
@@ -226,10 +226,10 @@ specified conditions must match.
 | `os` | Operating-system identifiers, such as `windows`. |
 
 An untitled document is matched by `extensions` through its language mode:
-choosing the JSON mode in an untitled document makes the tools for `.json`
-apply to it. `patterns` is about file names, so it still needs a saved
-document, and a document that has been saved is always matched by its own
-extension, whichever mode was chosen for it.
+choosing the JSON mode in an untitled document makes the tools for `.json`,
+`.jsonc`, and `.json5` apply to it. `patterns` is about file names, so it
+still needs a saved document, and a document that has been saved is always
+matched by its own extension, whichever mode was chosen for it.
 
 With `visibility = "whenAvailable"`, a tool is hidden when its conditions do
 not match or its command cannot be resolved. With `visibility = "always"`, it

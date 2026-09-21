@@ -110,12 +110,47 @@ public sealed class BuiltInSyntaxLanguagesTests
     }
 
     [Fact]
+    public async Task Json_mode_classifies_jsonc_and_json5_syntax()
+    {
+        const string text =
+            "/* true 0x1 */\n"
+            + "// false 0x1\n"
+            + "{ unquoted: 'text', true: Infinity, value: -.5, trailing: 1., hex: +0xFF, nan: NaN, 日本語: 2 }";
+
+        var spans = await BuiltInSyntaxLanguages.Json.GetSyntaxAsync(
+            new EditorProviderContext(new TextSnapshot(text), 0, TextSelection.Caret(0)));
+
+        Assert.Equal(
+            [
+                "/* true 0x1 */:comment",
+                "// false 0x1:comment",
+                "unquoted:property",
+                "'text':string",
+                "true:property",
+                "Infinity:number",
+                "value:property",
+                "-.5:number",
+                "trailing:property",
+                "1.:number",
+                "hex:property",
+                "+0xFF:number",
+                "nan:property",
+                "NaN:number",
+                "日本語:property",
+                "2:number"
+            ],
+            spans.Select(span => $"{text[span.Range.Start..span.Range.End]}:{span.Classification}"));
+    }
+
+    [Fact]
     public void Definitions_expose_normalized_extensions()
     {
         Assert.Contains(".cs", BuiltInSyntaxLanguages.CSharp.FileExtensions);
         Assert.Contains(".tsx", BuiltInSyntaxLanguages.TypeScript.FileExtensions);
         Assert.Contains(".yaml", BuiltInSyntaxLanguages.Yaml.FileExtensions);
         Assert.Contains(".yml", BuiltInSyntaxLanguages.Yaml.FileExtensions);
+        Assert.Contains(".jsonc", BuiltInSyntaxLanguages.Json.FileExtensions);
+        Assert.Contains(".json5", BuiltInSyntaxLanguages.Json.FileExtensions);
         Assert.Contains("*.toml", BuiltInSyntaxLanguages.Toml.Patterns);
         Assert.IsType<TomlFoldingProvider>(BuiltInSyntaxLanguages.Toml.FoldingProvider);
         Assert.Equal([".", "(", "{", "[", "->"], BuiltInSyntaxLanguages.CSharp.CompletionTriggerCharacters);
