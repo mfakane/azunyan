@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Optional four-part package version (for example, 0.1.0.42)
+        description: Optional four-part package version (for example, 0.1.42.0)
         required: false
         type: string
 
@@ -105,7 +105,7 @@ jobs:
         run: |
           $version = $env:REQUESTED_VERSION
           if ([string]::IsNullOrWhiteSpace($version)) {
-              $version = "0.1.0.$env:GITHUB_RUN_NUMBER"
+              $version = "0.1.$env:GITHUB_RUN_NUMBER.0"
           }
 
           ./scripts/Package-AzunoteMsix.ps1 `
