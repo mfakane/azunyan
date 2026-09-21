@@ -21,7 +21,7 @@
 
   <Properties>
     <DisplayName>Azunote</DisplayName>
-    <PublisherDisplayName>mfakane</PublisherDisplayName>
+    <PublisherDisplayName>MF Alie</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
     <uap10:PackageIntegrity>
       <uap10:Content Enforcement="on"/>
