@@ -15,8 +15,8 @@
   IgnorableNamespaces="uap uap2 uap3 uap5 uap10 desktop desktop2 desktop4 desktop6 rescap">
 
   <Identity
-    Name="Azunote"
-    Publisher="CN=MF Alie"
+    Name="45929MFAlie.Azunote"
+    Publisher="CN=D7E708B5-C0DE-4FEA-AC18-53FAA75BE2F5"
     Version="0.1.0.0" />
 
   <Properties>
