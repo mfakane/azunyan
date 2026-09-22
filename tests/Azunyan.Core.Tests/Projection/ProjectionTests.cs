@@ -310,6 +310,87 @@ public sealed class ProjectionTests
     }
 
     [Fact]
+    public void Same_snapshot_fold_projection_reuses_unaffected_lines_and_matches_full_build()
+    {
+        var snapshot = new TextSnapshot("aa\nbb\ncc\ndd\nee\nff\ngg\nhh");
+        var previous = TextProjectionBuilder.Build(snapshot);
+        var folds = new[] { new FoldRange("middle", TextRange.FromBounds(6, 8), "...") };
+
+        var incremental = TextProjectionBuilder.BuildIncremental(snapshot, previous, folds, null);
+        var expected = TextProjectionBuilder.Build(snapshot, folds);
+
+        AssertProjectionEquivalent(expected, incremental, snapshot);
+        Assert.Same(previous.Lines[0], incremental.Lines[0]);
+        Assert.Same(previous.Lines[^1], incremental.Lines[^1]);
+    }
+
+    [Fact]
+    public void Same_snapshot_fold_expand_matches_full_build()
+    {
+        var snapshot = new TextSnapshot("aa\nbb\ncc\ndd\nee\nff");
+        var folds = new[] { new FoldRange("middle", TextRange.FromBounds(3, 8), "...") };
+        var previous = TextProjectionBuilder.Build(snapshot, folds);
+
+        var incremental = TextProjectionBuilder.BuildIncremental(snapshot, previous, Array.Empty<FoldRange>(), null);
+        var expected = TextProjectionBuilder.Build(snapshot);
+
+        AssertProjectionEquivalent(expected, incremental, snapshot);
+    }
+
+    [Fact]
+    public void Same_snapshot_projection_handles_nested_fold_normalization_and_inlay_changes()
+    {
+        var snapshot = new TextSnapshot("0123456789\nabcdefghij");
+        var oldFolds = new[] { new FoldRange("inner", new TextRange(3, 2)) };
+        var oldInlays = new[]
+        {
+            new InlineAdornment("hint", DocumentAnchor.Before(12), "hint", new AdornmentContent(" old"))
+        };
+        var previous = TextProjectionBuilder.Build(snapshot, oldFolds, oldInlays);
+        var currentFolds = new[]
+        {
+            new FoldRange("outer", TextRange.FromBounds(1, 7)),
+            new FoldRange("inner", new TextRange(3, 2))
+        };
+        var currentInlays = new[]
+        {
+            new InlineAdornment("hint", DocumentAnchor.Before(12), "hint", new AdornmentContent(" new"))
+        };
+
+        var incremental = TextProjectionBuilder.BuildIncremental(
+            snapshot,
+            previous,
+            currentFolds,
+            currentInlays);
+        var expected = TextProjectionBuilder.Build(snapshot, currentFolds, currentInlays);
+
+        AssertProjectionEquivalent(expected, incremental, snapshot);
+    }
+
+    [Fact]
+    public void Same_snapshot_projection_rebuilds_the_union_when_adornments_move_between_lines()
+    {
+        var snapshot = new TextSnapshot("aa\nbb\ncc\ndd\nee\nff");
+        var previous = TextProjectionBuilder.Build(
+            snapshot,
+            folds: new[] { new FoldRange("fold", new TextRange(15, 2), "old") },
+            inlays: new[]
+            {
+                new InlineAdornment("hint", DocumentAnchor.Before(13), "hint", new AdornmentContent(" old"))
+            });
+        var folds = new[] { new FoldRange("fold", new TextRange(3, 2), "new") };
+        var inlays = new[]
+        {
+            new InlineAdornment("hint", DocumentAnchor.Before(1), "hint", new AdornmentContent(" new"))
+        };
+
+        var incremental = TextProjectionBuilder.BuildIncremental(snapshot, previous, folds, inlays);
+        var expected = TextProjectionBuilder.Build(snapshot, folds, inlays);
+
+        AssertProjectionEquivalent(expected, incremental, snapshot);
+    }
+
+    [Fact]
     public void A_fold_covering_a_line_to_its_end_hides_that_line()
     {
         var snapshot = new TextSnapshot("a\nb\nc");

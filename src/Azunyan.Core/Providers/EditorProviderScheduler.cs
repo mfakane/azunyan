@@ -6,7 +6,8 @@ public sealed class DocumentProviderResults
         TextSnapshot snapshot,
         SyntaxAnalysis syntax,
         IReadOnlyList<TextDecoration> decorations,
-        FoldingAnalysis folding)
+        FoldingAnalysis folding,
+        bool isProvisional = false)
     {
         Snapshot = snapshot;
         SyntaxAnalysis = syntax;
@@ -14,6 +15,7 @@ public sealed class DocumentProviderResults
         Decorations = Array.AsReadOnly(decorations.ToArray());
         FoldingAnalysis = folding;
         Folds = folding.Folds;
+        IsProvisional = isProvisional;
     }
 
     public TextSnapshot Snapshot { get; }
@@ -29,6 +31,44 @@ public sealed class DocumentProviderResults
     public FoldingAnalysis FoldingAnalysis { get; }
 
     public bool FoldsAreComplete => FoldingAnalysis.IsComplete;
+
+    public bool IsProvisional { get; }
+
+    /// <summary>
+    /// Maps unaffected classifications forward for display while providers
+    /// compute an authoritative result for the new snapshot.
+    /// </summary>
+    public DocumentProviderResults MapUnchangedRanges(
+        TextSnapshot snapshot,
+        TextChange change)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        TextChangeMapper.Validate(change, Snapshot, snapshot);
+        var syntax = Syntax
+            .Where(span => !Touches(span.Range, change.OldRange))
+            .Select(span => new SyntaxSpan(
+                TextChangeMapper.MapRange(Snapshot, snapshot, change, span.Range),
+                span.Classification))
+            .ToArray();
+        var decorations = Decorations
+            .Where(decoration => !Touches(decoration.Range, change.OldRange))
+            .Select(decoration => new TextDecoration(
+                TextChangeMapper.MapRange(Snapshot, snapshot, change, decoration.Range),
+                decoration.Kind,
+                decoration.Message))
+            .ToArray();
+        return new DocumentProviderResults(
+            snapshot,
+            new SyntaxAnalysis(syntax),
+            decorations,
+            FoldingAnalysis.EmptyIncomplete,
+            isProvisional: true);
+    }
+
+    private static bool Touches(TextRange range, TextRange change) =>
+        change.IsEmpty
+            ? range.Start <= change.Start && change.Start <= range.End
+            : range.Start < change.End && change.Start < range.End;
 }
 
 public sealed class ViewportProviderResults

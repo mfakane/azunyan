@@ -153,6 +153,27 @@ public sealed class LayoutTests
     }
 
     [Fact]
+    public void Incremental_visual_rows_handle_same_snapshot_fold_changes_with_wrapping()
+    {
+        var snapshot = new TextSnapshot("abcdef\nghijkl\nmnopqr\nstuvwx");
+        var previousProjection = TextProjectionBuilder.Build(snapshot);
+        var previous = VisualRowMapBuilder.Build(previousProjection, wrapColumns: 3);
+        var folds = new[] { new FoldRange("middle", TextRange.FromBounds(7, 9), "...") };
+        var projection = TextProjectionBuilder.BuildIncremental(snapshot, previousProjection, folds, null);
+
+        var incremental = VisualRowMapBuilder.BuildIncremental(
+            previousProjection,
+            projection,
+            previous,
+            wrapColumns: 3);
+        var expected = VisualRowMapBuilder.Build(projection, wrapColumns: 3);
+
+        Assert.Equal(expected.Rows.Select(DescribeRow), incremental.Rows.Select(DescribeRow));
+        Assert.NotNull(incremental.ChangeWindow);
+        Assert.Same(previous.Rows[0], incremental.Rows[0]);
+    }
+
+    [Fact]
     public void Visible_layouts_reuse_cached_unwrapped_line_layouts()
     {
         var snapshot = new TextSnapshot("abcdef");

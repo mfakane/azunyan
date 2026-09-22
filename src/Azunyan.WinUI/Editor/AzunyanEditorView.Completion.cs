@@ -193,19 +193,21 @@ public sealed partial class AzunyanEditorView
 
     private bool HasCompletionPrefix() => GetCompletionPrefix().Length > 0;
 
-    private bool IsCompletionTrigger(string text, int caretPosition)
+    private bool IsCompletionTrigger(TextSnapshot snapshot, int caretPosition)
     {
         if (_completionTriggerCharacters.Length == 0
             || caretPosition <= 0
-            || caretPosition > text.Length)
+            || caretPosition > snapshot.Length)
         {
             return false;
         }
 
         return _completionTriggerCharacters.Any(trigger =>
             trigger.Length <= caretPosition
-            && text.AsSpan(caretPosition - trigger.Length, trigger.Length)
-                .SequenceEqual(trigger.AsSpan()));
+            && string.Equals(
+                snapshot.GetText(caretPosition - trigger.Length, trigger.Length),
+                trigger,
+                StringComparison.Ordinal));
     }
 
     private string GetCompletionPrefix()

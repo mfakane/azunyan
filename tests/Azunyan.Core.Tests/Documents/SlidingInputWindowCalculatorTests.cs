@@ -1,4 +1,5 @@
 using Azunyan.Core;
+using System.Reflection;
 using Xunit;
 
 namespace Azunyan.Core.Tests;
@@ -75,5 +76,54 @@ public sealed class SlidingInputWindowCalculatorTests
     {
         Assert.Throws<ArgumentOutOfRangeException>(
             () => new SlidingInputWindowCalculator(beforeContextLength: -1));
+    }
+
+    [Fact]
+    public void Reuses_an_aligned_window_for_an_interior_change_without_materializing_text()
+    {
+        var snapshot = new TextSnapshot("0a\u0301😀xbc9");
+        var change = new TextChange(new TextRange(5, 0), string.Empty, "x");
+
+        Assert.True(SlidingInputWindowCalculator.TryReuseAlignedWindow(
+            new TextRange(1, 8),
+            change,
+            snapshot.Length,
+            out var window));
+
+        Assert.Equal(new TextRange(1, 8), window);
+        Assert.Null(typeof(TextSnapshot)
+            .GetField("_text", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(snapshot));
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(6, 0)]
+    public void Falls_back_when_a_change_touches_a_window_edge(int start, int length)
+    {
+        var change = new TextChange(
+            new TextRange(start, length),
+            new string('a', length),
+            string.Empty);
+
+        Assert.False(SlidingInputWindowCalculator.TryReuseAlignedWindow(
+            new TextRange(0, 6),
+            change,
+            snapshotLength: 6,
+            out _));
+    }
+
+    [Fact]
+    public void Maps_an_aligned_window_through_an_interior_managed_edit()
+    {
+        var change = new TextChange(TextRange.Empty(50), string.Empty, "\r\n    ");
+
+        Assert.True(SlidingInputWindowCalculator.TryMapAlignedWindow(
+            new TextRange(10, 100),
+            change,
+            snapshotLength: 206,
+            out var window));
+
+        Assert.Equal(new TextRange(10, 106), window);
     }
 }

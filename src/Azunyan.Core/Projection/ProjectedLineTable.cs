@@ -26,6 +26,32 @@ internal sealed class ProjectedLineTable : IReadOnlyList<ProjectedLine>
 
     public int Count { get; }
 
+    public bool TryGetVisualLine(int logicalLine, out int visualLine)
+    {
+        visualLine = GetVisualLineAtOrAfter(logicalLine);
+        return visualLine < Count && this[visualLine].LogicalLine == logicalLine;
+    }
+
+    public int GetVisualLineAtOrAfter(int logicalLine)
+    {
+        var low = 0;
+        var high = Count;
+        while (low < high)
+        {
+            var middle = low + ((high - low) / 2);
+            if (this[middle].LogicalLine < logicalLine)
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                high = middle;
+            }
+        }
+
+        return low;
+    }
+
     public ProjectedLine this[int index]
     {
         get

@@ -1324,17 +1324,18 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         {
             _pendingDocumentChange = null;
         }
-        RenderFoldChevrons(context, layouts);
+        RenderFoldChevrons(context, layoutState, layouts);
         _gutterSurface.Invalidate();
         _textSurface.Invalidate();
     }
 
     private static void RenderFoldChevrons(
         AzunyanEditorRenderContext context,
+        ProjectedTextLayoutState layoutState,
         IReadOnlyList<ViewportRowLayout> layouts)
     {
         if (context.ToggleFold is null
-            || context.Folds is not { Count: > 0 } folds
+            || layoutState.FoldsByLogicalLine.Count == 0
             || context.GutterWidth < FoldChevronWidth)
         {
             return;
@@ -1348,8 +1349,12 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
                 continue;
             }
 
-            foreach (var fold in folds.Where(fold =>
-                context.Snapshot.Lines.GetLine(fold.Range.Start) == row.LogicalLine))
+            if (!layoutState.FoldsByLogicalLine.TryGetValue(row.LogicalLine, out var folds))
+            {
+                continue;
+            }
+
+            foreach (var fold in folds)
             {
                 var collapsed = context.CollapsedFoldIds.Contains(fold.Id);
                 var button = new Button
@@ -1576,6 +1581,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         var documentFolds = context.Folds;
         var inlays = context.ViewportResults?.Inlays;
         var blocks = context.ViewportResults?.BlockAdornments;
+        var collapsedFoldIdSet = context.CollapsedFoldIds;
         var collapsedFoldIds = context.CollapsedFoldIds
             .OrderBy(id => id, StringComparer.Ordinal)
             .ToArray();
@@ -1617,7 +1623,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         var folds = documentFolds is null
             ? Array.Empty<FoldRange>()
             : documentFolds
-                .Where(fold => collapsedFoldIds.Contains(fold.Id, StringComparer.Ordinal))
+                .Where(fold => collapsedFoldIdSet.Contains(fold.Id))
                 .ToArray();
         var projection = TryBuildIncrementalProjection(
             context,
@@ -1664,6 +1670,16 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         FoldRange[] folds)
     {
         if (cached is not null
+            && ReferenceEquals(cached.Snapshot, context.Snapshot))
+        {
+            return TextProjectionBuilder.BuildIncremental(
+                context.Snapshot,
+                cached.Rows.Projection,
+                folds,
+                inlays ?? Array.Empty<InlineAdornment>());
+        }
+
+        if (cached is not null
             && _pendingDocumentChange is { } change
             && ReferenceEquals(change.OldSnapshot, cached.Snapshot)
             && ReferenceEquals(change.NewSnapshot, context.Snapshot)
@@ -1699,10 +1715,14 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         var currentBlocks = blocks ?? Array.Empty<BlockAdornment>();
         var pendingChange = _pendingDocumentChange;
         var canBuildIncrementally = previousLayout is not null
-            && !ReferenceEquals(previousLayout.Snapshot, context.Snapshot)
-            && pendingChange is { } change
-            && ReferenceEquals(change.OldSnapshot, previousLayout.Snapshot)
-            && ReferenceEquals(change.NewSnapshot, context.Snapshot);
+            && (ReferenceEquals(previousLayout.Snapshot, context.Snapshot)
+                    && previousLayout.LineHeight == context.LineHeight
+                    && previousLayout.WrapColumns == wrapColumns
+                    && previousLayout.WrapWidth == wrapWidth
+                    && previousLayout.TabDisplaySize == context.TabDisplaySize
+                || pendingChange is { } change
+                    && ReferenceEquals(change.OldSnapshot, previousLayout.Snapshot)
+                    && ReferenceEquals(change.NewSnapshot, context.Snapshot));
         var rows = canBuildIncrementally
             ? VisualRowMapBuilder.BuildIncremental(
                 previousLayout!.Rows.Projection,
@@ -1711,7 +1731,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
                 currentBlocks,
                 wrapColumns,
                 measuredBreaks,
-                pendingChange!.Change)
+                pendingChange?.Change)
             : VisualRowMapBuilder.Build(
                 projection,
                 currentBlocks,
@@ -2207,6 +2227,9 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             WrapBreaks = measuredBreaks;
             Rows = rows;
             Heights = heights;
+            FoldsByLogicalLine = (folds ?? Array.Empty<FoldRange>())
+                .GroupBy(fold => snapshot.Lines.GetLine(fold.Range.Start))
+                .ToDictionary(group => group.Key, group => (IReadOnlyList<FoldRange>)group.ToArray());
         }
 
         public TextSnapshot Snapshot { get; }
@@ -2232,6 +2255,8 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         public VisualRowMap Rows { get; }
 
         public VisualLineHeightIndex Heights { get; }
+
+        public Dictionary<int, IReadOnlyList<FoldRange>> FoldsByLogicalLine { get; }
 
         public bool Matches(
             TextSnapshot snapshot,

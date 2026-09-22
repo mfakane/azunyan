@@ -119,6 +119,30 @@ internal sealed class TextTree
         VisitPieces(_root, visitor);
     }
 
+    internal int GetLineBreakCountBefore(int position)
+    {
+        ValidatePosition(position);
+        var summary = GetPrefixSummary(_root, position);
+        if (summary.EndsWithCarriageReturn && position < Length && GetCharAt(position) == '\n')
+        {
+            return summary.LineBreakCount - 1;
+        }
+
+        return summary.LineBreakCount;
+    }
+
+    internal (int Start, int Length) GetLineBreak(int index)
+    {
+        if (index < 0 || _root is null || index >= _root.Summary.LineBreakCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index));
+        }
+
+        var start = FindLineBreak(_root, index, 0);
+        var breakLength = start + 1 < Length && GetCharAt(start) == '\r' && GetCharAt(start + 1) == '\n' ? 2 : 1;
+        return (start, breakLength);
+    }
+
     private static void VisitPieces(
         Node? node,
         Action<ReadOnlyMemory<char>> visitor)
@@ -131,6 +155,91 @@ internal sealed class TextTree
         VisitPieces(node.Left, visitor);
         visitor(node.Piece.Memory);
         VisitPieces(node.Right, visitor);
+    }
+
+    private static Summary GetPrefixSummary(Node? node, int length)
+    {
+        if (node is null || length == 0)
+        {
+            return default;
+        }
+
+        if (length >= node.Length)
+        {
+            return node.Summary;
+        }
+
+        var leftLength = Node.GetLength(node.Left);
+        if (length <= leftLength)
+        {
+            return GetPrefixSummary(node.Left, length);
+        }
+
+        var summary = node.Left?.Summary ?? default;
+        var pieceLength = Math.Min(node.Piece.Length, length - leftLength);
+        summary = Combine(summary, node.Piece.GetSummary(pieceLength));
+        if (pieceLength == node.Piece.Length && length > leftLength + pieceLength)
+        {
+            summary = Combine(summary, GetPrefixSummary(node.Right, length - leftLength - pieceLength));
+        }
+
+        return summary;
+    }
+
+    private static Summary Combine(Summary left, Summary right)
+    {
+        if (!left.HasText)
+        {
+            return right;
+        }
+
+        if (!right.HasText)
+        {
+            return left;
+        }
+
+        return new Summary(
+            true,
+            left.LineBreakCount + right.LineBreakCount
+                - (left.EndsWithCarriageReturn && right.StartsWithLineFeed ? 1 : 0),
+            left.StartsWithLineFeed,
+            right.EndsWithCarriageReturn);
+    }
+
+    private static int FindLineBreak(Node node, int index, int documentStart)
+    {
+        var left = node.Left;
+        var leftCount = left?.Summary.LineBreakCount ?? 0;
+        if (index < leftCount)
+        {
+            return FindLineBreak(left!, index, documentStart);
+        }
+
+        index -= leftCount;
+        var pieceStart = documentStart + Node.GetLength(left);
+        var pieceSummary = node.Piece.Summary;
+        var mergeLeftAndPiece = left is not null
+            && left.Summary.EndsWithCarriageReturn
+            && pieceSummary.StartsWithLineFeed;
+        var pieceCount = pieceSummary.LineBreakCount - (mergeLeftAndPiece ? 1 : 0);
+        if (index < pieceCount)
+        {
+            return pieceStart + node.Piece.GetLineBreakStart(index + (mergeLeftAndPiece ? 1 : 0));
+        }
+
+        index -= pieceCount;
+        var right = node.Right;
+        if (right is null)
+        {
+            throw new InvalidOperationException("The text tree did not contain the requested line break.");
+        }
+
+        var mergePieceAndRight = pieceSummary.EndsWithCarriageReturn
+            && right.Summary.StartsWithLineFeed;
+        return FindLineBreak(
+            right,
+            index + (mergePieceAndRight ? 1 : 0),
+            pieceStart + node.Piece.Length);
     }
 
     private void ValidatePosition(int position)
@@ -265,6 +374,7 @@ internal sealed class TextTree
             Left = left;
             Right = right;
             Length = GetLength(left) + piece.Length + GetLength(right);
+            Summary = Combine(Combine(left?.Summary ?? default, piece.Summary), right?.Summary ?? default);
         }
 
         public TextPiece Piece { get; }
@@ -277,21 +387,34 @@ internal sealed class TextTree
 
         public int Length { get; }
 
+        public Summary Summary { get; }
+
         public static int GetLength(Node? node) => node?.Length ?? 0;
     }
+
+    private readonly record struct Summary(
+        bool HasText,
+        int LineBreakCount,
+        bool StartsWithLineFeed,
+        bool EndsWithCarriageReturn);
 
     private readonly struct TextPiece
     {
         public TextPiece(string source)
-            : this(source, 0, source.Length)
+            : this(source, 0, source.Length, CreateNewlineOffsets(source))
         {
         }
 
-        private TextPiece(string source, int start, int length)
+        private TextPiece(string source, int start, int length, int[] breakStarts)
         {
             Source = source;
             Start = start;
             Length = length;
+            BreakStarts = breakStarts;
+            HasLeadingVirtualLineFeed = start > 0
+                && start < source.Length
+                && source[start] == '\n'
+                && source[start - 1] == '\r';
         }
 
         private string Source { get; }
@@ -300,11 +423,96 @@ internal sealed class TextTree
 
         public int Length { get; }
 
+        private int[] BreakStarts { get; }
+
+        private bool HasLeadingVirtualLineFeed { get; }
+
+        public Summary Summary => GetSummary(Length);
+
         public char this[int offset] => Source[Start + offset];
 
         public ReadOnlyMemory<char> Memory => Source.AsMemory(Start, Length);
 
-        public TextPiece Slice(int start, int length) => new(Source, Start + start, length);
+        public TextPiece Slice(int start, int length) => new(Source, Start + start, length, BreakStarts);
+
+        public Summary GetSummary(int length)
+        {
+            if (length == 0)
+            {
+                return default;
+            }
+
+            var end = Start + length;
+            var breakCount = CountInRange(BreakStarts, Start, end)
+                + (HasLeadingVirtualLineFeed ? 1 : 0);
+            return new Summary(
+                true,
+                breakCount,
+                Source[Start] == '\n',
+                Source[end - 1] == '\r');
+        }
+
+        public int GetLineBreakStart(int index)
+        {
+            if (HasLeadingVirtualLineFeed)
+            {
+                if (index == 0)
+                {
+                    return 0;
+                }
+
+                index--;
+            }
+
+            var first = LowerBound(BreakStarts, Start);
+            var sourceIndex = first + index;
+            if (sourceIndex >= BreakStarts.Length || BreakStarts[sourceIndex] >= Start + Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(index));
+            }
+
+            return BreakStarts[sourceIndex] - Start;
+        }
+
+        private static int[] CreateNewlineOffsets(string source)
+        {
+            var offsets = new List<int>();
+            for (var index = 0; index < source.Length; index++)
+            {
+                if (source[index] == '\r'
+                    || (source[index] == '\n' && (index == 0 || source[index - 1] != '\r')))
+                {
+                    offsets.Add(index);
+                }
+            }
+
+            return offsets.ToArray();
+        }
+
+        private static int CountInRange(int[] offsets, int start, int endExclusive)
+        {
+            return LowerBound(offsets, endExclusive) - LowerBound(offsets, start);
+        }
+
+        private static int LowerBound(int[] values, int value)
+        {
+            var low = 0;
+            var high = values.Length;
+            while (low < high)
+            {
+                var middle = low + ((high - low) / 2);
+                if (values[middle] < value)
+                {
+                    low = middle + 1;
+                }
+                else
+                {
+                    high = middle;
+                }
+            }
+
+            return low;
+        }
 
         public void AppendTo(StringBuilder builder)
         {

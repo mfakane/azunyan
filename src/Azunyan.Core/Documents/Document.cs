@@ -362,7 +362,7 @@ public sealed class Document
         var column = 0;
         for (var index = 0; index < local; index++)
         {
-            column = Snapshot.Text[lineStart + index] == '\t'
+            column = Snapshot[lineStart + index] == '\t'
                 ? column + 4 - (column % 4)
                 : column + 1;
         }

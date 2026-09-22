@@ -19,24 +19,28 @@ public sealed partial class AzunyanEditorView
         var snapshot = Snapshot;
         var selection = Document.Selection;
         var previousFrame = _providerFrame;
-        var currentFrame = GetCurrentFrame();
 
         if (requestDocument)
         {
             var generation = NextProviderGeneration(ref _documentProviderGeneration);
-            _providerFrame = new EditorProviderFrame(snapshot, selection);
-            RenderViewport();
             var canUseDocumentChange = documentChange is { }
                 && ReferenceEquals(documentChange.NewSnapshot, snapshot);
+            var previousDocument = canUseDocumentChange
+                && previousFrame?.Document is { } previousResults
+                && !previousResults.IsProvisional
+                && ReferenceEquals(previousResults.Snapshot, documentChange!.OldSnapshot)
+                    ? previousResults
+                    : null;
+            _providerFrame = new EditorProviderFrame(
+                snapshot,
+                selection,
+                previousDocument?.MapUnchangedRanges(snapshot, documentChange!.Change));
+            RenderViewport();
             _ = ApplyDocumentProviderResultAsync(
                 _providerScheduler.RequestDocumentAsync(
                     snapshot,
                     selection,
-                    previousResults: canUseDocumentChange
-                        && previousFrame?.Document is { } previousResults
-                        && ReferenceEquals(previousResults.Snapshot, documentChange!.OldSnapshot)
-                            ? previousResults
-                            : null,
+                    previousResults: previousDocument,
                     change: canUseDocumentChange
                         ? documentChange!.Change
                         : null),
@@ -57,12 +61,16 @@ public sealed partial class AzunyanEditorView
         if (requestPosition)
         {
             var generation = NextProviderGeneration(ref _positionProviderGeneration);
-            _providerFrame = new EditorProviderFrame(
-                snapshot,
-                selection,
-                currentFrame?.Document,
-                currentFrame?.Viewport);
-            RenderViewport();
+            if (!requestDocument)
+            {
+                var frame = GetCurrentFrame();
+                _providerFrame = new EditorProviderFrame(
+                    snapshot,
+                    selection,
+                    frame?.Document,
+                    frame?.Viewport);
+                RenderViewport();
+            }
             _ = ApplyPositionProviderResultAsync(
                 _providerScheduler.RequestPositionAsync(
                     snapshot,

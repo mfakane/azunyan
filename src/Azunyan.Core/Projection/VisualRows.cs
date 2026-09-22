@@ -119,7 +119,7 @@ public sealed class VisualRowMapBuilder
         if (blocks.Length == 0
             && wrapColumns == 0
             && wrappedLineBreaks is null
-            && wrappedLineBreaksByVisualLine is null)
+            && wrappedLineBreaksByVisualLine is not { Count: > 0 })
         {
             return VisualRowMap.CreatePlain(projection);
         }
@@ -165,9 +165,19 @@ public sealed class VisualRowMapBuilder
 
         if (!ReferenceEquals(previous.Projection, previousProjection)
             || projection.ChangeWindow is not { } changeWindow
-            || !projection.IsPlain && previousProjection.IsPlain)
+            || !projection.IsPlain
+                && previousProjection.IsPlain
+                && !ReferenceEquals(previousProjection.Snapshot, projection.Snapshot))
         {
             return Build(projection, blockAdornments, wrapColumns, wrappedLineBreaksByVisualLine: wrappedLineBreaksByVisualLine);
+        }
+
+        var blockArray = blockAdornments?.ToArray() ?? Array.Empty<BlockAdornment>();
+        if (blockArray.Length == 0
+            && wrapColumns == 0
+            && wrappedLineBreaksByVisualLine is not { Count: > 0 })
+        {
+            return VisualRowMap.CreatePlain(projection);
         }
 
         var wrapBreaks = CreateWrapBreakMap(
@@ -182,7 +192,7 @@ public sealed class VisualRowMapBuilder
             changeWindow);
         var blocks = NormalizeBlocks(
             projection,
-            blockAdornments?.ToArray() ?? Array.Empty<BlockAdornment>());
+            blockArray);
         var oldVisualWindow = GetVisualWindow(
             previousProjection,
             changeWindow.OldStartLine,

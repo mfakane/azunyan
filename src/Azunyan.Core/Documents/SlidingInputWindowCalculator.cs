@@ -31,6 +31,76 @@ public sealed class SlidingInputWindowCalculator
     public int HysteresisLength { get; }
 
     /// <summary>
+    /// Reuses a window that the native control has already kept text-element
+    /// aligned while applying <paramref name="change"/>. The supplied range
+    /// is the post-change native window; callers must only use this for a
+    /// validated event from the generation that produced that window.
+    /// </summary>
+    public static bool TryReuseAlignedWindow(
+        TextRange trustedWindow,
+        TextChange change,
+        int snapshotLength,
+        out TextRange window)
+    {
+        window = default;
+        ArgumentOutOfRangeException.ThrowIfNegative(snapshotLength);
+        if (!IsUsable(trustedWindow, snapshotLength))
+        {
+            return false;
+        }
+
+        var oldWindowEnd = trustedWindow.End
+            - (change.NewText.Length - change.OldRange.Length);
+        if (oldWindowEnd < trustedWindow.Start)
+        {
+            return false;
+        }
+
+        var oldWindow = TextRange.FromBounds(trustedWindow.Start, oldWindowEnd);
+        if (!oldWindow.Contains(change.OldRange)
+            || !trustedWindow.Contains(change.NewRange)
+            || change.OldRange.Start <= oldWindow.Start
+            || change.OldRange.End >= oldWindow.End
+            || change.NewRange.Start <= trustedWindow.Start
+            || change.NewRange.End >= trustedWindow.End)
+        {
+            return false;
+        }
+
+        window = trustedWindow;
+        return true;
+    }
+
+    /// <summary>
+    /// Maps an already aligned pre-change window through an interior edit.
+    /// Edits touching either edge require normal text-element alignment.
+    /// </summary>
+    public static bool TryMapAlignedWindow(
+        TextRange alignedWindow,
+        TextChange change,
+        int snapshotLength,
+        out TextRange window)
+    {
+        window = default;
+        ArgumentOutOfRangeException.ThrowIfNegative(snapshotLength);
+        if (!alignedWindow.Contains(change.OldRange)
+            || change.OldRange.Start <= alignedWindow.Start
+            || change.OldRange.End >= alignedWindow.End)
+        {
+            return false;
+        }
+
+        var length = alignedWindow.Length + change.NewText.Length - change.OldRange.Length;
+        if (length < 0 || alignedWindow.Start + length > snapshotLength)
+        {
+            return false;
+        }
+
+        window = new TextRange(alignedWindow.Start, length);
+        return true;
+    }
+
+    /// <summary>
     /// Returns a text-element-aligned window that contains the selection and,
     /// when present, the composition range. A valid existing window is kept
     /// until the required range reaches one of its hysteresis edges.

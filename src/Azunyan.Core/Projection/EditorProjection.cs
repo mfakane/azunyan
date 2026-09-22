@@ -426,7 +426,6 @@ internal readonly record struct ProjectionChangeWindow(
 
 public sealed class TextProjection
 {
-    private readonly int[] _logicalToVisual;
     private readonly FoldRange[] _folds;
     private readonly InlineAdornment[] _inlays;
     private readonly int[] _foldStarts;
@@ -437,7 +436,6 @@ public sealed class TextProjection
         ProjectedLineTable lines,
         IReadOnlyList<FoldRange> folds,
         IReadOnlyList<InlineAdornment> inlays,
-        int[]? logicalToVisual,
         bool isPlain,
         ProjectionChangeWindow? changeWindow = null)
     {
@@ -447,7 +445,6 @@ public sealed class TextProjection
         _folds = folds.ToArray();
         _inlays = inlays.ToArray();
         _foldStarts = _folds.Select(fold => fold.Range.Start).ToArray();
-        _logicalToVisual = logicalToVisual ?? Array.Empty<int>();
         IsPlain = isPlain;
         ChangeWindow = changeWindow;
     }
@@ -465,7 +462,9 @@ public sealed class TextProjection
     internal ProjectionChangeWindow? ChangeWindow { get; }
 
     internal int GetVisualLineForLogicalLine(int logicalLine) =>
-        IsPlain ? logicalLine : _logicalToVisual[logicalLine];
+        IsPlain
+            ? logicalLine
+            : _lineTable.TryGetVisualLine(logicalLine, out var visualLine) ? visualLine : -1;
 
     internal bool IsPlain { get; }
 
@@ -479,7 +478,7 @@ public sealed class TextProjection
         var logicalLine = Snapshot.Lines.GetLine(containingFold?.Range.Start ?? offset);
         var visualLine = IsPlain
             ? logicalLine
-            : _logicalToVisual[logicalLine];
+            : _lineTable.TryGetVisualLine(logicalLine, out var projectedLine) ? projectedLine : -1;
 
         // A position at the very end of a fold belongs to no fold, but the
         // line holding it can be hidden by that fold all the same. It is shown
@@ -488,7 +487,7 @@ public sealed class TextProjection
             && !IsPlain
             && FindContainingFold(offset, AnchorAffinity.Before) is { } endingFold)
         {
-            visualLine = _logicalToVisual[Snapshot.Lines.GetLine(endingFold.Range.Start)];
+            visualLine = GetVisualLineForLogicalLine(Snapshot.Lines.GetLine(endingFold.Range.Start));
         }
 
         if (visualLine < 0)
@@ -606,31 +605,22 @@ public sealed class TextProjectionBuilder
                 ProjectedLineTable.FromLines(lines),
                 normalizedFolds,
                 normalizedInlays,
-                logicalToVisual: null,
                 isPlain: true);
         }
 
-        var logicalToVisual = Enumerable.Repeat(-1, snapshot.Lines.LineCount).ToArray();
-
-        for (var logicalLine = 0; logicalLine < snapshot.Lines.LineCount; logicalLine++)
-        {
-            var sourceRange = snapshot.Lines.GetLineRange(logicalLine);
-            var inlines = BuildLineInlines(sourceRange, normalizedFolds, normalizedInlays);
-            if (inlines is null)
-            {
-                continue;
-            }
-
-            logicalToVisual[logicalLine] = lines.Count;
-            lines.Add(new ProjectedLine(logicalLine, sourceRange, inlines));
-        }
+        BuildProjectedLines(
+            snapshot,
+            0,
+            snapshot.Lines.LineCount,
+            normalizedFolds,
+            normalizedInlays,
+            lines);
 
         return new TextProjection(
             snapshot,
             ProjectedLineTable.FromLines(lines),
             normalizedFolds,
             normalizedInlays,
-            logicalToVisual,
             isPlain: false);
     }
 
@@ -651,6 +641,19 @@ public sealed class TextProjectionBuilder
             change,
             folds: null,
             inlays: null);
+
+    public static TextProjection BuildIncremental(
+        TextSnapshot snapshot,
+        TextProjection previous,
+        IEnumerable<FoldRange>? folds,
+        IEnumerable<InlineAdornment>? inlays)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(previous);
+        return ReferenceEquals(snapshot, previous.Snapshot)
+            ? BuildSameSnapshotIncremental(previous, snapshot, folds, inlays)
+            : Build(snapshot, folds, inlays);
+    }
 
     /// <summary>
     /// Incrementally rebuilds the projection and its fold/inlay metadata.
@@ -673,6 +676,11 @@ public sealed class TextProjectionBuilder
             || change.NewRange.End > snapshot.Length)
         {
             return Build(snapshot, folds, inlays);
+        }
+
+        if (ReferenceEquals(oldSnapshot, snapshot))
+        {
+            return BuildSameSnapshotIncremental(previous, snapshot, folds, inlays);
         }
 
         var normalizedFolds = NormalizeFolds(snapshot, folds ?? Array.Empty<FoldRange>());
@@ -709,29 +717,19 @@ public sealed class TextProjectionBuilder
         // The line table is indexed by visual line, and a fold can hide a
         // logical line completely, so the reused prefix and suffix are counted
         // in visual lines rather than in logical ones.
-        var prefixVisualCount = CountVisibleLines(previous, oldWindow.StartLine);
-        var oldChangedVisualCount = CountVisibleLines(
-            previous,
-            oldWindow.StartLine,
-            oldWindow.EndLine);
-        var suffixVisualStart = prefixVisualCount + oldChangedVisualCount;
+        var prefixVisualCount = previous.LineTable.GetVisualLineAtOrAfter(oldWindow.StartLine);
+        var suffixVisualStart = previous.LineTable.GetVisualLineAtOrAfter(oldWindow.EndLine);
+        var oldChangedVisualCount = suffixVisualStart - prefixVisualCount;
         previous.LineTable.AddRange(chunks, 0, prefixVisualCount);
 
-        var changedLines = new List<ProjectedLine>(newWindow.EndLine - newWindow.StartLine);
-        var logicalToVisual = Enumerable.Repeat(-1, newLines.LineCount).ToArray();
-        CopyPrefixVisualLines(previous, logicalToVisual, oldWindow.StartLine);
-        for (var logicalLine = newWindow.StartLine; logicalLine < newWindow.EndLine; logicalLine++)
-        {
-            var sourceRange = newLines.GetLineRange(logicalLine);
-            var line = BuildLineInlines(sourceRange, normalizedFolds, normalizedInlays);
-            if (line is null)
-            {
-                continue;
-            }
-
-            logicalToVisual[logicalLine] = prefixVisualCount + changedLines.Count;
-            changedLines.Add(new ProjectedLine(logicalLine, sourceRange, line));
-        }
+        var changedLines = new List<ProjectedLine>();
+        BuildProjectedLines(
+            snapshot,
+            newWindow.StartLine,
+            newWindow.EndLine,
+            normalizedFolds,
+            normalizedInlays,
+            changedLines);
 
         ProjectedLineTable.FromLines(changedLines).AddRange(
             chunks,
@@ -744,28 +742,11 @@ public sealed class TextProjectionBuilder
             newWindow.EndLine - oldWindow.EndLine,
             delta);
 
-        var visualDelta = changedLines.Count - oldChangedVisualCount;
-        var logicalDelta = newWindow.EndLine - oldWindow.EndLine;
-        for (var logicalLine = newWindow.EndLine; logicalLine < newLines.LineCount; logicalLine++)
-        {
-            var oldLogicalLine = logicalLine - logicalDelta;
-            if (oldLogicalLine < 0 || oldLogicalLine >= oldLines.LineCount)
-            {
-                continue;
-            }
-
-            var oldVisualLine = previous.GetVisualLineForLogicalLine(oldLogicalLine);
-            logicalToVisual[logicalLine] = oldVisualLine < 0
-                ? -1
-                : oldVisualLine + visualDelta;
-        }
-
         return new TextProjection(
             snapshot,
             ProjectedLineTable.FromChunks(chunks),
             normalizedFolds,
             normalizedInlays,
-            logicalToVisual,
             isPlain: normalizedFolds.Count == 0 && normalizedInlays.Length == 0,
             changeWindow: new ProjectionChangeWindow(
                 oldWindow.StartLine,
@@ -774,35 +755,122 @@ public sealed class TextProjectionBuilder
                 newWindow.EndLine));
     }
 
-    private static void CopyPrefixVisualLines(
+    private static TextProjection BuildSameSnapshotIncremental(
         TextProjection previous,
-        int[] destination,
-        int count)
+        TextSnapshot snapshot,
+        IEnumerable<FoldRange>? folds,
+        IEnumerable<InlineAdornment>? inlays)
     {
-        for (var logicalLine = 0; logicalLine < count; logicalLine++)
-        {
-            destination[logicalLine] = previous.GetVisualLineForLogicalLine(logicalLine);
-        }
+        var normalizedFolds = NormalizeFolds(snapshot, folds ?? Array.Empty<FoldRange>());
+        var normalizedInlays = NormalizeInlays(snapshot, inlays ?? Array.Empty<InlineAdornment>());
+        var oldImpact = new List<TextRange>();
+        var newImpact = new List<TextRange>();
+        AddChangedFoldRangesSameSnapshot(previous.Folds, normalizedFolds, oldImpact, newImpact);
+        AddChangedInlayRangesSameSnapshot(previous.Inlays, normalizedInlays, oldImpact, newImpact);
+        var impact = new List<TextRange>(oldImpact.Count + newImpact.Count);
+        impact.AddRange(oldImpact);
+        impact.AddRange(newImpact);
+        var window = impact.Count == 0
+            ? (StartLine: 0, EndLine: 0)
+            : GetLineWindow(snapshot, CombineRanges(impact));
+        var oldWindow = window;
+        var newWindow = window;
+
+        var prefixVisualCount = previous.LineTable.GetVisualLineAtOrAfter(oldWindow.StartLine);
+        var suffixVisualStart = previous.LineTable.GetVisualLineAtOrAfter(oldWindow.EndLine);
+        var chunks = new List<ProjectedLineChunk>();
+        previous.LineTable.AddRange(chunks, 0, prefixVisualCount);
+        var changedLines = new List<ProjectedLine>();
+        BuildProjectedLines(
+            snapshot,
+            newWindow.StartLine,
+            newWindow.EndLine,
+            normalizedFolds,
+            normalizedInlays,
+            changedLines);
+
+        ProjectedLineTable.FromLines(changedLines).AddRange(chunks, 0, changedLines.Count);
+        previous.LineTable.AddRange(chunks, suffixVisualStart, previous.LineTable.Count - suffixVisualStart);
+        return new TextProjection(
+            snapshot,
+            ProjectedLineTable.FromChunks(chunks),
+            normalizedFolds,
+            normalizedInlays,
+            normalizedFolds.Count == 0 && normalizedInlays.Length == 0,
+            new ProjectionChangeWindow(
+                oldWindow.StartLine,
+                oldWindow.EndLine,
+                newWindow.StartLine,
+                newWindow.EndLine));
     }
 
-    private static int CountVisibleLines(TextProjection projection, int endLine) =>
-        CountVisibleLines(projection, 0, endLine);
-
-    private static int CountVisibleLines(
-        TextProjection projection,
-        int startLine,
-        int endLine)
+    private static void AddChangedFoldRangesSameSnapshot(
+        IReadOnlyList<FoldRange> previous,
+        List<FoldRange> current,
+        List<TextRange> oldImpact,
+        List<TextRange> newImpact)
     {
-        var count = 0;
-        for (var logicalLine = startLine; logicalLine < endLine; logicalLine++)
+        var matched = new bool[current.Count];
+        foreach (var oldFold in previous)
         {
-            if (projection.GetVisualLineForLogicalLine(logicalLine) >= 0)
+            var index = FindFold(current, oldFold.Id, matched);
+            if (index >= 0 && FoldMatches(oldFold, current[index], oldFold.Range))
             {
-                count++;
+                matched[index] = true;
+                continue;
+            }
+
+            oldImpact.Add(oldFold.Range);
+            if (index >= 0)
+            {
+                newImpact.Add(current[index].Range);
+                matched[index] = true;
+            }
+            else
+            {
+                newImpact.Add(oldFold.Range);
             }
         }
 
-        return count;
+        for (var index = 0; index < current.Count; index++)
+        {
+            if (!matched[index])
+            {
+                oldImpact.Add(current[index].Range);
+                newImpact.Add(current[index].Range);
+            }
+        }
+    }
+
+    private static void AddChangedInlayRangesSameSnapshot(
+        IReadOnlyList<InlineAdornment> previous,
+        InlineAdornment[] current,
+        List<TextRange> oldImpact,
+        List<TextRange> newImpact)
+    {
+        var matched = new bool[current.Length];
+        foreach (var oldInlay in previous)
+        {
+            var index = FindInlay(current, oldInlay, matched, oldInlay.Anchor.Position.Offset);
+            if (index >= 0)
+            {
+                matched[index] = true;
+            }
+            else
+            {
+                oldImpact.Add(TextRange.Empty(oldInlay.Anchor.Position.Offset));
+                newImpact.Add(TextRange.Empty(oldInlay.Anchor.Position.Offset));
+            }
+        }
+
+        for (var index = 0; index < current.Length; index++)
+        {
+            if (!matched[index])
+            {
+                oldImpact.Add(TextRange.Empty(current[index].Anchor.Position.Offset));
+                newImpact.Add(TextRange.Empty(current[index].Anchor.Position.Offset));
+            }
+        }
     }
 
     private static void AddChangedFoldRanges(
@@ -923,6 +991,25 @@ public sealed class TextProjectionBuilder
         return -1;
     }
 
+    private static int FindInlay(
+        InlineAdornment[] inlays,
+        InlineAdornment previous,
+        bool[] matched,
+        int position)
+    {
+        for (var index = 0; index < inlays.Length; index++)
+        {
+            if (!matched[index]
+                && string.Equals(inlays[index].Id, previous.Id, StringComparison.Ordinal)
+                && InlayMatches(previous, inlays[index], position))
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
     private static bool FoldMatches(
         FoldRange previous,
         FoldRange current,
@@ -1030,7 +1117,6 @@ public sealed class TextProjectionBuilder
             ProjectedLineTable.FromChunks(chunks),
             Array.Empty<FoldRange>(),
             Array.Empty<InlineAdornment>(),
-            logicalToVisual: null,
             isPlain: true,
             changeWindow: new ProjectionChangeWindow(
                 oldWindow.StartLine,
@@ -1044,6 +1130,39 @@ public sealed class TextProjectionBuilder
             logicalLine,
             sourceRange,
             new ProjectionInline[] { new ProjectedText(sourceRange) });
+
+    private static void BuildProjectedLines(
+        TextSnapshot snapshot,
+        int startLine,
+        int endLine,
+        List<FoldRange> folds,
+        IReadOnlyList<InlineAdornment> inlays,
+        List<ProjectedLine> lines)
+    {
+        for (var logicalLine = startLine; logicalLine < endLine; logicalLine++)
+        {
+            var sourceRange = snapshot.Lines.GetLineRange(logicalLine);
+            var inlines = BuildLineInlines(sourceRange, folds, inlays);
+            if (inlines is not null)
+            {
+                lines.Add(new ProjectedLine(logicalLine, sourceRange, inlines));
+                continue;
+            }
+
+            var firstFold = LowerBoundFold(folds, sourceRange.Start);
+            if (firstFold == 0)
+            {
+                continue;
+            }
+
+            var coveringFold = folds[firstFold - 1];
+            var foldEndLine = snapshot.Lines.GetLine(coveringFold.Range.End);
+            if (foldEndLine > logicalLine)
+            {
+                logicalLine = Math.Min(endLine, foldEndLine) - 1;
+            }
+        }
+    }
 
     private static void BuildPlainProjection(
         TextSnapshot snapshot,

@@ -42,6 +42,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private bool _applyingInputChange;
     private bool _inputWindowSynchronizationPending;
     private bool _inputWindowSynchronizationScheduled;
+    private TextRange? _mappedAlignedInputWindow;
     private readonly HashSet<VirtualKey> _nativeKeysDown = new();
     private bool _autoIndentOnEnter = true;
     private bool _suppressVerticalCaretNavigation;
@@ -1266,6 +1267,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             $"native-text-changed generation={args.Generation}; oldRange={args.Change.OldRange}; "
             + $"newTextLength={args.Change.NewText.Length}; selection={args.Selection}; "
             + $"composition={args.CompositionRange?.ToString() ?? "none"}; {DescribeDiagnosticState()}");
+        var canReuseNativeWindow = IsTypedInput(args)
+            && _blockSelection is null
+            && Document.CaretSet.Count == 1;
         if (IsTypedInput(args))
         {
             BeginTypedInputUndoGroup();
@@ -1338,8 +1342,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
         var documentChange = _pendingProviderDocumentChange;
         _pendingProviderDocumentChange = null;
-        RenderViewport();
-        _inputWindowSynchronizationPending = !IsInputWindowSynchronized();
+        _inputWindowSynchronizationPending = !IsInputWindowSynchronized(
+            canReuseNativeWindow ? args.Change : null);
         if (!IsComposing)
         {
             FlushPendingAutomationDocumentChange(render: false);
@@ -1349,6 +1353,10 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 true,
                 requestCompletion: _completionRequested,
                 documentChange: documentChange);
+        }
+        else
+        {
+            RenderViewport();
         }
 
         if (_nativeKeysDown.Count == 0)
@@ -1696,6 +1704,20 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
         _foldStateTracker.ApplyTextChange(args.OldSnapshot, args.NewSnapshot, args.Change);
         _defaultRenderer.TextRenderer.NotifyDocumentChanged(args);
+        if (!_applyingInputChange
+            && _mappedAlignedInputWindow is null
+            && SlidingInputWindowCalculator.TryMapAlignedWindow(
+                InputWindow.WindowRange,
+                args.Change,
+                args.NewSnapshot.Length,
+                out var mappedInputWindow))
+        {
+            _mappedAlignedInputWindow = mappedInputWindow;
+        }
+        else if (!_applyingInputChange)
+        {
+            _mappedAlignedInputWindow = null;
+        }
         _pendingProviderDocumentChange = args;
         _pendingAutomationDocumentChange = args;
         DispatcherQueue.TryEnqueue(FlushPendingAutomationDocumentChange);
@@ -1707,7 +1729,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             var isEdit = args.Kind == DocumentChangeKind.Edit;
             var isTriggerInsertion = isEdit
                 && args.Change.IsInsertion
-                && IsCompletionTrigger(args.NewSnapshot.Text, args.NewSelection.CaretPosition);
+                && IsCompletionTrigger(args.NewSnapshot, args.NewSelection.CaretPosition);
 
             if (isTriggerInsertion)
             {
@@ -1735,8 +1757,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         if (!_applyingDocumentCommand && !_applyingInputChange)
         {
             SyncInputWindow();
-            RenderViewport();
-            RequestProviderResults(true, true, true);
+            _pendingProviderDocumentChange = null;
+            RequestProviderResults(true, true, true, documentChange: args);
         }
     }
 
@@ -1957,7 +1979,12 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         var currentWindow = InputWindow.WindowRange;
-        var window = CalculateInputWindow(currentWindow);
+        var window = _mappedAlignedInputWindow is { } mapped
+            && mapped.End <= Snapshot.Length
+            && mapped.Contains(Document.Selection.Range)
+            && (_compositionRange is not { } composition || mapped.Contains(composition))
+                ? mapped
+                : CalculateInputWindow(currentWindow);
         var text = Snapshot.GetText(window);
         TextRange? compositionRange = _compositionRange is { } compositionInWindow
             && window.Contains(compositionInWindow)
@@ -1996,6 +2023,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         _inputWindowSynchronizationPending = false;
+        _mappedAlignedInputWindow = null;
         LogDiagnosticStage(
             AzunyanDiagnosticCategory.Input,
             "after-native-window-set",
@@ -2014,10 +2042,17 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                     _compositionRange,
                     currentWindow);
 
-    private bool IsInputWindowSynchronized()
+    private bool IsInputWindowSynchronized(TextChange? trustedChange = null)
     {
         var currentWindow = InputWindow.WindowRange;
-        var window = CalculateInputWindow(currentWindow);
+        var window = trustedChange is { } change
+            && SlidingInputWindowCalculator.TryReuseAlignedWindow(
+                currentWindow,
+                change,
+                Snapshot.Length,
+                out var reusedWindow)
+                ? reusedWindow
+                : CalculateInputWindow(currentWindow);
         TextRange? compositionRange = _compositionRange is { } compositionInWindow
             && window.Contains(compositionInWindow)
                 ? compositionInWindow
@@ -2839,10 +2874,10 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         else
         {
             SyncInputWindow();
-            RenderViewport();
         }
         if (ReferenceEquals(previousSnapshot, Snapshot))
         {
+            RenderViewport();
             // SelectionChanged is intentionally suppressed while the command
             // mutates the document model. Keep position-scoped results and
             // the provider frame selection in sync after the command ends.
@@ -2877,6 +2912,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             // across the next focus session.
             _nativeKeysDown.Clear();
             _queuedNonRepeatingKeys.Clear();
+            _mappedAlignedInputWindow = null;
             _keyInputEpoch++;
             InputWindow.NativeTextBoxControl.ResetHandledKeyState();
         }
