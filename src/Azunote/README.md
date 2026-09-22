@@ -276,7 +276,7 @@ there and reconciles it with the native caret rectangle for IME candidate
 placement. Completion results and provider tooltips use the same caret geometry.
 
 Built-in language definitions are available for C#, JavaScript, TypeScript,
-Python, JSON (including JSONC and JSON5), YAML, TOML, Markdown, and
+Python, JSON (including JSONC and JSON5), XML, YAML, TOML, Markdown, and
 PowerShell. Azunote exposes them from
 View > Language Mode, alongside Plain Text and its Azunote note mode. Custom
 language modes are described in [Settings](../../docs/settings.md).
@@ -286,7 +286,9 @@ TOML and the Azunote note mode fold a table section up to the next header, JSON
 folds an object or an array so that a collapsed container reads as one line,
 `"items": [ … ],`, and YAML folds the block indented under a key or a sequence
 entry, taking in the line break of its last line so no empty row is left behind
-and leaving trailing blank lines outside the fold. Each fold is
+and leaving trailing blank lines outside the fold. XML folds a multiline element
+from its opening tag through the matching closing tag, with identities such as
+`xml-element:$/root[0]/item[1]`. Each fold is
 named after the path of what it covers, such as `$/items/2` or `/jobs/build`,
 so a collapsed block stays collapsed while the text above it is edited.
 

@@ -21,6 +21,8 @@ public static class BuiltInSyntaxLanguages
 
     public static SyntaxLanguageDefinition Json => CreateJson();
 
+    public static SyntaxLanguageDefinition Xml => CreateXml();
+
     public static SyntaxLanguageDefinition Yaml => CreateYaml();
 
     public static SyntaxLanguageDefinition Toml => CreateToml();
@@ -36,6 +38,7 @@ public static class BuiltInSyntaxLanguages
         TypeScript,
         Python,
         Json,
+        Xml,
         Yaml,
         Toml,
         Markdown,
@@ -148,6 +151,15 @@ public static class BuiltInSyntaxLanguages
         ],
         CommonCompletionTriggers,
         foldingProvider: new JsonFoldingProvider());
+
+    private static SyntaxLanguageDefinition CreateXml() =>
+        new(
+            "xml",
+            "XML",
+            [".xml"],
+            [new XmlSyntaxProvider()],
+            CommonCompletionTriggers,
+            foldingProvider: new XmlFoldingProvider());
 
     private static SyntaxLanguageDefinition CreateYaml() =>
         new(

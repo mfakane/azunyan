@@ -68,6 +68,7 @@
               <uap:FileType ContentType="text/plain">.json</uap:FileType>
               <uap:FileType ContentType="text/plain">.jsonc</uap:FileType>
               <uap:FileType ContentType="text/plain">.json5</uap:FileType>
+              <uap:FileType ContentType="text/plain">.xml</uap:FileType>
               <uap:FileType ContentType="text/plain">.toml</uap:FileType>
               <uap:FileType ContentType="text/plain">.md</uap:FileType>
               <uap:FileType ContentType="text/plain">.yaml</uap:FileType>

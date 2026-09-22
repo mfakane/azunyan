@@ -39,6 +39,17 @@ public sealed class BuiltInSyntaxLanguagesTests
         };
         yield return new object[]
         {
+            BuiltInSyntaxLanguages.Xml,
+            "<root id=\"1\"><child /></root>",
+            new[]
+            {
+                "<:keyword", "root:keyword", "id:variable", "\"1\":string", ">:keyword",
+                "<:keyword", "child:keyword", "/>:keyword",
+                "</:keyword", "root:keyword", ">:keyword"
+            }
+        };
+        yield return new object[]
+        {
             BuiltInSyntaxLanguages.Yaml,
             "---\n"
             + "name: app\n"
@@ -151,10 +162,14 @@ public sealed class BuiltInSyntaxLanguagesTests
         Assert.Contains(".yml", BuiltInSyntaxLanguages.Yaml.FileExtensions);
         Assert.Contains(".jsonc", BuiltInSyntaxLanguages.Json.FileExtensions);
         Assert.Contains(".json5", BuiltInSyntaxLanguages.Json.FileExtensions);
+        Assert.Contains(".xml", BuiltInSyntaxLanguages.Xml.FileExtensions);
+        Assert.Equal(["*.xml"], BuiltInSyntaxLanguages.Xml.Patterns);
+        Assert.IsType<XmlSyntaxProvider>(Assert.Single(BuiltInSyntaxLanguages.Xml.Sources));
+        Assert.IsType<XmlFoldingProvider>(BuiltInSyntaxLanguages.Xml.FoldingProvider);
         Assert.Contains("*.toml", BuiltInSyntaxLanguages.Toml.Patterns);
         Assert.IsType<TomlFoldingProvider>(BuiltInSyntaxLanguages.Toml.FoldingProvider);
         Assert.Equal([".", "(", "{", "[", "->"], BuiltInSyntaxLanguages.CSharp.CompletionTriggerCharacters);
-        Assert.Equal(9, BuiltInSyntaxLanguages.All.Count);
+        Assert.Equal(10, BuiltInSyntaxLanguages.All.Count);
     }
 
     [Fact]

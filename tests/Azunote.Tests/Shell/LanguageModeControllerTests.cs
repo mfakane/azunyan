@@ -87,6 +87,7 @@ public sealed class LanguageModeControllerTests
     [InlineData("data.json")]
     [InlineData("config.jsonc")]
     [InlineData("settings.json5")]
+    [InlineData("layout.xml")]
     [InlineData("config.yml")]
     [InlineData("settings.toml")]
     public void Structured_document_modes_supply_a_folding_provider(string path)

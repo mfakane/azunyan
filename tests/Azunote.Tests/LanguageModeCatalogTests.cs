@@ -46,6 +46,7 @@ public sealed class LanguageModeCatalogTests
         Assert.Contains(".txt", filters.Single(filter => filter.Id == "plain-text").Extensions);
         Assert.Contains(".jsonc", filters.Single(filter => filter.Id == "json").Extensions);
         Assert.Contains(".json5", filters.Single(filter => filter.Id == "json").Extensions);
+        Assert.Contains(".xml", filters.Single(filter => filter.Id == "xml").Extensions);
     }
 
     [Theory]
@@ -54,6 +55,7 @@ public sealed class LanguageModeCatalogTests
     [InlineData("program.cs", true)]
     [InlineData("settings.jsonc", true)]
     [InlineData("settings.json5", true)]
+    [InlineData("settings.xml", true)]
     [InlineData("icon.png", false)]
     [InlineData("archive.zip", false)]
     public void Known_files_are_the_ones_a_language_mode_covers(string path, bool expected)
@@ -69,6 +71,12 @@ public sealed class LanguageModeCatalogTests
     public void Json_family_files_select_the_json_mode(string path)
     {
         Assert.Equal("json", LanguageModeCatalog.Create().SelectForPath(path));
+    }
+
+    [Fact]
+    public void Xml_files_select_the_xml_mode()
+    {
+        Assert.Equal("xml", LanguageModeCatalog.Create().SelectForPath("settings.xml"));
     }
 
     [Fact]
