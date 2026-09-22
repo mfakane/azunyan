@@ -21,6 +21,37 @@ If the executable is in a non-default location, set `AZUNOTE_EXE` to its full pa
 Each test starts its own process and closes it when the test finishes, so document,
 window, and menu state cannot leak into subsequent tests.
 
+## Windows Sandbox
+
+Use the repository script to run the tests on a disposable Windows desktop instead
+of the host desktop:
+
+```powershell
+pwsh ./scripts/Test-AzunoteUiTestsInSandbox.ps1
+```
+
+The script requires Windows 11 version 24H2 or later with Windows Sandbox and its
+`wsb.exe` CLI installed, plus an x64 .NET 10 SDK. Keep the host desktop unlocked
+while it runs. By default, the script builds the solution on the host, finds the
+`dotnet.exe` root from `PATH`, and mounts that directory read-only as a portable SDK
+inside the Sandbox. An extracted SDK can be selected explicitly:
+
+```powershell
+pwsh ./scripts/Test-AzunoteUiTestsInSandbox.ps1 `
+    -DotNetRoot C:\tools\dotnet-sdk-10
+```
+
+Pass `-NoBuild` to reuse existing `Debug` outputs, or `-Configuration Release` to
+build and test Release outputs. Each run writes its available TRX, log, and exit-code
+artifacts under `artifacts/ui-tests-sandbox/<run-id>`.
+
+The repository and SDK mappings are read-only. Only the per-run result directory is
+writable from the Sandbox. The script disables Sandbox networking, clipboard
+redirection, and vGPU; copies the application and test outputs to the disposable
+guest disk; runs `dotnet vstest` in the interactive Sandbox login; then stops only
+the Sandbox instance it created. A failed run keeps every result file produced before
+the failure.
+
 The external-tool tests create uniquely named definitions in the executable's portable
 `appdata/tools` directory and remove those definitions afterwards. Use a writable test
 build directory. The selection test verifies disabled/enabled/disabled transitions,
