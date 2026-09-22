@@ -88,8 +88,9 @@ public sealed class SingleInstanceHostTests
         release.SetResult(null);
         await disposing.WaitAsync(TimeSpan.FromSeconds(5));
 
-        Assert.True(forwarding.IsCompleted);
-        Assert.Equal(SingleInstanceStatus.Completed, await forwarding);
+        Assert.Equal(
+            SingleInstanceStatus.Completed,
+            await forwarding.WaitAsync(TimeSpan.FromSeconds(5)));
     }
 
     private static Task<bool> TryAcquireFromAnotherThreadAsync(SingleInstanceHost host) =>
