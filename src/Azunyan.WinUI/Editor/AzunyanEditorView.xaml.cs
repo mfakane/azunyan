@@ -70,7 +70,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private double _characterWidth = 8;
     private IAzunyanEditorRenderer? _renderer;
     private EditorProviderFrame? _providerFrame;
-    private readonly HashSet<string> _collapsedFoldIds = new(StringComparer.Ordinal);
+    private readonly FoldStateTracker _foldStateTracker = new();
+    private IFoldingProvider? _foldStateProvider;
+    private (TextSnapshot Snapshot, DocumentAnchor Anchor, double OffsetWithinRow)? _pendingViewportAnchor;
     private double _projectedVerticalOffset;
     private bool _synchronizingProjectedScroll;
     private bool _projectedScrollInteraction;
@@ -118,6 +120,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         _defaultRenderer.LayoutInvalidated += OnRendererLayoutInvalidated;
         _providerScheduler = new EditorProviderScheduler(_providers);
         _renderer = _defaultRenderer;
+        _foldStateTracker.Reset(_document.Snapshot);
 
         _document.Changed += OnInputDocumentChanged;
         _document.SelectionChanged += OnDocumentSelectionChanged;
@@ -411,7 +414,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     /// </summary>
     public string LinkNavigationHint { get; set; } = "Ctrl + Click to open";
 
-    public IReadOnlySet<string> CollapsedFoldIds => _collapsedFoldIds;
+    public IReadOnlySet<string> CollapsedFoldIds => _foldStateTracker.CollapsedIds;
 
     /// <summary>
     /// Categories enabled for the detailed operation log. The default is
@@ -615,6 +618,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         _providerFrame = null;
         _pendingProviderDocumentChange = null;
         _pendingAutomationDocumentChange = null;
+        _pendingViewportAnchor = null;
+        _foldStateTracker.Reset(_document.Snapshot);
         _compositionRange = null;
         _blockSelection = null;
         _document.Reset(text);
@@ -639,9 +644,11 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         _providerFrame = null;
         _pendingProviderDocumentChange = null;
         _pendingAutomationDocumentChange = null;
+        _pendingViewportAnchor = null;
         DetachDocument();
         _document.CloseView();
         _document = document;
+        _foldStateTracker.Reset(_document.Snapshot);
         AttachDocument();
         _compositionRange = null;
         _blockSelection = null;
@@ -1036,7 +1043,16 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         });
     }
 
-    public void RefreshProviders() => RequestProviderResults(true, true, true);
+    public void RefreshProviders()
+    {
+        if (!ReferenceEquals(_foldStateProvider, _providers.Folding))
+        {
+            ResetFoldStateCore();
+            _foldStateProvider = _providers.Folding;
+        }
+
+        RequestProviderResults(true, true, true);
+    }
 
     /// <summary>Requests completion explicitly, independent of the current prefix.</summary>
     public void RequestCompletion()
@@ -1087,19 +1103,18 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(foldId);
         if (collapsed)
         {
-            var fold = GetCurrentFrame()?.Document?.Folds
-                .FirstOrDefault(candidate => candidate.Id == foldId);
+            var fold = _foldStateTracker.FindFold(foldId);
             if (fold is not null
                 && fold.Range.Contains(Document.Selection.CaretPosition))
             {
                 SetDocumentSelection(TextSelection.Caret(fold.Range.Start));
             }
 
-            _collapsedFoldIds.Add(foldId);
+            _foldStateTracker.SetCollapsed(foldId, true);
         }
         else
         {
-            _collapsedFoldIds.Remove(foldId);
+            _foldStateTracker.SetCollapsed(foldId, false);
         }
 
         RenderViewport();
@@ -1108,18 +1123,34 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     public void ToggleFold(string foldId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(foldId);
-        SetFoldCollapsed(foldId, !_collapsedFoldIds.Contains(foldId));
+        SetFoldCollapsed(foldId, !_foldStateTracker.CollapsedIds.Contains(foldId));
     }
 
     public void ExpandAllFolds()
     {
-        if (_collapsedFoldIds.Count == 0)
+        if (_foldStateTracker.CollapsedIds.Count == 0)
         {
             return;
         }
 
-        _collapsedFoldIds.Clear();
+        _foldStateTracker.ExpandAll();
         RenderViewport();
+    }
+
+    public void ResetFoldState()
+    {
+        ResetFoldStateCore();
+        _foldStateProvider = _providers.Folding;
+        RenderViewport();
+    }
+
+    private void ResetFoldStateCore()
+    {
+        _providerScheduler.CancelAll();
+        InvalidateProviderGenerations();
+        _providerFrame = null;
+        _foldStateTracker.Reset(Snapshot);
+        _pendingViewportAnchor = null;
     }
 
     public new bool Focus(FocusState value) => InputWindow.Focus(value);
@@ -1631,6 +1662,39 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         object? sender,
         DocumentChangedEventArgs args)
     {
+        if (_pendingViewportAnchor is { } pendingAnchor
+            && ReferenceEquals(pendingAnchor.Snapshot, args.OldSnapshot))
+        {
+            _pendingViewportAnchor = (
+                args.NewSnapshot,
+                TextChangeMapper.MapAnchor(
+                    args.OldSnapshot,
+                    args.NewSnapshot,
+                    args.Change,
+                    pendingAnchor.Anchor),
+                pendingAnchor.OffsetWithinRow);
+        }
+        else if (IsProjectedTextSurface
+            && !_projectedScrollInteraction
+            && _selectionPointerId is null
+            && GetVerticalOffset() < GetProjectedScrollMaximum(Math.Max(1, ProjectedSurfaceHost.ActualHeight)) - 0.5
+            && _defaultRenderer.TextRenderer.TryGetViewportAnchor(
+                args.OldSnapshot,
+                GetVerticalOffset(),
+                out var anchor,
+                out var offsetWithinRow))
+        {
+            _pendingViewportAnchor = (
+                args.NewSnapshot,
+                TextChangeMapper.MapAnchor(
+                    args.OldSnapshot,
+                    args.NewSnapshot,
+                    args.Change,
+                    anchor),
+                offsetWithinRow);
+        }
+
+        _foldStateTracker.ApplyTextChange(args.OldSnapshot, args.NewSnapshot, args.Change);
         _defaultRenderer.TextRenderer.NotifyDocumentChanged(args);
         _pendingProviderDocumentChange = args;
         _pendingAutomationDocumentChange = args;

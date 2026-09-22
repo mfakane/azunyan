@@ -34,7 +34,13 @@ public sealed partial class AzunyanEditorView
             && verticalOffset >= previousScrollMaximum - 0.5;
         var viewportAnchor = DocumentAnchor.Before(0);
         var offsetWithinRow = 0d;
-        var preserveViewport = !_projectedScrollInteraction
+        (TextSnapshot Snapshot, DocumentAnchor Anchor, double OffsetWithinRow)? pendingAnchor =
+            _pendingViewportAnchor is { } pendingForSnapshot
+            && ReferenceEquals(pendingForSnapshot.Snapshot, Snapshot)
+                ? pendingForSnapshot
+                : null;
+        var preserveViewport = pendingAnchor is not null
+            || (!_projectedScrollInteraction
             && _selectionPointerId is null
             && !wasAtBottom
             && IsProjectedTextSurface
@@ -42,7 +48,12 @@ public sealed partial class AzunyanEditorView
                 Snapshot,
                 verticalOffset,
                 out viewportAnchor,
-                out offsetWithinRow);
+                out offsetWithinRow));
+        if (pendingAnchor is { } pending)
+        {
+            viewportAnchor = pending.Anchor;
+            offsetWithinRow = pending.OffsetWithinRow;
+        }
         var horizontalOffset = GetHorizontalOffset();
         var firstVisibleLine = Math.Clamp(
             (int)Math.Floor(verticalOffset / _lineHeight) - 1,
@@ -62,8 +73,8 @@ public sealed partial class AzunyanEditorView
             ? providerGutter!.Max(item => item.Text.Length)
             : 0;
         var showLogicalLineNumbers = supportsLogicalLineGutter && ShowLineNumbers;
-        var hasFoldGutter = supportsLogicalLineGutter
-            && currentFrame?.Document?.Folds is { Count: > 0 };
+        var folds = _foldStateTracker.Folds;
+        var hasFoldGutter = supportsLogicalLineGutter && folds.Count > 0;
         var foldGutterWidth = hasFoldGutter ? 20 : 0;
         var gutterWidth = showLogicalLineNumbers || hasProviderGutter
             ? Math.Max(
@@ -121,7 +132,8 @@ public sealed partial class AzunyanEditorView
             showLogicalLineNumbers,
             TextWrapping,
             TabDisplaySize,
-            _collapsedFoldIds,
+            _foldStateTracker.CollapsedIds,
+            folds,
             currentFrame);
         _renderer?.Render(frame);
         if (TryGetRendererCaretRect(
@@ -136,6 +148,7 @@ public sealed partial class AzunyanEditorView
             && !_preservingViewport
             && GetProjectedScrollMaximum(viewportHeight) > GetVerticalOffset() + 0.5)
         {
+            _pendingViewportAnchor = null;
             _projectedVerticalOffset = GetProjectedScrollMaximum(viewportHeight);
             _preservingViewport = true;
             try
@@ -158,6 +171,7 @@ public sealed partial class AzunyanEditorView
                 out var restoredOffset)
             && Math.Abs(restoredOffset - GetVerticalOffset()) > 0.5)
         {
+            _pendingViewportAnchor = null;
             _projectedVerticalOffset = restoredOffset;
             _preservingViewport = true;
             try
@@ -171,6 +185,8 @@ public sealed partial class AzunyanEditorView
 
             return;
         }
+
+        _pendingViewportAnchor = null;
 
         UpdateProjectedScrollExtent(viewportHeight);
         UpdateCompletionPopup();

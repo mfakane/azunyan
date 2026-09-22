@@ -2,9 +2,14 @@ using Azunyan.Core;
 
 namespace Azunyan.Syntax;
 
-public sealed class XmlFoldingProvider : IFoldingProvider
+public sealed class XmlFoldingProvider : IFoldingAnalysisProvider
 {
-    public ValueTask<IReadOnlyList<FoldRange>> GetFoldsAsync(
+    public async ValueTask<IReadOnlyList<FoldRange>> GetFoldsAsync(
+        EditorProviderContext context,
+        CancellationToken cancellationToken = default)
+        => (await GetFoldingAnalysisAsync(context, cancellationToken).ConfigureAwait(false)).Folds;
+
+    public ValueTask<FoldingAnalysis> GetFoldingAnalysisAsync(
         EditorProviderContext context,
         CancellationToken cancellationToken = default)
     {
@@ -12,7 +17,9 @@ public sealed class XmlFoldingProvider : IFoldingProvider
         var snapshot = context.Snapshot;
         var frames = new List<XmlFrame>();
         var folds = new List<FoldRange>();
-        foreach (var token in XmlScanner.Scan(snapshot.Text, cancellationToken))
+        var scan = XmlScanner.Scan(snapshot.Text, cancellationToken);
+        var isComplete = scan.IsComplete;
+        foreach (var token in scan.Tokens)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (token.Kind == XmlTokenKind.StartElement)
@@ -26,7 +33,12 @@ public sealed class XmlFoldingProvider : IFoldingProvider
             else if (token.Kind == XmlTokenKind.EndElement && token.IsClosed && frames.Count > 0)
             {
                 var frame = frames[^1];
-                if (!string.Equals(frame.Name, token.Name, StringComparison.Ordinal)) continue;
+                if (!string.Equals(frame.Name, token.Name, StringComparison.Ordinal))
+                {
+                    isComplete = false;
+                    frames.Clear();
+                    continue;
+                }
                 frames.RemoveAt(frames.Count - 1);
                 if (snapshot.Lines.GetLine(frame.Token.Start) == snapshot.Lines.GetLine(token.Start)
                     || string.IsNullOrWhiteSpace(snapshot.GetText(TextRange.FromBounds(frame.Token.End, token.Start))))
@@ -55,10 +67,15 @@ public sealed class XmlFoldingProvider : IFoldingProvider
                     TextRange.FromBounds(frame.Token.End, end),
                     $" … {closingTag}"));
             }
+            else if (token.Kind == XmlTokenKind.EndElement && token.IsClosed)
+            {
+                isComplete = false;
+            }
         }
 
+        isComplete &= frames.Count == 0;
         folds.Sort(static (left, right) => left.Range.Start.CompareTo(right.Range.Start));
-        return ValueTask.FromResult<IReadOnlyList<FoldRange>>(folds);
+        return ValueTask.FromResult(new FoldingAnalysis(folds, isComplete));
     }
 
     private sealed class XmlFrame

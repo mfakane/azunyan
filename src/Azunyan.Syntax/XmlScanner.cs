@@ -29,19 +29,28 @@ internal sealed class XmlToken
     public IReadOnlyList<XmlAttributeToken> Attributes { get; init; } = Array.Empty<XmlAttributeToken>();
 }
 
+internal sealed record XmlScanResult(IReadOnlyList<XmlToken> Tokens, bool IsComplete);
+
 internal static class XmlScanner
 {
-    public static IReadOnlyList<XmlToken> Scan(string text, CancellationToken cancellationToken)
+    public static XmlScanResult Scan(string text, CancellationToken cancellationToken)
     {
         var tokens = new List<XmlToken>();
+        var isComplete = true;
         var position = 0;
         while (position < text.Length)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (text[position] != '<' || position + 1 >= text.Length)
+            if (text[position] != '<')
             {
                 position++;
                 continue;
+            }
+
+            if (position + 1 >= text.Length)
+            {
+                isComplete = false;
+                break;
             }
 
             XmlToken? token = text[position + 1] switch
@@ -56,42 +65,48 @@ internal static class XmlScanner
 
             if (token is null)
             {
+                isComplete = false;
                 position++;
                 continue;
             }
 
             tokens.Add(token);
+            isComplete &= token.IsClosed;
             position = Math.Max(position + 1, token.End);
         }
 
-        return tokens;
+        return new XmlScanResult(tokens, isComplete);
     }
 
     private static XmlToken ScanComment(string text, int start)
     {
         var end = text.IndexOf("-->", start + 4, StringComparison.Ordinal);
-        end = end < 0 ? text.Length : end + 3;
-        return Opaque(XmlTokenKind.Comment, start, end);
+        var closed = end >= 0;
+        end = closed ? end + 3 : text.Length;
+        return Opaque(XmlTokenKind.Comment, start, end, closed);
     }
 
     private static XmlToken ScanCdata(string text, int start)
     {
         var end = text.IndexOf("]]>", start + 9, StringComparison.Ordinal);
-        end = end < 0 ? text.Length : end + 3;
-        return Opaque(XmlTokenKind.Cdata, start, end);
+        var closed = end >= 0;
+        end = closed ? end + 3 : text.Length;
+        return Opaque(XmlTokenKind.Cdata, start, end, closed);
     }
 
     private static XmlToken ScanProcessingInstruction(string text, int start)
     {
         var end = text.IndexOf("?>", start + 2, StringComparison.Ordinal);
-        end = end < 0 ? text.Length : end + 2;
-        return Opaque(XmlTokenKind.ProcessingInstruction, start, end);
+        var closed = end >= 0;
+        end = closed ? end + 2 : text.Length;
+        return Opaque(XmlTokenKind.ProcessingInstruction, start, end, closed);
     }
 
     private static XmlToken ScanDoctype(string text, int start)
     {
         var quote = '\0';
         var subsetDepth = 0;
+        var closed = false;
         var position = start + 2;
         while (position < text.Length)
         {
@@ -120,6 +135,7 @@ internal static class XmlScanner
             }
             else if (character == '>' && subsetDepth == 0)
             {
+                closed = true;
                 break;
             }
         }
@@ -130,7 +146,8 @@ internal static class XmlScanner
             Start = start,
             End = position,
             NameStart = start + 2,
-            NameLength = "DOCTYPE".Length
+            NameLength = "DOCTYPE".Length,
+            IsClosed = closed
         };
     }
 
@@ -151,6 +168,11 @@ internal static class XmlScanner
         while (position < text.Length)
         {
             var character = text[position];
+            if (character == '<')
+            {
+                return CreateElementToken(text, start, endElement, nameStart, nameEnd, attributes, closeStart, false, false, position);
+            }
+
             if (quote != '\0')
             {
                 if (character == quote)
@@ -191,7 +213,25 @@ internal static class XmlScanner
                     {
                         var valueQuote = text[position++];
                         var valueStart = position - 1;
-                        while (position < text.Length && text[position] != valueQuote) position++;
+                        while (position < text.Length && text[position] != valueQuote)
+                        {
+                            if (text[position] == '<')
+                            {
+                                return CreateElementToken(
+                                    text,
+                                    start,
+                                    endElement,
+                                    nameStart,
+                                    nameEnd,
+                                    attributes,
+                                    closeStart,
+                                    false,
+                                    false,
+                                    position);
+                            }
+
+                            position++;
+                        }
                         if (position < text.Length) position++;
                         attributes.Add(new XmlAttributeToken(attributeStart, attributeEnd - attributeStart, valueStart, position - valueStart));
                     }
@@ -204,11 +244,24 @@ internal static class XmlScanner
         }
 
         var selfClosing = !endElement && closed && closeStart > start && text[closeStart - 1] == '/';
-        return new XmlToken
+        return CreateElementToken(text, start, endElement, nameStart, nameEnd, attributes, closeStart, closed, selfClosing, position);
+    }
+
+    private static XmlToken CreateElementToken(
+        string text,
+        int start,
+        bool endElement,
+        int nameStart,
+        int nameEnd,
+        List<XmlAttributeToken> attributes,
+        int closeStart,
+        bool closed,
+        bool selfClosing,
+        int end) => new()
         {
             Kind = endElement ? XmlTokenKind.EndElement : XmlTokenKind.StartElement,
             Start = start,
-            End = position,
+            End = end,
             NameStart = nameStart,
             NameLength = nameEnd - nameStart,
             OpenEnd = nameEnd,
@@ -218,10 +271,9 @@ internal static class XmlScanner
             Name = text[nameStart..nameEnd],
             Attributes = attributes,
         };
-    }
 
-    private static XmlToken Opaque(XmlTokenKind kind, int start, int end) =>
-        new() { Kind = kind, Start = start, End = end };
+    private static XmlToken Opaque(XmlTokenKind kind, int start, int end, bool closed) =>
+        new() { Kind = kind, Start = start, End = end, IsClosed = closed };
 
     private static int ReadName(string text, int position)
     {

@@ -39,6 +39,7 @@ internal sealed class AzunyanEditorRenderContext
         TextWrapping textWrapping,
         int tabDisplaySize,
         IReadOnlySet<string> collapsedFoldIds,
+        IReadOnlyList<FoldRange> folds,
         EditorProviderFrame? providerFrame,
         Action<string>? toggleFold)
     {
@@ -69,6 +70,7 @@ internal sealed class AzunyanEditorRenderContext
         TextWrapping = textWrapping;
         TabDisplaySize = tabDisplaySize;
         CollapsedFoldIds = collapsedFoldIds;
+        Folds = folds;
         ProviderFrame = providerFrame;
         ProviderResults = providerFrame?.ToLegacyResults();
         ToggleFold = toggleFold;
@@ -108,6 +110,7 @@ internal sealed class AzunyanEditorRenderContext
             frame.TextWrapping,
             frame.TabDisplaySize,
             frame.CollapsedFoldIds,
+            frame.Folds,
             frame.ProviderFrame,
             toggleFold)
     {
@@ -171,6 +174,8 @@ internal sealed class AzunyanEditorRenderContext
     public int TabDisplaySize { get; }
 
     public IReadOnlySet<string> CollapsedFoldIds { get; }
+
+    public IReadOnlyList<FoldRange> Folds { get; }
 
     internal Action<string>? ToggleFold { get; }
 

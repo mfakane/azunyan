@@ -95,6 +95,21 @@ public sealed class SyntaxAnalysis
     public static SyntaxAnalysis Empty { get; } = new();
 }
 
+public sealed class FoldingAnalysis
+{
+    public FoldingAnalysis(IReadOnlyList<FoldRange>? folds = null, bool isComplete = true)
+    {
+        Folds = Array.AsReadOnly((folds ?? Array.Empty<FoldRange>()).ToArray());
+        IsComplete = isComplete;
+    }
+
+    public IReadOnlyList<FoldRange> Folds { get; }
+
+    public bool IsComplete { get; }
+
+    public static FoldingAnalysis EmptyIncomplete { get; } = new(Array.Empty<FoldRange>(), false);
+}
+
 /// <summary>
 /// Provider-owned state carried from one complete syntax analysis to the next.
 /// </summary>
@@ -289,6 +304,13 @@ public interface IGutterProvider
 public interface IFoldingProvider
 {
     ValueTask<IReadOnlyList<FoldRange>> GetFoldsAsync(
+        EditorProviderContext context,
+        CancellationToken cancellationToken = default);
+}
+
+public interface IFoldingAnalysisProvider : IFoldingProvider
+{
+    ValueTask<FoldingAnalysis> GetFoldingAnalysisAsync(
         EditorProviderContext context,
         CancellationToken cancellationToken = default);
 }

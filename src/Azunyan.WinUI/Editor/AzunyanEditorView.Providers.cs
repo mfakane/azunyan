@@ -18,6 +18,7 @@ public sealed partial class AzunyanEditorView
 
         var snapshot = Snapshot;
         var selection = Document.Selection;
+        var previousFrame = _providerFrame;
         var currentFrame = GetCurrentFrame();
 
         if (requestDocument)
@@ -32,7 +33,7 @@ public sealed partial class AzunyanEditorView
                     snapshot,
                     selection,
                     previousResults: canUseDocumentChange
-                        && currentFrame?.Document is { } previousResults
+                        && previousFrame?.Document is { } previousResults
                         && ReferenceEquals(previousResults.Snapshot, documentChange!.OldSnapshot)
                             ? previousResults
                             : null,
@@ -102,6 +103,10 @@ public sealed partial class AzunyanEditorView
                     return;
                 }
 
+                _foldStateTracker.ApplyProviderFolds(
+                    result.Snapshot,
+                    result.Folds,
+                    result.FoldsAreComplete);
                 var currentFrame = GetCurrentFrame();
                 PublishProviderFrame(new EditorProviderFrame(
                     result.Snapshot,

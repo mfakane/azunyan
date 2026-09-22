@@ -922,7 +922,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             || !double.IsFinite(characterWidth)
             || characterWidth <= 0
             || layout.Rows.Rows.Count == 0
-            || frame.Context.DocumentResults?.Folds is not { Count: > 0 } folds)
+            || frame.Context.Folds is not { Count: > 0 } folds)
         {
             return false;
         }
@@ -1334,7 +1334,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         IReadOnlyList<ViewportRowLayout> layouts)
     {
         if (context.ToggleFold is null
-            || context.DocumentResults?.Folds is not { Count: > 0 } folds
+            || context.Folds is not { Count: > 0 } folds
             || context.GutterWidth < FoldChevronWidth)
         {
             return;
@@ -1573,7 +1573,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         int wrapColumns,
         double wrapWidth)
     {
-        var documentFolds = context.DocumentResults?.Folds;
+        var documentFolds = context.Folds;
         var inlays = context.ViewportResults?.Inlays;
         var blocks = context.ViewportResults?.BlockAdornments;
         var collapsedFoldIds = context.CollapsedFoldIds

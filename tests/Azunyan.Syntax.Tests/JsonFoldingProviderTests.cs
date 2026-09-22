@@ -193,6 +193,18 @@ public sealed class JsonFoldingProviderTests
         Assert.Empty(await GetAsync(snapshot));
     }
 
+    [Theory]
+    [InlineData("{\n  \"value\": \"unfinished\n")]
+    [InlineData("{\n  /* unfinished\n")]
+    [InlineData("{\n  \"items\": [1\n")]
+    [InlineData("{\n  \"items\": [1}\n")]
+    public async Task Incomplete_json_reports_an_incomplete_analysis(string text)
+    {
+        var analysis = await GetAnalysisAsync(new TextSnapshot(text));
+
+        Assert.False(analysis.IsComplete);
+    }
+
     [Fact]
     public void Json_language_definition_supplies_the_provider()
     {
@@ -211,5 +223,9 @@ public sealed class JsonFoldingProviderTests
 
     private static async Task<IReadOnlyList<FoldRange>> GetAsync(TextSnapshot snapshot) =>
         await new JsonFoldingProvider().GetFoldsAsync(
+            new EditorProviderContext(snapshot, 0, TextSelection.Caret(0)));
+
+    private static async Task<FoldingAnalysis> GetAnalysisAsync(TextSnapshot snapshot) =>
+        await new JsonFoldingProvider().GetFoldingAnalysisAsync(
             new EditorProviderContext(snapshot, 0, TextSelection.Caret(0)));
 }

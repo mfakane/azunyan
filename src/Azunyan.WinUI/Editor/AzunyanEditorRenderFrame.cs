@@ -36,6 +36,7 @@ public sealed class AzunyanEditorRenderFrame
         TextWrapping textWrapping,
         int tabDisplaySize,
         IReadOnlySet<string> collapsedFoldIds,
+        IReadOnlyList<FoldRange> folds,
         EditorProviderFrame? providerFrame)
     {
         Snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
@@ -62,6 +63,7 @@ public sealed class AzunyanEditorRenderFrame
         TextWrapping = textWrapping;
         TabDisplaySize = tabDisplaySize;
         CollapsedFoldIds = collapsedFoldIds ?? throw new ArgumentNullException(nameof(collapsedFoldIds));
+        Folds = folds ?? throw new ArgumentNullException(nameof(folds));
         ProviderFrame = providerFrame;
         ProviderResults = providerFrame?.ToLegacyResults();
     }
@@ -123,6 +125,8 @@ public sealed class AzunyanEditorRenderFrame
     public int TabDisplaySize { get; }
 
     public IReadOnlySet<string> CollapsedFoldIds { get; }
+
+    public IReadOnlyList<FoldRange> Folds { get; }
 
     public EditorProviderFrame? ProviderFrame { get; }
 

@@ -15,9 +15,14 @@ namespace Azunyan.Syntax;
 /// such as <c>$/items/2</c>, which is what lets a collapsed container stay
 /// collapsed while the text above it changes.
 /// </remarks>
-public sealed class JsonFoldingProvider : IFoldingProvider
+public sealed class JsonFoldingProvider : IFoldingAnalysisProvider
 {
-    public ValueTask<IReadOnlyList<FoldRange>> GetFoldsAsync(
+    public async ValueTask<IReadOnlyList<FoldRange>> GetFoldsAsync(
+        EditorProviderContext context,
+        CancellationToken cancellationToken = default)
+        => (await GetFoldingAnalysisAsync(context, cancellationToken).ConfigureAwait(false)).Folds;
+
+    public ValueTask<FoldingAnalysis> GetFoldingAnalysisAsync(
         EditorProviderContext context,
         CancellationToken cancellationToken = default)
     {
@@ -28,6 +33,7 @@ public sealed class JsonFoldingProvider : IFoldingProvider
         var occurrences = new Dictionary<string, int>(StringComparer.Ordinal);
         var frames = new List<JsonFrame>();
         var position = 0;
+        var isComplete = true;
 
         while (position < text.Length)
         {
@@ -43,7 +49,14 @@ public sealed class JsonFoldingProvider : IFoldingProvider
 
                 if (text[position + 1] == '*')
                 {
-                    position = SkipBlockComment(text, position);
+                    var commentEnd = text.IndexOf("*/", position + 2, StringComparison.Ordinal);
+                    if (commentEnd < 0)
+                    {
+                        isComplete = false;
+                        break;
+                    }
+
+                    position = commentEnd + 2;
                     continue;
                 }
             }
@@ -63,7 +76,14 @@ public sealed class JsonFoldingProvider : IFoldingProvider
             {
                 case '"':
                 case '\'':
-                    var stringEnd = SkipString(text, position, character);
+                    var stringEnd = SkipString(text, position, character, out var stringClosed);
+                    if (!stringClosed)
+                    {
+                        isComplete = false;
+                        position = stringEnd;
+                        continue;
+                    }
+
                     if (frames.Count > 0
                         && frames[^1].IsObject
                         && stringEnd > position
@@ -84,19 +104,29 @@ public sealed class JsonFoldingProvider : IFoldingProvider
                     break;
                 case '}':
                 case ']':
+                    if (frames.Count == 0)
+                    {
+                        isComplete = false;
+                        break;
+                    }
+
+                    var frame = frames[^1];
+                    if (frame.IsObject != (character == '}'))
+                    {
+                        isComplete = false;
+                        frames.Clear();
+                        break;
+                    }
+
+                    frames.RemoveAt(frames.Count - 1);
+                    if (TryCreateFold(snapshot, frame, position, occurrences, out var fold))
+                    {
+                        folds.Add(fold);
+                    }
+
                     if (frames.Count > 0)
                     {
-                        var frame = frames[^1];
-                        frames.RemoveAt(frames.Count - 1);
-                        if (TryCreateFold(snapshot, frame, position, occurrences, out var fold))
-                        {
-                            folds.Add(fold);
-                        }
-
-                        if (frames.Count > 0)
-                        {
-                            frames[^1].PendingKey = null;
-                        }
+                        frames[^1].PendingKey = null;
                     }
 
                     break;
@@ -113,7 +143,8 @@ public sealed class JsonFoldingProvider : IFoldingProvider
             position++;
         }
 
-        return ValueTask.FromResult<IReadOnlyList<FoldRange>>(folds);
+        isComplete &= frames.Count == 0;
+        return ValueTask.FromResult(new FoldingAnalysis(folds, isComplete));
     }
 
     private static bool TryCreateFold(
@@ -191,8 +222,9 @@ public sealed class JsonFoldingProvider : IFoldingProvider
     }
 
     /// <summary>Reports the position after the closing quote.</summary>
-    private static int SkipString(string text, int position, char quote)
+    private static int SkipString(string text, int position, char quote, out bool closed)
     {
+        closed = false;
         position++;
         while (position < text.Length)
         {
@@ -205,6 +237,7 @@ public sealed class JsonFoldingProvider : IFoldingProvider
 
             if (character == quote)
             {
+                closed = true;
                 break;
             }
         }

@@ -242,9 +242,21 @@ including any line delimiters it contains. Hidden positions cannot receive the
 caret. Editing at a fold boundary either expands the fold or applies an
 explicit command policy; it must never silently edit a hidden location.
 
-Fold state is remapped after edits by stable ID when available, then by mapped
-range as a fallback. Invalid or overlapping folding ranges are normalized
-deterministically before projection.
+Fold state is maintained by an editor-owned `FoldStateTracker`, initialized
+and reset to the current snapshot. On every document change it maps candidates
+from the old snapshot to the new snapshot before rendering. Provider results
+are reconciled independently from the raw `DocumentProviderResults`: complete
+results replace the candidate set, while incomplete results may retain
+provisional collapsed candidates until the provider reports them. Reconciliation
+validates every provider range against the snapshot, then matches collapsed
+state by exact mapped range first, then by the same ID only when its ranges
+still overlap. This keeps ordinal or path IDs from moving a collapse to a
+different sibling. Raw provider folds and completeness stay available through
+compatibility provider events; render frames receive only the reconciled folds.
+
+`SetText`, `SetDocument`, and an explicit `ResetFoldState()` clear candidates
+and collapse state. Changing the folding provider identity also resets fold
+state; changing unrelated providers does not.
 
 ### Inline adornments
 
@@ -300,7 +312,11 @@ scroll or layout pass is prohibited.
 For unwrapped fixed-height text, all document rows have exact heights without
 being realized. With wrapping, unmeasured chunks use an estimate. When exact
 heights become known, scrolling preserves a document anchor at the top of the
-viewport so content does not jump.
+viewport so content does not jump. Snapshot edits capture that anchor against
+the old cached layout and map it through `TextChangeMapper`; consecutive edits
+chain-map a pending anchor. The next viewport render consumes the mapped
+anchor and row offset, with bottom-stickiness taking precedence, then clears
+the pending anchor on success or fallback.
 
 ## 7. Layout and rendering
 

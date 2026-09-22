@@ -6,13 +6,14 @@ public sealed class DocumentProviderResults
         TextSnapshot snapshot,
         SyntaxAnalysis syntax,
         IReadOnlyList<TextDecoration> decorations,
-        IReadOnlyList<FoldRange> folds)
+        FoldingAnalysis folding)
     {
         Snapshot = snapshot;
         SyntaxAnalysis = syntax;
         Syntax = syntax.Spans;
         Decorations = Array.AsReadOnly(decorations.ToArray());
-        Folds = Array.AsReadOnly(folds.ToArray());
+        FoldingAnalysis = folding;
+        Folds = folding.Folds;
     }
 
     public TextSnapshot Snapshot { get; }
@@ -24,6 +25,10 @@ public sealed class DocumentProviderResults
     public IReadOnlyList<TextDecoration> Decorations { get; }
 
     public IReadOnlyList<FoldRange> Folds { get; }
+
+    public FoldingAnalysis FoldingAnalysis { get; }
+
+    public bool FoldsAreComplete => FoldingAnalysis.IsComplete;
 }
 
 public sealed class ViewportProviderResults
@@ -283,19 +288,61 @@ public sealed class EditorProviderScheduler : IDisposable
             : InvokeListAsync(
                 () => providers.Decorations.GetDecorationsAsync(context, cancellationToken),
                 cancellationToken);
-        var foldingTask = providers.Folding is null
-            ? Task.FromResult<IReadOnlyList<FoldRange>>(Array.Empty<FoldRange>())
-            : InvokeListAsync(
-                () => providers.Folding.GetFoldsAsync(context, cancellationToken),
-                cancellationToken);
+        var foldingTask = GetFoldingAsync(providers, context, cancellationToken);
 
         await Task.WhenAll(syntaxTask, decorationTask, foldingTask).ConfigureAwait(false);
         return new DocumentProviderResults(
             context.Snapshot,
             FilterSyntax(syntaxTask.Result, context.Snapshot),
             decorationTask.Result.Where(item => IsValidRange(item.Range, context.Snapshot)).ToArray(),
-            foldingTask.Result.Where(item => IsValidRange(item.Range, context.Snapshot)).ToArray());
+            FilterFolding(foldingTask.Result, context.Snapshot));
     }
+
+    private static Task<FoldingAnalysis> GetFoldingAsync(
+        EditorProviderConfiguration providers,
+        EditorProviderContext context,
+        CancellationToken cancellationToken)
+    {
+        var analysisProvider = providers.Folding as IFoldingAnalysisProvider;
+        if (analysisProvider is not null)
+        {
+            return InvokeFoldingAnalysisAsync(
+                () => analysisProvider.GetFoldingAnalysisAsync(context, cancellationToken),
+                cancellationToken);
+        }
+
+        if (providers.Folding is null)
+        {
+            return Task.FromResult(new FoldingAnalysis());
+        }
+
+        return InvokeFoldingAnalysisAsync(
+            async () => new FoldingAnalysis(
+                await providers.Folding.GetFoldsAsync(context, cancellationToken).ConfigureAwait(false),
+                isComplete: true),
+            cancellationToken);
+    }
+
+    private static async Task<FoldingAnalysis> InvokeFoldingAnalysisAsync(
+        Func<ValueTask<FoldingAnalysis>> invoke,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await invoke().ConfigureAwait(false) ?? FoldingAnalysis.EmptyIncomplete;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            return FoldingAnalysis.EmptyIncomplete;
+        }
+    }
+
+    private static FoldingAnalysis FilterFolding(FoldingAnalysis analysis, TextSnapshot snapshot) =>
+        new(analysis.Folds.Where(item => IsValidRange(item.Range, snapshot)).ToArray(), analysis.IsComplete);
 
     private static Task<SyntaxAnalysis> GetSyntaxAsync(
         ISyntaxProvider? provider,

@@ -11,7 +11,7 @@ public sealed class XmlSyntaxProvider : ISyntaxProvider
         ArgumentNullException.ThrowIfNull(context);
         var text = context.Snapshot.Text;
         var spans = new List<SyntaxSpan>();
-        foreach (var token in XmlScanner.Scan(text, cancellationToken))
+        foreach (var token in XmlScanner.Scan(text, cancellationToken).Tokens)
         {
             cancellationToken.ThrowIfCancellationRequested();
             switch (token.Kind)

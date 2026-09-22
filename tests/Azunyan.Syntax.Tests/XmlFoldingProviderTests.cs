@@ -70,6 +70,29 @@ public sealed class XmlFoldingProviderTests
         Assert.Empty(await GetAsync(unclosed));
     }
 
+    [Theory]
+    [InlineData("<broken\n<valid>\n  value\n</valid>")]
+    [InlineData("</broken\n<valid>\n  value\n</valid>")]
+    [InlineData("<broken value=\"unfinished\n<valid>\n  value\n</valid>")]
+    public async Task Incomplete_tags_resync_at_the_next_raw_opening_tag(string text)
+    {
+        var analysis = await GetAnalysisAsync(new TextSnapshot(text));
+
+        Assert.False(analysis.IsComplete);
+        Assert.Contains(analysis.Folds, fold => fold.Id == "xml-element:$/valid[0]");
+    }
+
+    [Theory]
+    [InlineData("<")]
+    [InlineData("<!")]
+    [InlineData("<@")]
+    public async Task Incomplete_markup_openers_report_partial_analysis(string text)
+    {
+        var analysis = await GetAnalysisAsync(new TextSnapshot(text));
+
+        Assert.False(analysis.IsComplete);
+    }
+
     [Fact]
     public void Xml_language_definition_supplies_the_provider()
     {
@@ -78,5 +101,9 @@ public sealed class XmlFoldingProviderTests
 
     private static async Task<IReadOnlyList<FoldRange>> GetAsync(TextSnapshot snapshot) =>
         await new XmlFoldingProvider().GetFoldsAsync(
+            new EditorProviderContext(snapshot, 0, TextSelection.Caret(0)));
+
+    private static async Task<FoldingAnalysis> GetAnalysisAsync(TextSnapshot snapshot) =>
+        await new XmlFoldingProvider().GetFoldingAnalysisAsync(
             new EditorProviderContext(snapshot, 0, TextSelection.Caret(0)));
 }
