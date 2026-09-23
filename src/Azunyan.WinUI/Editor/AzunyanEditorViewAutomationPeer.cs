@@ -40,8 +40,32 @@ internal sealed partial class AzunyanEditorViewAutomationPeer : FrameworkElement
 
     internal IRawElementProviderSimple GetRawProvider() => ProviderFromPeer(this)!;
 
-    internal void NotifyDocumentChanged(DocumentChangedEventArgs args) =>
-        NotifyTextChanged(args.OldSnapshot.Text, args.NewSnapshot.Text);
+    internal void NotifyDocumentChanged(DocumentChangedEventArgs args)
+    {
+        if (string.Equals(
+                args.Change.OldText,
+                args.Change.NewText,
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        if (ListenerExists(AutomationEvents.TextPatternOnTextChanged))
+        {
+            RaiseAutomationEvent(AutomationEvents.TextPatternOnTextChanged);
+        }
+
+        // Snapshot.Text materializes the complete persistent text tree. Keep
+        // that O(document length) work off the typing path unless a UIA client
+        // is actively listening for the old and new Value values.
+        if (ListenerExists(AutomationEvents.PropertyChanged))
+        {
+            RaisePropertyChangedEvent(
+                ValuePatternIdentifiers.ValueProperty,
+                args.OldSnapshot.Text,
+                args.NewSnapshot.Text);
+        }
+    }
 
     internal void NotifyTextChanged(string oldText, string newText)
     {
