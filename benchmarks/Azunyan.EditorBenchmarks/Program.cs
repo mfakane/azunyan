@@ -183,6 +183,12 @@ var denseSyntaxLayout = Measure(
         syntaxLine,
         denseSyntax,
         new LayoutMetrics(8, 18, 14)));
+var integratedNoWrapScenario = new IntegratedEditScenario(text, lineCount / 2, wrapColumns: 0);
+_ = integratedNoWrapScenario.Step();
+var integratedNoWrapMiddleEdit = Measure(iterations, integratedNoWrapScenario.Step);
+var integratedWrappedScenario = new IntegratedEditScenario(text, lineCount / 2, wrapColumns: 80);
+_ = integratedWrappedScenario.Step();
+var integratedWrappedMiddleEdit = Measure(iterations, integratedWrappedScenario.Step);
 
 Console.WriteLine($"scenario=100k-lines-middle-insert");
 Console.WriteLine($"full_mean_ms={full.Elapsed.TotalMilliseconds / iterations:F3}");
@@ -217,15 +223,28 @@ Console.WriteLine($"fold_rows_equivalent={foldRowsEquivalent}");
 Console.WriteLine($"fold_reuses_edges={foldReusesEdges}");
 Console.WriteLine($"dense_syntax_visible_line_mean_ms={denseSyntaxLayout.Elapsed.TotalMilliseconds / iterations:F3}");
 Console.WriteLine($"dense_syntax_visible_line_mean_allocated_bytes={denseSyntaxLayout.AllocatedBytes / iterations}");
+WriteIntegratedMeasurement("integrated_no_wrap_middle_edit", integratedNoWrapMiddleEdit, integratedNoWrapScenario, iterations);
+WriteIntegratedMeasurement("integrated_wrapped_middle_edit", integratedWrappedMiddleEdit, integratedWrappedScenario, iterations);
 
 if (verify && (!equivalent
     || !decoratedEquivalent
     || !inputWindowReused
     || !foldEquivalent
     || !foldRowsEquivalent
-    || !foldReusesEdges))
+    || !foldReusesEdges
+    || !integratedNoWrapScenario.IsValid
+    || !integratedWrappedScenario.IsValid))
 {
     throw new InvalidOperationException("An incremental editor result differs from its full-build reference.");
+}
+if (verify
+    && (integratedNoWrapMiddleEdit.Elapsed.TotalMilliseconds / iterations > 10
+        || integratedWrappedMiddleEdit.Elapsed.TotalMilliseconds / iterations > 10
+        || integratedNoWrapMiddleEdit.AllocatedBytes / iterations > 500_000
+        || integratedWrappedMiddleEdit.AllocatedBytes / iterations > 500_000))
+{
+    throw new InvalidOperationException(
+        "The integrated middle-edit path exceeded its latency or allocation budget.");
 }
 
 static string BuildText(int lineCount)
@@ -241,6 +260,18 @@ static string BuildText(int lineCount)
     }
 
     return builder.ToString();
+}
+
+static void WriteIntegratedMeasurement(
+    string name,
+    Measurement measurement,
+    IntegratedEditScenario scenario,
+    int iterations)
+{
+    Console.WriteLine($"{name}_mean_ms={measurement.Elapsed.TotalMilliseconds / iterations:F3}");
+    Console.WriteLine($"{name}_mean_allocated_bytes={measurement.AllocatedBytes / iterations}");
+    Console.WriteLine($"{name}_rows={scenario.RowCount}");
+    Console.WriteLine($"{name}_visible_rows={scenario.VisibleRowCount}");
 }
 
 static Measurement Measure<T>(int count, Func<T> action)
@@ -329,3 +360,94 @@ static string DescribeContent(AdornmentContent content) =>
     $"{content.Text}:{content.IconKey}:{string.Join(',', content.Actions.Select(action => $"{action.Id}/{action.Label}/{action.CommandId}"))}";
 
 readonly record struct Measurement(TimeSpan Elapsed, long AllocatedBytes);
+
+sealed class IntegratedEditScenario
+{
+    private const double LineHeight = 18;
+    private readonly Document _document;
+    private readonly FoldStateTracker _folds = new();
+    private readonly int _editPosition;
+    private readonly int _wrapColumns;
+    private readonly MonospaceLineLayoutEngine _lineLayoutEngine = new();
+    private readonly Dictionary<ProjectedLine, UnwrappedLineLayout> _lineLayouts = new();
+    private TextProjection _projection;
+    private VisualRowMap _rows;
+    private VisualLineHeightIndex _heights;
+    private bool _toggle;
+
+    public IntegratedEditScenario(string text, int editLine, int wrapColumns)
+    {
+        _document = new Document(text, undoLimit: 0);
+        _editPosition = _document.Snapshot.Lines.GetLineStart(editLine) + 16;
+        _wrapColumns = wrapColumns;
+        _projection = TextProjectionBuilder.Build(_document.Snapshot);
+        _rows = VisualRowMapBuilder.Build(_projection, wrapColumns: _wrapColumns);
+        _heights = VisualLineHeightIndex.CreateUniform(_rows.Rows.Count, LineHeight);
+        _folds.Reset(_document.Snapshot);
+    }
+
+    public int RowCount => _rows.Rows.Count;
+
+    public int VisibleRowCount { get; private set; }
+
+    public bool IsValid =>
+        ReferenceEquals(_folds.Snapshot, _document.Snapshot)
+        && ReferenceEquals(_rows.Projection, _projection)
+        && _heights.Count == _rows.Rows.Count
+        && VisibleRowCount > 0;
+
+    public int Step()
+    {
+        var oldSnapshot = _document.Snapshot;
+        var previousProjection = _projection;
+        var previousRows = _rows;
+        var change = _document.Replace(_editPosition, 1, _toggle ? "x" : "y");
+        _toggle = !_toggle;
+        _folds.ApplyTextChange(oldSnapshot, _document.Snapshot, change);
+        _projection = TextProjectionBuilder.BuildIncremental(
+            oldSnapshot,
+            _document.Snapshot,
+            previousProjection,
+            change,
+            _folds.Folds,
+            inlays: null);
+        _rows = VisualRowMapBuilder.BuildIncremental(
+            previousProjection,
+            _projection,
+            previousRows,
+            wrapColumns: _wrapColumns,
+            change: change);
+        _heights = UpdateHeights(_heights, _rows);
+        _lineLayouts.Clear();
+        var viewportRow = _rows.Rows.Count / 2;
+        var visible = ViewportLayoutEngine.LayoutVisibleRows(
+            _document.Snapshot,
+            _rows,
+            _heights,
+            new LayoutViewport(_heights.GetOffset(viewportRow), LineHeight * 40),
+            LineHeight,
+            Array.Empty<SyntaxSpan>(),
+            new LayoutMetrics(8, LineHeight, 14),
+            _lineLayoutEngine,
+            _lineLayouts);
+        VisibleRowCount = visible.Count;
+        return VisibleRowCount;
+    }
+
+    private static VisualLineHeightIndex UpdateHeights(
+        VisualLineHeightIndex previous,
+        VisualRowMap rows)
+    {
+        if (rows.ChangeWindow is not { } change)
+        {
+            return VisualLineHeightIndex.CreateUniform(rows.Rows.Count, LineHeight);
+        }
+
+        var heights = previous.Clone();
+        heights.Splice(
+            change.OldStart,
+            change.OldEnd - change.OldStart,
+            Enumerable.Repeat(LineHeight, change.NewEnd - change.NewStart));
+        return heights;
+    }
+}

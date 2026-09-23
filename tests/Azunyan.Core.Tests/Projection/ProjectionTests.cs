@@ -256,6 +256,12 @@ public sealed class ProjectionTests
             Assert.True(
                 expectedRows.SequenceEqual(actualRows),
                 $"{string.Join("; ", history)}, rowWindow={incremental.ChangeWindow}, expected={string.Join(",", expectedRows)}, actual={string.Join(",", actualRows)}");
+            for (var visualLine = 0; visualLine < projection.Lines.Count; visualLine++)
+            {
+                Assert.Equal(
+                    expected.GetTextRowIndices(expected.Projection.Lines[visualLine]),
+                    incremental.GetTextRowIndices(projection.Lines[visualLine]));
+            }
             previousProjection = projection;
             previousRows = incremental;
         }
@@ -485,6 +491,21 @@ public sealed class ProjectionTests
             Enumerable.Range(0, index.Count).Select(index.GetHeight).ToArray());
         Assert.Equal(30, index.GetOffset(2));
         Assert.Equal(2, index.FindLine(31));
+    }
+
+    [Fact]
+    public void Uniform_height_index_clones_and_splices_uniform_rows()
+    {
+        var original = VisualLineHeightIndex.CreateUniform(100_000, 18);
+        var clone = original.Clone();
+
+        clone.Splice(50_000, 1, new[] { 18d, 18d });
+
+        Assert.Equal(100_000, original.Count);
+        Assert.Equal(100_001, clone.Count);
+        Assert.Equal(1_800_018, clone.TotalHeight);
+        Assert.Equal(900_000, clone.GetOffset(50_000));
+        Assert.Equal(50_000, clone.FindLine(900_000));
     }
 
     [Fact]

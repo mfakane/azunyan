@@ -1801,6 +1801,11 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         VisualRowMap rows,
         ProjectedTextLayoutState? previousLayout)
     {
+        if (rows.HasUniformTextHeights)
+        {
+            return VisualLineHeightIndex.CreateUniform(rows.Rows.Count, context.LineHeight);
+        }
+
         if (previousLayout is not null
             && rows.ChangeWindow is { } changeWindow
             && changeWindow.OldStart >= 0
@@ -1825,9 +1830,8 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             return heights;
         }
 
-        return rows.HasUniformTextHeights
-            ? VisualLineHeightIndex.CreateUniform(rows.Rows.Count, context.LineHeight)
-            : new VisualLineHeightIndex(rows.Rows.Select(row => GetRowHeight(row, context.LineHeight)));
+        return new VisualLineHeightIndex(
+            rows.Rows.Select(row => GetRowHeight(row, context.LineHeight)));
     }
 
     private static double GetRowHeight(VisualRow row, double lineHeight) =>

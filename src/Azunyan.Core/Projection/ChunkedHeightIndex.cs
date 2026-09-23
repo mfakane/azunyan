@@ -7,6 +7,7 @@ internal sealed class ChunkedHeightIndex
     private int[] _ends = Array.Empty<int>();
     private double[] _totals = Array.Empty<double>();
     private double[] _tree = Array.Empty<double>();
+    private double? _uniformHeight;
 
     public ChunkedHeightIndex(IEnumerable<double> heights)
     {
@@ -21,30 +22,41 @@ internal sealed class ChunkedHeightIndex
         Rebuild(chunks);
     }
 
+    private ChunkedHeightIndex(int count, double uniformHeight)
+    {
+        Count = count;
+        _uniformHeight = uniformHeight;
+    }
+
     public int Count { get; private set; }
 
-    public double TotalHeight => Prefix(_chunks.Length);
+    public double TotalHeight => _uniformHeight is { } height
+        ? Count * height
+        : Prefix(_chunks.Length);
 
     public static ChunkedHeightIndex CreateUniform(int count, double height)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(count);
         ValidateHeight(height, 0);
-        var chunks = new List<HeightChunk>((count + ChunkSize - 1) / ChunkSize);
-        for (var start = 0; start < count; start += ChunkSize)
-        {
-            var values = new double[Math.Min(ChunkSize, count - start)];
-            Array.Fill(values, height);
-            chunks.Add(new HeightChunk(values));
-        }
-
-        return new ChunkedHeightIndex(chunks.ToArray());
+        return new ChunkedHeightIndex(count, height);
     }
 
-    public ChunkedHeightIndex Clone() =>
-        new(_chunks.Select(chunk => chunk.Clone()).ToArray());
+    public ChunkedHeightIndex Clone() => _uniformHeight is { } height
+        ? new ChunkedHeightIndex(Count, height)
+        : new ChunkedHeightIndex(_chunks.Select(chunk => chunk.Clone()).ToArray());
 
     public double GetHeight(int line)
     {
+        if (line < 0 || line >= Count)
+        {
+            throw new ArgumentOutOfRangeException(nameof(line));
+        }
+
+        if (_uniformHeight is { } height)
+        {
+            return height;
+        }
+
         var (chunk, local) = Locate(line);
         return _chunks[chunk].Values[local];
     }
@@ -61,6 +73,11 @@ internal sealed class ChunkedHeightIndex
             return TotalHeight;
         }
 
+        if (_uniformHeight is { } height)
+        {
+            return line * height;
+        }
+
         var chunk = FindChunk(line);
         var start = chunk == 0 ? 0 : _ends[chunk - 1];
         var sum = Prefix(chunk);
@@ -74,8 +91,23 @@ internal sealed class ChunkedHeightIndex
 
     public void SetHeight(int line, double height)
     {
-        var (chunk, local) = Locate(line);
+        if (line < 0 || line >= Count)
+        {
+            throw new ArgumentOutOfRangeException(nameof(line));
+        }
+
         ValidateHeight(height, line);
+        if (_uniformHeight is { } uniformHeight)
+        {
+            if (height == uniformHeight)
+            {
+                return;
+            }
+
+            MaterializeUniform();
+        }
+
+        var (chunk, local) = Locate(line);
         var delta = height - _chunks[chunk].Values[local];
         _chunks[chunk].Values[local] = height;
         _totals[chunk] += delta;
@@ -97,6 +129,11 @@ internal sealed class ChunkedHeightIndex
         if (offset == TotalHeight)
         {
             return Count - 1;
+        }
+
+        if (_uniformHeight is { } height)
+        {
+            return Math.Min(Count - 1, (int)(offset / height));
         }
 
         var low = 0;
@@ -141,6 +178,17 @@ internal sealed class ChunkedHeightIndex
 
         var inserted = insertedHeights.ToArray();
         ValidateValues(inserted);
+        if (_uniformHeight is { } height)
+        {
+            if (inserted.All(value => value == height))
+            {
+                Count = checked(Count - removeCount + inserted.Length);
+                return;
+            }
+
+            MaterializeUniform();
+        }
+
         var chunks = new List<HeightChunk>();
         AddRange(chunks, 0, index);
         chunks.AddRange(CreateChunks(inserted));
@@ -166,6 +214,7 @@ internal sealed class ChunkedHeightIndex
 
     private void Rebuild(HeightChunk[] chunks)
     {
+        _uniformHeight = null;
         _chunks = chunks;
         _ends = new int[chunks.Length];
         _totals = new double[chunks.Length];
@@ -182,6 +231,18 @@ internal sealed class ChunkedHeightIndex
         {
             Add(index, _totals[index]);
         }
+    }
+
+    private void MaterializeUniform()
+    {
+        if (_uniformHeight is not { } height)
+        {
+            return;
+        }
+
+        var values = new double[Count];
+        Array.Fill(values, height);
+        Rebuild(CreateChunks(values));
     }
 
     private (int Chunk, int Local) Locate(int line)

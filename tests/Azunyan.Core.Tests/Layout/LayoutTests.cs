@@ -171,6 +171,12 @@ public sealed class LayoutTests
         Assert.Equal(
             expected.Rows.Select(DescribeRow),
             incremental.Rows.Select(DescribeRow));
+        Assert.Equal(
+            expected.GetTextRowIndices(expected.Projection.Lines[2]),
+            incremental.GetTextRowIndices(currentProjection.Lines[2]));
+        Assert.Equal(
+            expected.GetBlockRowIndices(currentBlock.Anchor),
+            incremental.GetBlockRowIndices(currentBlock.Anchor));
         Assert.Same(previous.Rows[0], incremental.Rows[0]);
     }
 

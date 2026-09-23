@@ -235,15 +235,16 @@ public sealed class VisualRowMapBuilder
                 wrappedLineBreaksByVisualLine: wrappedLineBreaksByVisualLine);
         }
 
-        var oldRowWindow = GetRowWindow(previous, oldVisualWindow);
+        var oldRowWindow = previous.GetRowRange(oldVisualWindow.Start, oldVisualWindow.End);
         var newRowStart = oldRowWindow.Start;
-        var newRowEnd = checked(newRowStart + CountRows(
+        var newRowCounts = GetRowCounts(
             projection,
             blocks,
             wrapColumns,
             newVisualWindow.Start,
             newVisualWindow.End,
-            wrapBreaks));
+            wrapBreaks);
+        var newRowEnd = checked(newRowStart + newRowCounts.Sum());
         var changedRows = BuildRows(
             projection,
             blocks,
@@ -275,6 +276,10 @@ public sealed class VisualRowMapBuilder
             rows,
             blocks,
             wrapBreaks,
+            previous.RowCounts.Replace(
+                oldVisualWindow.Start,
+                oldVisualWindow.End - oldVisualWindow.Start,
+                newRowCounts),
             new VisualRowChangeWindow(
                 oldRowWindow.Start,
                 oldRowWindow.End,
@@ -316,42 +321,7 @@ public sealed class VisualRowMapBuilder
         return (projection.Lines.Count, projection.Lines.Count);
     }
 
-    private static (int Start, int End) GetRowWindow(
-        VisualRowMap rows,
-        (int Start, int End) visualWindow)
-    {
-        var start = int.MaxValue;
-        var end = -1;
-        for (var visualLine = visualWindow.Start; visualLine < visualWindow.End; visualLine++)
-        {
-            var line = rows.Projection.Lines[visualLine];
-            foreach (var rowIndex in rows.GetTextRowIndices(line))
-            {
-                start = Math.Min(start, rowIndex);
-                end = Math.Max(end, rowIndex + 1);
-            }
-
-            foreach (var block in rows.BlockAdornments)
-            {
-                if (rows.Projection.MapDocumentPosition(block.Anchor).VisualLine != visualLine)
-                {
-                    continue;
-                }
-
-                foreach (var rowIndex in rows.GetBlockRowIndices(block.Anchor))
-                {
-                    start = Math.Min(start, rowIndex);
-                    end = Math.Max(end, rowIndex + 1);
-                }
-            }
-        }
-
-        return end >= 0
-            ? (start, end)
-            : (rows.Rows.Count, rows.Rows.Count);
-    }
-
-    private static int CountRows(
+    private static int[] GetRowCounts(
         TextProjection projection,
         IReadOnlyList<BlockAdornment> blocks,
         int wrapColumns,
@@ -362,17 +332,18 @@ public sealed class VisualRowMapBuilder
         var blocksByVisualLine = blocks
             .GroupBy(block => projection.MapDocumentPosition(block.Anchor).VisualLine)
             .ToDictionary(group => group.Key, group => group.Count());
-        var count = 0;
+        var counts = new int[endVisualLine - startVisualLine];
         for (var visualLine = startVisualLine; visualLine < endVisualLine; visualLine++)
         {
-            count = checked(count + (blocksByVisualLine.TryGetValue(visualLine, out var blockCount)
+            var count = blocksByVisualLine.TryGetValue(visualLine, out var blockCount)
                 ? blockCount
-                : 0));
+                : 0;
             var line = projection.Lines[visualLine];
-            count = checked(count + GetTextRowCount(line, wrapColumns, wrapBreaks));
+            counts[visualLine - startVisualLine] = checked(
+                count + GetTextRowCount(line, wrapColumns, wrapBreaks));
         }
 
-        return count;
+        return counts;
     }
 
     private static int GetTextRowCount(
@@ -745,9 +716,8 @@ public sealed class VisualRowMapBuilder
 
 public sealed class VisualRowMap
 {
-    private readonly Lazy<Dictionary<int, int[]>> _textRowsByLine;
-    private readonly Lazy<Dictionary<DocumentAnchor, int[]>> _blockRowsByAnchor;
     private readonly bool _isPlain;
+    internal VisualRowCountIndex RowCounts { get; }
 
     internal VisualRowMap(TextProjection projection, IReadOnlyList<VisualRow> rows)
         : this(
@@ -755,6 +725,7 @@ public sealed class VisualRowMap
             rows,
             Array.Empty<BlockAdornment>(),
             new Dictionary<WrapBreakKey, IReadOnlyList<int>>(),
+            rowCounts: null,
             changeWindow: null,
             isPlain: false)
     {
@@ -769,6 +740,7 @@ public sealed class VisualRowMap
             rows,
             blockAdornments,
             new Dictionary<WrapBreakKey, IReadOnlyList<int>>(),
+            rowCounts: null,
             changeWindow: null,
             isPlain: false)
     {
@@ -779,7 +751,7 @@ public sealed class VisualRowMap
         IReadOnlyList<VisualRow> rows,
         IReadOnlyList<BlockAdornment> blockAdornments,
         IReadOnlyDictionary<WrapBreakKey, IReadOnlyList<int>> wrapBreaks)
-        : this(projection, rows, blockAdornments, wrapBreaks, changeWindow: null, isPlain: false)
+        : this(projection, rows, blockAdornments, wrapBreaks, rowCounts: null, changeWindow: null, isPlain: false)
     {
     }
 
@@ -788,8 +760,9 @@ public sealed class VisualRowMap
         IReadOnlyList<VisualRow> rows,
         IReadOnlyList<BlockAdornment> blockAdornments,
         IReadOnlyDictionary<WrapBreakKey, IReadOnlyList<int>> wrapBreaks,
+        VisualRowCountIndex rowCounts,
         VisualRowChangeWindow changeWindow)
-        : this(projection, rows, blockAdornments, wrapBreaks, changeWindow, isPlain: false)
+        : this(projection, rows, blockAdornments, wrapBreaks, rowCounts, changeWindow, isPlain: false)
     {
     }
 
@@ -798,6 +771,7 @@ public sealed class VisualRowMap
         IReadOnlyList<VisualRow> rows,
         IReadOnlyList<BlockAdornment> blockAdornments,
         IReadOnlyDictionary<WrapBreakKey, IReadOnlyList<int>> wrapBreaks,
+        VisualRowCountIndex? rowCounts,
         VisualRowChangeWindow? changeWindow,
         bool isPlain)
     {
@@ -807,20 +781,7 @@ public sealed class VisualRowMap
         WrapBreaks = wrapBreaks;
         ChangeWindow = changeWindow;
         _isPlain = isPlain;
-        _textRowsByLine = new Lazy<Dictionary<int, int[]>>(
-            () => rows
-                .Where(row => row.TextLine is not null)
-                .GroupBy(row => row.TextLine!.LogicalLine)
-                .ToDictionary(group => group.Key, group => group
-                    .Select(row => row.VisualRowIndex)
-                    .ToArray()));
-        _blockRowsByAnchor = new Lazy<Dictionary<DocumentAnchor, int[]>>(
-            () => rows
-                .Where(row => row.BlockAdornment is not null)
-                .GroupBy(row => row.BlockAdornment!.Anchor)
-                .ToDictionary(group => group.Key, group => group
-                    .Select(row => row.VisualRowIndex)
-                    .ToArray()));
+        RowCounts = rowCounts ?? CreateRowCounts(projection, rows);
     }
 
     public TextProjection Projection { get; }
@@ -853,7 +814,7 @@ public sealed class VisualRowMap
         return result;
     }
 
-    public bool HasUniformTextHeights => _isPlain;
+    public bool HasUniformTextHeights => BlockAdornments.Count == 0;
 
     internal static VisualRowMap CreatePlain(TextProjection projection) =>
         new(
@@ -861,26 +822,55 @@ public sealed class VisualRowMap
             new PlainVisualRowList(projection),
             Array.Empty<BlockAdornment>(),
             new Dictionary<WrapBreakKey, IReadOnlyList<int>>(),
+            VisualRowCountIndex.CreateUniform(projection.Lines.Count, 1),
             changeWindow: null,
             isPlain: true);
 
-    public IReadOnlyList<int> GetTextRowIndices(ProjectedLine line) =>
-        _isPlain && ProjectionLineMatches(line, out var plainRow)
-            ? new[] { plainRow }
-            : _textRowsByLine.Value.TryGetValue(line.LogicalLine, out var rows)
-            ? rows
-            : Array.Empty<int>();
+    public IReadOnlyList<int> GetTextRowIndices(ProjectedLine line)
+    {
+        if (!ProjectionLineMatches(line, out var visualLine)) return Array.Empty<int>();
+        var range = RowCounts.GetRowRange(visualLine, visualLine + 1);
+        return Enumerable.Range(range.Start, range.End - range.Start)
+            .Where(index => ReferenceEquals(
+                Rows[index].TextLine?.LayoutCacheIdentity,
+                line.LayoutCacheIdentity))
+            .ToArray();
+    }
 
-    public IReadOnlyList<int> GetBlockRowIndices(DocumentAnchor anchor) =>
-        _blockRowsByAnchor.Value.TryGetValue(anchor, out var rows)
-            ? rows
-            : Array.Empty<int>();
+    public IReadOnlyList<int> GetBlockRowIndices(DocumentAnchor anchor)
+    {
+        var visualLine = Projection.MapDocumentPosition(anchor).VisualLine;
+        var range = RowCounts.GetRowRange(visualLine, visualLine + 1);
+        return Enumerable.Range(range.Start, range.End - range.Start)
+            .Where(index => Rows[index].BlockAdornment?.Anchor == anchor)
+            .ToArray();
+    }
+
+    internal (int Start, int End) GetRowRange(int startVisualLine, int endVisualLine) =>
+        RowCounts.GetRowRange(startVisualLine, endVisualLine);
 
     private bool ProjectionLineMatches(ProjectedLine line, out int visualRow)
     {
-        visualRow = line.LogicalLine;
-        return visualRow >= 0
-            && visualRow < Projection.Lines.Count
+        return Projection.TryGetVisualLine(line.LogicalLine, out visualRow)
             && ReferenceEquals(Projection.Lines[visualRow], line);
+    }
+
+    private static VisualRowCountIndex CreateRowCounts(
+        TextProjection projection,
+        IReadOnlyList<VisualRow> rows)
+    {
+        var counts = new int[projection.Lines.Count];
+        foreach (var row in rows)
+        {
+            var logicalLine = row.TextLine?.LogicalLine ?? row.LogicalLine;
+            if (!projection.TryGetVisualLine(logicalLine, out var visualLine))
+            {
+                throw new InvalidOperationException("A visual row does not belong to its projection.");
+            }
+
+            counts[visualLine]++;
+        }
+
+        return VisualRowCountIndex.Create(counts);
     }
 }
