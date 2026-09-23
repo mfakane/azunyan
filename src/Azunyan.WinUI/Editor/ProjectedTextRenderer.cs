@@ -29,7 +29,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
     private readonly CanvasControl _textSurface;
     private readonly Dictionary<ProjectedLine, UnwrappedLineLayout> _lineLayouts = new();
     private readonly Dictionary<VisualRow, GutterLayoutEntry> _gutterLayouts = new();
-    private readonly Dictionary<VisualRow, DirectWriteTextLayout> _textLayouts = new();
+    private readonly Dictionary<TextLayoutRowKey, TextLayoutEntry> _textLayouts = new();
     private readonly MonospaceLineLayoutEngine _lineLayoutEngine = new();
     private long _textLayoutCreates;
     private long _textLayoutHits;
@@ -37,6 +37,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
     private ProjectedTextRenderFrame? _renderFrame;
     private DocumentChangedEventArgs? _pendingDocumentChange;
     private TextLayoutCacheKey? _textLayoutCacheKey;
+    private IReadOnlyList<SyntaxSpan>? _lineLayoutSyntax;
     private bool _disposed;
 
     public ProjectedTextRenderer(CanvasControl gutterSurface, CanvasControl textSurface)
@@ -608,7 +609,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         if (_renderFrame is { } frame
             && rowIndex >= 0
             && rowIndex < frame.Layouts.Count
-            && _textLayouts.TryGetValue(frame.Layouts[rowIndex].Row, out var directWriteLayout))
+            && TryGetTextLayout(frame.Layouts[rowIndex].Row, out var directWriteLayout))
         {
             return directWriteLayout.GetCaretPosition(localStop).X;
         }
@@ -631,9 +632,22 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
     private DirectWriteTextLayout? GetTextLayoutForGlobalRow(
         VisualRow row)
     {
-        return _textLayouts.TryGetValue(row, out var layout)
+        return TryGetTextLayout(row, out var layout)
             ? layout
             : null;
+    }
+
+    private bool TryGetTextLayout(VisualRow row, out DirectWriteTextLayout layout)
+    {
+        if (TryGetTextLayoutKey(row, out var key)
+            && _textLayouts.TryGetValue(key, out var entry))
+        {
+            layout = entry.Layout;
+            return true;
+        }
+
+        layout = null!;
+        return false;
     }
 
     private UnwrappedLineLayout? GetLineLayoutForGlobalRow(
@@ -1418,9 +1432,9 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
 
     private void ClearTextLayouts()
     {
-        foreach (var textLayout in _textLayouts.Values)
+        foreach (var entry in _textLayouts.Values)
         {
-            textLayout.Dispose();
+            entry.Layout.Dispose();
         }
 
         foreach (var gutterLayout in _gutterLayouts.Values)
@@ -1434,8 +1448,14 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
 
     private void EnsureTextLayoutCache(AzunyanEditorRenderContext context)
     {
+        var syntax = context.DocumentResults?.Syntax;
+        if (!ReferenceEquals(_lineLayoutSyntax, syntax))
+        {
+            _lineLayouts.Clear();
+            _lineLayoutSyntax = syntax;
+        }
+
         var key = new TextLayoutCacheKey(
-            context.DocumentResults?.Syntax,
             context.ColorScheme,
             context.FontFamily.Source,
             context.FontSize,
@@ -1454,9 +1474,14 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
 
     private void PruneLayoutCaches(IReadOnlyList<ViewportRowLayout> layouts)
     {
-        var rows = layouts
-            .Select(layout => layout.Row)
+        var textLayoutKeys = layouts
+            .Select(layout => TryGetTextLayoutKey(layout.Row, out var key)
+                ? key
+                : (TextLayoutRowKey?)null)
+            .Where(key => key is not null)
+            .Select(key => key!.Value)
             .ToHashSet();
+        var rows = layouts.Select(layout => layout.Row).ToHashSet();
         var textLines = layouts
             .Select(layout => layout.Row.TextLine)
             .Where(line => line is not null)
@@ -1467,10 +1492,10 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             _lineLayouts.Remove(line);
         }
 
-        foreach (var row in _textLayouts.Keys.Where(row => !rows.Contains(row)).ToArray())
+        foreach (var key in _textLayouts.Keys.Where(key => !textLayoutKeys.Contains(key)).ToArray())
         {
-            _textLayouts[row].Dispose();
-            _textLayouts.Remove(row);
+            _textLayouts[key].Layout.Dispose();
+            _textLayouts.Remove(key);
         }
 
         foreach (var row in _gutterLayouts.Keys.Where(row => !rows.Contains(row)).ToArray())
@@ -1848,8 +1873,20 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         double top,
         VisualRow row)
     {
-        if (!_textLayouts.TryGetValue(row, out var textLayout))
+        if (!TryGetTextLayoutKey(row, out var key))
         {
+            return;
+        }
+
+        DirectWriteTextLayout textLayout;
+        if (!_textLayouts.TryGetValue(key, out var entry)
+            || !entry.Matches(line.Runs))
+        {
+            if (entry is not null)
+            {
+                entry.Layout.Dispose();
+            }
+
             _textLayoutCreates++;
             var runs = line.Runs
                 .Select(run => new DirectWriteTextRun(
@@ -1868,10 +1905,11 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
                 (float)context.LineHeight,
                 Math.Min((float)context.LineHeight * 0.8f, (float)context.LineHeight),
                 (float)(context.CharacterWidth * context.TabDisplaySize));
-            _textLayouts.Add(row, textLayout);
+            _textLayouts[key] = TextLayoutEntry.Create(textLayout, line.Runs);
         }
         else
         {
+            textLayout = entry.Layout;
             _textLayoutHits++;
         }
 
@@ -2475,7 +2513,6 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
     private sealed class TextLayoutCacheKey
     {
         public TextLayoutCacheKey(
-            IReadOnlyList<SyntaxSpan>? syntax,
             AzunyanColorScheme colorScheme,
             string fontFamily,
             double fontSize,
@@ -2485,7 +2522,6 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             int tabDisplaySize,
             TextWrapping textWrapping)
         {
-            Syntax = syntax;
             ColorScheme = colorScheme;
             FontFamily = fontFamily;
             FontSize = fontSize;
@@ -2495,8 +2531,6 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             TabDisplaySize = tabDisplaySize;
             TextWrapping = textWrapping;
         }
-
-        public IReadOnlyList<SyntaxSpan>? Syntax { get; }
 
         public AzunyanColorScheme ColorScheme { get; }
 
@@ -2515,8 +2549,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         public TextWrapping TextWrapping { get; }
 
         public bool Matches(TextLayoutCacheKey other) =>
-            ReferenceEquals(Syntax, other.Syntax)
-            && Equals(ColorScheme, other.ColorScheme)
+            Equals(ColorScheme, other.ColorScheme)
             && string.Equals(FontFamily, other.FontFamily, StringComparison.Ordinal)
             && FontSize == other.FontSize
             && CharacterWidth == other.CharacterWidth
@@ -2524,6 +2557,87 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             && GutterWidth == other.GutterWidth
             && TabDisplaySize == other.TabDisplaySize
             && TextWrapping == other.TextWrapping;
+    }
+
+    private static bool TryGetTextLayoutKey(VisualRow row, out TextLayoutRowKey key)
+    {
+        if (row.TextLine is not { } line)
+        {
+            key = default;
+            return false;
+        }
+
+        key = new TextLayoutRowKey(
+            line.LayoutCacheIdentity,
+            row.TextStartColumn,
+            row.TextLength);
+        return true;
+    }
+
+    private readonly record struct TextLayoutRowKey(
+        object LineIdentity,
+        int TextStartColumn,
+        int TextLength);
+
+    private readonly record struct DirectWriteRunShape(
+        int VisualStart,
+        int Length,
+        bool IsInlineAdornment,
+        bool IsLink);
+
+    private sealed class TextLayoutEntry
+    {
+        private TextLayoutEntry(
+            DirectWriteTextLayout layout,
+            DirectWriteRunShape[] shapes)
+        {
+            Layout = layout;
+            Shapes = shapes;
+        }
+
+        public DirectWriteTextLayout Layout { get; }
+
+        private DirectWriteRunShape[] Shapes { get; }
+
+        public bool Matches(IReadOnlyList<LayoutRun> runs)
+        {
+            var shapeIndex = 0;
+            foreach (var run in runs)
+            {
+                var isAdornment = run.Kind == LayoutRunKind.InlineAdornment;
+                var isLink = IsLink(run);
+                if (!isAdornment && !isLink)
+                {
+                    continue;
+                }
+
+                if (shapeIndex >= Shapes.Length
+                    || Shapes[shapeIndex++] != new DirectWriteRunShape(
+                        run.VisualStart,
+                        run.Text.Length,
+                        isAdornment,
+                        isLink))
+                {
+                    return false;
+                }
+            }
+
+            return shapeIndex == Shapes.Length;
+        }
+
+        public static TextLayoutEntry Create(
+            DirectWriteTextLayout layout,
+            IReadOnlyList<LayoutRun> runs) =>
+            new(
+                layout,
+                runs
+                    .Where(run => run.Kind == LayoutRunKind.InlineAdornment || IsLink(run))
+                    .Select(run => new DirectWriteRunShape(
+                        run.VisualStart,
+                        run.Text.Length,
+                        run.Kind == LayoutRunKind.InlineAdornment,
+                        IsLink(run)))
+                    .ToArray());
     }
 }
 

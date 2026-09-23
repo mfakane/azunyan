@@ -180,12 +180,17 @@ public sealed record BlockAdornment
 /// </summary>
 public sealed class ProjectedLine
 {
-    internal ProjectedLine(int logicalLine, TextRange sourceRange, IReadOnlyList<ProjectionInline> inlines)
+    internal ProjectedLine(
+        int logicalLine,
+        TextRange sourceRange,
+        IReadOnlyList<ProjectionInline> inlines,
+        object? layoutCacheIdentity = null)
     {
         LogicalLine = logicalLine;
         SourceRange = sourceRange;
         Inlines = inlines;
         VisualLength = inlines.Sum(GetVisualLength);
+        LayoutCacheIdentity = layoutCacheIdentity ?? this;
     }
 
     public int LogicalLine { get; }
@@ -199,6 +204,8 @@ public sealed class ProjectedLine
     /// Layout replaces this estimate with shaped caret stops later.
     /// </summary>
     public int VisualLength { get; }
+
+    internal object LayoutCacheIdentity { get; }
 
     public int GetVisualColumn(DocumentAnchor anchor)
     {
@@ -328,7 +335,7 @@ public sealed class ProjectedLine
                 _ => inline
             })
             .ToArray();
-        return new ProjectedLine(logicalLine, sourceRange, inlines);
+        return new ProjectedLine(logicalLine, sourceRange, inlines, LayoutCacheIdentity);
     }
 
     public DocumentAnchor GetAnchor(int visualColumn)

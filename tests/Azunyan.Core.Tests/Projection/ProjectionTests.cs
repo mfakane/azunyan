@@ -43,6 +43,8 @@ public sealed class ProjectionTests
             change);
 
         Assert.Same(previous.Lines[0], incremental.Lines[0]);
+        Assert.NotSame(previous.Lines[1].LayoutCacheIdentity, incremental.Lines[1].LayoutCacheIdentity);
+        Assert.Same(previous.Lines[2].LayoutCacheIdentity, incremental.Lines[2].LayoutCacheIdentity);
         Assert.Equal("aa", document.Snapshot.GetText(incremental.Lines[0].SourceRange));
         Assert.Equal("bXb", document.Snapshot.GetText(incremental.Lines[1].SourceRange));
         Assert.Equal("cc", document.Snapshot.GetText(incremental.Lines[2].SourceRange));
