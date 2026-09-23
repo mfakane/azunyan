@@ -9,11 +9,67 @@ namespace Azunyan.WinUI;
 
 public sealed partial class AzunyanEditorView
 {
+    private bool _viewportRenderScheduled;
+    private bool _executingScheduledViewportRender;
+    private long _viewportRenderTicket;
+
+    private void RequestViewportRender()
+    {
+        if (_disposed || !IsLoaded || _viewportRenderScheduled)
+        {
+            return;
+        }
+
+        _viewportRenderScheduled = true;
+        var ticket = checked(++_viewportRenderTicket);
+        if (!DispatcherQueue.TryEnqueue(
+                Microsoft.UI.Dispatching.DispatcherQueuePriority.High,
+                () => RunScheduledViewportRender(ticket)))
+        {
+            _viewportRenderScheduled = false;
+        }
+    }
+
+    private void RunScheduledViewportRender(long ticket)
+    {
+        if (ticket != _viewportRenderTicket)
+        {
+            return;
+        }
+
+        _viewportRenderScheduled = false;
+        if (_disposed || !IsLoaded)
+        {
+            return;
+        }
+
+        _executingScheduledViewportRender = true;
+        try
+        {
+            RenderViewport();
+        }
+        finally
+        {
+            _executingScheduledViewportRender = false;
+        }
+    }
+
+    private void InvalidateScheduledViewportRender()
+    {
+        _viewportRenderScheduled = false;
+        _viewportRenderTicket = checked(_viewportRenderTicket + 1);
+    }
+
     private void RenderViewport()
     {
         if (!IsLoaded)
         {
             return;
+        }
+
+        if (!_executingScheduledViewportRender)
+        {
+            InvalidateScheduledViewportRender();
         }
 
         var traceRender = IsDiagnosticEnabled(AzunyanDiagnosticCategory.Render);

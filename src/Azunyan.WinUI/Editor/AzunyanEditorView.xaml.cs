@@ -166,6 +166,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         _disposed = true;
+        InvalidateScheduledViewportRender();
         EndTypedInputUndoGroup();
         if (_pasteBatchRefreshTimer is { } pasteBatchRefreshTimer)
         {
@@ -1240,6 +1241,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         EndTypedInputUndoGroup();
+        InvalidateScheduledViewportRender();
         _providerScheduler.CancelAll();
         InvalidateProviderGenerations();
         if (_scrollViewer is not null && !IsProjectedTextSurface)
@@ -1818,7 +1820,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     {
         if (IsLoaded)
         {
-            DispatcherQueue.TryEnqueue(RenderViewport);
+            RequestViewportRender();
         }
     }
 
@@ -1942,7 +1944,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
         if (render)
         {
-            RenderViewport();
+            RequestViewportRender();
         }
 
         _automationPeer?.NotifyDocumentChanged(automationChange);

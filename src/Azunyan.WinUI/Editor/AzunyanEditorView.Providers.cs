@@ -33,7 +33,7 @@ public sealed partial class AzunyanEditorView
             _documentProviderDelayCancellation?.Dispose();
             _documentProviderDelayCancellation = null;
             _providerFrame = new EditorProviderFrame(snapshot, selection);
-            RenderViewport();
+            RequestViewportRender();
             requestDocument = false;
         }
 
@@ -62,7 +62,7 @@ public sealed partial class AzunyanEditorView
                     snapshot,
                     documentChange!.Change,
                     provisionalRange));
-            RenderViewport();
+            RequestViewportRender();
             _ = ApplyDocumentProviderResultAsync(
                 RequestDocumentProviderResultAsync(
                     snapshot,
@@ -94,7 +94,7 @@ public sealed partial class AzunyanEditorView
                     selection,
                     frame?.Document,
                     frame?.Viewport);
-                RenderViewport();
+                RequestViewportRender();
             }
             _ = ApplyPositionProviderResultAsync(
                 _providerScheduler.RequestPositionAsync(
@@ -315,7 +315,7 @@ public sealed partial class AzunyanEditorView
         }
 
         _providerFrame = frame;
-        RenderViewport();
+        RequestViewportRender();
         ProviderFrameChanged?.Invoke(this, new EditorProviderFrameEventArgs(frame));
         ProviderResultsChanged?.Invoke(
             this,
