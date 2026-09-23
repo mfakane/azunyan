@@ -16,12 +16,16 @@ public sealed partial class AzunyanEditorView
             return;
         }
 
-        LogDiagnosticStage(
-            AzunyanDiagnosticCategory.Render,
-            "render-start",
-            $"selection={Document.Selection}; caretCount={Document.CaretSet.Count}; "
-            + $"wrapping={TextWrapping}");
-        UpdateTextMetrics();
+        var traceRender = IsDiagnosticEnabled(AzunyanDiagnosticCategory.Render);
+        var renderStarted = traceRender ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
+        if (traceRender)
+        {
+            LogDiagnosticStage(
+                AzunyanDiagnosticCategory.Render,
+                "render-start",
+                $"input={_latestInputSequence}; selection={Document.Selection}; "
+                + $"caretCount={Document.CaretSet.Count}; wrapping={TextWrapping}");
+        }
 
         var lineIndex = Snapshot.Lines;
         var lineCount = lineIndex.LineCount;
@@ -135,6 +139,14 @@ public sealed partial class AzunyanEditorView
             _foldStateTracker.CollapsedIds,
             folds,
             currentFrame);
+        if (traceRender)
+        {
+            frame.DiagnosticInputSequence = _latestInputSequence;
+            frame.DiagnosticInputStarted = _latestInputStarted;
+            frame.DiagnosticSink = message => LogDiagnostic(
+                AzunyanDiagnosticCategory.Render,
+                message);
+        }
         _renderer?.Render(frame);
         if (TryGetRendererCaretRect(
                 Document.CaretSet.Primary.CaretAnchor,
@@ -192,10 +204,15 @@ public sealed partial class AzunyanEditorView
         UpdateCompletionPopup();
         UpdateTooltipPopup();
         _automationPeer?.NotifyLayoutChanged();
-        LogDiagnosticStage(
-            AzunyanDiagnosticCategory.Render,
-            "render-finished",
-            DescribeDiagnosticState());
+        if (traceRender)
+        {
+            LogDiagnosticStage(
+                AzunyanDiagnosticCategory.Render,
+                "render-finished",
+                $"input={_latestInputSequence}; elapsedMs="
+                + $"{System.Diagnostics.Stopwatch.GetElapsedTime(renderStarted).TotalMilliseconds:F3}; "
+                + DescribeDiagnosticState());
+        }
     }
 
     private void ReconcileInputWindowCaret()

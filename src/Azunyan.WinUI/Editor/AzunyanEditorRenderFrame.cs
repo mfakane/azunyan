@@ -138,5 +138,11 @@ public sealed class AzunyanEditorRenderFrame
 
     public EditorProviderResults? ProviderResults { get; }
 
+    internal long DiagnosticInputSequence { get; set; }
+
+    internal long DiagnosticInputStarted { get; set; }
+
+    internal Action<string>? DiagnosticSink { get; set; }
+
     public TextRange GetLineRange(int line) => Snapshot.Lines.GetLineRange(line);
 }

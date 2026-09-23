@@ -104,6 +104,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private DocumentChangedEventArgs? _pendingAutomationDocumentChange;
     private AzunyanEditorViewAutomationPeer? _automationPeer;
     private long _diagnosticOperationSequence;
+    private long _latestInputSequence;
+    private long _latestInputStarted;
     private string? _diagnosticOperation;
     private string? _diagnosticPasteOperation;
 
@@ -1211,6 +1213,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             _scrollViewer.ViewChanged += OnViewportChanged;
         }
 
+        UpdateTextMetrics();
         ApplyIndentSize();
         ApplyIndentationInputMode();
         UpdateTextSurfaceMode();
@@ -1265,11 +1268,17 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             return;
         }
 
-        LogDiagnostic(
-            AzunyanDiagnosticCategory.Input,
-            $"native-text-changed generation={args.Generation}; oldRange={args.Change.OldRange}; "
-            + $"newTextLength={args.Change.NewText.Length}; selection={args.Selection}; "
-            + $"composition={args.CompositionRange?.ToString() ?? "none"}; {DescribeDiagnosticState()}");
+        _latestInputSequence = checked(_latestInputSequence + 1);
+        _latestInputStarted = System.Diagnostics.Stopwatch.GetTimestamp();
+        if (IsDiagnosticEnabled(AzunyanDiagnosticCategory.Input))
+        {
+            LogDiagnostic(
+                AzunyanDiagnosticCategory.Input,
+                $"native-text-changed input={_latestInputSequence}; generation={args.Generation}; "
+                + $"oldRange={args.Change.OldRange}; newTextLength={args.Change.NewText.Length}; "
+                + $"selection={args.Selection}; composition={args.CompositionRange?.ToString() ?? "none"}; "
+                + DescribeDiagnosticState());
+        }
         var canReuseNativeWindow = IsTypedInput(args)
             && _blockSelection is null
             && Document.CaretSet.Count == 1;
@@ -2004,11 +2013,14 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
         var generation = checked(++_inputWindowGeneration);
 
-        LogDiagnosticStage(
-            AzunyanDiagnosticCategory.Input,
-            "before-native-window-set",
-            $"generation={generation}; windowStart={window.Start}; windowLength={window.Length}; "
-            + $"selection={Document.Selection}");
+        if (IsDiagnosticEnabled(AzunyanDiagnosticCategory.Input))
+        {
+            LogDiagnosticStage(
+                AzunyanDiagnosticCategory.Input,
+                "before-native-window-set",
+                $"input={_latestInputSequence}; generation={generation}; windowStart={window.Start}; "
+                + $"windowLength={window.Length}; selection={Document.Selection}");
+        }
 
         _synchronizingInputWindow = true;
         try
@@ -2027,10 +2039,14 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
         _inputWindowSynchronizationPending = false;
         _mappedAlignedInputWindow = null;
-        LogDiagnosticStage(
-            AzunyanDiagnosticCategory.Input,
-            "after-native-window-set",
-            $"generation={generation}; windowStart={window.Start}; windowLength={window.Length}");
+        if (IsDiagnosticEnabled(AzunyanDiagnosticCategory.Input))
+        {
+            LogDiagnosticStage(
+                AzunyanDiagnosticCategory.Input,
+                "after-native-window-set",
+                $"input={_latestInputSequence}; generation={generation}; windowStart={window.Start}; "
+                + $"windowLength={window.Length}");
+        }
     }
 
     private TextRange CalculateInputWindow(TextRange currentWindow) =>
@@ -2698,6 +2714,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 $"Azunyan editor diagnostic sink failed: {exception}");
         }
     }
+
+    private bool IsDiagnosticEnabled(AzunyanDiagnosticCategory category) =>
+        (DiagnosticCategories & category) != 0;
 
     private void OnNativeInputCallbackException(string source, Exception exception)
     {
@@ -3843,7 +3862,6 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     private TextRange GetVisibleDocumentRange()
     {
-        UpdateTextMetrics();
         var snapshot = Snapshot;
         if (IsProjectedTextSurface
             && _defaultRenderer.TextRenderer.TryGetVisibleDocumentRange(

@@ -31,6 +31,8 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
     private readonly Dictionary<VisualRow, GutterLayoutEntry> _gutterLayouts = new();
     private readonly Dictionary<VisualRow, DirectWriteTextLayout> _textLayouts = new();
     private readonly MonospaceLineLayoutEngine _lineLayoutEngine = new();
+    private long _textLayoutCreates;
+    private long _textLayoutHits;
     private ProjectedTextLayoutState? _cachedLayout;
     private ProjectedTextRenderFrame? _renderFrame;
     private DocumentChangedEventArgs? _pendingDocumentChange;
@@ -1554,6 +1556,8 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             return;
         }
 
+        var creates = _textLayoutCreates;
+        var hits = _textLayoutHits;
         args.DrawingSession.Clear(frame.Context.ColorScheme.EditorBackground);
 
         for (var index = 0; index < frame.Layouts.Count; index++)
@@ -1570,6 +1574,18 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             {
                 DrawBlock(args.DrawingSession, frame.Context, block, rowLayout.Height, top);
             }
+        }
+
+        if (frame.Context.DiagnosticSink is { } diagnosticSink)
+        {
+            var inputElapsed = frame.Context.DiagnosticInputStarted == 0
+                ? 0
+                : System.Diagnostics.Stopwatch.GetElapsedTime(
+                    frame.Context.DiagnosticInputStarted).TotalMilliseconds;
+            diagnosticSink(
+                $"canvas-text-draw input={frame.Context.DiagnosticInputSequence}; "
+                + $"inputElapsedMs={inputElapsed:F3}; rows={frame.Layouts.Count}; "
+                + $"layoutCreates={_textLayoutCreates - creates}; layoutHits={_textLayoutHits - hits}");
         }
     }
 
@@ -1834,6 +1850,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
     {
         if (!_textLayouts.TryGetValue(row, out var textLayout))
         {
+            _textLayoutCreates++;
             var runs = line.Runs
                 .Select(run => new DirectWriteTextRun(
                     run.Text,
@@ -1852,6 +1869,10 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
                 Math.Min((float)context.LineHeight * 0.8f, (float)context.LineHeight),
                 (float)(context.CharacterWidth * context.TabDisplaySize));
             _textLayouts.Add(row, textLayout);
+        }
+        else
+        {
+            _textLayoutHits++;
         }
 
         ResetTextForegrounds(textLayout, line.Runs, context.ColorScheme);

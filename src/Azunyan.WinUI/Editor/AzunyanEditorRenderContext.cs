@@ -114,6 +114,9 @@ internal sealed class AzunyanEditorRenderContext
             frame.ProviderFrame,
             toggleFold)
     {
+        DiagnosticInputSequence = frame.DiagnosticInputSequence;
+        DiagnosticInputStarted = frame.DiagnosticInputStarted;
+        DiagnosticSink = frame.DiagnosticSink;
     }
 
     public TextSnapshot Snapshot { get; }
@@ -178,6 +181,12 @@ internal sealed class AzunyanEditorRenderContext
     public IReadOnlyList<FoldRange> Folds { get; }
 
     internal Action<string>? ToggleFold { get; }
+
+    internal long DiagnosticInputSequence { get; }
+
+    internal long DiagnosticInputStarted { get; }
+
+    internal Action<string>? DiagnosticSink { get; }
 
     /// <summary>
     /// The immutable provider channels used to build this render pass. A
