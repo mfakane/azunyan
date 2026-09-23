@@ -268,6 +268,33 @@ public sealed class ProjectionTests
     }
 
     [Fact]
+    public void Nested_incremental_rows_rebase_directly_to_latest_projection()
+    {
+        var longProjection = TextProjectionBuilder.Build(new TextSnapshot("0123456789"));
+        var shortProjection = TextProjectionBuilder.Build(new TextSnapshot("01234"));
+        var original = VisualRowMapBuilder.Build(longProjection, wrapColumns: 20).Rows;
+        var intermediate = new IncrementalVisualRowList(
+            original,
+            Array.Empty<VisualRow>(),
+            shortProjection,
+            new Dictionary<string, BlockAdornment>(),
+            oldStart: 0,
+            oldEnd: 0,
+            logicalDelta: 0);
+        var current = new IncrementalVisualRowList(
+            intermediate,
+            Array.Empty<VisualRow>(),
+            longProjection,
+            new Dictionary<string, BlockAdornment>(),
+            oldStart: 0,
+            oldEnd: 0,
+            logicalDelta: 0);
+
+        Assert.Equal(10, current[0].TextLength);
+        Assert.Same(longProjection.Lines[0], current[0].TextLine);
+    }
+
+    [Fact]
     public void Folded_ranges_hide_middle_lines_and_map_hidden_positions_to_placeholder()
     {
         var snapshot = new TextSnapshot("a\nb\nc");

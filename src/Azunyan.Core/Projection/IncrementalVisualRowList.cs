@@ -47,7 +47,7 @@ internal sealed class IncrementalVisualRowList : IReadOnlyList<VisualRow>
 
             if (index < _oldStart)
             {
-                return _previous[index];
+                return Resolve(index, index);
             }
 
             var changedEnd = _oldStart + _changed.Count;
@@ -61,8 +61,7 @@ internal sealed class IncrementalVisualRowList : IReadOnlyList<VisualRow>
                 return row;
             }
 
-            var oldIndex = checked(_oldEnd + index - changedEnd);
-            row = Rebase(_previous[oldIndex], index);
+            row = Resolve(index, index);
             _suffixRows[index] = row;
             return row;
         }
@@ -79,9 +78,54 @@ internal sealed class IncrementalVisualRowList : IReadOnlyList<VisualRow>
     System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() =>
         GetEnumerator();
 
-    private VisualRow Rebase(VisualRow previous, int visualRow)
+    private VisualRow Resolve(int index, int visualRow)
     {
-        var logicalLine = checked(previous.LogicalLine + _logicalDelta);
+        // Skip transient projections in older lazy lists and bind the source
+        // row once to the latest projection.
+        var current = this;
+        var logicalDelta = 0;
+        var needsRebase = false;
+        VisualRow row;
+        while (true)
+        {
+            if (index < current._oldStart)
+            {
+                if (current._previous is IncrementalVisualRowList previous)
+                {
+                    current = previous;
+                    continue;
+                }
+
+                row = current._previous[index];
+                break;
+            }
+
+            var changedEnd = current._oldStart + current._changed.Count;
+            if (index < changedEnd)
+            {
+                row = current._changed[index - current._oldStart];
+                break;
+            }
+
+            index = checked(current._oldEnd + index - changedEnd);
+            logicalDelta = checked(logicalDelta + current._logicalDelta);
+            needsRebase = true;
+            if (current._previous is IncrementalVisualRowList previousList)
+            {
+                current = previousList;
+                continue;
+            }
+
+            row = current._previous[index];
+            break;
+        }
+
+        return needsRebase ? Rebase(row, visualRow, logicalDelta) : row;
+    }
+
+    private VisualRow Rebase(VisualRow previous, int visualRow, int logicalDelta)
+    {
+        var logicalLine = checked(previous.LogicalLine + logicalDelta);
         if (previous.TextLine is { } textLine)
         {
             if (!_projection.TryGetVisualLine(logicalLine, out var projectedLine))
