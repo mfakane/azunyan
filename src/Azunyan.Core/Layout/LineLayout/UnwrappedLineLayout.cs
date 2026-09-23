@@ -258,6 +258,10 @@ public interface IUnwrappedLineLayoutEngine
 /// </summary>
 public sealed class MonospaceLineLayoutEngine : IUnwrappedLineLayoutEngine
 {
+    private IReadOnlyList<SyntaxSpan>? _indexedSyntax;
+    private IndexedSyntaxSpan[] _syntaxByStart = Array.Empty<IndexedSyntaxSpan>();
+    private int[] _prefixMaximumEnds = Array.Empty<int>();
+
     public UnwrappedLineLayout Layout(
         TextSnapshot snapshot,
         ProjectedLine line,
@@ -267,6 +271,7 @@ public sealed class MonospaceLineLayoutEngine : IUnwrappedLineLayoutEngine
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(line);
         ArgumentNullException.ThrowIfNull(syntax);
+        EnsureSyntaxIndex(syntax);
 
         var runs = new List<LayoutRun>();
         var visualStart = 0;
@@ -275,7 +280,7 @@ public sealed class MonospaceLineLayoutEngine : IUnwrappedLineLayoutEngine
             switch (inline)
             {
                 case ProjectedText text:
-                    AddTextRuns(runs, snapshot, text.Source, syntax, ref visualStart);
+                    AddTextRuns(runs, snapshot, text.Source, ref visualStart);
                     break;
                 case FoldPlaceholder fold:
                     runs.Add(new LayoutRun(
@@ -302,11 +307,10 @@ public sealed class MonospaceLineLayoutEngine : IUnwrappedLineLayoutEngine
         return new UnwrappedLineLayout(line, runs, metrics);
     }
 
-    private static void AddTextRuns(
+    private void AddTextRuns(
         List<LayoutRun> runs,
         TextSnapshot snapshot,
         TextRange source,
-        IReadOnlyList<SyntaxSpan> syntax,
         ref int visualStart)
     {
         if (source.IsEmpty)
@@ -314,18 +318,16 @@ public sealed class MonospaceLineLayoutEngine : IUnwrappedLineLayoutEngine
             return;
         }
 
-        var boundaries = syntax
-            .Where(span => Intersects(span.Range, source))
-            .SelectMany(span => new[]
-            {
-                Math.Max(source.Start, span.Range.Start),
-                Math.Min(source.End, span.Range.End)
-            })
-            .Append(source.Start)
-            .Append(source.End)
-            .Distinct()
-            .OrderBy(value => value)
-            .ToArray();
+        var intersecting = GetIntersectingSyntax(source);
+        var boundarySet = new HashSet<int> { source.Start, source.End };
+        foreach (var indexed in intersecting)
+        {
+            boundarySet.Add(Math.Max(source.Start, indexed.Span.Range.Start));
+            boundarySet.Add(Math.Min(source.End, indexed.Span.Range.End));
+        }
+
+        var boundaries = boundarySet.ToArray();
+        Array.Sort(boundaries);
 
         for (var index = 0; index + 1 < boundaries.Length; index++)
         {
@@ -337,9 +339,11 @@ public sealed class MonospaceLineLayoutEngine : IUnwrappedLineLayoutEngine
             }
 
             var range = TextRange.FromBounds(start, end);
-            var classification = syntax
-                .FirstOrDefault(span => span.Range.Contains(start))
-                .Classification;
+            var classification = intersecting
+                .Where(item => item.Span.Range.Contains(start))
+                .OrderBy(item => item.OriginalIndex)
+                .Select(item => item.Span.Classification)
+                .FirstOrDefault();
             runs.Add(new LayoutRun(
                 LayoutRunKind.Text,
                 snapshot.GetText(range),
@@ -352,4 +356,59 @@ public sealed class MonospaceLineLayoutEngine : IUnwrappedLineLayoutEngine
 
     private static bool Intersects(TextRange left, TextRange right) =>
         left.Start < right.End && right.Start < left.End;
+
+    private void EnsureSyntaxIndex(IReadOnlyList<SyntaxSpan> syntax)
+    {
+        if (ReferenceEquals(_indexedSyntax, syntax))
+        {
+            return;
+        }
+
+        _indexedSyntax = syntax;
+        _syntaxByStart = syntax
+            .Select((span, index) => new IndexedSyntaxSpan(span, index))
+            .OrderBy(item => item.Span.Range.Start)
+            .ThenBy(item => item.OriginalIndex)
+            .ToArray();
+        _prefixMaximumEnds = new int[_syntaxByStart.Length];
+        var maximumEnd = 0;
+        for (var index = 0; index < _syntaxByStart.Length; index++)
+        {
+            maximumEnd = Math.Max(maximumEnd, _syntaxByStart[index].Span.Range.End);
+            _prefixMaximumEnds[index] = maximumEnd;
+        }
+    }
+
+    private List<IndexedSyntaxSpan> GetIntersectingSyntax(TextRange source)
+    {
+        var low = 0;
+        var high = _prefixMaximumEnds.Length;
+        while (low < high)
+        {
+            var middle = low + ((high - low) / 2);
+            if (_prefixMaximumEnds[middle] <= source.Start)
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                high = middle;
+            }
+        }
+
+        var result = new List<IndexedSyntaxSpan>();
+        for (var index = low;
+             index < _syntaxByStart.Length && _syntaxByStart[index].Span.Range.Start < source.End;
+             index++)
+        {
+            if (Intersects(_syntaxByStart[index].Span.Range, source))
+            {
+                result.Add(_syntaxByStart[index]);
+            }
+        }
+
+        return result;
+    }
+
+    private readonly record struct IndexedSyntaxSpan(SyntaxSpan Span, int OriginalIndex);
 }

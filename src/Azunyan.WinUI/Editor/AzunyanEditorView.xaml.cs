@@ -179,6 +179,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         _typedInputUndoGroupTimer = null;
+        _documentProviderDelayCancellation?.Cancel();
+        _documentProviderDelayCancellation?.Dispose();
+        _documentProviderDelayCancellation = null;
         InputWindow.NativeTextBoxControl.BeforeKeyDown -= OnInputKeyDown;
         InputWindow.NativeTextBoxControl.AfterKeyUp -= OnInputKeyUp;
         CompletionPopup.Accepted -= CompletionPopup_Accepted;

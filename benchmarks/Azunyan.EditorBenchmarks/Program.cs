@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using Azunyan.Core;
+using Azunyan.Layout;
 
 const int lineCount = 100_000;
 const int iterations = 8;
@@ -165,6 +166,23 @@ var foldEquivalent = AreEquivalent(foldSnapshot, fullFoldProjection, foldedProje
 var foldRowsEquivalent = AreRowsEquivalent(fullFoldRows, incrementalFoldRows);
 var foldReusesEdges = ReferenceEquals(unfoldedProjection.Lines[0], foldedProjection.Lines[0])
     && ReferenceEquals(unfoldedProjection.Lines[^1], foldedProjection.Lines[^1]);
+var denseSyntax = Enumerable.Range(0, current.Lines.LineCount)
+    .Select(line => new SyntaxSpan(current.Lines.GetLineRange(line), "line"))
+    .ToArray();
+var syntaxLayoutEngine = new MonospaceLineLayoutEngine();
+var syntaxLine = incrementalProjection.Lines[lineCount / 2];
+_ = syntaxLayoutEngine.Layout(
+    current,
+    syntaxLine,
+    denseSyntax,
+    new LayoutMetrics(8, 18, 14));
+var denseSyntaxLayout = Measure(
+    iterations,
+    () => syntaxLayoutEngine.Layout(
+        current,
+        syntaxLine,
+        denseSyntax,
+        new LayoutMetrics(8, 18, 14)));
 
 Console.WriteLine($"scenario=100k-lines-middle-insert");
 Console.WriteLine($"full_mean_ms={full.Elapsed.TotalMilliseconds / iterations:F3}");
@@ -197,6 +215,8 @@ Console.WriteLine($"fold_rows_incremental_mean_allocated_bytes={foldRowsIncremen
 Console.WriteLine($"fold_equivalent={foldEquivalent}");
 Console.WriteLine($"fold_rows_equivalent={foldRowsEquivalent}");
 Console.WriteLine($"fold_reuses_edges={foldReusesEdges}");
+Console.WriteLine($"dense_syntax_visible_line_mean_ms={denseSyntaxLayout.Elapsed.TotalMilliseconds / iterations:F3}");
+Console.WriteLine($"dense_syntax_visible_line_mean_allocated_bytes={denseSyntaxLayout.AllocatedBytes / iterations}");
 
 if (verify && (!equivalent
     || !decoratedEquivalent

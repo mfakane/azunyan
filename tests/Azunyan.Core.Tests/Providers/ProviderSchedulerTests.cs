@@ -137,6 +137,37 @@ public sealed class ProviderSchedulerTests
     }
 
     [Fact]
+    public async Task A_pre_canceled_request_does_not_cancel_the_current_channel_request()
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var providers = new EditorProviderSet
+        {
+            Syntax = new DelegateSyntaxProvider(async _ =>
+            {
+                started.SetResult();
+                await release.Task;
+                return Array.Empty<SyntaxSpan>();
+            })
+        };
+        using var scheduler = new EditorProviderScheduler(providers);
+        var snapshot = new TextSnapshot("current");
+        var current = scheduler.RequestDocumentAsync(snapshot, TextSelection.Caret(0));
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var canceled = await scheduler.RequestDocumentAsync(
+            snapshot,
+            TextSelection.Caret(0),
+            cancellationToken: cancellation.Token);
+        release.SetResult();
+
+        Assert.Null(canceled);
+        Assert.NotNull(await current.WaitAsync(TimeSpan.FromSeconds(1)));
+    }
+
+    [Fact]
     public async Task Cancel_all_returns_null_even_when_a_provider_observes_cancellation_late()
     {
         var started = new TaskCompletionSource(

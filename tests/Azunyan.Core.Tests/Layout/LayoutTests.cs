@@ -30,6 +30,28 @@ public sealed class LayoutTests
     }
 
     [Fact]
+    public void Syntax_index_preserves_provider_priority_for_unsorted_overlapping_spans()
+    {
+        var snapshot = new TextSnapshot("zero\none\ntwo");
+        var projection = TextProjectionBuilder.Build(snapshot);
+        var syntax = new[]
+        {
+            new SyntaxSpan(new TextRange(5, 3), "first"),
+            new SyntaxSpan(new TextRange(0, snapshot.Length), "fallback"),
+            new SyntaxSpan(new TextRange(6, 1), "second")
+        };
+        var engine = new MonospaceLineLayoutEngine();
+
+        var layout = engine.Layout(
+            snapshot,
+            projection.Lines[1],
+            syntax,
+            new LayoutMetrics(8, 18, 14));
+
+        Assert.All(layout.Runs, run => Assert.Equal("first", run.Classification));
+    }
+
+    [Fact]
     public void Layout_caret_stops_map_back_to_document_anchors_through_inlays()
     {
         var snapshot = new TextSnapshot("ab");

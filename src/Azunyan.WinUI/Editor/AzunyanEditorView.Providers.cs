@@ -4,6 +4,9 @@ namespace Azunyan.WinUI;
 
 public sealed partial class AzunyanEditorView
 {
+    private static readonly TimeSpan DocumentProviderEditDelay = TimeSpan.FromMilliseconds(50);
+    private CancellationTokenSource? _documentProviderDelayCancellation;
+
     private void RequestProviderResults(
         bool requestDocument,
         bool requestViewport,
@@ -20,6 +23,26 @@ public sealed partial class AzunyanEditorView
         var selection = Document.Selection;
         var previousFrame = _providerFrame;
 
+        if (requestDocument
+            && _providers.Syntax is null
+            && _providers.Decorations is null
+            && _providers.Folding is null)
+        {
+            NextProviderGeneration(ref _documentProviderGeneration);
+            _documentProviderDelayCancellation?.Cancel();
+            _documentProviderDelayCancellation?.Dispose();
+            _documentProviderDelayCancellation = null;
+            _providerFrame = new EditorProviderFrame(snapshot, selection);
+            RenderViewport();
+            requestDocument = false;
+        }
+
+        requestViewport &= _providers.Gutter is not null
+            || _providers.Inlay is not null
+            || _providers.BlockAdornment is not null;
+        requestPosition &= _providers.Tooltip is not null
+            || requestCompletion && _providers.Completion is not null;
+
         if (requestDocument)
         {
             var generation = NextProviderGeneration(ref _documentProviderGeneration);
@@ -31,19 +54,21 @@ public sealed partial class AzunyanEditorView
                 && ReferenceEquals(previousResults.Snapshot, documentChange!.OldSnapshot)
                     ? previousResults
                     : null;
+            var provisionalRange = GetProvisionalDocumentRange(snapshot, selection.CaretPosition);
             _providerFrame = new EditorProviderFrame(
                 snapshot,
                 selection,
-                previousDocument?.MapUnchangedRanges(snapshot, documentChange!.Change));
+                previousDocument?.MapUnchangedRanges(
+                    snapshot,
+                    documentChange!.Change,
+                    provisionalRange));
             RenderViewport();
             _ = ApplyDocumentProviderResultAsync(
-                _providerScheduler.RequestDocumentAsync(
+                RequestDocumentProviderResultAsync(
                     snapshot,
                     selection,
-                    previousResults: previousDocument,
-                    change: canUseDocumentChange
-                        ? documentChange!.Change
-                        : null),
+                    previousDocument,
+                    canUseDocumentChange ? documentChange!.Change : null),
                 generation);
         }
 
@@ -79,6 +104,60 @@ public sealed partial class AzunyanEditorView
                     includeCompletion: requestCompletion),
                 generation);
         }
+    }
+
+    private static TextRange GetProvisionalDocumentRange(TextSnapshot snapshot, int position)
+    {
+        const int contextLines = 256;
+        var lines = snapshot.Lines;
+        var line = lines.GetLine(position);
+        var first = Math.Max(0, line - contextLines);
+        var last = Math.Min(lines.LineCount - 1, line + contextLines);
+        return TextRange.FromBounds(lines.GetLineStart(first), lines.GetLineEnd(last));
+    }
+
+    private Task<DocumentProviderResults?> RequestDocumentProviderResultAsync(
+        TextSnapshot snapshot,
+        TextSelection selection,
+        DocumentProviderResults? previousResults,
+        TextChange? change)
+    {
+        _documentProviderDelayCancellation?.Cancel();
+        _documentProviderDelayCancellation?.Dispose();
+        _documentProviderDelayCancellation = null;
+        if (change is null)
+        {
+            return _providerScheduler.RequestDocumentAsync(
+                snapshot,
+                selection,
+                previousResults: null,
+                change: null);
+        }
+
+        var cancellation = new CancellationTokenSource();
+        _documentProviderDelayCancellation = cancellation;
+        return RequestAfterTypingPauseAsync(
+            snapshot,
+            selection,
+            previousResults,
+            change.Value,
+            cancellation.Token);
+    }
+
+    private async Task<DocumentProviderResults?> RequestAfterTypingPauseAsync(
+        TextSnapshot snapshot,
+        TextSelection selection,
+        DocumentProviderResults? previousResults,
+        TextChange change,
+        CancellationToken cancellationToken)
+    {
+        await Task.Delay(DocumentProviderEditDelay, cancellationToken).ConfigureAwait(false);
+        return await _providerScheduler.RequestDocumentAsync(
+            snapshot,
+            selection,
+            previousResults,
+            change,
+            cancellationToken).ConfigureAwait(false);
     }
 
     private async Task ApplyDocumentProviderResultAsync(

@@ -2,6 +2,9 @@ namespace Azunyan.Core;
 
 public sealed class DocumentProviderResults
 {
+    private readonly SyntaxSpan[] _syntaxByStart;
+    private readonly int[] _syntaxPrefixMaximumEnds;
+
     internal DocumentProviderResults(
         TextSnapshot snapshot,
         SyntaxAnalysis syntax,
@@ -16,6 +19,16 @@ public sealed class DocumentProviderResults
         FoldingAnalysis = folding;
         Folds = folding.Folds;
         IsProvisional = isProvisional;
+        _syntaxByStart = Syntax
+            .OrderBy(span => span.Range.Start)
+            .ToArray();
+        _syntaxPrefixMaximumEnds = new int[_syntaxByStart.Length];
+        var maximumEnd = 0;
+        for (var index = 0; index < _syntaxByStart.Length; index++)
+        {
+            maximumEnd = Math.Max(maximumEnd, _syntaxByStart[index].Range.End);
+            _syntaxPrefixMaximumEnds[index] = maximumEnd;
+        }
     }
 
     public TextSnapshot Snapshot { get; }
@@ -40,15 +53,19 @@ public sealed class DocumentProviderResults
     /// </summary>
     public DocumentProviderResults MapUnchangedRanges(
         TextSnapshot snapshot,
-        TextChange change)
+        TextChange change,
+        TextRange? targetRange = null)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         TextChangeMapper.Validate(change, Snapshot, snapshot);
-        var syntax = Syntax
+        var range = targetRange ?? TextRange.FromBounds(0, snapshot.Length);
+        var previousRange = MapRangeBeforeChange(range, change, Snapshot.Length);
+        var syntax = GetSyntaxIntersecting(previousRange)
             .Where(span => !Touches(span.Range, change.OldRange))
             .Select(span => new SyntaxSpan(
                 TextChangeMapper.MapRange(Snapshot, snapshot, change, span.Range),
                 span.Classification))
+            .Where(span => Intersects(span.Range, range))
             .ToArray();
         var decorations = Decorations
             .Where(decoration => !Touches(decoration.Range, change.OldRange))
@@ -56,6 +73,7 @@ public sealed class DocumentProviderResults
                 TextChangeMapper.MapRange(Snapshot, snapshot, change, decoration.Range),
                 decoration.Kind,
                 decoration.Message))
+            .Where(decoration => Intersects(decoration.Range, range))
             .ToArray();
         return new DocumentProviderResults(
             snapshot,
@@ -69,6 +87,57 @@ public sealed class DocumentProviderResults
         change.IsEmpty
             ? range.Start <= change.Start && change.Start <= range.End
             : range.Start < change.End && change.Start < range.End;
+
+    private static bool Intersects(TextRange left, TextRange right) =>
+        left.Start < right.End && right.Start < left.End;
+
+    private IEnumerable<SyntaxSpan> GetSyntaxIntersecting(TextRange range)
+    {
+        var low = 0;
+        var high = _syntaxPrefixMaximumEnds.Length;
+        while (low < high)
+        {
+            var middle = low + ((high - low) / 2);
+            if (_syntaxPrefixMaximumEnds[middle] <= range.Start)
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                high = middle;
+            }
+        }
+
+        for (var index = low;
+             index < _syntaxByStart.Length && _syntaxByStart[index].Range.Start < range.End;
+             index++)
+        {
+            if (Intersects(_syntaxByStart[index].Range, range))
+            {
+                yield return _syntaxByStart[index];
+            }
+        }
+    }
+
+    private static TextRange MapRangeBeforeChange(
+        TextRange range,
+        TextChange change,
+        int oldLength)
+    {
+        var delta = change.NewText.Length - change.OldRange.Length;
+        var start = MapPositionBeforeChange(range.Start, change, delta);
+        var end = MapPositionBeforeChange(range.End, change, delta);
+        return TextRange.FromBounds(
+            Math.Clamp(start, 0, oldLength),
+            Math.Clamp(end, 0, oldLength));
+    }
+
+    private static int MapPositionBeforeChange(int position, TextChange change, int delta) =>
+        position <= change.NewRange.Start
+            ? position
+            : position >= change.NewRange.End
+                ? position - delta
+                : change.OldRange.Start;
 }
 
 public sealed class ViewportProviderResults
@@ -271,6 +340,11 @@ public sealed class EditorProviderScheduler : IDisposable
         lock (_gate)
         {
             ThrowIfDisposed();
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return null;
+            }
+
             request = channel.Begin(cancellationToken);
         }
 

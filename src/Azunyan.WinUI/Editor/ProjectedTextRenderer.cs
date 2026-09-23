@@ -30,6 +30,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
     private readonly Dictionary<ProjectedLine, UnwrappedLineLayout> _lineLayouts = new();
     private readonly Dictionary<VisualRow, GutterLayoutEntry> _gutterLayouts = new();
     private readonly Dictionary<VisualRow, DirectWriteTextLayout> _textLayouts = new();
+    private readonly MonospaceLineLayoutEngine _lineLayoutEngine = new();
     private ProjectedTextLayoutState? _cachedLayout;
     private ProjectedTextRenderFrame? _renderFrame;
     private DocumentChangedEventArgs? _pendingDocumentChange;
@@ -1305,6 +1306,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             context.CharacterWidth,
             context.LineHeight,
             Math.Min(context.LineHeight * 0.8, context.LineHeight));
+        EnsureTextLayoutCache(context);
         var layouts = ViewportLayoutEngine.LayoutVisibleRows(
             context.Snapshot,
             layoutState.Rows,
@@ -1313,10 +1315,9 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             overscan: context.LineHeight,
             context.DocumentResults?.Syntax ?? Array.Empty<SyntaxSpan>(),
             metrics,
-            new MonospaceLineLayoutEngine(),
+            _lineLayoutEngine,
             _lineLayouts);
 
-        EnsureTextLayoutCache(context);
         _renderFrame = new ProjectedTextRenderFrame(context, layouts);
         PruneLayoutCaches(layouts);
         if (_pendingDocumentChange is { } change
@@ -1432,7 +1433,6 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
     private void EnsureTextLayoutCache(AzunyanEditorRenderContext context)
     {
         var key = new TextLayoutCacheKey(
-            context.Snapshot,
             context.DocumentResults?.Syntax,
             context.ColorScheme,
             context.FontFamily.Source,
@@ -2454,7 +2454,6 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
     private sealed class TextLayoutCacheKey
     {
         public TextLayoutCacheKey(
-            TextSnapshot snapshot,
             IReadOnlyList<SyntaxSpan>? syntax,
             AzunyanColorScheme colorScheme,
             string fontFamily,
@@ -2465,7 +2464,6 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             int tabDisplaySize,
             TextWrapping textWrapping)
         {
-            Snapshot = snapshot;
             Syntax = syntax;
             ColorScheme = colorScheme;
             FontFamily = fontFamily;
@@ -2476,8 +2474,6 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             TabDisplaySize = tabDisplaySize;
             TextWrapping = textWrapping;
         }
-
-        public TextSnapshot Snapshot { get; }
 
         public IReadOnlyList<SyntaxSpan>? Syntax { get; }
 
@@ -2498,8 +2494,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         public TextWrapping TextWrapping { get; }
 
         public bool Matches(TextLayoutCacheKey other) =>
-            ReferenceEquals(Snapshot, other.Snapshot)
-            && ReferenceEquals(Syntax, other.Syntax)
+            ReferenceEquals(Syntax, other.Syntax)
             && Equals(ColorScheme, other.ColorScheme)
             && string.Equals(FontFamily, other.FontFamily, StringComparison.Ordinal)
             && FontSize == other.FontSize
