@@ -30,6 +30,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
     private readonly Dictionary<ProjectedLine, UnwrappedLineLayout> _lineLayouts = new();
     private readonly Dictionary<VisualRow, GutterLayoutEntry> _gutterLayouts = new();
     private readonly Dictionary<TextLayoutRowKey, TextLayoutEntry> _textLayouts = new();
+    private readonly Dictionary<string, Button> _foldButtons = new(StringComparer.Ordinal);
     private readonly MonospaceLineLayoutEngine _lineLayoutEngine = new();
     private long _textLayoutCreates;
     private long _textLayoutHits;
@@ -1315,9 +1316,14 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             return;
         }
 
+        var traceLayout = context.DiagnosticSink is not null;
+        var layoutStarted = traceLayout ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
         var wrapWidth = GetWrapWidth(context);
         var wrapColumns = GetWrapColumns(context);
         var layoutState = GetLayoutState(context, wrapColumns, wrapWidth);
+        var stateElapsed = traceLayout
+            ? System.Diagnostics.Stopwatch.GetElapsedTime(layoutStarted)
+            : TimeSpan.Zero;
         var metrics = new LayoutMetrics(
             context.CharacterWidth,
             context.LineHeight,
@@ -1333,6 +1339,14 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             metrics,
             _lineLayoutEngine,
             _lineLayouts);
+        if (traceLayout)
+        {
+            context.DiagnosticSink!(
+                $"renderer-layout input={context.DiagnosticInputSequence}; "
+                + $"stateMs={stateElapsed.TotalMilliseconds:F3}; "
+                + $"visibleMs={System.Diagnostics.Stopwatch.GetElapsedTime(layoutStarted).TotalMilliseconds - stateElapsed.TotalMilliseconds:F3}; "
+                + $"rows={layouts.Count}; lineCache={_lineLayouts.Count}");
+        }
 
         _renderFrame = new ProjectedTextRenderFrame(context, layouts);
         PruneLayoutCaches(layouts);
@@ -1346,7 +1360,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         _textSurface.Invalidate();
     }
 
-    private static void RenderFoldChevrons(
+    private void RenderFoldChevrons(
         AzunyanEditorRenderContext context,
         ProjectedTextLayoutState layoutState,
         IReadOnlyList<ViewportRowLayout> layouts)
@@ -1355,9 +1369,11 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             || layoutState.FoldsByLogicalLine.Count == 0
             || context.GutterWidth < FoldChevronWidth)
         {
+            ClearFoldChevrons(context.GutterLayer);
             return;
         }
 
+        var visible = new HashSet<string>(StringComparer.Ordinal);
         foreach (var rowLayout in layouts)
         {
             var row = rowLayout.Row;
@@ -1374,26 +1390,34 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             foreach (var fold in folds)
             {
                 var collapsed = context.CollapsedFoldIds.Contains(fold.Id);
-                var button = new Button
+                if (!_foldButtons.TryGetValue(fold.Id, out var button))
                 {
-                    Content = new FontIcon
-                    { 
-                        Glyph = collapsed ? "\uE76C" : "\uE70D",
-                        FontSize = FoldChevronFontSize,
-                    },
-                    Width = FoldChevronWidth,
-                    Height = context.LineHeight,
-                    Padding = new Thickness(0),
-                    Margin = new Thickness(0),
-                    BorderThickness = new Thickness(0),
-                    BorderBrush = new SolidColorBrush(Colors.Transparent),
-                    Background = new SolidColorBrush(Colors.Transparent),
-                    Foreground = new SolidColorBrush(context.ColorScheme.GutterForeground),
-                    HorizontalContentAlignment = HorizontalAlignment.Center,
-                    VerticalContentAlignment = VerticalAlignment.Center,
-                    IsTabStop = true
-                };
+                    button = new Button
+                    {
+                        Content = new FontIcon { FontSize = FoldChevronFontSize },
+                        Width = FoldChevronWidth,
+                        Padding = new Thickness(0),
+                        Margin = new Thickness(0),
+                        BorderThickness = new Thickness(0),
+                        BorderBrush = new SolidColorBrush(Colors.Transparent),
+                        Background = new SolidColorBrush(Colors.Transparent),
+                        HorizontalContentAlignment = HorizontalAlignment.Center,
+                        VerticalContentAlignment = VerticalAlignment.Center,
+                        IsTabStop = true,
+                        Tag = fold.Id
+                    };
+                    button.Click += OnFoldChevronClick;
+                    _foldButtons.Add(fold.Id, button);
+                    context.GutterLayer.Children.Add(button);
+                }
 
+                ((FontIcon)button.Content).Glyph = collapsed ? "\uE76C" : "\uE70D";
+                button.Height = context.LineHeight;
+                if (button.Foreground is not SolidColorBrush foreground
+                    || foreground.Color != context.ColorScheme.GutterForeground)
+                {
+                    button.Foreground = new SolidColorBrush(context.ColorScheme.GutterForeground);
+                }
                 AutomationProperties.SetName(
                     button,
                     collapsed ? "Expand section" : "Collapse section");
@@ -1404,15 +1428,39 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
                 ToolTipService.SetToolTip(
                     button,
                     collapsed ? "Expand section" : "Collapse section");
-                button.Click += (_, _) => context.ToggleFold(fold.Id);
 
                 Canvas.SetLeft(button, 0);
                 Canvas.SetTop(
                     button,
                     context.ContentTop + rowLayout.Top - context.VerticalOffset);
-                context.GutterLayer.Children.Add(button);
+                visible.Add(fold.Id);
             }
         }
+
+        foreach (var pair in _foldButtons.Where(pair => !visible.Contains(pair.Key)).ToArray())
+        {
+            context.GutterLayer.Children.Remove(pair.Value);
+            _foldButtons.Remove(pair.Key);
+        }
+    }
+
+    private void OnFoldChevronClick(object sender, RoutedEventArgs args)
+    {
+        if (sender is FrameworkElement { Tag: string foldId }
+            && _renderFrame?.Context.ToggleFold is { } toggleFold)
+        {
+            toggleFold(foldId);
+        }
+    }
+
+    private void ClearFoldChevrons(Canvas gutterLayer)
+    {
+        foreach (var button in _foldButtons.Values)
+        {
+            gutterLayer.Children.Remove(button);
+        }
+
+        _foldButtons.Clear();
     }
 
     private void OnCreateResources(CanvasControl sender, CanvasCreateResourcesEventArgs args)
@@ -1451,7 +1499,11 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         var syntax = context.DocumentResults?.Syntax;
         if (!ReferenceEquals(_lineLayoutSyntax, syntax))
         {
-            _lineLayouts.Clear();
+            if (_pendingDocumentChange is not { } change
+                || !ReferenceEquals(change.NewSnapshot, context.Snapshot))
+            {
+                _lineLayouts.Clear();
+            }
             _lineLayoutSyntax = syntax;
         }
 

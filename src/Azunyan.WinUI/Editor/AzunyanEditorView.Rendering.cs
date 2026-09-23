@@ -108,7 +108,6 @@ public sealed partial class AzunyanEditorView
         {
             Rect = new Rect(0, 0, viewportWidth, viewportHeight)
         };
-        GutterCanvas.Children.Clear();
         TextRenderLayer.Children.Clear();
         RenderOverlay.Children.Clear();
 
