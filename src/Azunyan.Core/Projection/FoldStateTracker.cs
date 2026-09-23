@@ -45,7 +45,10 @@ public sealed class FoldStateTracker
                 continue;
             }
 
-            var mappedFold = new FoldRange(fold.Id, TextChangeMapper.MapRange(oldSnapshot, newSnapshot, change, fold.Range), fold.Placeholder);
+            var mappedFold = new FoldRange(
+                fold.Id,
+                TextChangeMapper.MapRange(change, fold.Range),
+                fold.Placeholder);
             mapped.Add(mappedFold);
             if (_collapsed.ContainsKey(fold.Id))
             {
