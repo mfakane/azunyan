@@ -7,8 +7,8 @@ namespace Azunyan.Core;
 /// </summary>
 public sealed class SlidingInputWindowCalculator
 {
-    public const int DefaultContextLength = 2048;
-    public const int DefaultHysteresisLength = 512;
+    public const int DefaultContextLength = 256;
+    public const int DefaultHysteresisLength = 64;
 
     public SlidingInputWindowCalculator(
         int beforeContextLength = DefaultContextLength,
