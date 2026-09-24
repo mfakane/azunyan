@@ -1183,7 +1183,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             }
         }
 
-        view.InputWindow.NativeTextBoxControl.TextWrapping = (TextWrapping)args.NewValue;
+        // The native control is only a 1px-wide IME window. Wrapping its
+        // bounded text forces thousands of hidden visual lines to be laid out.
+        view.InputWindow.NativeTextBoxControl.TextWrapping = TextWrapping.NoWrap;
         view.UpdateTextSurfaceMode();
         view.RenderViewport();
     }

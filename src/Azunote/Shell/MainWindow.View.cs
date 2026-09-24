@@ -75,7 +75,7 @@ public sealed partial class MainWindow
 
     private void InitializeView()
     {
-        Editor.DiagnosticSink = (category, message) => ErrorReporter.LogMessage(
+        Editor.DiagnosticSink = (category, message) => ErrorReporter.QueueMessage(
             $"Editor diagnostic/{AzunyanDiagnosticCategories.GetName(category)}",
             message);
         Editor.DiagnosticExceptionSink = (source, exception) => ErrorReporter.LogException(

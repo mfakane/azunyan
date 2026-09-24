@@ -1339,13 +1339,16 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             metrics,
             _lineLayoutEngine,
             _lineLayouts);
+        var invalidateGutter = _renderFrame is null
+            || !GutterMatches(_renderFrame, context, layouts);
         if (traceLayout)
         {
             context.DiagnosticSink!(
                 $"renderer-layout input={context.DiagnosticInputSequence}; "
                 + $"stateMs={stateElapsed.TotalMilliseconds:F3}; "
                 + $"visibleMs={System.Diagnostics.Stopwatch.GetElapsedTime(layoutStarted).TotalMilliseconds - stateElapsed.TotalMilliseconds:F3}; "
-                + $"rows={layouts.Count}; lineCache={_lineLayouts.Count}");
+                + $"rows={layouts.Count}; lineCache={_lineLayouts.Count}; "
+                + $"gutterInvalidated={invalidateGutter}");
         }
 
         _renderFrame = new ProjectedTextRenderFrame(context, layouts);
@@ -1356,8 +1359,56 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             _pendingDocumentChange = null;
         }
         RenderFoldChevrons(context, layoutState, layouts);
-        _gutterSurface.Invalidate();
+        if (invalidateGutter)
+        {
+            _gutterSurface.Invalidate();
+        }
         _textSurface.Invalidate();
+    }
+
+    private static bool GutterMatches(
+        ProjectedTextRenderFrame previous,
+        AzunyanEditorRenderContext context,
+        IReadOnlyList<ViewportRowLayout> layouts)
+    {
+        var previousContext = previous.Context;
+        var previousGutter = previousContext.ViewportResults?.Gutter;
+        var currentGutter = context.ViewportResults?.Gutter;
+        if (!Equals(previousContext.ColorScheme, context.ColorScheme)
+            || !string.Equals(
+                previousContext.FontFamily.Source,
+                context.FontFamily.Source,
+                StringComparison.Ordinal)
+            || previousContext.FontSize != context.FontSize
+            || previousContext.LineHeight != context.LineHeight
+            || previousContext.GutterWidth != context.GutterWidth
+            || previousContext.ViewportHeight != context.ViewportHeight
+            || previousContext.ContentTop != context.ContentTop
+            || previousContext.VerticalOffset != context.VerticalOffset
+            || previousContext.ShowLineNumbers != context.ShowLineNumbers
+            || !ReferenceEquals(previousGutter, currentGutter)
+                && (previousGutter is null
+                    || currentGutter is null
+                    || !previousGutter.SequenceEqual(currentGutter))
+            || previous.Layouts.Count != layouts.Count)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < layouts.Count; index++)
+        {
+            var oldLayout = previous.Layouts[index];
+            var newLayout = layouts[index];
+            if (oldLayout.Top != newLayout.Top
+                || oldLayout.Row.Kind != newLayout.Row.Kind
+                || oldLayout.Row.IsContinuation != newLayout.Row.IsContinuation
+                || oldLayout.Row.LogicalLine != newLayout.Row.LogicalLine)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private void RenderFoldChevrons(
@@ -1633,6 +1684,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             return;
         }
 
+        var drawStarted = System.Diagnostics.Stopwatch.GetTimestamp();
         var creates = _textLayoutCreates;
         var hits = _textLayoutHits;
         args.DrawingSession.Clear(frame.Context.ColorScheme.EditorBackground);
@@ -1662,6 +1714,8 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             diagnosticSink(
                 $"canvas-text-draw input={frame.Context.DiagnosticInputSequence}; "
                 + $"inputElapsedMs={inputElapsed:F3}; rows={frame.Layouts.Count}; "
+                + $"queueMs={System.Diagnostics.Stopwatch.GetElapsedTime(frame.PreparedAt, drawStarted).TotalMilliseconds:F3}; "
+                + $"drawMs={System.Diagnostics.Stopwatch.GetElapsedTime(drawStarted).TotalMilliseconds:F3}; "
                 + $"layoutCreates={_textLayoutCreates - creates}; layoutHits={_textLayoutHits - hits}");
         }
     }
@@ -1934,7 +1988,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             return;
         }
 
-        DirectWriteTextLayout textLayout;
+        TextLayoutEntry currentEntry;
         if (!_textLayouts.TryGetValue(key, out var entry)
             || !entry.Matches(line.Runs))
         {
@@ -1951,7 +2005,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
                     run.Kind == LayoutRunKind.InlineAdornment,
                     IsLink(run)))
                 .ToArray();
-            textLayout = DirectWriteTextLayout.Create(
+            var textLayout = DirectWriteTextLayout.Create(
                 drawingSession,
                 runs,
                 context.FontFamily.Source,
@@ -1961,42 +2015,33 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
                 (float)context.LineHeight,
                 Math.Min((float)context.LineHeight * 0.8f, (float)context.LineHeight),
                 (float)(context.CharacterWidth * context.TabDisplaySize));
-            _textLayouts[key] = TextLayoutEntry.Create(textLayout, line.Runs);
+            currentEntry = TextLayoutEntry.Create(
+                textLayout,
+                line.Runs,
+                context.ColorScheme);
+            _textLayouts[key] = currentEntry;
         }
         else
         {
-            textLayout = entry.Layout;
+            currentEntry = entry;
             _textLayoutHits++;
         }
 
-        ResetTextForegrounds(textLayout, line.Runs, context.ColorScheme);
-        DrawSelection(drawingSession, context, line, textLayout, top, row);
-        textLayout.Draw(
+        currentEntry.EnsureForegrounds(line.Runs, context.ColorScheme);
+        DrawSelection(drawingSession, context, line, currentEntry.Layout, top, row);
+        if (context.BlockSelection is not null
+            || !context.Selection.IsEmpty
+            || context.CaretSet?.Any(caret => !caret.Selection.IsEmpty) == true)
+        {
+            currentEntry.MarkForegroundsDirty();
+        }
+        currentEntry.Layout.Draw(
             drawingSession,
             (float)(context.ContentLeft - context.HorizontalOffset),
             (float)top,
             context.ColorScheme.EditorForeground);
-        DrawComposition(drawingSession, context, line, textLayout, top);
-        DrawCaret(drawingSession, context, line, textLayout, top);
-    }
-
-    private static void ResetTextForegrounds(
-        DirectWriteTextLayout textLayout,
-        IReadOnlyList<LayoutRun> runs,
-        AzunyanColorScheme colors)
-    {
-        foreach (var run in runs)
-        {
-            if (run.Text.Length == 0)
-            {
-                continue;
-            }
-
-            textLayout.SetForegroundColor(
-                run.VisualStart,
-                run.Text.Length,
-                GetForeground(colors, run));
-        }
+        DrawComposition(drawingSession, context, line, currentEntry.Layout, top);
+        DrawCaret(drawingSession, context, line, currentEntry.Layout, top);
     }
 
     private static void DrawComposition(
@@ -2402,11 +2447,14 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         {
             Context = context;
             Layouts = layouts;
+            PreparedAt = System.Diagnostics.Stopwatch.GetTimestamp();
         }
 
         public AzunyanEditorRenderContext Context { get; }
 
         public IReadOnlyList<ViewportRowLayout> Layouts { get; }
+
+        public long PreparedAt { get; }
     }
 
     private Dictionary<int, IReadOnlyList<int>> MeasureVisibleWrapBreaks(
@@ -2641,15 +2689,25 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         bool IsInlineAdornment,
         bool IsLink);
 
+    private readonly record struct DirectWriteForeground(
+        int VisualStart,
+        int Length,
+        Color Color);
+
     private sealed class TextLayoutEntry
     {
         private TextLayoutEntry(
             DirectWriteTextLayout layout,
-            DirectWriteRunShape[] shapes)
+            DirectWriteRunShape[] shapes,
+            DirectWriteForeground[] foregrounds)
         {
             Layout = layout;
             Shapes = shapes;
+            _foregrounds = foregrounds;
         }
+
+        private DirectWriteForeground[] _foregrounds;
+        private bool _foregroundsDirty;
 
         public DirectWriteTextLayout Layout { get; }
 
@@ -2681,9 +2739,58 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             return shapeIndex == Shapes.Length;
         }
 
+        public void EnsureForegrounds(
+            IReadOnlyList<LayoutRun> runs,
+            AzunyanColorScheme colors)
+        {
+            if (!_foregroundsDirty && ForegroundsMatch(runs, colors))
+            {
+                return;
+            }
+
+            _foregrounds = CreateForegrounds(runs, colors);
+            foreach (var foreground in _foregrounds)
+            {
+                Layout.SetForegroundColor(
+                    foreground.VisualStart,
+                    foreground.Length,
+                    foreground.Color);
+            }
+
+            _foregroundsDirty = false;
+        }
+
+        public void MarkForegroundsDirty() => _foregroundsDirty = true;
+
+        private bool ForegroundsMatch(
+            IReadOnlyList<LayoutRun> runs,
+            AzunyanColorScheme colors)
+        {
+            var foregroundIndex = 0;
+            foreach (var run in runs)
+            {
+                if (run.Text.Length == 0)
+                {
+                    continue;
+                }
+
+                if (foregroundIndex >= _foregrounds.Length
+                    || _foregrounds[foregroundIndex++] != new DirectWriteForeground(
+                        run.VisualStart,
+                        run.Text.Length,
+                        GetForeground(colors, run)))
+                {
+                    return false;
+                }
+            }
+
+            return foregroundIndex == _foregrounds.Length;
+        }
+
         public static TextLayoutEntry Create(
             DirectWriteTextLayout layout,
-            IReadOnlyList<LayoutRun> runs) =>
+            IReadOnlyList<LayoutRun> runs,
+            AzunyanColorScheme colors) =>
             new(
                 layout,
                 runs
@@ -2693,7 +2800,19 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
                         run.Text.Length,
                         run.Kind == LayoutRunKind.InlineAdornment,
                         IsLink(run)))
-                    .ToArray());
+                    .ToArray(),
+                CreateForegrounds(runs, colors));
+
+        private static DirectWriteForeground[] CreateForegrounds(
+            IReadOnlyList<LayoutRun> runs,
+            AzunyanColorScheme colors) =>
+            runs
+                .Where(run => run.Text.Length > 0)
+                .Select(run => new DirectWriteForeground(
+                    run.VisualStart,
+                    run.Text.Length,
+                    GetForeground(colors, run)))
+                .ToArray();
     }
 }
 

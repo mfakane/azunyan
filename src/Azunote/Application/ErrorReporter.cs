@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using System.Threading.Channels;
 
 namespace Azunote;
 
@@ -11,6 +12,13 @@ internal static class ErrorReporter
 {
     private static readonly object Gate = new();
     private static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false);
+    private static readonly Channel<(string Source, string Message)> MessageQueue =
+        Channel.CreateUnbounded<(string, string)>(new UnboundedChannelOptions
+        {
+            SingleReader = true
+        });
+
+    static ErrorReporter() => _ = Task.Run(WriteMessagesAsync);
 
     public static string LogException(string source, Exception exception)
     {
@@ -64,6 +72,21 @@ internal static class ErrorReporter
         }
 
         return path;
+    }
+
+    public static void QueueMessage(string source, string message)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(source);
+        ArgumentNullException.ThrowIfNull(message);
+        MessageQueue.Writer.TryWrite((source, message));
+    }
+
+    private static async Task WriteMessagesAsync()
+    {
+        await foreach (var (source, message) in MessageQueue.Reader.ReadAllAsync())
+        {
+            LogMessage(source, message);
+        }
     }
 
     private static string GetLogPath()
