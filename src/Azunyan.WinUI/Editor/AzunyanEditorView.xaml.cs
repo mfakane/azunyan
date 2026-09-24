@@ -31,6 +31,7 @@ namespace Azunyan.WinUI;
 /// </summary>
 public sealed partial class AzunyanEditorView : UserControl, IDisposable
 {
+    private const string LineCopyClipboardFormat = "application/vnd.azunyan.line-copy";
     private static readonly TimeSpan TypedInputUndoGroupInterval =
         TimeSpan.FromMilliseconds(500);
     private readonly AzunyanEditorRenderer _defaultRenderer;
@@ -895,7 +896,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         var range = GetSelectionOrCurrentLineDeletionRange();
-        SetClipboardText(GetSelectionOrCurrentLineClipboardText());
+        SetClipboardText(
+            GetSelectionOrCurrentLineClipboardText(),
+            Document.Selection.IsEmpty);
         ApplyDocumentCommand(() => Document.Delete(range));
     }
 
@@ -916,7 +919,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             return;
         }
 
-        SetClipboardText(GetSelectionOrCurrentLineClipboardText());
+        SetClipboardText(
+            GetSelectionOrCurrentLineClipboardText(),
+            Document.Selection.IsEmpty);
     }
 
     private string GetSelectionOrCurrentLineClipboardText()
@@ -1507,10 +1512,15 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 _preferredLineEnding));
     }
 
-    private static void SetClipboardText(string text)
+    private static void SetClipboardText(string text, bool isLineCopy = false)
     {
         var dataPackage = new DataPackage();
         dataPackage.SetText(text);
+        if (isLineCopy)
+        {
+            dataPackage.SetData(LineCopyClipboardFormat, "1");
+        }
+
         Clipboard.SetContent(dataPackage);
     }
 
@@ -1523,6 +1533,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         string text;
+        var isLineCopy = false;
         try
         {
             var content = Clipboard.GetContent();
@@ -1531,6 +1542,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 return;
             }
 
+            isLineCopy = content.Contains(LineCopyClipboardFormat);
             text = await content.GetTextAsync();
             _clipboardUnavailableUntil = default;
         }
@@ -1550,6 +1562,24 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
         if (_disposed || IsReadOnly)
         {
+            return;
+        }
+
+        if (isLineCopy
+            && _blockSelection is null
+            && Document.CaretSet.Count == 1
+            && Document.Selection.IsEmpty
+            && EndsWithLineEnding(text))
+        {
+            var pasteSelection = Document.Selection;
+            var lineStart = TextEditorCommands.GetCurrentLineRange(
+                Snapshot,
+                pasteSelection.CaretPosition).Start;
+            var caretPosition = pasteSelection.CaretPosition + text.Length;
+            ApplyDocumentCommand(() => _document.Replace(
+                TextRange.Empty(lineStart),
+                text,
+                TextSelection.Caret(caretPosition)));
             return;
         }
 
@@ -1592,6 +1622,11 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             .Replace('\r', '\n')
             .Split('\n', StringSplitOptions.None);
     }
+
+    private static bool EndsWithLineEnding(string text) =>
+        text.EndsWith("\r\n", StringComparison.Ordinal)
+        || text.EndsWith('\n')
+        || text.EndsWith('\r');
 
     private string GetCaretSetSelectedText()
         => GetCaretSetSelectedText(Document.CaretSet);
