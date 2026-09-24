@@ -311,6 +311,45 @@ public sealed class LayoutTests
     }
 
     [Fact]
+    public void Same_projection_wrap_update_does_not_reapply_the_document_line_delta()
+    {
+        var document = new Document("aaaa\nbbbbbbbb\ncccccccc\ndddddddd");
+        var oldSnapshot = document.Snapshot;
+        var oldProjection = TextProjectionBuilder.Build(oldSnapshot);
+        var previous = VisualRowMapBuilder.Build(oldProjection, wrapColumns: 4);
+        var change = document.Insert(8, "\n  ");
+        var projection = TextProjectionBuilder.BuildIncremental(
+            oldSnapshot,
+            document.Snapshot,
+            oldProjection,
+            change);
+        var edited = VisualRowMapBuilder.BuildIncremental(
+            oldProjection,
+            projection,
+            previous,
+            wrapColumns: 4,
+            change: change);
+        var measured = new Dictionary<int, IReadOnlyList<int>>
+        {
+            [2] = new[] { 1 }
+        };
+
+        var incremental = VisualRowMapBuilder.BuildIncremental(
+            projection,
+            projection,
+            edited,
+            wrapColumns: 4,
+            wrappedLineBreaksByVisualLine: measured,
+            change: change);
+        var expected = VisualRowMapBuilder.Build(
+            projection,
+            wrapColumns: 4,
+            wrappedLineBreaksByVisualLine: measured);
+
+        Assert.Equal(expected.Rows.Select(DescribeRow), incremental.Rows.Select(DescribeRow));
+    }
+
+    [Fact]
     public void Large_mixed_script_document_realizes_only_the_viewport_rows()
     {
         var line = "日本語🙂e\u0301 " + new string('x', 92);

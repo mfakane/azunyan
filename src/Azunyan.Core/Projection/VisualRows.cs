@@ -163,8 +163,9 @@ public sealed class VisualRowMapBuilder
                 nameof(wrappedLineBreaksByVisualLine));
         }
 
+        var sameProjection = ReferenceEquals(previousProjection, projection);
         if (!ReferenceEquals(previous.Projection, previousProjection)
-            || projection.ChangeWindow is not { } changeWindow
+            || !sameProjection && projection.ChangeWindow is null
             || !projection.IsPlain
                 && previousProjection.IsPlain
                 && !ReferenceEquals(previousProjection.Snapshot, projection.Snapshot))
@@ -180,6 +181,10 @@ public sealed class VisualRowMapBuilder
             return VisualRowMap.CreatePlain(projection);
         }
 
+        var changeWindow = sameProjection
+            ? new ProjectionChangeWindow(0, 0, 0, 0)
+            : projection.ChangeWindow!.Value;
+        var effectiveChange = sameProjection ? null : change;
         var wrapBreaks = CreateWrapBreakMap(
             projection,
             wrappedLineBreaks: null,
@@ -215,7 +220,7 @@ public sealed class VisualRowMapBuilder
             projection,
             previous.BlockAdornments,
             blocks,
-            change,
+            effectiveChange,
             ref oldVisualWindow,
             ref newVisualWindow);
         ExpandForWrapBreakChanges(
