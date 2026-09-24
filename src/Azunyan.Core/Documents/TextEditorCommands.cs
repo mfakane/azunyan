@@ -172,6 +172,43 @@ public static class TextEditorCommands
     }
 
     /// <summary>
+    /// Returns the content range of the line containing <paramref name="position"/>.
+    /// The line ending is not included.
+    /// </summary>
+    public static TextRange GetCurrentLineRange(TextSnapshot snapshot, int position)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentOutOfRangeException.ThrowIfNegative(position);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(position, snapshot.Length);
+
+        var line = snapshot.Lines.GetLine(position);
+        return snapshot.Lines.GetLineRange(line);
+    }
+
+    /// <summary>
+    /// Returns the range to remove when the line containing
+    /// <paramref name="position"/> is cut. The line ending is removed with the
+    /// line when possible; the preceding line ending is used for the final line.
+    /// </summary>
+    public static TextRange GetCurrentLineDeletionRange(TextSnapshot snapshot, int position)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentOutOfRangeException.ThrowIfNegative(position);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(position, snapshot.Length);
+
+        var line = snapshot.Lines.GetLine(position);
+        var lineStart = snapshot.Lines.GetLineStart(line);
+        if (line + 1 < snapshot.Lines.LineCount)
+        {
+            return TextRange.FromBounds(lineStart, snapshot.Lines.GetLineStart(line + 1));
+        }
+
+        return line == 0
+            ? snapshot.Lines.GetLineRange(line)
+            : TextRange.FromBounds(snapshot.Lines.GetLineEnd(line - 1), snapshot.Length);
+    }
+
+    /// <summary>
     /// Inserts one indentation unit at a caret, or indents/dedents every line
     /// touched by a selection. A selection is expanded to complete lines so
     /// that a multi-line Tab operation behaves like a normal code editor. When

@@ -221,6 +221,22 @@ public sealed class DocumentTests
     }
 
     [Fact]
+    public void Current_line_range_excludes_the_line_ending()
+    {
+        var snapshot = new TextSnapshot("first\r\nsecond\n");
+
+        Assert.Equal(new TextRange(0, 5), TextEditorCommands.GetCurrentLineRange(snapshot, 2));
+        Assert.Equal(new TextRange(7, 6), TextEditorCommands.GetCurrentLineRange(snapshot, 9));
+        Assert.Equal(TextRange.Empty(snapshot.Length),
+            TextEditorCommands.GetCurrentLineRange(snapshot, snapshot.Length));
+
+        Assert.Equal(new TextRange(0, 7),
+            TextEditorCommands.GetCurrentLineDeletionRange(snapshot, 2));
+        Assert.Equal(new TextRange(7, 7),
+            TextEditorCommands.GetCurrentLineDeletionRange(snapshot, 9));
+    }
+
+    [Fact]
     public void Newline_auto_indent_carries_leading_spaces_and_preserves_line_ending()
     {
         var document = new Document("  first\r\nsecond");

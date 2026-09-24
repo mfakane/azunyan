@@ -894,11 +894,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             return;
         }
 
-        if (Document.Selection.Length > 0)
-        {
-            SetClipboardText(Snapshot.GetText(Document.Selection.Range));
-            ApplyDocumentCommand(() => Document.DeleteSelection());
-        }
+        var range = GetSelectionOrCurrentLineDeletionRange();
+        SetClipboardText(GetSelectionOrCurrentLineClipboardText());
+        ApplyDocumentCommand(() => Document.Delete(range));
     }
 
     public void CopySelectionToClipboard()
@@ -918,10 +916,30 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             return;
         }
 
-        if (Document.Selection.Length > 0)
+        SetClipboardText(GetSelectionOrCurrentLineClipboardText());
+    }
+
+    private string GetSelectionOrCurrentLineClipboardText()
+    {
+        var selection = Document.Selection.Range;
+        if (!selection.IsEmpty)
         {
-            SetClipboardText(Snapshot.GetText(Document.Selection.Range));
+            return Snapshot.GetText(selection);
         }
+
+        var lineRange = TextEditorCommands.GetCurrentLineRange(Snapshot, selection.Start);
+        return Snapshot.GetText(lineRange)
+            + TextBlockSelectionOperations.GetPreferredLineEnding(
+                Snapshot,
+                _preferredLineEnding);
+    }
+
+    private TextRange GetSelectionOrCurrentLineDeletionRange()
+    {
+        var selection = Document.Selection.Range;
+        return selection.IsEmpty
+            ? TextEditorCommands.GetCurrentLineDeletionRange(Snapshot, selection.Start)
+            : selection;
     }
 
     public void PasteFromClipboard()
