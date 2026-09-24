@@ -1,4 +1,5 @@
 using Azunyan.Core;
+using Azunyan.Layout;
 using System.Globalization;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
@@ -4000,16 +4001,26 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 0,
                 out var endOffset))
         {
-            targetOffset = endOffset
-                - viewportHeight
-                + _lineHeight
-                + Math.Max(0, padding.Top)
-                + Math.Max(0, padding.Bottom);
+            var contentHeight = Math.Max(
+                1,
+                viewportHeight
+                    - Math.Max(0, padding.Top)
+                    - Math.Max(0, padding.Bottom));
+            targetOffset = new LayoutViewport(
+                _projectedVerticalOffset,
+                contentHeight).GetOffsetToReveal(
+                    startOffset,
+                    endOffset + _lineHeight);
         }
 
         var maximum = GetProjectedScrollMaximum(
             viewportHeight);
         targetOffset = Math.Clamp(targetOffset, 0, maximum);
+        if (Math.Abs(targetOffset - _projectedVerticalOffset) <= 0.5)
+        {
+            return true;
+        }
+
         _synchronizingProjectedScroll = true;
         try
         {

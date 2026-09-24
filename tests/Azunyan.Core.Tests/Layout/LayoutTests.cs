@@ -7,6 +7,16 @@ namespace Azunyan.Core.Tests;
 public sealed class LayoutTests
 {
     [Fact]
+    public void Viewport_reveal_scrolls_only_when_range_is_outside()
+    {
+        var viewport = new LayoutViewport(100, 200);
+
+        Assert.Equal(100, viewport.GetOffsetToReveal(120, 138));
+        Assert.Equal(80, viewport.GetOffsetToReveal(80, 98));
+        Assert.Equal(118, viewport.GetOffsetToReveal(300, 318));
+    }
+
+    [Fact]
     public void Monospace_layout_splits_text_runs_at_syntax_boundaries()
     {
         var snapshot = new TextSnapshot("TODO note");

@@ -23,6 +23,26 @@ public readonly record struct LayoutViewport
     public double VerticalOffset { get; }
 
     public double Height { get; }
+
+    public double GetOffsetToReveal(double startOffset, double endOffset)
+    {
+        if (!double.IsFinite(startOffset)
+            || !double.IsFinite(endOffset)
+            || startOffset < 0
+            || endOffset < startOffset)
+        {
+            throw new ArgumentOutOfRangeException(nameof(startOffset));
+        }
+
+        if (startOffset < VerticalOffset)
+        {
+            return startOffset;
+        }
+
+        return endOffset > VerticalOffset + Height
+            ? endOffset - Height
+            : VerticalOffset;
+    }
 }
 
 public sealed class ViewportRowLayout
