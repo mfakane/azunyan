@@ -54,6 +54,30 @@ internal static class ExternalToolMenuBuilder
         return entries;
     }
 
+    public static ExternalToolSettings? SelectByPriority(
+        IReadOnlyList<ExternalToolSettings> candidates,
+        Func<ExternalToolSettings, bool> isEnabled)
+    {
+        ArgumentNullException.ThrowIfNull(candidates);
+        ArgumentNullException.ThrowIfNull(isEnabled);
+
+        ExternalToolSettings? selected = null;
+        foreach (var candidate in candidates)
+        {
+            if (!isEnabled(candidate))
+            {
+                continue;
+            }
+
+            if (selected is null || candidate.Priority > selected.Priority)
+            {
+                selected = candidate;
+            }
+        }
+
+        return selected;
+    }
+
     public static IEnumerable<ExternalToolSettings> EnumerateTools(
         IReadOnlyList<ExternalToolMenuNode> nodes)
     {

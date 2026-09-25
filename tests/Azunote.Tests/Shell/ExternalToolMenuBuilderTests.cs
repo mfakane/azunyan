@@ -136,8 +136,32 @@ public sealed class ExternalToolMenuBuilderTests
             _ => new ExternalToolMenuState(true, true)));
     }
 
-    private static ExternalToolSettings CreateTool(string name) => new()
+    [Fact]
+    public void SelectByPriority_picks_the_highest_enabled_and_keeps_ties()
     {
-        Name = name
+        var earlier = CreateTool("Earlier", priority: 1);
+        var later = CreateTool("Later", priority: 1);
+        var specific = CreateTool("Specific", priority: 5);
+        var unavailable = CreateTool("Unavailable", priority: 10);
+
+        var selected = ExternalToolMenuBuilder.SelectByPriority(
+            [earlier, unavailable, later, specific],
+            tool => tool != unavailable);
+
+        Assert.Same(specific, selected);
+        Assert.Same(
+            earlier,
+            ExternalToolMenuBuilder.SelectByPriority(
+                [earlier, later],
+                _ => true));
+        Assert.Null(ExternalToolMenuBuilder.SelectByPriority(
+            [unavailable],
+            _ => false));
+    }
+
+    private static ExternalToolSettings CreateTool(string name, int priority = 0) => new()
+    {
+        Name = name,
+        Priority = priority
     };
 }

@@ -541,6 +541,8 @@ public sealed class ExternalToolSettings
 
     public string? Shortcut { get; set; }
 
+    public int Priority { get; set; }
+
     public string[] Menus { get; set; } =
         [ExternalToolEnumValues.ToTomlValue(ExternalToolMenuTarget.Tools)];
 

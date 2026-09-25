@@ -84,6 +84,7 @@ NODE_ENV = "development"
 | --- | --- | --- |
 | `name` | String | Name shown in the selected menu. If omitted, the definition file or bundle name is used. |
 | `shortcut` | Shortcut string | Optional keyboard shortcut, such as `Alt+Shift+F`. It is shown beside the item in both menus. |
+| `priority` | Integer | Shortcut tie-break when several tools share a key. The highest value among enabled tools runs. Defaults to `0`. Equal values keep discovery order. Menu order is unchanged. |
 | `menus` | Array of `tools`, `context` | Menu surfaces where the tool is shown. Use both values to show it in both menus. Defaults to `["tools"]`. |
 | `visibility` | `always`, `whenAvailable` | Whether the item remains visible when its conditions or command are unavailable. |
 

@@ -1636,6 +1636,7 @@ public sealed class ExternalToolsTests
                 """
                 name = "Format document"
                 shortcut = "Alt+Shift+F"
+                priority = 10
                 visibility = "whenAvailable"
 
                 [launch]
@@ -1661,6 +1662,7 @@ public sealed class ExternalToolsTests
             var tool = Assert.Single(settings.ExternalTools);
 
             Assert.Equal("Alt+Shift+F", tool.Shortcut);
+            Assert.Equal(10, tool.Priority);
             Assert.Equal("whenAvailable", tool.Visibility);
             Assert.Equal("cmd.exe", tool.ToDefinition().FileName);
             Assert.Equal(["/c", "more"], tool.ToDefinition().Arguments);

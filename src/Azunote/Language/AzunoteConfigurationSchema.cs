@@ -93,6 +93,7 @@ public static class AzunoteSchemaCatalog
                 [
                     Field("name", AzunoteSchemaValueKind.String, "property", documentation: "The tool name shown in the Tools menu."),
                     Field("shortcut", AzunoteSchemaValueKind.String, "property", documentation: "Optional keyboard shortcut, such as Alt+Shift+F."),
+                    Field("priority", AzunoteSchemaValueKind.Integer, documentation: "Shortcut tie-break. Higher wins among enabled tools on the same key. Defaults to 0."),
                     Field("menus", AzunoteSchemaValueKind.Array, documentation: "Menu targets: tools, context, or both. Defaults to tools."),
                     EnumField("visibility", "always", "whenAvailable")
                 ]),
