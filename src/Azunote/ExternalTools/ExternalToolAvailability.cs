@@ -173,6 +173,12 @@ public static class ExternalToolAvailability
             return "This tool is not available on the current operating system.";
         }
 
+        if (when.Exists is { Values.Count: > 0 }
+            && ExternalToolExists.FirstFailure(when.Exists.Values, context) is { } existsFailure)
+        {
+            return $"Exists condition '{existsFailure}' was not met.";
+        }
+
         return null;
     }
 

@@ -24,7 +24,8 @@ internal sealed class PreparedExternalTool
             {
                 Extensions = [.. when.Extensions], Patterns = [.. when.Patterns],
                 Languages = [.. when.Languages], Os = [.. when.Os],
-                File = when.File, Selection = when.Selection, Document = when.Document
+                File = when.File, Selection = when.Selection, Document = when.Document,
+                Exists = when.Exists
             }
         };
     }

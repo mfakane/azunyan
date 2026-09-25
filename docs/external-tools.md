@@ -227,6 +227,7 @@ specified conditions must match.
 | `selection` | `any`, `empty`, or `nonEmpty`. |
 | `document` | `any`, `clean`, or `dirty`. |
 | `os` | Operating-system identifiers, such as `windows`. |
+| `exists` | A path or glob, or an array of them. Array entries are all required. `|` separates alternatives inside one entry, and `!` negates that alternative. A bare name walks from the document directory toward the root. `./` checks only the document directory. `${workspaceFolder}` and `${workspaceFolder:pattern}` name a specific root. A match may be a file or a directory. |
 
 An untitled document is matched by `extensions` through its language mode:
 choosing the JSON mode in an untitled document makes the tools for `.json`,

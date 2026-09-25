@@ -79,6 +79,27 @@ internal static class WorkspaceFolderResolver
         return hasPattern ? matcher : null;
     }
 
+    internal static bool MatchesPattern(string directory, string pattern)
+    {
+        if (string.IsNullOrWhiteSpace(directory) || string.IsNullOrWhiteSpace(pattern))
+        {
+            return false;
+        }
+
+        Matcher matcher;
+        try
+        {
+            matcher = new Matcher(StringComparison.OrdinalIgnoreCase);
+            matcher.AddInclude(pattern.Replace('\\', '/'));
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+
+        return HasMatchingFile(matcher, directory);
+    }
+
     private static bool HasMatchingFile(Matcher matcher, string directory)
     {
         try

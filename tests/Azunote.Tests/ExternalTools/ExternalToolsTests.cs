@@ -611,6 +611,65 @@ public sealed class ExternalToolsTests
     }
 
     [Fact]
+    public void Availability_requires_exists_patterns_and_does_not_walk_a_same_directory_pattern()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"azunote-exists-{Guid.NewGuid():N}");
+        var repo = Path.Combine(root, "repo");
+        var nested = Path.Combine(repo, "src");
+        var loose = Path.Combine(root, "loose");
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(repo, ".git"));
+            Directory.CreateDirectory(nested);
+            Directory.CreateDirectory(loose);
+            File.WriteAllText(Path.Combine(repo, "prettier.config.js"), "{}");
+            var nestedFile = Path.Combine(nested, "notes.cs");
+            var repoFile = Path.Combine(repo, "notes.cs");
+            var looseFile = Path.Combine(loose, "notes.cs");
+
+            Assert.True(EvaluateExists(".git", nestedFile).IsEnabled);
+            Assert.False(EvaluateExists(".git", looseFile).IsVisible);
+            Assert.False(EvaluateExists("./.git", nestedFile).IsEnabled);
+            Assert.True(EvaluateExists("./.git", repoFile).IsEnabled);
+            Assert.True(EvaluateExists("!.git", looseFile).IsEnabled);
+            Assert.False(EvaluateExists("!.git", nestedFile).IsVisible);
+            Assert.True(EvaluateExists("prettier.config.*|biome.json", nestedFile).IsEnabled);
+            Assert.True(EvaluateExists(new[] { ".git", "!biome.json" }, nestedFile).IsEnabled);
+            Assert.False(EvaluateExists(new[] { ".git", "biome.json" }, nestedFile).IsVisible);
+            Assert.True(EvaluateExists("${workspaceFolder}/.git", nestedFile).IsEnabled);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        static ExternalToolMenuState EvaluateExists(object exists, string file)
+        {
+            var values = exists switch
+            {
+                string rule => new[] { rule },
+                string[] rules => rules,
+                _ => throw new ArgumentException("Expected a rule.", nameof(exists))
+            };
+            return ExternalToolAvailability.Evaluate(
+                new ExternalToolSettings
+                {
+                    Name = "Git",
+                    Visibility = "whenAvailable",
+                    Launch = new ExternalToolLaunchSettings { Command = "cmd.exe" },
+                    When = new ExternalToolWhenSettings
+                    {
+                        Exists = new ExternalToolSearchPath(values)
+                    }
+                },
+                new ExternalToolContext(file, file, "document", string.Empty));
+        }
+    }
+
+    [Fact]
     public void Availability_hides_when_available_tools_when_conditions_do_not_match()
     {
         var settings = new ExternalToolSettings

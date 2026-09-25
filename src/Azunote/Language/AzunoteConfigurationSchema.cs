@@ -127,7 +127,8 @@ public static class AzunoteSchemaCatalog
                     EnumField("file", "any", "backed", "untitled"),
                     EnumField("selection", "any", "empty", "nonEmpty"),
                     EnumField("document", "any", "clean", "dirty"),
-                    Field("os", AzunoteSchemaValueKind.Array, "property")
+                    Field("os", AzunoteSchemaValueKind.Array, "property"),
+                    Field("exists", AzunoteSchemaValueKind.StringOrArray, documentation: "Path or glob that must exist. Entries are AND; | is OR; ! negates; ./ is the document directory only.")
                 ]),
             new AzunoteSchemaTable(
                 "env",

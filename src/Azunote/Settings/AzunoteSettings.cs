@@ -594,6 +594,9 @@ public sealed class ExternalToolWhenSettings
     public string Document { get; set; } = ExternalToolEnumValues.ToTomlValue(ExternalToolDocumentCondition.Any);
 
     public string[] Os { get; set; } = [];
+
+    [TomlConverter(typeof(ExternalToolSearchPathTomlConverter))]
+    public ExternalToolSearchPath? Exists { get; set; }
 }
 
 public sealed class ExternalToolSettings
@@ -679,6 +682,7 @@ public sealed class ExternalToolSettings
         When.Patterns ??= [];
         When.Languages ??= [];
         When.Os ??= [];
+        When.Exists ??= new ExternalToolSearchPath([]);
 
         if (string.IsNullOrWhiteSpace(Name))
         {
