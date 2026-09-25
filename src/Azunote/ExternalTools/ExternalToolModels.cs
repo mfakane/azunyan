@@ -232,7 +232,8 @@ public sealed record ExternalToolDefinition
         IReadOnlyDictionary<string, string>? environment = null,
         string? definitionDirectory = null,
         ExternalToolCommandMode commandMode = ExternalToolCommandMode.Executable,
-        ExternalToolStreamChannels stream = ExternalToolStreamChannels.None)
+        ExternalToolStreamChannels stream = ExternalToolStreamChannels.None,
+        IReadOnlyList<string>? searchPath = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
         if (commandMode is not ExternalToolCommandMode.Executable
@@ -259,6 +260,7 @@ public sealed record ExternalToolDefinition
         }
 
         WorkingDirectory = workingDirectory;
+        SearchPath = searchPath ?? [];
         Environment = environment ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         DefinitionDirectory = string.IsNullOrWhiteSpace(definitionDirectory)
             ? null
@@ -289,6 +291,8 @@ public sealed record ExternalToolDefinition
     public ExternalToolStreamChannels Stream { get; }
 
     public string? WorkingDirectory { get; }
+
+    public IReadOnlyList<string> SearchPath { get; }
 
     public IReadOnlyDictionary<string, string> Environment { get; }
 

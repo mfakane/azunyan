@@ -47,11 +47,17 @@ public static class ExternalToolAvailability
 
         var environment = ExternalToolEnvironmentResolver.Resolve(definition, invocationContext, cache);
         var command = invocationContext.Expand(definition.FileName, environment.Values);
+        var searchPath = ExternalToolLaunchResolver.ExpandSearchPath(
+            definition.SearchPath,
+            definition.DefinitionDirectory,
+            invocationContext,
+            environment.Values);
         var launchPlan = cache is null ? ExternalToolLaunchResolver.Resolve(
             command,
             definition.CommandMode,
-            definition.DefinitionDirectory)
-            : cache.Launch(command, definition.CommandMode, definition.DefinitionDirectory);
+            definition.DefinitionDirectory,
+            searchPath)
+            : cache.Launch(command, definition.CommandMode, definition.DefinitionDirectory, searchPath);
         if (launchPlan is null)
         {
             var reason = $"Command '{command}' was not found.";

@@ -127,7 +127,12 @@ public sealed class ExternalToolRunner
         var launchPlan = ExternalToolLaunchResolver.Resolve(
             command,
             definition.CommandMode,
-            definition.DefinitionDirectory);
+            definition.DefinitionDirectory,
+            ExternalToolLaunchResolver.ExpandSearchPath(
+                definition.SearchPath,
+                definition.DefinitionDirectory,
+                context,
+                environment.Values));
         if (launchPlan is null)
         {
             var exception = new InvalidOperationException(

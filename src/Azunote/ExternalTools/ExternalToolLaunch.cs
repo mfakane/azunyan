@@ -105,7 +105,8 @@ internal static class ExternalToolLaunchResolver
     public static ExternalToolLaunchPlan? Resolve(
         string command,
         ExternalToolCommandMode commandMode,
-        string? definitionDirectory)
+        string? definitionDirectory,
+        IReadOnlyList<string>? searchPath = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(command);
         using var measurement = ShellPerformance.Measure("command.search");
@@ -134,7 +135,7 @@ internal static class ExternalToolLaunchResolver
                     ExternalToolLaunchKind.PowerShellCommand);
         }
 
-        var resolvedPath = ResolveExecutable(command, definitionDirectory);
+        var resolvedPath = ResolveExecutable(command, definitionDirectory, searchPath);
         if (resolvedPath is null)
         {
             return null;
@@ -176,9 +177,45 @@ internal static class ExternalToolLaunchResolver
             ExternalToolLaunchKind.Direct);
     }
 
+    internal static IReadOnlyList<string> ExpandSearchPath(
+        IReadOnlyList<string>? path,
+        string? definitionDirectory,
+        ExternalToolContext context,
+        IReadOnlyDictionary<string, string> environment)
+    {
+        if (path is null || path.Count == 0)
+        {
+            return [];
+        }
+
+        var expanded = new string[path.Count];
+        for (var i = 0; i < path.Count; i++)
+        {
+            var value = context.Expand(path[i] ?? string.Empty, environment);
+            if (!string.IsNullOrWhiteSpace(value)
+                && !Path.IsPathRooted(value)
+                && !string.IsNullOrWhiteSpace(definitionDirectory))
+            {
+                try
+                {
+                    value = Path.GetFullPath(Path.Combine(definitionDirectory, value));
+                }
+                catch (Exception exception) when (
+                    exception is ArgumentException or IOException or NotSupportedException)
+                {
+                }
+            }
+
+            expanded[i] = value;
+        }
+
+        return expanded;
+    }
+
     private static string? ResolveExecutable(
         string command,
-        string? definitionDirectory)
+        string? definitionDirectory,
+        IReadOnlyList<string>? searchPath = null)
     {
         command = command.Trim();
         var hasPath = Path.IsPathRooted(command)
@@ -190,6 +227,23 @@ internal static class ExternalToolLaunchResolver
                 ? command
                 : Path.Combine(definitionDirectory, command);
             return ResolvePath(path, allowExtensionless: true);
+        }
+
+        if (searchPath is not null)
+        {
+            foreach (var directory in searchPath)
+            {
+                if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
+                {
+                    continue;
+                }
+
+                var preferred = ResolvePath(Path.Combine(directory, command), allowExtensionless: false);
+                if (preferred is not null)
+                {
+                    return preferred;
+                }
+            }
         }
 
         var pathVariable = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;

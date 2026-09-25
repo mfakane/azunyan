@@ -93,6 +93,7 @@ NODE_ENV = "development"
 | Field | Values | Description |
 | --- | --- | --- |
 | `command` | Optional string | Executable or script to launch. Use this with `args`; it is mutually exclusive with `cmd` and `pwsh`. |
+| `path` | Optional string or array | Directories searched before `PATH` when resolving `command`. A missing directory is skipped, so a later entry or the process `PATH` is used. |
 | `args` | Optional array of strings | Arguments passed to `command`. Defaults to an empty array. Cannot be used with `cmd` or `pwsh`. |
 | `cmd` | Optional string or array of strings | One command line evaluated by `cmd.exe`. Array elements are joined with spaces; elements containing spaces are automatically quoted. Mutually exclusive with `command` and `pwsh`. |
 | `pwsh` | Optional string or array of strings | One command line evaluated by PowerShell (`pwsh.exe`, falling back to `powershell.exe`). Array elements are joined with spaces; elements containing spaces are automatically quoted. Mutually exclusive with `command` and `cmd`. |
@@ -109,6 +110,7 @@ The defaults are:
 
 - `menus = ["tools"]`
 - `args = []`
+- `path` is omitted, so `command` is resolved from the process `PATH` only.
 - `workingDirectory` is omitted; the current document's directory is used when
   available, otherwise the Azunote process directory.
 - `input = "none"`

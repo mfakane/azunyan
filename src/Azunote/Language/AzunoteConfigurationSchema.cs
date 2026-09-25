@@ -101,6 +101,7 @@ public static class AzunoteSchemaCatalog
                 "launch",
                 [
                     Field("command", AzunoteSchemaValueKind.String, "command", supportsPlaceholders: true),
+                    Field("path", AzunoteSchemaValueKind.StringOrArray, "path", supportsPlaceholders: true, documentation: "Directories searched before PATH. A missing directory is skipped."),
                     Field("args", AzunoteSchemaValueKind.Array, "property", supportsPlaceholders: true),
                     Field("cmd", AzunoteSchemaValueKind.StringOrArray, "command", supportsPlaceholders: true),
                     Field("pwsh", AzunoteSchemaValueKind.StringOrArray, "command", supportsPlaceholders: true),

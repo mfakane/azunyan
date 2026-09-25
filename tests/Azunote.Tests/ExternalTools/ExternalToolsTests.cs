@@ -512,6 +512,50 @@ public sealed class ExternalToolsTests
     }
 
     [Fact]
+    public void Launch_resolver_prefers_a_search_path_and_skips_a_missing_directory()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var root = Path.Combine(Path.GetTempPath(), $"azunote-path-{Guid.NewGuid():N}");
+        var bin = Path.Combine(root, "node_modules", ".bin");
+        try
+        {
+            Directory.CreateDirectory(bin);
+            File.WriteAllText(Path.Combine(bin, "prettier.cmd"), "@echo off\r\n");
+
+            var local = ExternalToolLaunchResolver.Resolve(
+                "prettier",
+                ExternalToolCommandMode.Executable,
+                null,
+                [bin, Path.Combine(root, "missing")]);
+
+            Assert.Equal(
+                Path.GetFullPath(Path.Combine(bin, "prettier.cmd")),
+                local!.ResolvedPath,
+                StringComparer.OrdinalIgnoreCase);
+
+            var fallback = ExternalToolLaunchResolver.Resolve(
+                "cmd.exe",
+                ExternalToolCommandMode.Executable,
+                null,
+                [Path.Combine(root, "missing")]);
+
+            Assert.NotNull(fallback);
+            Assert.EndsWith("cmd.exe", fallback!.ResolvedPath, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void Availability_disables_a_tool_whose_specified_working_directory_does_not_exist()
     {
         var missing = Path.Combine(Path.GetTempPath(), $"azunote-missing-{Guid.NewGuid():N}");
@@ -1696,6 +1740,7 @@ public sealed class ExternalToolsTests
 
                 [launch]
                 command = "cmd.exe"
+                path = "${workspaceFolder:package.json}/node_modules/.bin"
                 args = ["/c", "more"]
                 workingDirectory = "${documentDirname}"
                 input = "document"
@@ -1720,6 +1765,9 @@ public sealed class ExternalToolsTests
             Assert.Equal(10, tool.Priority);
             Assert.Equal("whenAvailable", tool.Visibility);
             Assert.Equal("cmd.exe", tool.ToDefinition().FileName);
+            Assert.Equal(
+                ["${workspaceFolder:package.json}/node_modules/.bin"],
+                tool.Launch.Path!.Values);
             Assert.Equal(["/c", "more"], tool.ToDefinition().Arguments);
             Assert.Equal("development", tool.ToDefinition().Environment["NODE_ENV"]);
             Assert.Equal([".md"], tool.When.Extensions);

@@ -4,7 +4,8 @@ visibility = "whenAvailable"
 
 [launch]
 command = "prettier"
-args = ["--write", "${file}"]   # or "--write ${file}"
+path = "${workspaceFolder:package.json}/node_modules/.bin"  # Search for the local Prettier binary first
+args = ["--write", "${file}"]  # or "--write ${file}"
 workingDirectory = "${documentDirname}"
 output = ["reloadFile", "ignore"]
 

@@ -158,7 +158,8 @@ public sealed class AzunoteDebugSettings
     Converters = [
         typeof(ExternalToolOutputActionsTomlConverter),
         typeof(ExternalToolStreamChannelsTomlConverter),
-        typeof(ExternalToolCommandTomlConverter)])]
+        typeof(ExternalToolCommandTomlConverter),
+        typeof(ExternalToolSearchPathTomlConverter)])]
 [TomlSerializable(typeof(AzunoteSettings))]
 [TomlSerializable(typeof(AzunoteDebugSettings))]
 [TomlSerializable(typeof(AzunoteToolsSettings))]
@@ -401,6 +402,63 @@ public sealed class ExternalToolCommandTomlConverter : TomlConverter<ExternalToo
         writer.WriteStringValue(value.Value);
 }
 
+public sealed class ExternalToolSearchPath
+{
+    public ExternalToolSearchPath(IReadOnlyList<string> values)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        Values = values;
+    }
+
+    public IReadOnlyList<string> Values { get; }
+}
+
+public sealed class ExternalToolSearchPathTomlConverter : TomlConverter<ExternalToolSearchPath>
+{
+    public override ExternalToolSearchPath Read(TomlReader reader)
+    {
+        if (reader.TokenType == TomlTokenType.String)
+        {
+            return new ExternalToolSearchPath([reader.GetString()]);
+        }
+
+        if (reader.TokenType != TomlTokenType.StartArray)
+        {
+            throw reader.CreateException("Expected a search path string or string array.");
+        }
+
+        var values = new List<string>();
+        while (reader.Read() && reader.TokenType != TomlTokenType.EndArray)
+        {
+            if (reader.TokenType != TomlTokenType.String)
+            {
+                throw reader.CreateException("Search path arrays may contain only strings.");
+            }
+
+            values.Add(reader.GetString());
+        }
+
+        if (reader.TokenType != TomlTokenType.EndArray)
+        {
+            throw reader.CreateException("The search path array was not closed.");
+        }
+
+        reader.Read();
+        return new ExternalToolSearchPath(values);
+    }
+
+    public override void Write(TomlWriter writer, ExternalToolSearchPath value)
+    {
+        writer.WriteStartArray();
+        foreach (var item in value.Values)
+        {
+            writer.WriteStringValue(item);
+        }
+
+        writer.WriteEndArray();
+    }
+}
+
 public sealed class ShellCommandSettings
 {
     public string Command { get; set; } = string.Empty;
@@ -487,6 +545,9 @@ internal static class ExternalToolEnumValues
 public sealed class ExternalToolLaunchSettings
 {
     public string? Command { get; set; }
+
+    [TomlConverter(typeof(ExternalToolSearchPathTomlConverter))]
+    public ExternalToolSearchPath? Path { get; set; }
 
     [TomlConverter(typeof(ExternalToolCommandTomlConverter))]
     public ExternalToolCommand? Cmd { get; set; }
@@ -598,7 +659,8 @@ public sealed class ExternalToolSettings
             Environment,
             DefinitionDirectory,
             commandMode,
-            Launch.Stream);
+            Launch.Stream,
+            Launch.Path?.Values ?? []);
     }
 
     internal void Validate()
@@ -606,6 +668,7 @@ public sealed class ExternalToolSettings
         Menus ??= [ExternalToolEnumValues.ToTomlValue(ExternalToolMenuTarget.Tools)];
         Launch ??= new();
         Launch.Arguments ??= [];
+        Launch.Path ??= new ExternalToolSearchPath([]);
         Launch.Stdin ??= string.Empty;
         Launch.Output ??= ExternalToolOutputActions.Ignore;
         Launch.Stdout ??= ExternalToolOutputActions.Ignore;

@@ -85,13 +85,24 @@ internal sealed class ExternalToolAvailabilityCache : IDisposable
         lock (_dependenciesGate) _dependencies.Remove(dependencies);
     }
 
-    public ExternalToolLaunchPlan? Launch(string command, ExternalToolCommandMode mode, string? directory)
+    public ExternalToolLaunchPlan? Launch(
+        string command,
+        ExternalToolCommandMode mode,
+        string? directory,
+        IReadOnlyList<string>? searchPath = null)
     {
         // Expanded commands can contain document/selection text. Do not retain large payloads as keys.
-        if (command.Length > 4096) return ExternalToolLaunchResolver.Resolve(command, mode, directory);
-        return Get(("launch", command, mode, directory, Environment.CurrentDirectory,
+        var searchKey = searchPath is null || searchPath.Count == 0
+            ? null
+            : string.Join('\0', searchPath);
+        if (command.Length > 4096)
+        {
+            return ExternalToolLaunchResolver.Resolve(command, mode, directory, searchPath);
+        }
+
+        return Get(("launch", command, mode, directory, searchKey, Environment.CurrentDirectory,
                 Environment.GetEnvironmentVariable("PATH"), Environment.GetEnvironmentVariable("PATHEXT")),
-            () => ExternalToolLaunchResolver.Resolve(command, mode, directory));
+            () => ExternalToolLaunchResolver.Resolve(command, mode, directory, searchPath));
     }
 
     public void Dispose()
