@@ -9,7 +9,7 @@ workingDirectory = "${documentDirname}"
 output = ["reloadFile", "ignore"]
 
 [when]
-extensions = [".js", ".jsx", ".ts", ".tsx", ".json", ".jsonc", ".json5", ".css", ".scss", ".html"]
+extensions = [".js", ".jsx", ".ts", ".tsx", ".json", ".jsonc", ".json5", ".yaml", ".yml", ".md", ".css", ".less", ".scss", ".html", ".htm"]
 
 [env]
 NODE_ENV = "development"
