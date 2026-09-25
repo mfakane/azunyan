@@ -60,6 +60,35 @@ public static class ExternalToolAvailability
                 : new ExternalToolMenuState(false, false, reason);
         }
 
+        if (!string.IsNullOrWhiteSpace(definition.WorkingDirectory))
+        {
+            string directory;
+            try
+            {
+                directory = ExternalToolRunner.ExpandWorkingDirectory(
+                    definition.WorkingDirectory,
+                    definition.DefinitionDirectory,
+                    invocationContext,
+                    environment.Values);
+            }
+            catch (Exception exception) when (
+                exception is ArgumentException or IOException or NotSupportedException)
+            {
+                directory = definition.WorkingDirectory;
+            }
+
+            if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
+            {
+                var shown = string.IsNullOrWhiteSpace(directory)
+                    ? definition.WorkingDirectory
+                    : directory;
+                var reason = $"Working directory '{shown}' was not found.";
+                return visibility == ExternalToolVisibility.Always
+                    ? new ExternalToolMenuState(true, false, reason)
+                    : new ExternalToolMenuState(false, false, reason);
+            }
+        }
+
         return new ExternalToolMenuState(true, true);
     }
 

@@ -512,6 +512,61 @@ public sealed class ExternalToolsTests
     }
 
     [Fact]
+    public void Availability_disables_a_tool_whose_specified_working_directory_does_not_exist()
+    {
+        var missing = Path.Combine(Path.GetTempPath(), $"azunote-missing-{Guid.NewGuid():N}");
+        var settings = new ExternalToolSettings
+        {
+            Name = "Format",
+            Visibility = "whenAvailable",
+            Launch = new ExternalToolLaunchSettings
+            {
+                Command = "cmd.exe",
+                WorkingDirectory = missing
+            }
+        };
+        var context = new ExternalToolContext(
+            Path.Combine(missing, "notes.cs"),
+            Path.Combine(missing, "notes.cs"),
+            "document",
+            string.Empty);
+
+        var hidden = ExternalToolAvailability.Evaluate(settings, context);
+
+        Assert.False(hidden.IsVisible);
+        Assert.False(hidden.IsEnabled);
+        Assert.Contains(missing, hidden.DisabledReason);
+
+        settings.Visibility = "always";
+        var shown = ExternalToolAvailability.Evaluate(settings, context);
+        Assert.True(shown.IsVisible);
+        Assert.False(shown.IsEnabled);
+
+        var root = Path.Combine(Path.GetTempPath(), $"azunote-wd-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            settings.Visibility = "whenAvailable";
+            settings.Launch.WorkingDirectory = "${documentDirname}";
+            var document = Path.Combine(root, "notes.cs");
+            var enabled = ExternalToolAvailability.Evaluate(
+                settings,
+                new ExternalToolContext(document, document, "document", string.Empty));
+            Assert.True(enabled.IsEnabled, enabled.DisabledReason);
+
+            var untitled = ExternalToolAvailability.Evaluate(
+                settings,
+                new ExternalToolContext(null, null, "document", string.Empty));
+            Assert.False(untitled.IsEnabled);
+            Assert.False(untitled.IsVisible);
+        }
+        finally
+        {
+            Directory.Delete(root);
+        }
+    }
+
+    [Fact]
     public void Availability_hides_when_available_tools_when_conditions_do_not_match()
     {
         var settings = new ExternalToolSettings

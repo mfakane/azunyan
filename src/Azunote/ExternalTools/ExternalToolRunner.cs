@@ -378,21 +378,35 @@ public sealed class ExternalToolRunner
         return argument;
     }
 
+    internal static string ExpandWorkingDirectory(
+        string workingDirectory,
+        string? definitionDirectory,
+        ExternalToolContext context,
+        IReadOnlyDictionary<string, string> environment)
+    {
+        var configured = context.Expand(workingDirectory, environment);
+        if (!string.IsNullOrWhiteSpace(configured)
+            && !Path.IsPathRooted(configured)
+            && !string.IsNullOrWhiteSpace(definitionDirectory))
+        {
+            configured = Path.GetFullPath(Path.Combine(definitionDirectory, configured));
+        }
+
+        return configured;
+    }
+
     private static string ResolveWorkingDirectory(
         ExternalToolDefinition definition,
         ExternalToolContext context,
         IReadOnlyDictionary<string, string> environment)
     {
-        var configured = definition.WorkingDirectory is null
+        var configured = string.IsNullOrWhiteSpace(definition.WorkingDirectory)
             ? context.DocumentDirname ?? context.FileDirname
-            : context.Expand(definition.WorkingDirectory, environment);
-
-        if (!string.IsNullOrWhiteSpace(configured)
-            && !Path.IsPathRooted(configured)
-            && !string.IsNullOrWhiteSpace(definition.DefinitionDirectory))
-        {
-            configured = Path.GetFullPath(Path.Combine(definition.DefinitionDirectory, configured));
-        }
+            : ExpandWorkingDirectory(
+                definition.WorkingDirectory,
+                definition.DefinitionDirectory,
+                context,
+                environment);
 
         return string.IsNullOrWhiteSpace(configured) || !Directory.Exists(configured)
             ? Environment.CurrentDirectory

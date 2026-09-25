@@ -96,7 +96,7 @@ NODE_ENV = "development"
 | `args` | Optional array of strings | Arguments passed to `command`. Defaults to an empty array. Cannot be used with `cmd` or `pwsh`. |
 | `cmd` | Optional string or array of strings | One command line evaluated by `cmd.exe`. Array elements are joined with spaces; elements containing spaces are automatically quoted. Mutually exclusive with `command` and `pwsh`. |
 | `pwsh` | Optional string or array of strings | One command line evaluated by PowerShell (`pwsh.exe`, falling back to `powershell.exe`). Array elements are joined with spaces; elements containing spaces are automatically quoted. Mutually exclusive with `command` and `cmd`. |
-| `workingDirectory` | Optional string | Working directory. Relative paths are resolved from the tool definition directory. If omitted, the current document's directory is used when available; otherwise the Azunote process directory is used. |
+| `workingDirectory` | Optional string | Working directory. Relative paths are resolved from the tool definition directory. If the expanded directory does not exist, the tool is not executable. If omitted, the current document's directory is used when available; otherwise the Azunote process directory is used. |
 | `input` | `none`, `filePath`, `document`, `selection` | Selects the value exposed as `${input}`. It is not written to standard input automatically. |
 | `per` | `none`, `line`, `regex:<pattern>` | Runs once for the input, each line, or each regex match. |
 | `stdin` | String | Text written to standard input after substitution expansion. Empty by default. |
