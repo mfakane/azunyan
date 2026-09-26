@@ -1,0 +1,13 @@
+name = "Base64 Encode"
+menus = ["tools", "context"]
+visibility = "whenAvailable"
+
+[launch]
+pwsh = '&{ [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($input -join "`n")) }'
+input = "selection"
+stdin = "${input}"
+stdout = ["replaceSelection", "ignore"]
+stderr = ["ignore", "newDocument"]
+
+[when]
+selection = "nonEmpty"

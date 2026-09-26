@@ -1,0 +1,13 @@
+name = "Blame File"
+visibility = "whenAvailable"
+
+[launch]
+command = "git"
+args = ["blame", "--", "${documentFile}"]
+workingDirectory = "${documentDirname}"
+stdout = ["newDocument", "ignore"]
+stderr = ["ignore", "newDocument"]
+
+[when]
+file = "backed"
+exists = ".git"

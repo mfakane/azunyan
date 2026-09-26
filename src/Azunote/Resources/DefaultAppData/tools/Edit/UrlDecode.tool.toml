@@ -1,0 +1,13 @@
+name = "URL Decode"
+menus = ["tools", "context"]
+visibility = "whenAvailable"
+
+[launch]
+pwsh = '&{ [uri]::UnescapeDataString(($input -join "").Trim()) }'
+input = "selection"
+stdin = "${input}"
+stdout = ["replaceSelection", "ignore"]
+stderr = ["ignore", "newDocument"]
+
+[when]
+selection = "regex:%[0-9A-Fa-f]{2}"

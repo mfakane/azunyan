@@ -1,0 +1,13 @@
+name = "Remove Duplicate Lines"
+menus = ["tools", "context"]
+visibility = "whenAvailable"
+
+[launch]
+pwsh = "Select-Object -Unique"
+input = "selection"
+stdin = "${input}"
+stdout = ["replaceSelection", "ignore"]
+stderr = ["ignore", "newDocument"]
+
+[when]
+selection = "nonEmpty"

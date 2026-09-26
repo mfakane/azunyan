@@ -1,0 +1,13 @@
+name = "File History"
+visibility = "whenAvailable"
+
+[launch]
+command = "git"
+args = ["log", "--follow", "--oneline", "-n", "50", "--", "${documentFile}"]
+workingDirectory = "${documentDirname}"
+stdout = ["newDocument", "ignore"]
+stderr = ["ignore", "newDocument"]
+
+[when]
+file = "backed"
+exists = ".git"

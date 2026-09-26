@@ -1,0 +1,13 @@
+name = "URL Encode"
+menus = ["tools", "context"]
+visibility = "whenAvailable"
+
+[launch]
+pwsh = '&{ [uri]::EscapeDataString($input -join "`n") }'
+input = "selection"
+stdin = "${input}"
+stdout = ["replaceSelection", "ignore"]
+stderr = ["ignore", "newDocument"]
+
+[when]
+selection = "nonEmpty"

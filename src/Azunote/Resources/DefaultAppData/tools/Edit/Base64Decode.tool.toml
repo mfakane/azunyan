@@ -1,0 +1,13 @@
+name = "Base64 Decode"
+menus = ["tools", "context"]
+visibility = "whenAvailable"
+
+[launch]
+pwsh = '&{ [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(($input -join "").Trim())) }'
+input = "selection"
+stdin = "${input}"
+stdout = ["replaceSelection", "ignore"]
+stderr = ["ignore", "newDocument"]
+
+[when]
+selection = "regex:^(?:[A-Za-z0-9+/]{4}){4,}(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
