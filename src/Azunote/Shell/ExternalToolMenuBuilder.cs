@@ -54,6 +54,15 @@ internal static class ExternalToolMenuBuilder
         return entries;
     }
 
+    public static bool NeedsContextSeparator(string? previousName, string name) =>
+        previousName is not null && TopFolder(previousName) != TopFolder(name);
+
+    public static string TopFolder(string name)
+    {
+        var split = name.Split(": ", 2, StringSplitOptions.None);
+        return split.Length == 2 ? split[0] : string.Empty;
+    }
+
     public static ExternalToolSettings? SelectByPriority(
         IReadOnlyList<ExternalToolSettings> candidates,
         Func<ExternalToolSettings, bool> isEnabled)

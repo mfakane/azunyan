@@ -101,6 +101,24 @@ public sealed class ExternalToolMenuBuilderTests
     }
 
     [Fact]
+    public void Context_separator_follows_the_top_folder()
+    {
+        Assert.False(ExternalToolMenuBuilder.NeedsContextSeparator(null, "Edit: Encode"));
+        Assert.False(ExternalToolMenuBuilder.NeedsContextSeparator(
+            "Edit: Encode",
+            "Edit: Decode"));
+        Assert.True(ExternalToolMenuBuilder.NeedsContextSeparator(
+            "Edit: Decode",
+            "Format: Trim"));
+        Assert.False(ExternalToolMenuBuilder.NeedsContextSeparator(
+            "Format: CSharp: Format",
+            "Format: JS: Prettier"));
+        Assert.False(ExternalToolMenuBuilder.NeedsContextSeparator(
+            "Loose tool",
+            "Another loose tool"));
+    }
+
+    [Fact]
     public void A_tool_targeted_at_both_menus_is_present_in_both_builds()
     {
         var tool = CreateTool("Format");

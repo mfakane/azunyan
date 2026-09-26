@@ -903,8 +903,15 @@ public sealed partial class MainWindow
         IReadOnlyList<ExternalToolMenuItemViewModel> entries)
     {
         var items = new List<MenuFlyoutItemBase>(entries.Count);
+        string? previousName = null;
         foreach (var entry in entries)
         {
+            if (ExternalToolMenuBuilder.NeedsContextSeparator(previousName, entry.Text))
+            {
+                items.Add(new MenuFlyoutSeparator());
+            }
+
+            previousName = entry.Text;
             var item = new MenuFlyoutItem
             {
                 Text = entry.Text,
