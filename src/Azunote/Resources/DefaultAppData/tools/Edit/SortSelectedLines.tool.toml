@@ -1,0 +1,13 @@
+name = "Sort Selected Lines"
+menus = ["tools", "context"]
+visibility = "whenAvailable"
+
+[launch]
+pwsh = 'Sort-Object -Unique'
+input = "selection"
+stdin = "${input}"
+stdout = ["replaceSelection", "ignore"]
+stderr = ["ignore", "newDocument"]
+
+[when]
+selection = "nonEmpty"

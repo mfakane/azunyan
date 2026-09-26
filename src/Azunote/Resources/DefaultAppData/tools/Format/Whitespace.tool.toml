@@ -1,0 +1,10 @@
+name = "Trim Trailing Whitespace"
+shortcut = "Ctrl+Alt+W"
+menus = ["tools", "context"]
+visibility = "whenAvailable"
+
+[launch]
+pwsh = '&{ $input -replace "(?m)[ \t]+(?=\r?$)", "" }'
+input = "document"
+stdin = "${input}"
+stdout = ["replaceDocument", "ignore"]

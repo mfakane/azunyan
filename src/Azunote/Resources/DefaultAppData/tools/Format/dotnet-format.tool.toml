@@ -1,0 +1,13 @@
+name = "dotnet format"
+shortcut = "Alt+Shift+F"
+visibility = "whenAvailable"
+
+[launch]
+command = "dotnet"
+args = ["format", "whitespace", ".", "--folder", "--include", "${file}"]
+workingDirectory = "${documentDirname}"
+stdout = ["reloadFile", "ignore"]
+stderr = ["ignore", "newDocument"]
+
+[when]
+extensions = [".cs", ".vb"]

@@ -1,0 +1,13 @@
+name = "Show File Diff"
+visibility = "whenAvailable"
+
+[launch]
+command = "git"
+args = ["diff", "--no-ext-diff", "--no-color", "--", "${documentFile}"]
+workingDirectory = "${documentDirname}"
+stdout = ["newDocument", "ignore"]
+stderr = ["ignore", "newDocument"]
+
+[when]
+file = "backed"
+exists = ".git"

@@ -1,0 +1,14 @@
+name = "ConvertFrom-Json | ConvertTo-Json"
+shortcut = "Alt+Shift+F"
+priority = -10
+visibility = "whenAvailable"
+
+[launch]
+pwsh = '&{ $input | ConvertFrom-Json | ConvertTo-Json -Depth 100 }'
+input = "document"
+stdin = "${input}"
+stdout = ["replaceDocument", "ignore"]
+stderr = ["ignore", "newDocument"]
+
+[when]
+extensions = [".json"]
