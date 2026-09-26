@@ -98,5 +98,12 @@ never creates certificates or changes trust settings. The existing
 wrapper for callers using the current user's `My` certificate store. Unsigned
 packages can also be handed to an external signing service.
 
+## Draft release
+
+`.github/workflows/release.yml` is started by hand. Enter a `major.minor`
+version, such as `0.2`. It tests the selected commit, packages an unsigned MSIX
+and a portable ZIP as `major.minor.<run number>.0`, then tags `v<major>.<minor>` and opens
+a draft release with those files. A failed package does not create the tag.
+
 The scripts verify the generated notice inventory before publishing. The
 distribution review items in `THIRD-PARTY-NOTICES.md` still apply.
