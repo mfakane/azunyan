@@ -39,7 +39,7 @@
 
   <ItemGroup>
     <!-- WinApp CLI integration: enables 'dotnet run' support for packaged apps -->
-    <PackageReference Include="Microsoft.Windows.SDK.BuildTools.WinApp" Version="0.6.1" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools.WinApp" Version="0.7.0" />
     <ProjectReference Include="..\Azunote.Ipc\Azunote.Ipc.csproj" />
     <!--
       azu.exe is the console entry point. The editor does not link against
