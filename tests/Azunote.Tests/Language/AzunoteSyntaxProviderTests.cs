@@ -37,7 +37,7 @@ public sealed class AzunoteSyntaxProviderTests
         var folds = await provider.GetFoldsAsync(
             new EditorProviderContext(snapshot, 0, TextSelection.Caret(0)));
 
-        var fold = Assert.Single(folds.Where(item => item.Id.Contains("debug", StringComparison.Ordinal)));
+        var fold = Assert.Single(folds, item => item.Id.Contains("debug", StringComparison.Ordinal));
         Assert.Equal("\nlogging = []\n", snapshot.GetText(fold.Range));
     }
 }

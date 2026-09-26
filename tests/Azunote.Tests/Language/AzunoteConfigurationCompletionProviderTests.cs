@@ -188,7 +188,6 @@ public sealed class AzunoteConfigurationCompletionProviderTests
         var fileItem = Assert.Single(result.Items, item => item.Label == "${file}");
         Assert.Equal("${file}", fileItem.InsertText);
         Assert.Equal("Placeholder", fileItem.Detail);
-        Assert.NotEmpty(fileItem.Documentation);
         Assert.Contains("Example: ${file} -> C:\\work\\notes\\current.azunote", fileItem.Documentation);
         Assert.Equal(
             TextRange.FromBounds(text.IndexOf("${", StringComparison.Ordinal), text.Length),

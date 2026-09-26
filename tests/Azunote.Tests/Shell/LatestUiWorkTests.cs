@@ -12,7 +12,7 @@ public sealed class LatestUiWorkTests
         var time = new ObservedTime();
         using var worker = new LatestUiWork<int, int>(new RejectedDispatcher(),
             () => throw new InvalidOperationException("Capture must not run"),
-            (value, _) => value, _ => Assert.True(false, "Apply must not run"),
+            (value, _) => value, _ => Assert.Fail("Apply must not run"),
             exception => throw exception, time);
         worker.Request();
         await time.WaitForDelay();
@@ -129,7 +129,7 @@ public sealed class LatestUiWorkTests
         var dispatcher = new QueuedDispatcher();
         var captures = 0;
         using var worker = new LatestUiWork<int, int>(dispatcher, () => ++captures,
-            (value, _) => value, _ => Assert.True(false, "Disposed work was applied"),
+            (value, _) => value, _ => Assert.Fail("Disposed work was applied"),
             exception => throw exception, time);
         worker.Request();
         await time.WaitForDelay();
