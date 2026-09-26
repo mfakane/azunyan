@@ -120,9 +120,7 @@ internal sealed class MainWindowRuntime : IDisposable
             RefreshExternalToolsMenu);
         _toolCache = new(watches: SharedFileWatchRegistry.Shared, invalidated: RefreshExternalToolsMenu);
         _toolUpdates = new(_dispatcher,
-            () => new(_view.Snapshot, _view.Selection, _session.State,
-                _languageModes.CurrentModeId, _languageModes.CurrentModeFileExtensions,
-                _settings.PreparedTools),
+            CaptureExternalToolInput,
             (input, isCurrent) => input.Evaluate(isCurrent, _toolCache),
             states => _settings.ApplyExternalToolStates(states),
             exception => ErrorReporter.LogException("External tool availability", exception));
@@ -484,7 +482,6 @@ internal sealed class MainWindowRuntime : IDisposable
         if (previousState == _session.State)
         {
             _status.Refresh();
-            RefreshExternalToolsMenu();
         }
     }
 
@@ -495,6 +492,31 @@ internal sealed class MainWindowRuntime : IDisposable
         UpdatePowerShellWarmPool();
         _toolUpdates?.Request();
     }
+
+    public void RefreshExternalToolsMenuNow()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _toolUpdates?.DiscardPending();
+        UpdatePowerShellWarmPool();
+        try
+        {
+            var states = CaptureExternalToolInput().Evaluate(() => true, _toolCache);
+            _settings.ApplyExternalToolStates(states);
+        }
+        catch (Exception exception)
+        {
+            ErrorReporter.LogException("External tool availability", exception);
+        }
+    }
+
+    private ExternalToolEvaluationInput CaptureExternalToolInput() =>
+        new(_view.Snapshot, _view.Selection, _session.State,
+            _languageModes.CurrentModeId, _languageModes.CurrentModeFileExtensions,
+            _settings.PreparedTools);
 
     /// <summary>
     /// Keeps a PowerShell process waiting only while a `pwsh` tool is
@@ -628,14 +650,12 @@ internal sealed class MainWindowRuntime : IDisposable
         _viewModel.IndentationInputMode = _view.IndentationInputMode;
         _status.Refresh(args.LineEnding);
         _status.RefreshTitle();
-        RefreshExternalToolsMenu();
         _refreshWindowMenus();
     }
 
     private void LanguageModes_Changed(object? sender, EventArgs args)
     {
         _status.Refresh();
-        RefreshExternalToolsMenu();
     }
 
     private void Session_StateChanged(object? sender, EventArgs args)
@@ -723,6 +743,5 @@ internal sealed class MainWindowRuntime : IDisposable
         if (_session.State.IsReadOnly) _viewModel.IsReplaceMode = false;
         _status.Refresh();
         _status.RefreshTitle();
-        RefreshExternalToolsMenu();
     }
 }

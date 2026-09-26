@@ -56,12 +56,12 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
             application.OpenStreamedTextInNewWindowAsync);
         ViewModel.Attach(this);
         // MenuBarItem does not expose its internal flyout's Opening event.
-        // Cover pointer and keyboard entry, including reopening an already focused item.
-        ToolsMenuItem.PointerEntered += (_, _) => _runtime.RefreshExternalToolsMenu();
-        ToolsMenuItem.PointerPressed += (_, _) => _runtime.RefreshExternalToolsMenu();
-        ToolsMenuItem.GotFocus += (_, _) => _runtime.RefreshExternalToolsMenu();
-        ToolsMenuItem.KeyDown += (_, _) => _runtime.RefreshExternalToolsMenu();
-        Editor.ContextMenuOpening += (_, _) => _runtime.RefreshExternalToolsMenu();
+        // Refresh synchronously on entry so the flyout's first paint is final.
+        ToolsMenuItem.PointerEntered += (_, _) => _runtime.RefreshExternalToolsMenuNow();
+        ToolsMenuItem.PointerPressed += (_, _) => _runtime.RefreshExternalToolsMenuNow();
+        ToolsMenuItem.GotFocus += (_, _) => _runtime.RefreshExternalToolsMenuNow();
+        ToolsMenuItem.KeyDown += (_, _) => _runtime.RefreshExternalToolsMenuNow();
+        Editor.ContextMenuOpening += (_, _) => _runtime.RefreshExternalToolsMenuNow();
         RegisterKeyboardAccelerators();
 
         if (_appWindow is not null)
@@ -231,7 +231,6 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         if (_isWindowActive)
         {
             _application.WindowActivated(this);
-            _runtime.RefreshExternalToolsMenu();
         }
     }
 
@@ -248,7 +247,6 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     {
         using var measurement = ShellPerformance.Measure("selection.changed");
         _runtime.RefreshStatus();
-        _runtime.RefreshExternalToolsMenu();
     }
 
     private void Editor_KeyDown(object sender, KeyRoutedEventArgs e)

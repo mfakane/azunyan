@@ -49,6 +49,12 @@ internal sealed class LatestUiWork<TInput, TResult> : IDisposable
         _requests.Writer.TryWrite(true);
     }
 
+    public void DiscardPending()
+    {
+        if (Volatile.Read(ref _disposed) != 0) return;
+        Interlocked.Increment(ref _generation);
+    }
+
     private async Task RunAsync()
     {
         var token = _shutdown.Token;
