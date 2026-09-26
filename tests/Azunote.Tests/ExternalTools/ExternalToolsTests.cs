@@ -670,6 +670,46 @@ public sealed class ExternalToolsTests
     }
 
     [Fact]
+    public void Availability_matches_a_selection_regex_and_rejects_an_oversized_selection()
+    {
+        var settings = new ExternalToolSettings
+        {
+            Name = "Decode",
+            Visibility = "whenAvailable",
+            Launch = new ExternalToolLaunchSettings { Command = "cmd.exe" },
+            When = new ExternalToolWhenSettings
+            {
+                Selection = "regex:%[0-9A-Fa-f]{2}"
+            }
+        };
+
+        var matched = ExternalToolAvailability.Evaluate(
+            settings,
+            new ExternalToolContext(null, null, "document", "hello%20world"));
+        Assert.True(matched.IsEnabled, matched.DisabledReason);
+
+        var unmatched = ExternalToolAvailability.Evaluate(
+            settings,
+            new ExternalToolContext(null, null, "document", "hello"));
+        Assert.False(unmatched.IsVisible);
+        Assert.Equal(
+            "The selection does not match the configured pattern.",
+            unmatched.DisabledReason);
+
+        var oversized = ExternalToolAvailability.Evaluate(
+            settings,
+            new ExternalToolContext(
+                null,
+                null,
+                "document",
+                new string('a', ExternalToolSelectionPattern.MaxLength + 1) + "%20"));
+        Assert.False(oversized.IsVisible);
+
+        settings.When.Selection = "regex:[";
+        Assert.Throws<SettingsFileException>(() => settings.Validate());
+    }
+
+    [Fact]
     public void Availability_hides_when_available_tools_when_conditions_do_not_match()
     {
         var settings = new ExternalToolSettings

@@ -224,7 +224,7 @@ specified conditions must match.
 | `patterns` | File-name patterns. |
 | `languages` | Language-mode identifiers. |
 | `file` | `any`, `backed`, or `untitled`. |
-| `selection` | `any`, `empty`, or `nonEmpty`. |
+| `selection` | `any`, `empty`, `nonEmpty`, or `regex:<pattern>`. The pattern is compiled when the tool is loaded and tested with `IsMatch`. A selection longer than 16 KiB, or a match that exceeds the time limit, does not match. |
 | `document` | `any`, `clean`, or `dirty`. |
 | `os` | Operating-system identifiers, such as `windows`. |
 | `exists` | A path or glob, or an array of them. Array entries are all required. `|` separates alternatives inside one entry, and `!` negates that alternative. A bare name walks from the document directory toward the root. `./` checks only the document directory. `${workspaceFolder}` and `${workspaceFolder:pattern}` name a specific root. A match may be a file or a directory. |

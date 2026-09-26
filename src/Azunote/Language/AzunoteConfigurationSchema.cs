@@ -125,7 +125,11 @@ public static class AzunoteSchemaCatalog
                     Field("patterns", AzunoteSchemaValueKind.Array, "property"),
                     Field("languages", AzunoteSchemaValueKind.Array, "property"),
                     EnumField("file", "any", "backed", "untitled"),
-                    EnumField("selection", "any", "empty", "nonEmpty"),
+                    new AzunoteSchemaField(
+                        "selection",
+                        AzunoteSchemaValueKind.String,
+                        AllowedValues: ["any", "empty", "nonEmpty"],
+                        Documentation: "any, empty, nonEmpty, or regex:<pattern>. Compiled when loaded. A selection over 16 KiB, or a match that times out, does not match."),
                     EnumField("document", "any", "clean", "dirty"),
                     Field("os", AzunoteSchemaValueKind.Array, "property"),
                     Field("exists", AzunoteSchemaValueKind.StringOrArray, documentation: "Path or glob that must exist. Entries are AND; | is OR; ! negates; ./ is the document directory only.")

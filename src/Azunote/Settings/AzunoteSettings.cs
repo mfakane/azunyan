@@ -741,7 +741,7 @@ public sealed class ExternalToolSettings
         }
         _ = ExternalToolEnumValues.Parse<ExternalToolVisibility>(Visibility, nameof(Visibility));
         _ = ExternalToolEnumValues.Parse<ExternalToolFileCondition>(When.File, "when.file");
-        _ = ExternalToolEnumValues.Parse<ExternalToolSelectionCondition>(When.Selection, "when.selection");
+        ExternalToolSelectionPattern.Validate(When.Selection);
         _ = ExternalToolEnumValues.Parse<ExternalToolDocumentCondition>(When.Document, "when.document");
 
         Shortcut = string.IsNullOrWhiteSpace(Shortcut) ? null : Shortcut.Trim();

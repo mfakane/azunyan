@@ -139,19 +139,29 @@ public static class ExternalToolAvailability
             return "This tool is only available for untitled documents.";
         }
 
-        var selectionCondition = ExternalToolEnumValues.Parse<ExternalToolSelectionCondition>(
-            when.Selection,
-            "when.selection");
-        if (selectionCondition == ExternalToolSelectionCondition.Empty
-            && context.Selection.Length > 0)
+        if (ExternalToolSelectionPattern.IsRegex(when.Selection))
         {
-            return "This tool requires an empty selection.";
+            if (!ExternalToolSelectionPattern.IsMatch(when.Selection, context.Selection))
+            {
+                return "The selection does not match the configured pattern.";
+            }
         }
-
-        if (selectionCondition == ExternalToolSelectionCondition.NonEmpty
-            && context.Selection.Length == 0)
+        else
         {
-            return "This tool requires a selection.";
+            var selectionCondition = ExternalToolEnumValues.Parse<ExternalToolSelectionCondition>(
+                when.Selection,
+                "when.selection");
+            if (selectionCondition == ExternalToolSelectionCondition.Empty
+                && context.Selection.Length > 0)
+            {
+                return "This tool requires an empty selection.";
+            }
+
+            if (selectionCondition == ExternalToolSelectionCondition.NonEmpty
+                && context.Selection.Length == 0)
+            {
+                return "This tool requires a selection.";
+            }
         }
 
         var documentCondition = ExternalToolEnumValues.Parse<ExternalToolDocumentCondition>(
