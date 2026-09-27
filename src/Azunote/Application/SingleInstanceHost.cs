@@ -22,7 +22,10 @@ internal sealed class SingleInstanceHost : IDisposable
     private Mutex? _mutex;
     private CancellationTokenSource? _serverCancellation;
     private Task? _serverTask;
-    private Func<SingleInstanceCommand, Task<SingleInstanceResponse>>? _commandHandler;
+    private Func<
+        SingleInstanceCommand,
+        IAsyncEnumerable<string>?,
+        Task<SingleInstanceResponse>>? _commandHandler;
     private bool _ownsMutex;
     private bool _disposed;
 
@@ -76,7 +79,11 @@ internal sealed class SingleInstanceHost : IDisposable
         }
     }
 
-    internal void Start(Func<SingleInstanceCommand, Task<SingleInstanceResponse>> commandHandler)
+    internal void Start(
+        Func<
+            SingleInstanceCommand,
+            IAsyncEnumerable<string>?,
+            Task<SingleInstanceResponse>> commandHandler)
     {
         ArgumentNullException.ThrowIfNull(commandHandler);
         ObjectDisposedException.ThrowIf(_disposed, nameof(SingleInstanceHost));
@@ -268,7 +275,10 @@ internal sealed class SingleInstanceHost : IDisposable
                 var command = await SingleInstanceProtocol.ReadCommandAsync(server).ConfigureAwait(false);
                 var handler = _commandHandler
                     ?? throw new InvalidOperationException("The command server is not initialized.");
-                var response = await handler(command).ConfigureAwait(false);
+                var standardInput = command.StreamStandardInput
+                    ? SingleInstanceProtocol.ReadStandardInputTextAsync(server)
+                    : null;
+                var response = await handler(command, standardInput).ConfigureAwait(false);
                 await SingleInstanceProtocol.WriteResponseAsync(server, response).ConfigureAwait(false);
             }
             catch (IOException)

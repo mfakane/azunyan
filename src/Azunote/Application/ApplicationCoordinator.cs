@@ -27,7 +27,9 @@ internal sealed class ApplicationCoordinator : IDisposable
         _ = ProcessInitialCommandLineAsync(registration, arguments);
     }
 
-    internal Task<SingleInstanceResponse> HandleForwardedCommandLineAsync(SingleInstanceCommand command)
+    internal Task<SingleInstanceResponse> HandleForwardedCommandLineAsync(
+        SingleInstanceCommand command,
+        IAsyncEnumerable<string>? standardInput)
     {
         ArgumentNullException.ThrowIfNull(command);
         ObjectDisposedException.ThrowIf(_disposed, nameof(ApplicationCoordinator));
@@ -38,10 +40,10 @@ internal sealed class ApplicationCoordinator : IDisposable
             TaskCreationOptions.RunContinuationsAsynchronously);
         if (dispatcher.HasThreadAccess)
         {
-            _ = ProcessForwardedCommandLineAsync(command, completion);
+            _ = ProcessForwardedCommandLineAsync(command, standardInput, completion);
         }
         else if (!dispatcher.TryEnqueue(() =>
-            _ = ProcessForwardedCommandLineAsync(command, completion)))
+            _ = ProcessForwardedCommandLineAsync(command, standardInput, completion)))
         {
             completion.SetException(
                 new InvalidOperationException("The Azunote UI dispatcher is unavailable."));
@@ -101,6 +103,7 @@ internal sealed class ApplicationCoordinator : IDisposable
 
     private async Task ProcessForwardedCommandLineAsync(
         SingleInstanceCommand command,
+        IAsyncEnumerable<string>? standardInput,
         TaskCompletionSource<SingleInstanceResponse> completion)
     {
         try
@@ -114,10 +117,22 @@ internal sealed class ApplicationCoordinator : IDisposable
             if (options.ReadStandardInput)
             {
                 target = TakeReusableWindow() ?? CreateWindowRegistration();
-                await target.Window.Runtime.OpenStartupTextAsync(
-                    command.StandardInput ?? string.Empty,
-                    options.Line,
-                    options.Column);
+                if (command.StreamStandardInput)
+                {
+                    await OpenStreamedStandardInputAsync(
+                        target,
+                        options,
+                        standardInput ?? throw new InvalidOperationException(
+                            "The streamed command did not include its standard input."));
+                }
+                else
+                {
+                    await target.Window.Runtime.OpenStartupTextAsync(
+                        command.StandardInput ?? string.Empty,
+                        options.Line,
+                        options.Column);
+                }
+
                 if (takesOutput)
                 {
                     target.Window.Runtime.AllowCommandLineClose();
@@ -668,6 +683,66 @@ internal sealed class ApplicationCoordinator : IDisposable
         {
             await runtime.ShowStartupErrorAsync("Could not read standard input", exception.Message);
         }
+    }
+
+    private async Task OpenStreamedStandardInputAsync(
+        WindowRegistration registration,
+        AzunoteCommandLineOptions options,
+        IAsyncEnumerable<string> standardInput)
+    {
+        await registration.Window.Runtime.OpenStartupTextAsync(
+            string.Empty,
+            options.Line,
+            options.Column);
+        ActivateWindow(registration);
+        var document = registration.Window.Runtime.CreateStreamedDocument();
+        try
+        {
+            await foreach (var text in standardInput.ConfigureAwait(false))
+            {
+                if (text.Length > 0)
+                {
+                    await RunOnUiThreadAsync(() => document.Append(text)).ConfigureAwait(false);
+                }
+            }
+        }
+        finally
+        {
+            await RunOnUiThreadAsync(document.Complete).ConfigureAwait(false);
+        }
+    }
+
+    private Task RunOnUiThreadAsync(Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        var dispatcher = _dispatcherQueue
+            ?? throw new InvalidOperationException("The Azunote UI dispatcher is unavailable.");
+        if (dispatcher.HasThreadAccess)
+        {
+            action();
+            return Task.CompletedTask;
+        }
+
+        var completion = new TaskCompletionSource<object?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!dispatcher.TryEnqueue(() =>
+            {
+                try
+                {
+                    action();
+                    completion.SetResult(null);
+                }
+                catch (Exception exception)
+                {
+                    completion.SetException(exception);
+                }
+            }))
+        {
+            completion.SetException(
+                new InvalidOperationException("The Azunote UI dispatcher is unavailable."));
+        }
+
+        return completion.Task;
     }
 
     private sealed class WindowRegistration

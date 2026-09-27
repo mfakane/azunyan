@@ -123,8 +123,14 @@ azu path\to\file.txt
 azu notes.md todo.md log.txt
 azu --wait --line 12 --column 4 path\to\file.txt
 Get-Content input.md | azu --stdin
+Get-Content -Wait input.log | azu --stream
 azu +12:4 path\to\file.txt
 ```
+
+`--stream` reads standard input and appends each arriving part to the editor,
+so it can display output from a process while that process is still running.
+Use `--stdin` to keep the existing behavior of opening the complete input once
+it has ended.
 
 Several document paths open one window each, in the order they were named,
 which leaves the document named last in front. A path that is already open

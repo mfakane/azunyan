@@ -51,6 +51,51 @@ public static class SingleInstanceClient
             .ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Streams standard input to the running instance while it processes the
+    /// command. Returns <see langword="null"/> when no instance answered within
+    /// <paramref name="attempts"/> connection attempts; in that case the input
+    /// stream has not been read.
+    /// </summary>
+    public static async Task<SingleInstanceResponse?> TrySendStreamingAsync(
+        string instanceName,
+        IReadOnlyList<string> arguments,
+        string workingDirectory,
+        Stream standardInput,
+        int attempts = 1,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(instanceName);
+        ArgumentNullException.ThrowIfNull(arguments);
+        ArgumentNullException.ThrowIfNull(standardInput);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(attempts);
+
+        using var client = new NamedPipeClientStream(
+            ".",
+            SingleInstanceProtocol.GetPipeName(instanceName),
+            PipeDirection.InOut,
+            PipeOptions.Asynchronous);
+        if (!await TryConnectAsync(client, attempts, cancellationToken).ConfigureAwait(false))
+        {
+            return null;
+        }
+
+        ForegroundHandoff.AllowFor(client);
+
+        await SingleInstanceProtocol.WriteStreamingCommandAsync(
+            client,
+            arguments,
+            workingDirectory,
+            cancellationToken).ConfigureAwait(false);
+        await SingleInstanceProtocol.WriteStandardInputAsync(
+            client,
+            standardInput,
+            cancellationToken).ConfigureAwait(false);
+        return await SingleInstanceProtocol
+            .ReadResponseAsync(client, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     private static async Task<bool> TryConnectAsync(
         NamedPipeClientStream client,
         int attempts,

@@ -60,9 +60,15 @@ internal static class Program
 
         try
         {
+            using var streamedInput = options.StreamStandardInput
+                ? Console.OpenStandardInput()
+                : null;
             var response = await SendAsync(
                 arguments,
-                options.ReadStandardInput ? await ReadStandardInputAsync() : null);
+                streamedInput is null && options.ReadStandardInput
+                    ? await ReadStandardInputAsync()
+                    : null,
+                streamedInput);
             if (response is null)
             {
                 await Console.Error.WriteLineAsync(
@@ -83,14 +89,25 @@ internal static class Program
 
     private static async Task<SingleInstanceResponse?> SendAsync(
         IReadOnlyList<string> arguments,
-        ReadOnlyMemory<byte>? standardInput)
+        ReadOnlyMemory<byte>? standardInput,
+        Stream? streamedInput)
     {
         var workingDirectory = Environment.CurrentDirectory;
-        var response = await SingleInstanceClient.TrySendAsync(
-            SingleInstanceProtocol.DefaultInstanceName,
-            arguments,
-            workingDirectory,
-            standardInput);
+        Task<SingleInstanceResponse?> TrySendAsync(int attempts) => streamedInput is null
+            ? SingleInstanceClient.TrySendAsync(
+                SingleInstanceProtocol.DefaultInstanceName,
+                arguments,
+                workingDirectory,
+                standardInput,
+                attempts)
+            : SingleInstanceClient.TrySendStreamingAsync(
+                SingleInstanceProtocol.DefaultInstanceName,
+                arguments,
+                workingDirectory,
+                streamedInput,
+                attempts);
+
+        var response = await TrySendAsync(attempts: 1);
         if (response is not null)
         {
             return response;
@@ -104,12 +121,7 @@ internal static class Program
             return null;
         }
 
-        return await SingleInstanceClient.TrySendAsync(
-            SingleInstanceProtocol.DefaultInstanceName,
-            arguments,
-            workingDirectory,
-            standardInput,
-            ColdStartConnectionAttempts);
+        return await TrySendAsync(ColdStartConnectionAttempts);
     }
 
     private static bool TryStartEditor()

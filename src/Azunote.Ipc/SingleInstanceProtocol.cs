@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Buffers.Binary;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace Azunote;
@@ -11,7 +12,8 @@ namespace Azunote;
 public sealed record SingleInstanceCommand(
     IReadOnlyList<string> Arguments,
     string WorkingDirectory,
-    string? StandardInput);
+    string? StandardInput,
+    bool StreamStandardInput = false);
 
 /// <summary>
 /// How the running instance finished a forwarded command. The value is the
@@ -90,6 +92,22 @@ public static class SingleInstanceProtocol
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
+        if (command.StreamStandardInput)
+        {
+            if (command.StandardInput is not null)
+            {
+                throw new ArgumentException(
+                    "A streamed command cannot also contain buffered standard input.",
+                    nameof(command));
+            }
+
+            return WriteStreamingCommandAsync(
+                stream,
+                command.Arguments,
+                command.WorkingDirectory,
+                cancellationToken);
+        }
+
         // Assigned in a statement rather than a conditional expression: a null
         // byte array converts to an empty ReadOnlyMemory, which would turn
         // absent standard input into empty standard input.
@@ -108,6 +126,23 @@ public static class SingleInstanceProtocol
     }
 
     /// <summary>
+    /// Starts a command whose standard input follows in separate frames until
+    /// an empty frame marks the end of the stream.
+    /// </summary>
+    public static Task WriteStreamingCommandAsync(
+        Stream stream,
+        IReadOnlyList<string> arguments,
+        string workingDirectory,
+        CancellationToken cancellationToken = default) =>
+        WriteCommandFrameAsync(
+            stream,
+            arguments,
+            workingDirectory,
+            standardInput: null,
+            streamStandardInput: true,
+            cancellationToken);
+
+    /// <summary>
     /// Writes a command whose standard input is already UTF-8. The client
     /// reads standard input as bytes, so this keeps the text out of a decode
     /// and re-encode round trip on the way to the editor.
@@ -118,6 +153,23 @@ public static class SingleInstanceProtocol
         string workingDirectory,
         ReadOnlyMemory<byte>? standardInput,
         CancellationToken cancellationToken = default)
+    {
+        await WriteCommandFrameAsync(
+            stream,
+            arguments,
+            workingDirectory,
+            standardInput,
+            streamStandardInput: false,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task WriteCommandFrameAsync(
+        Stream stream,
+        IReadOnlyList<string> arguments,
+        string workingDirectory,
+        ReadOnlyMemory<byte>? standardInput,
+        bool streamStandardInput,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(arguments);
@@ -135,7 +187,12 @@ public static class SingleInstanceProtocol
         }
 
         WriteString(writer, workingDirectory);
-        if (standardInput is { } input)
+        if (streamStandardInput)
+        {
+            writer.GetSpan(1)[0] = 2;
+            writer.Advance(1);
+        }
+        else if (standardInput is { } input)
         {
             writer.GetSpan(1)[0] = 1;
             writer.Advance(1);
@@ -175,8 +232,84 @@ public static class SingleInstanceProtocol
         {
             0 => new SingleInstanceCommand(arguments, workingDirectory, null),
             1 => new SingleInstanceCommand(arguments, workingDirectory, ReadString(span, ref offset)),
+            2 => new SingleInstanceCommand(arguments, workingDirectory, null, StreamStandardInput: true),
             _ => throw new InvalidDataException("The forwarded command contains an invalid standard-input flag.")
         };
+    }
+
+    /// <summary>
+    /// Reads source bytes and sends them to a streamed command in bounded
+    /// frames. The empty final frame marks end of input.
+    /// </summary>
+    public static async Task WriteStandardInputAsync(
+        Stream destination,
+        Stream source,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(destination);
+        ArgumentNullException.ThrowIfNull(source);
+
+        var buffer = new byte[16 * 1024];
+        while (true)
+        {
+            var length = await source.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            if (length == 0)
+            {
+                break;
+            }
+
+            await WriteFrameAsync(
+                destination,
+                buffer.AsMemory(0, length),
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        await WriteFrameAsync(
+            destination,
+            ReadOnlyMemory<byte>.Empty,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Reads a streamed standard input and yields UTF-8 text as soon as each
+    /// frame can be decoded, preserving characters split across frames.
+    /// </summary>
+    public static async IAsyncEnumerable<string> ReadStandardInputTextAsync(
+        Stream stream,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+
+        var decoder = Utf8.GetDecoder();
+        await foreach (var bytes in ReadStandardInputFramesAsync(stream, cancellationToken)
+            .ConfigureAwait(false))
+        {
+            var characters = new char[Utf8.GetMaxCharCount(bytes.Length)];
+            var length = decoder.GetChars(
+                bytes,
+                0,
+                bytes.Length,
+                characters,
+                0,
+                flush: false);
+            if (length > 0)
+            {
+                yield return new string(characters, 0, length);
+            }
+        }
+
+        var finalCharacters = new char[Utf8.GetMaxCharCount(0)];
+        var finalLength = decoder.GetChars(
+            Array.Empty<byte>(),
+            0,
+            0,
+            finalCharacters,
+            0,
+            flush: true);
+        if (finalLength > 0)
+        {
+            yield return new string(finalCharacters, 0, finalLength);
+        }
     }
 
     public static async Task WriteResponseAsync(
@@ -239,6 +372,22 @@ public static class SingleInstanceProtocol
         var frame = new byte[length];
         await stream.ReadExactlyAsync(frame, cancellationToken).ConfigureAwait(false);
         return frame;
+    }
+
+    private static async IAsyncEnumerable<byte[]> ReadStandardInputFramesAsync(
+        Stream stream,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            var frame = await ReadFrameAsync(stream, cancellationToken).ConfigureAwait(false);
+            if (frame.Length == 0)
+            {
+                yield break;
+            }
+
+            yield return frame;
+        }
     }
 
     private static void WriteInt32(ArrayBufferWriter<byte> writer, int value)

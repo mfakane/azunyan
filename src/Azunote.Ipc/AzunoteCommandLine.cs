@@ -27,6 +27,8 @@ public sealed record AzunoteCommandLineOptions
 
     public bool ReadStandardInput { get; init; }
 
+    public bool StreamStandardInput { get; init; }
+
     public bool ShowHelp { get; init; }
 
     /// <summary>
@@ -178,7 +180,9 @@ public static class AzunoteCommandLine
         }
 
         var paths = Array.FindAll(named, value => !string.IsNullOrWhiteSpace(value));
-        var readStandardInput = result.GetValue(grammar.StandardInput);
+        var streamStandardInput = result.GetValue(grammar.StreamStandardInput);
+        var readStandardInput = result.GetValue(grammar.StandardInput)
+            || streamStandardInput;
         if (paths.Length > 0 && readStandardInput)
         {
             throw new CommandLineParseException(
@@ -218,6 +222,7 @@ public static class AzunoteCommandLine
             Line = result.GetResult(grammar.Line) is null ? null : result.GetValue(grammar.Line),
             Column = result.GetResult(grammar.Column) is null ? null : result.GetValue(grammar.Column),
             ReadStandardInput = readStandardInput,
+            StreamStandardInput = streamStandardInput,
             ShowHelp = result.GetResult(grammar.Help) is not null,
             Output = output,
             Json = json,
@@ -333,6 +338,7 @@ public static class AzunoteCommandLine
             Argument<string[]> paths,
             Option<bool> wait,
             Option<bool> standardInput,
+            Option<bool> streamStandardInput,
             HelpOption help,
             Option<int> line,
             Option<int> column,
@@ -344,6 +350,7 @@ public static class AzunoteCommandLine
             Paths = paths;
             Wait = wait;
             StandardInput = standardInput;
+            StreamStandardInput = streamStandardInput;
             Help = help;
             Line = line;
             Column = column;
@@ -360,6 +367,8 @@ public static class AzunoteCommandLine
         public Option<bool> Wait { get; }
 
         public Option<bool> StandardInput { get; }
+
+        public Option<bool> StreamStandardInput { get; }
 
         public HelpOption Help { get; }
 
@@ -385,6 +394,10 @@ public static class AzunoteCommandLine
             var standardInput = new Option<bool>("--stdin")
             {
                 Description = "Read the document from standard input."
+            };
+            var streamStandardInput = new Option<bool>("--stream")
+            {
+                Description = "Stream standard input into the document as it arrives."
             };
             var line = CreatePositionOption("--line", "-l", "line", "Open at one-based line N.");
             var column = CreatePositionOption(
@@ -414,6 +427,7 @@ public static class AzunoteCommandLine
                 paths,
                 wait,
                 standardInput,
+                streamStandardInput,
                 line,
                 column,
                 output,
@@ -431,6 +445,7 @@ public static class AzunoteCommandLine
                 paths,
                 wait,
                 standardInput,
+                streamStandardInput,
                 help,
                 line,
                 column,
