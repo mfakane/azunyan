@@ -13,7 +13,7 @@ public sealed class SingleInstanceHostTests
 
         var received = new TaskCompletionSource<SingleInstanceCommand>(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        owner.Start(command =>
+        owner.Start((command, _) =>
         {
             received.TrySetResult(command);
             return Task.FromResult(SingleInstanceResponse.Completed("payload"));
@@ -43,7 +43,7 @@ public sealed class SingleInstanceHostTests
             TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource<object?>(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        owner.Start(async _ =>
+        owner.Start(async (_, _) =>
         {
             processingStarted.SetResult(null);
             await release.Task;
@@ -69,7 +69,7 @@ public sealed class SingleInstanceHostTests
             TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource<object?>(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        owner.Start(async _ =>
+        owner.Start(async (_, _) =>
         {
             processingStarted.SetResult(null);
             await release.Task;
