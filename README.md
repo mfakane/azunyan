@@ -185,4 +185,4 @@ acceptance work includes real IME, Narrator/NVDA, BiDi, DPI, theme, and GPU
 matrices.
 
 Design, performance targets, and migration notes are documented in
-[docs/editor-architecture.md](docs/editor-architecture.md).
+[docs/development/editor-architecture.md](docs/development/editor-architecture.md).

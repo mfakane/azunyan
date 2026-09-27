@@ -108,16 +108,16 @@ the payload, and the status byte is the exit code `azu.exe` reports.
 ## Command line
 
 `azu.exe` is the console client for opening and editing documents from a shell.
-See the [Command-line reference](../../docs/command-line.md) for options,
+See the [Command-line reference](../../docs/user/command-line.md) for options,
 pipeline input and output, and shell completion.
 
 ## Configuration and external tools
 
 See the user-facing documentation for the application configuration:
 
-- [Settings](../../docs/settings.md), including `settings.toml`, state, and custom language modes
-- [External Tools](../../docs/external-tools.md), including tool discovery and launch definitions
-- [Substitution Variables](../../docs/substitution-variables.md), including `.env` loading and expansion
+- [Settings](../../docs/user/settings.md), including `settings.toml`, state, and custom language modes
+- [External Tools](../../docs/user/external-tools.md), including tool discovery and launch definitions
+- [Substitution Variables](../../docs/user/substitution-variables.md), including `.env` loading and expansion
 
 The settings directory is `%LOCALAPPDATA%\Azunote` by default. When an
 `appdata` directory exists next to `Azunote.exe`, as it does in the portable
@@ -149,7 +149,7 @@ Built-in language definitions are available for C#, JavaScript, TypeScript,
 Python, JSON (including JSONC and JSON5), XML, YAML, TOML, Markdown, and
 PowerShell. Azunote exposes them from
 View > Language Mode, alongside Plain Text and its Azunote note mode. Custom
-language modes are described in [Settings](../../docs/settings.md).
+language modes are described in [Settings](../../docs/user/settings.md).
 
 Folding is offered by the language definitions that supply a folding provider.
 TOML and the Azunote note mode fold a table section up to the next header, JSON
@@ -195,4 +195,4 @@ Unexpected UI exceptions are logged and shown in an error dialog. Unhandled
 AppDomain and unobserved task exceptions are logged as well. Logs are written
 to `%LOCALAPPDATA%\Azunote\logs\azunote-YYYYMMDD.log` when the per-user local
 application-data directory is available. Detailed operation logging is
-configured in [Settings](../../docs/settings.md).
+configured in [Settings](../../docs/user/settings.md).

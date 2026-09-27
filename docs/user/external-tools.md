@@ -205,9 +205,9 @@ The extra processes for a run are started while that run's earlier parts are
 already executing, so raising `powerShellWarmProcesses` helps the later parts
 rather than the first one, and a large value competes with the run for CPU. How
 deep is useful therefore depends on how many cores are free, which is why the
-default is derived from the logical processor count rather than fixed. In the
-[recorded measurements](../tools/Azunote.Performance/README.md) a depth of 4 was
-the fastest on 8 and 32 logical processors but slower than a depth of 1 on 4.
+default is derived from the logical processor count rather than fixed. Recorded
+measurements found a depth of 4 fastest on 8 and 32 logical processors, but
+slower than a depth of 1 on 4.
 
 `command`, `args`, `cmd`, `pwsh`, and `workingDirectory` support substitution variables. The
 `[env]` values do as well; see the [substitution variable documentation](substitution-variables.md)

@@ -96,6 +96,29 @@ function Copy-AzunotePayload($Context, [string] $Destination) {
     }
 }
 
+function Copy-AzunotePackageDocumentation($Context, [string] $Destination) {
+    $sourceRoot = Join-Path $Context.Repo 'docs/user'
+    if (!(Test-Path -LiteralPath $sourceRoot -PathType Container)) {
+        throw 'User documentation source is missing: docs/user.'
+    }
+    $files = @(Get-ChildItem -LiteralPath $sourceRoot -File -Recurse)
+    if (!$files.Count) { throw 'User documentation source is empty: docs/user.' }
+
+    $docsRoot = Join-Path $Destination 'docs'
+    foreach ($file in $files) {
+        $relative = [IO.Path]::GetRelativePath($sourceRoot, $file.FullName)
+        $target = Join-Path $docsRoot $relative
+        New-Item -ItemType Directory -Force (Split-Path $target) | Out-Null
+        Copy-Item -LiteralPath $file.FullName -Destination $target -Force
+    }
+
+    $readmeSource = Join-Path $Context.Repo 'scripts/Packaging.Readme.md'
+    if (!(Test-Path -LiteralPath $readmeSource -PathType Leaf)) {
+        throw 'Distribution README source is missing: scripts/Packaging.Readme.md.'
+    }
+    Copy-Item -LiteralPath $readmeSource -Destination (Join-Path $Destination 'README.md') -Force
+}
+
 function New-AzunotePackageResources($Context, [string] $Payload, [string] $WinApp, [string] $IdentityName) {
     $appPri = Join-Path $Payload 'Azunote.pri'
     if (!(Test-Path -LiteralPath $appPri -PathType Leaf)) {
@@ -148,7 +171,6 @@ function Copy-AzunotePortablePayload($Context, [string] $Destination) {
     New-Item -ItemType Directory -Force (Join-Path $Destination 'appdata') | Out-Null
 
     $files = @(
-        @{ Source = Join-Path $Context.Repo 'src/Azunote/README.md'; Name = 'README.md' }
         @{ Source = Join-Path $Context.Repo 'src/Azunote/Register-AzunoteCompletion.ps1'
            Name = 'Register-AzunoteCompletion.ps1' }
     )
@@ -158,6 +180,7 @@ function Copy-AzunotePortablePayload($Context, [string] $Destination) {
         }
         Copy-Item -LiteralPath $file.Source -Destination (Join-Path $Destination $file.Name)
     }
+    Copy-AzunotePackageDocumentation $Context $Destination
 }
 
 function Find-AzunoteWinApp($Context, [string] $PreferredPath) {

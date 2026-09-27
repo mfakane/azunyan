@@ -36,8 +36,11 @@ Existing output files are not overwritten. Neither script installs the app.
 The ZIP contains a top-level `Azunote-<version>-win-x64` folder. Its visible
 top level contains the `Azunote.exe` and `azu.exe` shims,
 `Register-AzunoteCompletion.ps1`, `README.md`, `LICENSE`,
-`THIRD-PARTY-NOTICES.md`, and an empty `appdata/` directory. The
-redistribution-required `licenses/` directory is kept with the notices. Build
+`THIRD-PARTY-NOTICES.md`, an empty `appdata/` directory, and `docs/` with the
+user guides. The package README links to the bundled command-line, settings,
+external-tools, and substitution-variable guides. Developer documentation is
+not included. The redistribution-required `licenses/` directory is kept with
+the notices. Build
 artifacts such as DLLs, WinMDs, PRI files, satellite resources, and manifests
 are in `.app` with the application the shims start; PDBs are not placed in the
 ZIP at all. Extract the entire folder and run `Azunote.exe` or the adjacent
@@ -62,6 +65,8 @@ runtime payload files and adds an external Windows App Runtime dependency even
 when the publish folder already contains the runtime.
 APPX uses `winapp tool makeappx`; the SDK build tools needed by winapp are
 resolved by the CLI from the project, NuGet cache, or its configured tool cache.
+MSIX/APPX staging also includes the package README and the same user-only
+`docs/` directory beside the executable.
 
 Both formats import the compiled `Azunote.pri` into the package-root
 `resources.pri`, retaining WinUI/XBF resources and using the package identity

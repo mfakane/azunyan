@@ -36,6 +36,8 @@ $manifest.Package.Identity.Version = $context.Version
 if ($IdentityName) { $manifest.Package.Identity.Name = $IdentityName }
 if ($Publisher) { $manifest.Package.Identity.Publisher = $Publisher }
 New-AzunotePackageResources $context $payload $winapp $manifest.Package.Identity.Name
+# Keep user documentation with the package without adding it to the PRI index.
+Copy-AzunotePackageDocumentation $context $payload
 if ($Format -eq 'msix') {
     $manifestPath = Join-Path $context.Work 'Package.appxmanifest'
     $manifest.Save($manifestPath)
