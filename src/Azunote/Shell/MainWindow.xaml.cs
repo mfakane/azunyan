@@ -590,6 +590,7 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         }
 
         _disposed = true;
+        WindowSnapper.Remove(this);
         _runtime.Dispose();
         DisposeView();
     }
@@ -615,6 +616,16 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     }
 
     internal void MinimizeWindow() => MinimizeView();
+
+    internal void EnableWindowSnapping() => WindowSnapper.Install(this);
+
+    internal void SetWindowSnappingEnabled(bool enabled) =>
+        WindowSnapper.SetEnabled(this, enabled);
+
+    internal WindowSnapBounds SnapWindow(
+        WindowSnapBounds bounds,
+        WindowSnapEdges resizingEdges = WindowSnapEdges.None) =>
+        _application.SnapWindow(this, bounds, resizingEdges);
 
     internal void RestoreIfMinimized() => RestoreIfMinimizedView();
 

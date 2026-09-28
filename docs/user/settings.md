@@ -27,6 +27,7 @@ The file uses TOML syntax. The top-level settings are:
 | --- | --- |
 | `fontFamily` | Font used by the editor and renderer. The default is `Consolas`. |
 | `fontSize` | Font size used by the editor and renderer. The default is `14`. |
+| `windowSnapping` | Enables magnetic alignment between Azunote windows while moving or resizing. The default is `true`. |
 | `[debug].logging` | Detailed diagnostic categories: `all`, `render`, `clipboard`, `key`, and `input`. An empty array disables high-volume diagnostic logging. |
 | `[tools].powerShellWarmProcesses` | Most PowerShell processes kept waiting at once for `[launch].pwsh` tools, 1 to 16. The default is half the logical processor count, between 1 and 4. |
 | `[tools].powerShellWarmIdleProcesses` | PowerShell processes kept waiting while no tool is running, 0 to `powerShellWarmProcesses`. The default is `1`. |
@@ -39,6 +40,7 @@ The default shell-command configuration is equivalent to:
 # Azunote settings. This file uses TOML syntax.
 fontFamily = "Consolas"
 fontSize = 14
+windowSnapping = true
 
 [debug]
 logging = []

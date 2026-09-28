@@ -16,6 +16,8 @@ public sealed class AzunoteSettings
 
     public double FontSize { get; set; } = DefaultFontSize;
 
+    public bool WindowSnapping { get; set; } = true;
+
     public AzunoteDebugSettings Debug { get; set; } = new();
 
     public AzunoteToolsSettings Tools { get; set; } = new();

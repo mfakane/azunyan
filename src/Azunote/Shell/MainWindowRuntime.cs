@@ -196,6 +196,7 @@ internal sealed class MainWindowRuntime : IDisposable
         _view.SetDiagnosticLogging(settings.Debug.Logging);
         _view.SetFontFamily(settings.FontFamily);
         _view.SetFontSize(settings.FontSize);
+        _window.SetWindowSnappingEnabled(settings.WindowSnapping);
     }
 
     public Task OpenStartupDocumentAsync(

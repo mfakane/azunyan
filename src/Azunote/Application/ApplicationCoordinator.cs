@@ -4,6 +4,7 @@ namespace Azunote;
 
 internal sealed class ApplicationCoordinator : IDisposable
 {
+    private const int WindowSnapDistance = 8;
     private static readonly IEqualityComparer<DocumentSession> DocumentSessionComparer =
         ReferenceEqualityComparer.Instance;
     private readonly WindowRegistry<WindowRegistration> _windows = new();
@@ -415,6 +416,30 @@ internal sealed class ApplicationCoordinator : IDisposable
         RefreshWindowMenus();
     }
 
+    internal WindowSnapBounds SnapWindow(
+        MainWindow movingWindow,
+        WindowSnapBounds movingBounds,
+        WindowSnapEdges resizingEdges = WindowSnapEdges.None)
+    {
+        var targets = new List<WindowSnapBounds>();
+        foreach (var registration in _windows.Windows)
+        {
+            if (!ReferenceEquals(registration.Window, movingWindow) &&
+                WindowSnapper.TryGetBounds(registration.Window, out var bounds))
+            {
+                targets.Add(bounds);
+            }
+        }
+
+        return resizingEdges == WindowSnapEdges.None
+            ? WindowSnapGeometry.Snap(movingBounds, targets, WindowSnapDistance)
+            : WindowSnapGeometry.Resize(
+                movingBounds,
+                targets,
+                WindowSnapDistance,
+                resizingEdges);
+    }
+
     internal void WindowClosed(MainWindow window)
     {
         var registration = FindRegistration(window);
@@ -583,6 +608,7 @@ internal sealed class ApplicationCoordinator : IDisposable
         var registration = new WindowRegistration(window);
         _windows.Register(registration);
         _windows.MarkActive(registration);
+        window.EnableWindowSnapping();
         _ = window.Runtime.InitializeSettingsAsync();
         window.RenderRecentFiles(_state.Current.RecentFiles);
         RefreshWindowMenus();

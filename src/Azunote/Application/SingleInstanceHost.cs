@@ -237,8 +237,12 @@ internal sealed class SingleInstanceHost : IDisposable
                     PipeTransmissionMode.Byte,
                     PipeOptions.Asynchronous);
                 await server.WaitForConnectionAsync(cancellationToken).ConfigureAwait(false);
-                TrackClient(HandleClientAsync(server));
+                var startClient = new TaskCompletionSource(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+                var client = HandleClientAsync(server, startClient.Task);
+                TrackClient(client);
                 server = null;
+                startClient.SetResult();
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -266,8 +270,9 @@ internal sealed class SingleInstanceHost : IDisposable
         }
     }
 
-    private async Task HandleClientAsync(NamedPipeServerStream server)
+    private async Task HandleClientAsync(NamedPipeServerStream server, Task start)
     {
+        await start.ConfigureAwait(false);
         using (server)
         {
             try
