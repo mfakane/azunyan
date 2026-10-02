@@ -93,7 +93,7 @@ jobs:
       - name: Set up WinApp CLI
         uses: microsoft/setup-WinAppCli@v0.2
         with:
-          version: v0.6.1
+          version: v0.7.1
 
       - name: Verify WinApp CLI
         shell: pwsh

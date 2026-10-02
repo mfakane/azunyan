@@ -39,7 +39,7 @@
 
   <ItemGroup>
     <!-- WinApp CLI integration: enables 'dotnet run' support for packaged apps -->
-    <PackageReference Include="Microsoft.Windows.SDK.BuildTools.WinApp" Version="0.7.0" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools.WinApp" Version="0.7.1" />
     <ProjectReference Include="..\Azunote.Ipc\Azunote.Ipc.csproj" />
     <!--
       azu.exe is the console entry point. The editor does not link against
@@ -175,7 +175,9 @@
                                 Exclude="$(PublishDir)**\*" />
       <_AzunoteReferencedXamlResources
           Include="$(MSBuildProjectDirectory)\..\Azunyan.WinUI\$(IntermediateOutputPath)embed\Azunyan.WinUI\**\*.xbf" />
-      <_AzunoteXamlResources Include="$(OutputPath)$(AssemblyName).pri" />
+      <!-- Packaged builds emit resources.pri in OutputPath; unpackaged AOT publishes may already emit Azunote.pri in PublishDir. -->
+      <_AzunoteXamlResources Include="$(OutputPath)resources.pri"
+                              Condition="Exists('$(OutputPath)resources.pri')" />
     </ItemGroup>
     <Copy SourceFiles="@(_AzunoteAppXamlResources)"
           DestinationFiles="@(_AzunoteAppXamlResources->'$(PublishDir)%(RecursiveDir)%(Filename)%(Extension)')"
@@ -184,8 +186,10 @@
           DestinationFiles="@(_AzunoteReferencedXamlResources->'$(PublishDir)Azunyan.WinUI\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(_AzunoteXamlResources)"
-          DestinationFiles="@(_AzunoteXamlResources->'$(PublishDir)%(RecursiveDir)%(Filename)%(Extension)')"
+          DestinationFiles="@(_AzunoteXamlResources->'$(PublishDir)Azunote.pri')"
           SkipUnchangedFiles="true" />
+    <Error Condition="!Exists('$(PublishDir)Azunote.pri')"
+           Text="The app resource index is missing from both OutputPath and PublishDir." />
   </Target>
 
 </Project>

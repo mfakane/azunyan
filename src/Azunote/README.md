@@ -71,6 +71,33 @@ dotnet publish src/Azunote/Azunote.csproj -c Release -r win-x64 --self-contained
 The runnable output is written below
 `src/Azunote/bin/Release/net10.0-windows10.0.19041.0/win-x64/publish`.
 
+### WinApp CLI development workflows
+
+The repository pins WinApp CLI 0.7.1. Install or update that version on `PATH`
+and confirm it with `winapp --version` before using the commands below.
+
+To check the Windows API surface referenced by Azunote, run `find-api` from its
+project directory after restore:
+
+```powershell
+Push-Location src/Azunote
+winapp find-api "Microsoft.UI.Xaml.Automation.Peers.FrameworkElementAutomationPeer"
+Pop-Location
+```
+
+For an isolated manual UI check, launch the app in Windows Sandbox and inspect
+the accessibility tree when the WinApp Sandbox target is available:
+
+```powershell
+winapp run .\src\Azunote\Azunote.csproj -c Debug --on sandbox --detach
+winapp ui inspect --on sandbox -a Azunote
+```
+
+These commands support local smoke tests and UI investigation. The distribution
+scripts still prepare the custom PRI resources and package contents, and the
+UI test suite remains documented in
+[Azunote UI tests](../../tests/Azunote.UiTests/README.md).
+
 Application tests, including the external-tool and command-line tests, are
 kept separate from the editor-component tests:
 

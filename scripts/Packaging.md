@@ -2,11 +2,12 @@
 
 Run these PowerShell 7 scripts on Windows with the .NET 10 SDK, Visual Studio
 C++ build tools, and Windows SDK installed. First initialize and build the
-[pinned Win2D package](Win2D-build.md). MSIX and APPX creation use the winapp
-CLI (currently 0.6.1). The script prefers a `winapp` executable on `PATH`, such
-as one installed by `setup-WinAppCli`, and falls back to the application's
-restored `Microsoft.Windows.SDK.BuildTools.WinApp` package. Explicit APPX
-output and legacy certificate-store signing are routed through `winapp tool`.
+[pinned Win2D package](Win2D-build.md). MSIX and APPX creation use WinApp CLI
+0.7.1. CI pins this version through `setup-WinAppCli`; the script prefers a
+`winapp` executable on `PATH` and falls back to the application's restored
+`Microsoft.Windows.SDK.BuildTools.WinApp` package at the same version. Explicit
+APPX output and legacy certificate-store signing are routed through
+`winapp tool`.
 
 ```powershell
 git submodule update --init external/Win2D
