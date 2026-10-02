@@ -1,16 +1,12 @@
-using System.Collections.ObjectModel;
-
 namespace Azunyan.Core;
 
 public sealed class FoldStateTracker
 {
     private TextSnapshot? _snapshot;
     private readonly List<FoldRange> _candidates = new();
-    private readonly ReadOnlyCollection<FoldRange> _candidateView;
+    private IReadOnlyList<FoldRange> _candidateView = Array.Empty<FoldRange>();
     private readonly Dictionary<string, FoldRange> _collapsed = new(StringComparer.Ordinal);
     private readonly HashSet<string> _collapsedIds = new(StringComparer.Ordinal);
-
-    public FoldStateTracker() => _candidateView = _candidates.AsReadOnly();
 
     public TextSnapshot Snapshot => _snapshot ?? throw new InvalidOperationException("The tracker has not been reset.");
 
@@ -29,6 +25,7 @@ public sealed class FoldStateTracker
         _candidates.Clear();
         _collapsed.Clear();
         _collapsedIds.Clear();
+        PublishCandidates();
     }
 
     public void ApplyTextChange(TextSnapshot oldSnapshot, TextSnapshot newSnapshot, TextChange change)
@@ -59,6 +56,7 @@ public sealed class FoldStateTracker
         _snapshot = newSnapshot;
         _candidates.Clear();
         _candidates.AddRange(mapped);
+        PublishCandidates();
         _collapsed.Clear();
         _collapsedIds.Clear();
         foreach (var item in collapsed)
@@ -135,6 +133,7 @@ public sealed class FoldStateTracker
         result.Sort(static (left, right) => left.Range.Start.CompareTo(right.Range.Start));
         _candidates.Clear();
         _candidates.AddRange(result);
+        PublishCandidates();
         _collapsed.Clear();
         _collapsedIds.Clear();
         foreach (var item in nextCollapsed)
@@ -215,6 +214,9 @@ public sealed class FoldStateTracker
 
     private static bool Related(TextRange left, TextRange right) =>
         left.Start < right.End && right.Start < left.End;
+
+    private void PublishCandidates() =>
+        _candidateView = Array.AsReadOnly(_candidates.ToArray());
 
     private void EnsureSnapshot(TextSnapshot snapshot)
     {

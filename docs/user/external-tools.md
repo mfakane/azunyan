@@ -49,6 +49,14 @@ removed. It ignores the entries the scan skips, so work below a hidden
 directory, such as a `git pull` writing to `.git`, does not reload anything.
 Invalid definitions are reported and do not replace the last valid tool menu.
 
+## Condition evaluation
+
+To keep typing and selection changes responsive, `[when]` conditions are not
+reevaluated on every editor change. The Tools and editor context menus refresh
+availability when opened, and configured keyboard shortcuts check the current
+conditions when invoked. Reloading external-tool settings also refreshes the
+menu state.
+
 ## Definition format
 
 A tool definition uses TOML. The following example formats the current file

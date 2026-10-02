@@ -73,7 +73,7 @@ public sealed class AzunoteUiTests : IDisposable
     }
 
     [AzunoteUiFact]
-    public void Tool_menu_tracks_selection_when_other_tools_can_change_visibility()
+    public void Tool_menu_does_not_refresh_when_selection_changes_while_open()
     {
         // A unique definition in the test executable's portable data directory;
         // never edit the user's global settings or an existing tool definition.
@@ -97,23 +97,11 @@ public sealed class AzunoteUiTests : IDisposable
             AzunoteUiFixture.OpenMenu(window, "Tools");
             var item = AzunoteUiFixture.WaitForElement(window, AutomationElement.NameProperty, name);
             Assert.False(item.Current.IsEnabled);
+
             var selection = text.DocumentRange.FindText("日本語", false, false)!;
             selection.Select();
             Assert.Equal("日本語", AzunoteUiFixture.WaitForSelectionText(text, value => value == "日本語"));
-            // Other configured tools may change visibility on selection, legitimately
-            // rebuilding the menu. Reacquire the current item instead of polling a
-            // detached control. The dotenv test below covers enabled-only identity.
-            AzunoteUiFixture.WaitFor(() =>
-                window.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, name))
-                    is { } current && current.Current.IsEnabled ? current : null,
-                "Selection did not enable the tool.");
-            selection.MoveEndpointByRange(TextPatternRangeEndpoint.End, selection, TextPatternRangeEndpoint.Start);
-            selection.Select();
-            Assert.Equal("", AzunoteUiFixture.WaitForSelectionText(text, value => value == ""));
-            AzunoteUiFixture.WaitFor(() =>
-                window.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, name))
-                    is { } current && !current.Current.IsEnabled ? current : null,
-                "Clearing selection did not disable the tool.");
+            Assert.False(item.Current.IsEnabled);
         }
         finally
         {
