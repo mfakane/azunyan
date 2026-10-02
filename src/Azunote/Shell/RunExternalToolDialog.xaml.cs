@@ -14,7 +14,9 @@ internal sealed partial class RunExternalToolDialog : ContentDialog
     {
         InitializeComponent();
 
-        InputModeBox.ItemsSource = Enum.GetNames<ExternalToolInputMode>();
+        InputModeBox.ItemsSource = Enum.GetNames<ExternalToolInputMode>()
+            .Where(name => name != nameof(ExternalToolInputMode.Prompt))
+            .ToArray();
         InputModeBox.SelectedIndex = 0;
         PerModeBox.ItemsSource = new[] { "none", "line", "regex" };
         PerModeBox.SelectedIndex = 0;

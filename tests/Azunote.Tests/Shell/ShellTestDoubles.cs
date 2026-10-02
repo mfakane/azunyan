@@ -386,6 +386,8 @@ internal sealed class FakeUserPrompt : IUserPrompt
 
     public ExternalChangeDecision ExternalDecision { get; set; } = ExternalChangeDecision.Reload;
 
+    public string? ExternalToolInput { get; set; }
+
     public int ExternalDecisionCount { get; private set; }
 
     public List<(string Title, string Message)> Errors { get; } = [];
@@ -398,6 +400,9 @@ internal sealed class FakeUserPrompt : IUserPrompt
         ExternalDecisionCount++;
         return Task.FromResult(ExternalDecision);
     }
+
+    public Task<string?> PromptExternalToolInputAsync(string placeholder) =>
+        Task.FromResult(ExternalToolInput);
 
     public Task ShowErrorAsync(string title, string message)
     {

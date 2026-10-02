@@ -98,7 +98,7 @@ NODE_ENV = "development"
 | `cmd` | Optional string or array of strings | One command line evaluated by `cmd.exe`. Array elements are joined with spaces; elements containing spaces are automatically quoted. Mutually exclusive with `command` and `pwsh`. |
 | `pwsh` | Optional string or array of strings | One command line evaluated by PowerShell (`pwsh.exe`, falling back to `powershell.exe`). Array elements are joined with spaces; elements containing spaces are automatically quoted. Mutually exclusive with `command` and `cmd`. |
 | `workingDirectory` | Optional string | Working directory. Relative paths are resolved from the tool definition directory. If the expanded directory does not exist, the tool is not executable. If omitted, the current document's directory is used when available; otherwise the Azunote process directory is used. |
-| `input` | `none`, `filePath`, `document`, `selection` | Selects the value exposed as `${input}`. It is not written to standard input automatically. |
+| `input` | `none`, `filePath`, `document`, `selection`, `prompt:<placeholder>` | Selects the value exposed as `${input}`. A prompt asks for text when the tool runs. It is not written to standard input automatically. |
 | `per` | `none`, `line`, `regex:<pattern>` | Runs once for the input, each line, or each regex match. |
 | `stdin` | String | Text written to standard input after substitution expansion. Empty by default. |
 | `output` | Action or two-item array | Handles the mixed stdout/stderr stream. An array is `[zero, non-zero]`. |
@@ -119,6 +119,18 @@ The defaults are:
 - `output = "ignore"`, `stdout = "ignore"`, and `stderr = "ignore"` for both
   zero and non-zero exit codes.
 - `stream` is empty, so every channel is applied after the tool exits.
+
+Use `prompt:<placeholder>` to show a multiline input box when the tool is run.
+The placeholder is displayed in the box; canceling the prompt skips the tool.
+The entered value becomes `${input}` and is sent to standard input only when
+`stdin` references it:
+
+```toml
+[launch]
+command = "my-assistant.exe"
+input = "prompt:Ask a question or make a request"
+stdin = "${input}"
+```
 
 Exactly one of `command`, `cmd`, or `pwsh` is required. `command` and `args`
 launch an executable without a shell. `cmd` and `pwsh` each launch their

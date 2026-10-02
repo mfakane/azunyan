@@ -308,6 +308,7 @@ public sealed partial record ExternalToolContext
                 "The external tool requires a file-backed document."),
         ExternalToolInputMode.Document => Document,
         ExternalToolInputMode.Selection => Selection,
+        ExternalToolInputMode.Prompt => Input,
         _ => throw new ArgumentOutOfRangeException(nameof(inputMode))
     };
 

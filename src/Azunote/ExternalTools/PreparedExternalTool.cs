@@ -15,7 +15,7 @@ internal sealed class PreparedExternalTool
             new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(
                 new Dictionary<string, string>(definition.Environment, StringComparer.OrdinalIgnoreCase)),
             definition.DefinitionDirectory, definition.CommandMode, definition.Stream,
-            definition.SearchPath);
+            definition.SearchPath, definition.InputPrompt);
         var when = settings.When;
         _conditions = new ExternalToolSettings
         {

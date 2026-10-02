@@ -8,7 +8,8 @@ public enum ExternalToolInputMode
     None,
     FilePath,
     Document,
-    Selection
+    Selection,
+    Prompt
 }
 
 public enum ExternalToolCommandMode
@@ -233,7 +234,8 @@ public sealed record ExternalToolDefinition
         string? definitionDirectory = null,
         ExternalToolCommandMode commandMode = ExternalToolCommandMode.Executable,
         ExternalToolStreamChannels stream = ExternalToolStreamChannels.None,
-        IReadOnlyList<string>? searchPath = null)
+        IReadOnlyList<string>? searchPath = null,
+        string? inputPrompt = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
         if (commandMode is not ExternalToolCommandMode.Executable
@@ -248,6 +250,9 @@ public sealed record ExternalToolDefinition
         Arguments = arguments ?? [];
         CommandMode = commandMode;
         InputMode = inputMode;
+        InputPrompt = string.IsNullOrWhiteSpace(inputPrompt)
+            ? "Type something"
+            : inputPrompt;
         Per = ExternalToolPer.Parse(per);
         Stdin = stdin ?? string.Empty;
         Output = output ?? ExternalToolOutputActions.Ignore;
@@ -274,6 +279,12 @@ public sealed record ExternalToolDefinition
     public ExternalToolCommandMode CommandMode { get; }
 
     public ExternalToolInputMode InputMode { get; }
+
+    /// <summary>
+    /// The placeholder shown when <see cref="InputMode"/> asks the user for
+    /// input.
+    /// </summary>
+    public string InputPrompt { get; }
 
     public ExternalToolPer Per { get; }
 

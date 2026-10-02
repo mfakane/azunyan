@@ -544,6 +544,48 @@ internal static class ExternalToolEnumValues
     }
 }
 
+internal readonly record struct ExternalToolInputSetting(
+    ExternalToolInputMode Mode,
+    string? Prompt)
+{
+    public static ExternalToolInputSetting Parse(string? value, string propertyName)
+    {
+        const string promptPrefix = "prompt:";
+        if (value?.StartsWith(promptPrefix, StringComparison.Ordinal) == true)
+        {
+            var prompt = value[promptPrefix.Length..];
+            if (string.IsNullOrWhiteSpace(prompt))
+            {
+                throw new SettingsFileException(
+                    $"Invalid {propertyName} value '{value}'. Expected prompt:<placeholder text>.");
+            }
+
+            return new ExternalToolInputSetting(ExternalToolInputMode.Prompt, prompt);
+        }
+
+        if (string.Equals(value, "prompt", StringComparison.Ordinal))
+        {
+            throw new SettingsFileException(
+                $"Invalid {propertyName} value 'prompt'. Expected prompt:<placeholder text>.");
+        }
+
+        foreach (var mode in Enum.GetValues<ExternalToolInputMode>())
+        {
+            if (mode != ExternalToolInputMode.Prompt
+                && string.Equals(
+                    ExternalToolEnumValues.ToTomlValue(mode),
+                    value,
+                    StringComparison.Ordinal))
+            {
+                return new ExternalToolInputSetting(mode, null);
+            }
+        }
+
+        throw new SettingsFileException(
+            $"Invalid {propertyName} value '{value}'. Expected none, filePath, document, selection, or prompt:<placeholder text>.");
+    }
+}
+
 public sealed class ExternalToolLaunchSettings
 {
     public string? Command { get; set; }
@@ -651,10 +693,11 @@ public sealed class ExternalToolSettings
             _ => Launch.Command!
         };
 
+        var input = ExternalToolInputSetting.Parse(Launch.Input, "launch.input");
         return new ExternalToolDefinition(
             command,
             Launch.Arguments ?? [],
-            ExternalToolEnumValues.Parse<ExternalToolInputMode>(Launch.Input, "launch.input"),
+            input.Mode,
             Launch.Per,
             Launch.Stdin,
             Launch.Output,
@@ -665,7 +708,8 @@ public sealed class ExternalToolSettings
             DefinitionDirectory,
             commandMode,
             Launch.Stream,
-            Launch.Path?.Values ?? []);
+            Launch.Path?.Values ?? [],
+            input.Prompt);
     }
 
     internal void Validate()
@@ -732,7 +776,7 @@ public sealed class ExternalToolSettings
                 $"External tool '{Name}': {streamError}");
         }
 
-        _ = ExternalToolEnumValues.Parse<ExternalToolInputMode>(Launch.Input, "launch.input");
+        _ = ExternalToolInputSetting.Parse(Launch.Input, "launch.input");
         try
         {
             _ = ExternalToolPer.Parse(Launch.Per, "launch.per");

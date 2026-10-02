@@ -52,6 +52,33 @@ internal sealed class WinUiUserPrompt : IUserPrompt
         };
     }
 
+    public async Task<string?> PromptExternalToolInputAsync(string placeholder)
+    {
+        var input = new TextBox
+        {
+            AcceptsReturn = true,
+            MinHeight = 112,
+            MaxHeight = 240,
+            PlaceholderText = placeholder,
+            TextWrapping = TextWrapping.Wrap
+        };
+        input.Loaded += (_, _) => input.Focus(FocusState.Programmatic);
+
+        var dialog = new ContentDialog
+        {
+            Title = "External tool input",
+            Content = input,
+            PrimaryButtonText = "Run",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = _xamlRoot()
+        };
+
+        return await dialog.ShowAsync() == ContentDialogResult.Primary
+            ? input.Text
+            : null;
+    }
+
     public async Task ShowErrorAsync(string title, string message)
     {
         try

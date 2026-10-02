@@ -24,6 +24,55 @@ public sealed class AzunoteUiTests : IDisposable
     }
 
     [AzunoteUiFact]
+    public void Run_external_tool_dialog_opens_with_default_input_and_can_be_canceled()
+    {
+        var window = _fixture.Window;
+        AzunoteUiFixture.InvokeMenuItem(window, "Tools", "Run External Tool...");
+
+        var run = AzunoteUiFixture.WaitForElement(
+            window,
+            AutomationElement.NameProperty,
+            "Run");
+        Assert.Equal(ControlType.Button, run.Current.ControlType);
+
+        var inputMode = AzunoteUiFixture.WaitFor(
+            () =>
+            {
+                var comboBoxes = window.FindAll(
+                    TreeScope.Descendants,
+                    new PropertyCondition(
+                        AutomationElement.ControlTypeProperty,
+                        ControlType.ComboBox));
+                foreach (AutomationElement comboBox in comboBoxes)
+                {
+                    if (comboBox.TryGetCurrentPattern(
+                            SelectionPattern.Pattern,
+                            out var pattern)
+                        && pattern is SelectionPattern selection
+                        && selection.Current.GetSelection() is [{ } selected]
+                        && selected.Current.Name == "None")
+                    {
+                        return comboBox;
+                    }
+                }
+
+                return null;
+            },
+            "The Input combo box did not start with None selected.");
+        Assert.Equal(ControlType.ComboBox, inputMode.Current.ControlType);
+
+        var cancel = AzunoteUiFixture.WaitForElement(
+            window,
+            AutomationElement.NameProperty,
+            "Cancel");
+        ((InvokePattern)cancel.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
+        AzunoteUiFixture.WaitForElementHidden(
+            window,
+            AutomationElement.AutomationIdProperty,
+            "InputModeBox");
+    }
+
+    [AzunoteUiFact]
     public void Tool_menu_tracks_selection_when_other_tools_can_change_visibility()
     {
         // A unique definition in the test executable's portable data directory;

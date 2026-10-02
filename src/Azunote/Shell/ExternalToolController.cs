@@ -66,11 +66,27 @@ public sealed partial class ExternalToolController
         var editorSnapshot = EditorBufferSnapshot.Capture(_editor);
         var selection = editorSnapshot.Selection;
         var filePath = _documents.Session.State.FilePath;
-        var temporaryFilePath = _documents.Session.State.IsDirty || filePath is null
-            ? CreateTemporaryFilePath(filePath)
-            : null;
+        string? temporaryFilePath = null;
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            string? promptedInput = null;
+            if (definition.InputMode == ExternalToolInputMode.Prompt)
+            {
+                promptedInput = await _prompt.PromptExternalToolInputAsync(
+                    definition.InputPrompt);
+                if (promptedInput is null)
+                {
+                    throw new OperationCanceledException(
+                        "The external tool input was canceled.",
+                        cancellationToken);
+                }
+            }
+
+            temporaryFilePath = _documents.Session.State.IsDirty || filePath is null
+                ? CreateTemporaryFilePath(filePath)
+                : null;
             if (temporaryFilePath is not null)
             {
                 await _files.WriteAsync(
@@ -96,6 +112,11 @@ public sealed partial class ExternalToolController
                 editorSnapshot.SelectionStart,
                 editorSnapshot.SelectionEnd,
                 languageExtensions: _languageExtensions());
+            if (promptedInput is not null)
+            {
+                context = context.WithInput(promptedInput);
+            }
+
             using var streaming = ExternalToolStreamingRun.TryCreate(this, definition, selection);
             var result = await ExternalToolRunner.RunAsync(
                 definition,
