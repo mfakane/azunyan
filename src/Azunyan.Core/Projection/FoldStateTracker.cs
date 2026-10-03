@@ -35,13 +35,10 @@ public sealed class FoldStateTracker
         TextChangeMapper.Validate(change, oldSnapshot, newSnapshot);
         var mapped = new List<FoldRange>(_candidates.Count);
         var collapsed = new Dictionary<string, FoldRange>(StringComparer.Ordinal);
+        // Keep mapped candidates through edits while the document provider recomputes them.
+        // Dropping touched folds here makes collapsed content and its gutter flicker per key.
         foreach (var fold in _candidates)
         {
-            if (Touches(oldSnapshot, fold, change))
-            {
-                continue;
-            }
-
             var mappedFold = new FoldRange(
                 fold.Id,
                 TextChangeMapper.MapRange(change, fold.Range),
@@ -193,23 +190,6 @@ public sealed class FoldStateTracker
             && Related(sameId.Range, fold.Range)
                 ? sameId
                 : null;
-    }
-
-    private static bool Touches(TextSnapshot snapshot, FoldRange fold, TextChange change)
-    {
-        var edit = change.OldRange;
-        var rangeTouched = edit.IsEmpty
-            ? edit.Start >= fold.Range.Start && edit.Start < fold.Range.End
-            : edit.Start < fold.Range.End && fold.Range.Start < edit.End;
-        var line = snapshot.Lines.GetLineColumn(fold.Range.Start).Line;
-        var headerEnd = line + 1 < snapshot.Lines.LineCount
-            ? snapshot.Lines.GetLineStart(line + 1)
-            : snapshot.Length;
-        var header = TextRange.FromBounds(snapshot.Lines.GetLineStart(line), headerEnd);
-        var headerTouched = edit.IsEmpty
-            ? edit.Start >= header.Start && edit.Start <= header.End
-            : edit.Start < header.End && header.Start < edit.End;
-        return rangeTouched || headerTouched;
     }
 
     private static bool Related(TextRange left, TextRange right) =>

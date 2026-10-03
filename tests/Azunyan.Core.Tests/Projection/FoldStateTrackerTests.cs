@@ -6,19 +6,35 @@ namespace Azunyan.Core.Tests;
 public sealed class FoldStateTrackerTests
 {
     [Fact]
-    public void Unaffected_folds_shift_and_touched_or_header_folds_are_invalidated()
+    public void Text_edits_map_fold_candidates_and_preserve_collapsed_state_until_provider_refresh()
     {
-        var oldSnapshot = new TextSnapshot("head\nbody\nother\n");
-        var newSnapshot = new TextSnapshot("prefix\nhead\nbody changed\nother\n");
-        var change = new TextChange(new TextRange(0, 0), string.Empty, "prefix\n");
+        var oldSnapshot = new TextSnapshot("if\nbody\nother\n");
+        var newSnapshot = new TextSnapshot("ifx\nbody\nother\n");
+        var change = new TextChange(TextRange.Empty(2), string.Empty, "x");
         var tracker = CreateTracker(oldSnapshot,
-            new FoldRange("head", new TextRange(0, 9)),
-            new FoldRange("other", new TextRange(10, 6)));
+            new FoldRange("head", new TextRange(0, 8)),
+            new FoldRange("other", new TextRange(8, 6)));
+        tracker.SetCollapsed("head", true);
 
         tracker.ApplyTextChange(oldSnapshot, newSnapshot, change);
 
-        Assert.Null(tracker.FindFold("head"));
-        Assert.Equal(new TextRange(17, 6), Assert.Single(tracker.Folds).Range);
+        Assert.Equal(new TextRange(0, 9), tracker.FindFold("head")?.Range);
+        Assert.Equal(new TextRange(9, 6), tracker.FindFold("other")?.Range);
+        Assert.Equal(new[] { "head" }, tracker.CollapsedIds);
+
+        tracker.ApplyProviderFolds(newSnapshot,
+            [
+                new FoldRange("head", new TextRange(0, 9)),
+                new FoldRange("other", new TextRange(9, 6))
+            ],
+            isComplete: true);
+
+        Assert.Equal(new[] { "head" }, tracker.CollapsedIds);
+
+        tracker.ApplyProviderFolds(newSnapshot, Array.Empty<FoldRange>(), isComplete: true);
+
+        Assert.Empty(tracker.CollapsedIds);
+        Assert.Empty(tracker.Folds);
     }
 
     [Fact]

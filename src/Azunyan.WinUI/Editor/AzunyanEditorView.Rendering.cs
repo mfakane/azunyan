@@ -78,8 +78,9 @@ public sealed partial class AzunyanEditorView
             : 0;
         var showLogicalLineNumbers = supportsLogicalLineGutter && ShowLineNumbers;
         var folds = _foldStateTracker.Folds;
-        var hasFoldGutter = supportsLogicalLineGutter && folds.Count > 0;
-        var foldGutterWidth = hasFoldGutter ? 20 : 0;
+        // Keep this column stable while the current document's fold analysis is refreshing.
+        var supportsFoldGutter = supportsLogicalLineGutter && _providers.Folding is not null;
+        var foldGutterWidth = supportsFoldGutter ? 20 : 0;
         var gutterWidth = showLogicalLineNumbers || hasProviderGutter
             ? Math.Max(
                 32,
