@@ -32,14 +32,43 @@ public static class ExternalToolStreaming
     /// <summary>
     /// Whether an action can be applied before the tool has exited.
     /// <see cref="ExternalToolOutputMode.ReloadFile"/> has no output to apply,
-    /// and <see cref="ExternalToolOutputMode.ShowCompletion"/> or
-    /// <see cref="ExternalToolOutputMode.ShowPromptResponse"/> needs the whole
-    /// result before it updates its UI.
+    /// and <see cref="ExternalToolOutputMode.ShowCompletion"/> needs the whole
+    /// result before it updates its UI. Prompt responses update one chat entry
+    /// as chunks arrive.
     /// </summary>
     public static bool IsStreamable(ExternalToolOutputMode mode) =>
         mode is ExternalToolOutputMode.ReplaceDocument
             or ExternalToolOutputMode.ReplaceSelection
-            or ExternalToolOutputMode.NewDocument;
+            or ExternalToolOutputMode.NewDocument
+            or ExternalToolOutputMode.ShowPromptResponse;
+
+    internal static ExternalToolStreamChannels GetImmediateFlushChannels(
+        ExternalToolStreamChannels channels,
+        ExternalToolOutputActions output,
+        ExternalToolOutputActions stdout,
+        ExternalToolOutputActions stderr)
+    {
+        ArgumentNullException.ThrowIfNull(output);
+        ArgumentNullException.ThrowIfNull(stdout);
+        ArgumentNullException.ThrowIfNull(stderr);
+
+        var immediate = ExternalToolStreamChannels.None;
+        foreach (var (channel, actions) in new[]
+                 {
+                     (ExternalToolOutputChannel.Mixed, output),
+                     (ExternalToolOutputChannel.Stdout, stdout),
+                     (ExternalToolOutputChannel.Stderr, stderr)
+                 })
+        {
+            if (Streams(channels, channel)
+                && actions.OnSuccess == ExternalToolOutputMode.ShowPromptResponse)
+            {
+                immediate |= ToFlag(channel);
+            }
+        }
+
+        return immediate;
+    }
 
     public static ExternalToolStreamChannels ToFlag(ExternalToolOutputChannel channel) =>
         channel switch
@@ -148,7 +177,8 @@ public static class ExternalToolStreaming
             {
                 return $"stream names {name}, which uses "
                     + $"{ExternalToolEnumValues.ToTomlValue(actions.OnSuccess)}; "
-                    + "only replaceDocument, replaceSelection, and newDocument "
+                    + "only replaceDocument, replaceSelection, newDocument, and "
+                    + "showPromptResponse "
                     + "can be applied while the tool runs.";
             }
         }
@@ -178,7 +208,7 @@ internal sealed class ExternalToolStreamBuffer
     private string _pending = string.Empty;
 
     /// <summary>Takes a chunk and returns the text that can be applied now.</summary>
-    public string Append(string chunk)
+    public string Append(string chunk, bool flushPartialText = false)
     {
         ArgumentNullException.ThrowIfNull(chunk);
         if (chunk.Length == 0)
@@ -187,6 +217,22 @@ internal sealed class ExternalToolStreamBuffer
         }
 
         _pending += chunk;
+        if (flushPartialText)
+        {
+            var safeLength = _pending.Length;
+            if (_pending[^1] == '\r')
+            {
+                safeLength--;
+            }
+
+            if (safeLength > 0 && char.IsHighSurrogate(_pending[safeLength - 1]))
+            {
+                safeLength--;
+            }
+
+            return Take(safeLength);
+        }
+
         var start = FindLastLineEndingStart(_pending);
         return start <= 0 ? string.Empty : Take(start);
     }
@@ -266,6 +312,7 @@ internal sealed class ExternalToolStreamRelay : IDisposable
     internal static readonly TimeSpan IdleInterval = TimeSpan.FromMilliseconds(75);
 
     private readonly IExternalToolStreamSink _sink;
+    private readonly ExternalToolStreamChannels _flushPartialTextChannels;
     private readonly Dictionary<ExternalToolOutputChannel, ExternalToolStreamBuffer> _buffers = [];
     private readonly Timer _idleTimer;
     private readonly object _gate = new();
@@ -273,9 +320,11 @@ internal sealed class ExternalToolStreamRelay : IDisposable
 
     public ExternalToolStreamRelay(
         IExternalToolStreamSink sink,
-        ExternalToolStreamChannels channels)
+        ExternalToolStreamChannels channels,
+        ExternalToolStreamChannels flushPartialTextChannels)
     {
         _sink = sink ?? throw new ArgumentNullException(nameof(sink));
+        _flushPartialTextChannels = flushPartialTextChannels;
         foreach (var channel in new[]
                  {
                      ExternalToolOutputChannel.Mixed,
@@ -313,7 +362,11 @@ internal sealed class ExternalToolStreamRelay : IDisposable
                 return;
             }
 
-            Write(channel, buffer.Append(chunk));
+            Write(channel, buffer.Append(
+                chunk,
+                flushPartialText: ExternalToolStreaming.Streams(
+                    _flushPartialTextChannels,
+                    channel)));
             _idleTimer.Change(IdleInterval, Timeout.InfiniteTimeSpan);
         }
     }

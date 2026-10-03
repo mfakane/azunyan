@@ -156,9 +156,11 @@ public sealed partial class ExternalToolController
                         cancellationToken);
                 }
 
+                var hasPromptResponse = streaming?.HasPromptResponseTarget == true
+                    || output.Actions.Any(action =>
+                        action.Mode == ExternalToolOutputMode.ShowPromptResponse);
                 if (definition.InputMode != ExternalToolInputMode.Prompt
-                    || !output.Actions.Any(action =>
-                        action.Mode == ExternalToolOutputMode.ShowPromptResponse))
+                    || !hasPromptResponse)
                 {
                     return result;
                 }

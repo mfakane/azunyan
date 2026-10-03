@@ -19,6 +19,8 @@ public sealed partial class ExternalToolController
         private bool _draining;
         private bool _undoGroupOpen;
 
+        public bool HasPromptResponseTarget { get; private set; }
+
         private ExternalToolStreamingRun(
             ExternalToolController owner,
             ExternalToolDefinition definition,
@@ -37,14 +39,17 @@ public sealed partial class ExternalToolController
                     continue;
                 }
 
-                _targets[channel] = actions.OnSuccess switch
+                StreamTarget target = actions.OnSuccess switch
                 {
                     ExternalToolOutputMode.ReplaceDocument => new EditorStreamTarget(this, selection, wholeDocument: true),
                     ExternalToolOutputMode.ReplaceSelection => new EditorStreamTarget(this, selection, wholeDocument: false),
                     ExternalToolOutputMode.NewDocument => new NewDocumentStreamTarget(this),
+                    ExternalToolOutputMode.ShowPromptResponse => new PromptResponseStreamTarget(this),
                     _ => throw new InvalidOperationException(
                         $"An external-tool channel using {actions.OnSuccess} cannot stream.")
                 };
+                _targets[channel] = target;
+                HasPromptResponseTarget |= target is PromptResponseStreamTarget;
             }
         }
 
@@ -412,6 +417,63 @@ public sealed partial class ExternalToolController
                 {
                     await _run._owner._openTextInNewWindow(_collected.ToString());
                 }
+            }
+        }
+
+        private sealed class PromptResponseStreamTarget : StreamTarget
+        {
+            private readonly ExternalToolStreamingRun _run;
+            private readonly Guid _responseId = Guid.NewGuid();
+            private IEditorView? _view;
+            private bool _started;
+
+            public PromptResponseStreamTarget(ExternalToolStreamingRun run) => _run = run;
+
+            public override Task AppendAsync(string text)
+            {
+                if (EnsureStarted())
+                {
+                    _view!.AppendInlineChatResponseChunk(_responseId, text);
+                }
+
+                return Task.CompletedTask;
+            }
+
+            public override Task FinishAsync()
+            {
+                if (_started)
+                {
+                    _view!.CompleteInlineChatResponse(_responseId);
+                }
+
+                return Task.CompletedTask;
+            }
+
+            public override void Dispose()
+            {
+                if (_started)
+                {
+                    _view!.CompleteInlineChatResponse(_responseId);
+                }
+            }
+
+            private bool EnsureStarted()
+            {
+                if (_started)
+                {
+                    return true;
+                }
+
+                if (_run._owner._editor is not IEditorView view)
+                {
+                    Error = "The current editor does not support inline prompt responses.";
+                    return false;
+                }
+
+                _view = view;
+                _view.BeginInlineChatResponse(_responseId);
+                _started = true;
+                return true;
             }
         }
     }

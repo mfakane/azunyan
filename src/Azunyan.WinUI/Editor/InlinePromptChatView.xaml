@@ -40,12 +40,12 @@
                                 Click="InlinePromptCopyButton_Click" />
                         </StackPanel>
                         <TextBlock
-                            Text="{x:Bind Text}"
+                            Text="{x:Bind Text, Mode=OneWay}"
                             Visibility="{x:Bind AssistantStyleVisibility}"
                             TextWrapping="Wrap"
                             IsTextSelectionEnabled="True" />
                         <TextBlock
-                            Text="{x:Bind Text}"
+                            Text="{x:Bind Text, Mode=OneWay}"
                             Visibility="{x:Bind UserStyleVisibility}"
                             Foreground="{ThemeResource TextControlForeground}"
                             TextWrapping="Wrap"

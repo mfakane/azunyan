@@ -72,9 +72,17 @@ public sealed class ExternalToolRunner
         // that launches several processes can raise the waiting count for
         // exactly as long as it needs it.
         var inputParts = definition.Per.GetInputParts(sourceInput);
+        var flushPartialTextChannels = ExternalToolStreaming.GetImmediateFlushChannels(
+            definition.Stream,
+            definition.Output,
+            definition.Stdout,
+            definition.Stderr);
         using var relay = streamSink is not null
             && definition.Stream != ExternalToolStreamChannels.None
-            ? new ExternalToolStreamRelay(streamSink, definition.Stream)
+            ? new ExternalToolStreamRelay(
+                streamSink,
+                definition.Stream,
+                flushPartialTextChannels)
             : null;
         using var reservation = inputParts.Count > 1
             && definition.CommandMode == ExternalToolCommandMode.Pwsh

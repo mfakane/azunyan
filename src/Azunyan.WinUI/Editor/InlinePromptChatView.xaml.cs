@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
@@ -12,6 +13,7 @@ namespace Azunyan.WinUI;
 
 public sealed partial class InlinePromptChatView : UserControl
 {
+    private readonly Dictionary<Guid, InlinePromptChatEntry> _streamingEntries = [];
     private bool _isComposing;
 
     public ObservableCollection<InlinePromptChatEntry> Entries { get; } = new();
@@ -96,7 +98,39 @@ public sealed partial class InlinePromptChatView : UserControl
     public void AppendEntry(bool isUser, string text, bool canInsert)
     {
         Entries.Add(new InlinePromptChatEntry(isUser, text, canInsert));
+        ShowTranscriptAndScroll();
+    }
+
+    public void BeginStreamingEntry(Guid responseId, bool canInsert)
+    {
+        var entry = new InlinePromptChatEntry(false, string.Empty, canInsert);
+        _streamingEntries.Add(responseId, entry);
+        Entries.Add(entry);
+        ShowTranscriptAndScroll();
+    }
+
+    public void AppendStreamingText(Guid responseId, string text)
+    {
+        if (!_streamingEntries.TryGetValue(responseId, out var entry))
+        {
+            return;
+        }
+
+        entry.AppendText(text);
+        ScrollTranscriptToBottom();
+    }
+
+    public void FinishStreamingEntry(Guid responseId) =>
+        _streamingEntries.Remove(responseId);
+
+    private void ShowTranscriptAndScroll()
+    {
         InlinePromptTranscriptScrollViewer.Visibility = Visibility.Visible;
+        ScrollTranscriptToBottom();
+    }
+
+    private void ScrollTranscriptToBottom()
+    {
         DispatcherQueue.TryEnqueue(() =>
         {
             InlinePromptTranscriptScrollViewer.UpdateLayout();
@@ -198,14 +232,28 @@ public sealed partial class InlinePromptChatView : UserControl
 }
 
 public sealed class InlinePromptChatEntry(bool isUser, string text, bool canInsert)
+    : INotifyPropertyChanged
 {
+    public event PropertyChangedEventHandler? PropertyChanged;
+
     public bool IsUser { get; } = isUser;
 
     public Visibility UserStyleVisibility => IsUser ? Visibility.Visible : Visibility.Collapsed;
 
     public Visibility AssistantStyleVisibility => IsUser ? Visibility.Collapsed : Visibility.Visible;
 
-    public string Text { get; } = text;
+    public string Text { get; private set; } = text;
 
     public bool CanInsert { get; } = canInsert;
+
+    public void AppendText(string text)
+    {
+        if (text.Length == 0)
+        {
+            return;
+        }
+
+        Text += text;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Text)));
+    }
 }

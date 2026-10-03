@@ -71,6 +71,12 @@ internal interface IEditorView : IEditorBuffer
 
     void AppendInlineChatResponse(string response);
 
+    void BeginInlineChatResponse(Guid responseId);
+
+    void AppendInlineChatResponseChunk(Guid responseId, string text);
+
+    void CompleteInlineChatResponse(Guid responseId);
+
     void ApplyLanguage(EditorLanguageConfiguration configuration);
 
     void SetFontFamily(string fontFamily);

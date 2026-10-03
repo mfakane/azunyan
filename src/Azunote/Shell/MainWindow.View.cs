@@ -1040,6 +1040,12 @@ public sealed partial class MainWindow
             _window._editor.SetInlineChatProcessing(isProcessing);
         public void AppendInlineChatResponse(string response) =>
             _window._editor.AppendInlineChatResponse(response);
+        public void BeginInlineChatResponse(Guid responseId) =>
+            _window._editor.BeginInlineChatResponse(responseId);
+        public void AppendInlineChatResponseChunk(Guid responseId, string text) =>
+            _window._editor.AppendInlineChatResponseChunk(responseId, text);
+        public void CompleteInlineChatResponse(Guid responseId) =>
+            _window._editor.CompleteInlineChatResponse(responseId);
         public void ApplyLanguage(EditorLanguageConfiguration configuration) =>
             _window.ApplyLanguage(configuration);
         public void SetFontFamily(string fontFamily) => _window.SetFontFamily(fontFamily);

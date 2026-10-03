@@ -330,7 +330,7 @@ default for all three output fields is `ignore`.
 
 By default a channel's output is applied once the tool has exited. `stream`
 names the channels that are applied while the tool is still running, so a slow
-tool fills the document as it produces text rather than in one step at the end.
+tool updates its destination as it produces text rather than in one step at the end.
 It takes one channel name or an array of them, and the names are the output
 fields themselves:
 
@@ -341,16 +341,21 @@ stdout = "newDocument"
 stream = "stdout"
 ```
 
+For generated text written to standard output, set
+`stdout = "showPromptResponse"` and `stream = "stdout"`. When using the combined
+`output` channel, set `output = "showPromptResponse"` and `stream = "output"`.
+The chat entry grows as each safe text chunk arrives.
+
 Streaming is opt-in per channel because it changes what a tool can be relied on
 to do, not only when its output appears:
 
 - The output is applied before the exit code is known, so a streamed channel
   cannot choose its action by exit status. A streamed channel's action must be
   a single action rather than a `[zero, non-zero]` array.
-- Only `replaceDocument`, `replaceSelection`, and `newDocument` can stream.
-  `reloadFile` has no output to apply, while `showCompletion` and
-  `showPromptResponse` need the whole result before updating their UI; `stream`
-  naming a channel that uses any of these is an error.
+- `replaceDocument`, `replaceSelection`, `newDocument`, and
+  `showPromptResponse` can stream. `reloadFile` has no output to apply, while
+  `showCompletion` needs the whole result before updating its UI; `stream`
+  naming a channel that uses either of these is an error.
 - `output` carries the same text as `stdout` and `stderr`, so `stream` may name
   `output`, or `stdout` and `stderr`, but not both at once.
 - Two streamed channels may not use the same action, since their text would be
@@ -359,11 +364,11 @@ to do, not only when its output appears:
 A definition that breaks one of those rules is reported the way any other
 invalid definition is, and does not replace the last valid tool menu.
 
-What finally lands in the document is the same text a non-streaming run would
-have applied. Output is applied a line at a time; a line that is still being
-written appears once the tool has produced nothing for a moment, so a tool that
-reports progress without newlines is still visible. A line ending is never split
-across two applications, and neither is a surrogate pair.
+Streamed output preserves the text a non-streaming run would have applied.
+Document edits are applied a line at a time; a line that is still being written
+appears once the tool has produced nothing for a moment. A `showPromptResponse`
+entry grows as text chunks arrive. Line endings and surrogate pairs are never
+split across updates.
 
 `newDocument` opens its window when the first output arrives rather than when
 the tool starts, so a tool that produces nothing opens no window. The other two
@@ -371,11 +376,12 @@ actions apply their first output as the replacement they describe and append
 what follows, so `replaceSelection` leaves the selection covering the whole
 output once the tool has exited, exactly as it does without `stream`.
 
-One run is one undo step, including a `per` run that launched several
-processes, and including a run that was cancelled or exited non-zero: what had
-already been applied stays in the document, and one undo removes all of it. An
-edit made between two of a run's own writes ends that step, so a document
-edited while a tool streams into it takes more than one undo to get back.
+A streamed document edit is one undo step, including a `per` run that launched
+several processes, and including a run that was cancelled or exited non-zero:
+what had already been applied stays in the document, and one undo removes all
+of it. An edit made between two of a run's own writes ends that step, so a
+document edited while a tool streams into it takes more than one undo to get
+back.
 
 Editing the document while a streamed run writes to it is allowed. The run owns
 the part of the document it is writing: the selection until its first output

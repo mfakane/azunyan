@@ -5,6 +5,8 @@ namespace Azunote.Tests.Shell;
 
 internal sealed class FakeEditorView : IEditorView
 {
+    private readonly Dictionary<Guid, int> _streamingChatResponseIndexes = [];
+
     private Document _document;
 
     public FakeEditorView(string text = "")
@@ -117,6 +119,23 @@ internal sealed class FakeEditorView : IEditorView
         IsInlineChatProcessing = isProcessing;
 
     public void AppendInlineChatResponse(string response) => InlineChatResponses.Add(response);
+
+    public void BeginInlineChatResponse(Guid responseId)
+    {
+        _streamingChatResponseIndexes.Add(responseId, InlineChatResponses.Count);
+        InlineChatResponses.Add(string.Empty);
+    }
+
+    public void AppendInlineChatResponseChunk(Guid responseId, string text)
+    {
+        if (_streamingChatResponseIndexes.TryGetValue(responseId, out var index))
+        {
+            InlineChatResponses[index] += text;
+        }
+    }
+
+    public void CompleteInlineChatResponse(Guid responseId) =>
+        _streamingChatResponseIndexes.Remove(responseId);
 
     public void ApplyLanguage(EditorLanguageConfiguration configuration) =>
         LanguageConfiguration = configuration;

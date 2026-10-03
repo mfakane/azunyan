@@ -51,6 +51,19 @@ public sealed class ExternalToolStreamingTests
         Assert.Equal(" done", buffer.Append(" done") + buffer.FlushIdle());
     }
 
+    [Fact]
+    public void Stream_buffer_flushes_prompt_text_immediately_without_splitting_crlf_or_surrogates()
+    {
+        var buffer = new ExternalToolStreamBuffer();
+        const string emoji = "\U0001F600";
+
+        Assert.Equal("first token", buffer.Append("first token", flushPartialText: true));
+        Assert.Equal("line", buffer.Append("line\r", flushPartialText: true));
+        Assert.Equal("\r\n", buffer.Append("\n", flushPartialText: true));
+        Assert.Equal(string.Empty, buffer.Append(emoji[..1], flushPartialText: true));
+        Assert.Equal(emoji, buffer.Append(emoji[1..], flushPartialText: true));
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("one")]
@@ -145,8 +158,22 @@ public sealed class ExternalToolStreamingTests
                 ExternalToolOutputMode.ReplaceSelection,
                 ExternalToolOutputMode.ReplaceSelection),
             new ExternalToolOutputActions(
-                ExternalToolOutputMode.NewDocument,
-                ExternalToolOutputMode.NewDocument)));
+                ExternalToolOutputMode.ShowPromptResponse,
+                ExternalToolOutputMode.ShowPromptResponse)));
+    }
+
+    [Fact]
+    public void Prompt_response_stream_channels_flush_partial_text_immediately()
+    {
+        Assert.Equal(
+            ExternalToolStreamChannels.Stdout,
+            ExternalToolStreaming.GetImmediateFlushChannels(
+                ExternalToolStreamChannels.Stdout,
+                ExternalToolOutputActions.Ignore,
+                new ExternalToolOutputActions(
+                    ExternalToolOutputMode.ShowPromptResponse,
+                    ExternalToolOutputMode.ShowPromptResponse),
+                ExternalToolOutputActions.Ignore));
     }
 
     [Fact]

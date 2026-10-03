@@ -51,15 +51,58 @@ public sealed partial class AzunyanEditorView
             return;
         }
 
-        _inlineChatAnchor ??= Document.CaretSet.Primary.CaretAnchor;
-        InlinePromptPopup.IsOpen = true;
-        InlinePromptChatPanel.SetDismissButtonContent(
-            _inlinePromptSubmission is null ? "Close" : "Cancel");
+        PrepareInlineChatResponseDisplay();
         InlinePromptChatPanel.AppendEntry(
             false,
             response,
             canInsert: !IsReadOnly);
         UpdateInlineChatPopupPosition();
+    }
+
+    public void BeginInlineChatResponse(Guid responseId)
+    {
+        if (!DispatcherQueue.HasThreadAccess)
+        {
+            DispatcherQueue.TryEnqueue(() => BeginInlineChatResponse(responseId));
+            return;
+        }
+
+        PrepareInlineChatResponseDisplay();
+        InlinePromptChatPanel.BeginStreamingEntry(responseId, canInsert: !IsReadOnly);
+        UpdateInlineChatPopupPosition();
+    }
+
+    public void AppendInlineChatResponseChunk(Guid responseId, string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        if (!DispatcherQueue.HasThreadAccess)
+        {
+            DispatcherQueue.TryEnqueue(() => AppendInlineChatResponseChunk(responseId, text));
+            return;
+        }
+
+        InlinePromptChatPanel.AppendStreamingText(responseId, text);
+        InlinePromptChatPanel.UpdateLayout();
+        UpdateInlineChatPopupPosition();
+    }
+
+    public void CompleteInlineChatResponse(Guid responseId)
+    {
+        if (!DispatcherQueue.HasThreadAccess)
+        {
+            DispatcherQueue.TryEnqueue(() => CompleteInlineChatResponse(responseId));
+            return;
+        }
+
+        InlinePromptChatPanel.FinishStreamingEntry(responseId);
+    }
+
+    private void PrepareInlineChatResponseDisplay()
+    {
+        _inlineChatAnchor ??= Document.CaretSet.Primary.CaretAnchor;
+        InlinePromptPopup.IsOpen = true;
+        InlinePromptChatPanel.SetDismissButtonContent(
+            _inlinePromptSubmission is null ? "Close" : "Cancel");
     }
 
     /// <summary>Updates the inline chat send button while an external tool runs.</summary>

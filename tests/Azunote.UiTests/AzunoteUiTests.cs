@@ -85,9 +85,10 @@ public sealed class AzunoteUiTests : IDisposable
             name = "{{name}}"
             visibility = "always"
             [launch]
-            cmd = "timeout /t 2 /nobreak > nul & echo ResponseFromTool"
+            cmd = "echo ResponseFromTool & ping 127.0.0.1 -n 9 > nul"
             input = "prompt:Type a message"
             stdout = "showPromptResponse"
+            stream = "stdout"
             """);
         try
         {
@@ -117,10 +118,12 @@ public sealed class AzunoteUiTests : IDisposable
             Assert.Equal(secondMessage, value.Current.Value);
 
             AzunoteUiFixture.WaitFor(
-                () => CountElementsWhoseNameContains(window, "External tool") >= 1
+                () => CountElementsWhoseNameContains(window, "ResponseFromTool") >= 1
                     ? window
                     : null,
             "The first inline-prompt response was not displayed.");
+            Assert.Equal("Processing", sendButton.Current.Name);
+            Assert.False(sendButton.Current.IsEnabled);
 
             AzunoteUiFixture.WaitFor(
                 () => sendButton.Current.IsEnabled ? sendButton : null,
@@ -136,7 +139,7 @@ public sealed class AzunoteUiTests : IDisposable
                 AutomationElement.NameProperty,
                 secondMessage);
             AzunoteUiFixture.WaitFor(
-                () => CountElementsWhoseNameContains(window, "External tool") >= 2
+                () => CountElementsWhoseNameContains(window, "ResponseFromTool") >= 2
                     ? window
                     : null,
                 "The second inline-prompt response was not displayed.");
