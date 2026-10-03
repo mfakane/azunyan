@@ -561,7 +561,7 @@ public sealed partial class MainWindow
     private void RenderExternalTools(
         IReadOnlyList<ExternalToolMenuNode> nodes,
         Func<ExternalToolSettings, ExternalToolMenuState> getState,
-        Func<ExternalToolSettings, Task> onSelected,
+        Func<ExternalToolSettings, string, Task> onSelected,
         Func<string, Task> onEditDefinition,
         Func<string, Task> onShowInExplorer)
     {
@@ -666,13 +666,16 @@ public sealed partial class MainWindow
 
     private void RegisterExternalToolAccelerators(
         IReadOnlyList<ExternalToolMenuNode> nodes,
-        Func<ExternalToolSettings, Task> onSelected)
+        Func<ExternalToolSettings, string, Task> onSelected)
     {
+        var promptTitles = new Dictionary<ExternalToolSettings, string>();
         var candidatesByShortcut = new Dictionary<
             ExternalToolShortcut,
             List<ExternalToolSettings>>();
-        foreach (var tool in ExternalToolMenuBuilder.EnumerateTools(nodes))
+        foreach (var (tool, promptTitle) in
+            ExternalToolMenuBuilder.EnumerateToolsWithPromptTitle(nodes))
         {
+            promptTitles.TryAdd(tool, promptTitle);
             if (!ExternalToolShortcut.TryParse(tool.Shortcut, out var parsedShortcut))
             {
                 continue;
@@ -706,7 +709,7 @@ public sealed partial class MainWindow
                 }
 
                 args.Handled = true;
-                _ = onSelected(tool);
+                _ = onSelected(tool, promptTitles.GetValueOrDefault(tool) ?? string.Empty);
             };
             _rootGrid.KeyboardAccelerators.Add(accelerator);
             _externalToolAccelerators.Add(accelerator);
@@ -1031,6 +1034,12 @@ public sealed partial class MainWindow
         public void Select(TextRange range) => _window.Select(range);
         public void RequestCompletion() => _window.RequestCompletion();
         public void ShowCompletion(CompletionResult completions) => _window.ShowCompletion(completions);
+        public Task<string?> PromptInlineChatAsync(string title, string placeholder) =>
+            _window._editor.PromptInlineChatAsync(title, placeholder);
+        public void SetInlineChatProcessing(bool isProcessing) =>
+            _window._editor.SetInlineChatProcessing(isProcessing);
+        public void AppendInlineChatResponse(string response) =>
+            _window._editor.AppendInlineChatResponse(response);
         public void ApplyLanguage(EditorLanguageConfiguration configuration) =>
             _window.ApplyLanguage(configuration);
         public void SetFontFamily(string fontFamily) => _window.SetFontFamily(fontFamily);
@@ -1073,7 +1082,7 @@ public sealed partial class MainWindow
         public void Render(
             IReadOnlyList<ExternalToolMenuNode> nodes,
             Func<ExternalToolSettings, ExternalToolMenuState> getState,
-            Func<ExternalToolSettings, Task> onSelected,
+            Func<ExternalToolSettings, string, Task> onSelected,
             Func<string, Task> onEditDefinition,
             Func<string, Task> onShowInExplorer) =>
             _window.RenderExternalTools(

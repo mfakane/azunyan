@@ -120,6 +120,17 @@
                 HorizontalAlignment="Left"
                 VerticalAlignment="Top" />
             <Popup
+                x:Name="InlinePromptPopup"
+                IsLightDismissEnabled="False"
+                IsOpen="False">
+                <Popup.ChildTransitions>
+                    <TransitionCollection>
+                        <PopupThemeTransition FromVerticalOffset="6" />
+                    </TransitionCollection>
+                </Popup.ChildTransitions>
+                <local:InlinePromptChatView x:Name="InlinePromptChatPanel" />
+            </Popup>
+            <Popup
                 x:Name="TooltipPopup"
                 IsHitTestVisible="False"
                 IsOpen="False">

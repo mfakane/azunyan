@@ -13,7 +13,7 @@ internal sealed class SettingsWorkflow : IDisposable
     private readonly IUserPrompt _prompt;
     private readonly ISettingsFolderOpener _folderOpener;
     private readonly Func<string?> _currentFilePath;
-    private readonly Func<ExternalToolSettings, Task> _runConfiguredTool;
+    private readonly Func<ExternalToolSettings, string, Task> _runConfiguredTool;
     private readonly Func<ExternalToolSettings, ExternalToolMenuState> _getToolState;
     private readonly Func<string, Task> _editDefinition;
     private readonly Func<string, Task> _showDefinitionInExplorer;
@@ -36,7 +36,7 @@ internal sealed class SettingsWorkflow : IDisposable
         IUserPrompt prompt,
         ISettingsFolderOpener folderOpener,
         Func<string?> currentFilePath,
-        Func<ExternalToolSettings, Task> runConfiguredTool,
+        Func<ExternalToolSettings, string, Task> runConfiguredTool,
         Func<ExternalToolSettings, ExternalToolMenuState>? getToolState = null,
         Func<string, Task>? editDefinition = null,
         Func<string, Task>? showDefinitionInExplorer = null,

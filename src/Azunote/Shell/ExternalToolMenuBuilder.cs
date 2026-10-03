@@ -4,7 +4,8 @@ internal sealed record ExternalToolMenuEntry(
     string Name,
     ExternalToolSettings? Tool,
     ExternalToolMenuState? State,
-    IReadOnlyList<ExternalToolMenuEntry> Children)
+    IReadOnlyList<ExternalToolMenuEntry> Children,
+    string PromptTitle)
 {
     public bool IsTool => Tool is not null;
 }
@@ -24,10 +25,19 @@ internal static class ExternalToolMenuBuilder
         ArgumentNullException.ThrowIfNull(nodes);
         ArgumentNullException.ThrowIfNull(getState);
 
+        return Build(nodes, getState, target, []);
+    }
+
+    private static List<ExternalToolMenuEntry> Build(
+        IReadOnlyList<ExternalToolMenuNode> nodes,
+        Func<ExternalToolSettings, ExternalToolMenuState> getState,
+        ExternalToolMenuTarget target,
+        string[] parentPath)
+    {
         var entries = new List<ExternalToolMenuEntry>(nodes.Count);
         foreach (var node in nodes)
         {
-            var entry = BuildNode(node, getState, target);
+            var entry = BuildNode(node, getState, target, parentPath);
             if (entry is not null)
             {
                 entries.Add(entry);
@@ -101,10 +111,25 @@ internal static class ExternalToolMenuBuilder
         }
     }
 
+    public static IEnumerable<(ExternalToolSettings Tool, string PromptTitle)>
+        EnumerateToolsWithPromptTitle(IReadOnlyList<ExternalToolMenuNode> nodes)
+    {
+        ArgumentNullException.ThrowIfNull(nodes);
+
+        foreach (var node in nodes)
+        {
+            foreach (var tool in EnumerateToolsWithPromptTitle(node, []))
+            {
+                yield return tool;
+            }
+        }
+    }
+
     private static ExternalToolMenuEntry? BuildNode(
         ExternalToolMenuNode node,
         Func<ExternalToolSettings, ExternalToolMenuState> getState,
-        ExternalToolMenuTarget target)
+        ExternalToolMenuTarget target,
+        string[] parentPath)
     {
         ArgumentNullException.ThrowIfNull(node);
 
@@ -117,11 +142,12 @@ internal static class ExternalToolMenuBuilder
 
             var state = getState(tool);
             return state.IsVisible
-                ? new ExternalToolMenuEntry(node.Name, tool, state, [])
+                ? new ExternalToolMenuEntry(
+                    node.Name, tool, state, [], MenuTitle(parentPath, node.Name))
                 : null;
         }
 
-        var children = Build(node.Children, getState, target);
+        var children = Build(node.Children, getState, target, parentPath.Append(node.Name).ToArray());
         if (children.Count == 0)
         {
             return null;
@@ -134,10 +160,12 @@ internal static class ExternalToolMenuBuilder
                 $"{node.Name}: {child.Name}",
                 childTool,
                 child.State,
-                []);
+                [],
+                child.PromptTitle);
         }
 
-        return new ExternalToolMenuEntry(node.Name, null, null, children);
+        return new ExternalToolMenuEntry(
+            node.Name, null, null, children, string.Empty);
     }
 
     private static void AddFlatEntries(
@@ -162,7 +190,8 @@ internal static class ExternalToolMenuBuilder
                 var path = parentPath.Length == 0
                     ? node.Name
                     : string.Join(": ", parentPath.Append(node.Name));
-                entries.Add(new ExternalToolMenuEntry(path, tool, state, []));
+                entries.Add(new ExternalToolMenuEntry(
+                    path, tool, state, [], path));
             }
 
             return;
@@ -194,4 +223,28 @@ internal static class ExternalToolMenuBuilder
             }
         }
     }
+
+    private static IEnumerable<(ExternalToolSettings Tool, string PromptTitle)>
+        EnumerateToolsWithPromptTitle(ExternalToolMenuNode node, string[] parentPath)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+
+        if (node.Tool is { } tool)
+        {
+            yield return (tool, MenuTitle(parentPath, node.Name));
+            yield break;
+        }
+
+        var childPath = parentPath.Append(node.Name).ToArray();
+        foreach (var child in node.Children)
+        {
+            foreach (var toolWithTitle in EnumerateToolsWithPromptTitle(child, childPath))
+            {
+                yield return toolWithTitle;
+            }
+        }
+    }
+
+    private static string MenuTitle(string[] parentPath, string toolName) =>
+        parentPath.Length == 0 ? toolName : string.Join(": ", parentPath.Append(toolName));
 }

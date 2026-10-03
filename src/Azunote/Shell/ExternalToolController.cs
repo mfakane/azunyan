@@ -59,10 +59,12 @@ public sealed partial class ExternalToolController
 
     public async Task<ExternalToolResult> RunAsync(
         ExternalToolDefinition definition,
+        string? promptTitle = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(definition);
 
+        var inlineTitle = ResolvePromptTitle(definition, promptTitle);
         var editorSnapshot = EditorBufferSnapshot.Capture(_editor);
         var selection = editorSnapshot.Selection;
         var filePath = _documents.Session.State.FilePath;
@@ -75,6 +77,7 @@ public sealed partial class ExternalToolController
             if (definition.InputMode == ExternalToolInputMode.Prompt)
             {
                 promptedInput = await _prompt.PromptExternalToolInputAsync(
+                    inlineTitle,
                     definition.InputPrompt);
                 if (promptedInput is null)
                 {
@@ -112,35 +115,62 @@ public sealed partial class ExternalToolController
                 editorSnapshot.SelectionStart,
                 editorSnapshot.SelectionEnd,
                 languageExtensions: _languageExtensions());
-            if (promptedInput is not null)
+            while (true)
             {
-                context = context.WithInput(promptedInput);
-            }
+                cancellationToken.ThrowIfCancellationRequested();
+                var runContext = promptedInput is null
+                    ? context
+                    : context.WithInput(promptedInput);
+                using var streaming = ExternalToolStreamingRun.TryCreate(this, definition, selection);
+                ExternalToolResult result;
+                try
+                {
+                    result = await ExternalToolRunner.RunAsync(
+                        definition,
+                        runContext,
+                        _warmPool,
+                        streaming,
+                        cancellationToken);
+                    if (streaming is not null)
+                    {
+                        await streaming.FinishAsync(result.InvocationCount > 0);
+                    }
+                }
+                finally
+                {
+                    if (definition.InputMode == ExternalToolInputMode.Prompt
+                        && _editor is IEditorView promptEditorView)
+                    {
+                        promptEditorView.SetInlineChatProcessing(isProcessing: false);
+                    }
+                }
 
-            using var streaming = ExternalToolStreamingRun.TryCreate(this, definition, selection);
-            var result = await ExternalToolRunner.RunAsync(
-                definition,
-                context,
-                _warmPool,
-                streaming,
-                cancellationToken);
-            if (streaming is not null)
-            {
-                await streaming.FinishAsync(result.InvocationCount > 0);
-            }
+                var output = ExternalToolOutputInterpreter.Interpret(definition, result);
+                foreach (var action in output.Actions)
+                {
+                    await ApplyOutputActionAsync(
+                        action,
+                        selection,
+                        temporaryFilePath,
+                        filePath,
+                        cancellationToken);
+                }
 
-            var output = ExternalToolOutputInterpreter.Interpret(definition, result);
-            foreach (var action in output.Actions)
-            {
-                await ApplyOutputActionAsync(
-                    action,
-                    selection,
-                    temporaryFilePath,
-                    filePath,
-                    cancellationToken);
-            }
+                if (definition.InputMode != ExternalToolInputMode.Prompt
+                    || !output.Actions.Any(action =>
+                        action.Mode == ExternalToolOutputMode.ShowPromptResponse))
+                {
+                    return result;
+                }
 
-            return result;
+                promptedInput = await _prompt.PromptExternalToolInputAsync(
+                    inlineTitle,
+                    definition.InputPrompt);
+                if (promptedInput is null)
+                {
+                    return result;
+                }
+            }
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -151,6 +181,25 @@ public sealed partial class ExternalToolController
         {
             DeleteTemporaryFile(temporaryFilePath);
         }
+    }
+
+    private static string ResolvePromptTitle(
+        ExternalToolDefinition definition,
+        string? promptTitle)
+    {
+        if (!string.IsNullOrWhiteSpace(promptTitle))
+        {
+            return promptTitle;
+        }
+
+        var command = definition.FileName;
+        if (definition.CommandMode == ExternalToolCommandMode.Executable
+            && definition.Arguments.Length > 0)
+        {
+            command += " " + string.Join(" ", definition.Arguments);
+        }
+
+        return command;
     }
 
     private async Task ApplyOutputActionAsync(
@@ -200,6 +249,15 @@ public sealed partial class ExternalToolController
                     new CompletionResult(
                         new TextRange(_editor.CaretPosition, 0),
                         ExternalToolOutputInterpreter.CreateCompletionItems(action.Text)));
+                return;
+            case ExternalToolOutputMode.ShowPromptResponse:
+                if (_editor is not IEditorView promptEditorView)
+                {
+                    throw new InvalidOperationException(
+                        "The current editor does not support inline prompt responses.");
+                }
+
+                promptEditorView.AppendInlineChatResponse(action.Text);
                 return;
             default:
                 throw new InvalidOperationException($"Unsupported external-tool output mode: {action.Mode}.");

@@ -63,7 +63,9 @@ internal sealed class MainWindowRuntime : IDisposable
         {
             _view.SetDocument(document);
         }
-        _prompt = new WinUiUserPrompt(() => _view.XamlRoot);
+        _prompt = new WinUiUserPrompt(
+            () => _view.XamlRoot,
+            _view.PromptInlineChatAsync);
         _dispatcher = new DispatcherQueueUiDispatcher(_view.DispatcherQueue);
         var files = new TextFileStore();
         var documents = new DocumentController(_view, _session, files, _prompt);
@@ -220,12 +222,16 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public async Task<ExternalToolResult> RunExternalToolAsync(
         ExternalToolDefinition definition,
+        string? promptTitle = null,
         CancellationToken cancellationToken = default)
     {
         UpdateRunningExternalToolCount(1);
         try
         {
-            return await _documents.RunExternalToolAsync(definition, cancellationToken);
+            return await _documents.RunExternalToolAsync(
+                definition,
+                promptTitle,
+                cancellationToken);
         }
         finally
         {
@@ -589,7 +595,9 @@ internal sealed class MainWindowRuntime : IDisposable
         }
     }
 
-    private async Task RunConfiguredExternalToolAsync(ExternalToolSettings tool)
+    private async Task RunConfiguredExternalToolAsync(
+        ExternalToolSettings tool,
+        string promptTitle)
     {
         try
         {
@@ -603,7 +611,8 @@ internal sealed class MainWindowRuntime : IDisposable
                 return;
             }
 
-            await RunExternalToolAsync(tool.ToDefinition());
+            await RunExternalToolAsync(
+                tool.ToDefinition(), promptTitle: promptTitle);
         }
         catch (OperationCanceledException)
         {

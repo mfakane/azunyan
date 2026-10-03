@@ -309,7 +309,7 @@ public sealed class DocumentControllerTests
 
         public ExternalChangeDecision ExternalDecision { get; set; } = ExternalChangeDecision.Reload;
 
-        public Task<string?> PromptExternalToolInputAsync(string placeholder) =>
+        public Task<string?> PromptExternalToolInputAsync(string title, string placeholder) =>
             Task.FromResult<string?>(null);
 
         public Task<PendingChangesDecision> ConfirmPendingChangesAsync() =>

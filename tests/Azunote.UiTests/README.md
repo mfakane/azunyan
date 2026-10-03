@@ -59,8 +59,9 @@ reacquiring items because other tools can change visibility and rebuild the menu
 The filesystem test creates, edits and deletes `.env` in a separate temporary document
 directory, outside the settings watcher. It verifies that an open menu updates without
 editor input and retains the item's UI Automation runtime ID for enabled-only changes.
-No external command is executed. To exercise the Native AOT build, set `AZUNOTE_EXE` to
-its executable.
+The inline-prompt test runs a uniquely named `echo` command to verify Enter submission
+and response display. To exercise the Native AOT build, set `AZUNOTE_EXE` to its
+executable.
 
 The current tests verify that the projected editor exposes TextPattern and a read/write
 ValuePattern, reports geometry for empty caret ranges, keeps ranges bound to the snapshot

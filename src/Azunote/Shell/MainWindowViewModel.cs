@@ -347,7 +347,7 @@ internal sealed class MainWindowViewModel :
     public void SetExternalToolItems(
         IReadOnlyList<ExternalToolMenuNode> nodes,
         Func<ExternalToolSettings, ExternalToolMenuState> getState,
-        Func<ExternalToolSettings, Task> onSelected,
+        Func<ExternalToolSettings, string, Task> onSelected,
         Func<string, Task> onEditDefinition,
         Func<string, Task> onShowInExplorer)
     {
@@ -364,14 +364,14 @@ internal sealed class MainWindowViewModel :
 
     private ExternalToolMenuItemViewModel CreateExternalToolItem(
         ExternalToolMenuEntry entry,
-        Func<ExternalToolSettings, Task> onSelected,
+        Func<ExternalToolSettings, string, Task> onSelected,
         Func<string, Task> onEditDefinition,
         Func<string, Task> onShowInExplorer) =>
         new(
             entry.Name,
             entry.Tool,
             entry.State,
-            entry.Tool is { } tool ? Async(() => onSelected(tool)) : null,
+            entry.Tool is { } tool ? Async(() => onSelected(tool, entry.PromptTitle)) : null,
             entry.Tool?.DefinitionPath is { } path ? Async(() => onEditDefinition(path)) : null,
             entry.Tool?.DefinitionPath is { } definitionPath ? Async(() => onShowInExplorer(definitionPath)) : null,
             entry.Children.Select(child => CreateExternalToolItem(

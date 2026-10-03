@@ -32,8 +32,9 @@ public static class ExternalToolStreaming
     /// <summary>
     /// Whether an action can be applied before the tool has exited.
     /// <see cref="ExternalToolOutputMode.ReloadFile"/> has no output to apply,
-    /// and <see cref="ExternalToolOutputMode.ShowCompletion"/> needs the whole
-    /// candidate list before it opens a window.
+    /// and <see cref="ExternalToolOutputMode.ShowCompletion"/> or
+    /// <see cref="ExternalToolOutputMode.ShowPromptResponse"/> needs the whole
+    /// result before it updates its UI.
     /// </summary>
     public static bool IsStreamable(ExternalToolOutputMode mode) =>
         mode is ExternalToolOutputMode.ReplaceDocument

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows.Automation;
 using System.Windows.Automation.Text;
 using Xunit;
@@ -70,6 +71,91 @@ public sealed class AzunoteUiTests : IDisposable
             window,
             AutomationElement.AutomationIdProperty,
             "InputModeBox");
+    }
+
+    [AzunoteUiFact]
+    public void Inline_prompt_accepts_multiple_messages_and_shows_each_tool_response()
+    {
+        var tools = Path.Combine(Path.GetDirectoryName(AzunoteUiFixture.ResolveExecutablePath())!, "appdata", "tools");
+        Directory.CreateDirectory(tools);
+        var suffix = Guid.NewGuid().ToString("N");
+        var name = "Inline prompt Enter test " + suffix;
+        var definition = Path.Combine(tools, name + ".tool.toml");
+        File.WriteAllText(definition, $$"""
+            name = "{{name}}"
+            visibility = "always"
+            [launch]
+            cmd = "timeout /t 2 /nobreak > nul & echo ResponseFromTool"
+            input = "prompt:Type a message"
+            stdout = "showPromptResponse"
+            """);
+        try
+        {
+            var window = _fixture.Window;
+            AzunoteUiFixture.InvokeMenuItem(window, "Tools", name);
+
+            var input = AzunoteUiFixture.WaitForElement(
+                window,
+                AutomationElement.AutomationIdProperty,
+                "InlinePromptInput");
+            var value = (ValuePattern)input.GetCurrentPattern(ValuePattern.Pattern);
+            const string firstMessage = "FirstSubmissionCheck";
+            value.SetValue(firstMessage);
+            input.SetFocus();
+            SendEnterKey();
+
+            Assert.True(input.Current.IsEnabled);
+            var sendButton = AzunoteUiFixture.WaitForElement(
+                window,
+                AutomationElement.AutomationIdProperty,
+                "InlinePromptSendButton");
+            AzunoteUiFixture.WaitFor(
+                () => sendButton.Current.Name == "Processing" ? sendButton : null,
+                "The send button did not show its processing indicator.");
+            const string secondMessage = "SecondSubmissionCheck";
+            value.SetValue(secondMessage);
+            Assert.Equal(secondMessage, value.Current.Value);
+
+            AzunoteUiFixture.WaitFor(
+                () => CountElementsWhoseNameContains(window, "External tool") >= 1
+                    ? window
+                    : null,
+            "The first inline-prompt response was not displayed.");
+
+            AzunoteUiFixture.WaitFor(
+                () => sendButton.Current.IsEnabled ? sendButton : null,
+                "The send button did not re-enable after the first tool response.");
+            Assert.Equal(secondMessage, value.Current.Value);
+            input.SetFocus();
+            SendEnterKey();
+            AzunoteUiFixture.WaitFor(
+                () => sendButton.Current.Name == "Processing" ? sendButton : null,
+                "The send button did not show processing for the second message.");
+            AzunoteUiFixture.WaitForElement(
+                window,
+                AutomationElement.NameProperty,
+                secondMessage);
+            AzunoteUiFixture.WaitFor(
+                () => CountElementsWhoseNameContains(window, "External tool") >= 2
+                    ? window
+                    : null,
+                "The second inline-prompt response was not displayed.");
+
+            var cancel = AzunoteUiFixture.WaitForElement(
+                window,
+                AutomationElement.NameProperty,
+                "Cancel");
+            ((InvokePattern)cancel.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
+            AzunoteUiFixture.WaitForElementHidden(
+                window,
+                AutomationElement.AutomationIdProperty,
+                "InlinePromptInput");
+        }
+        finally
+        {
+            _fixture.Dispose();
+            File.Delete(definition);
+        }
     }
 
     [AzunoteUiFact]
@@ -589,6 +675,80 @@ public sealed class AzunoteUiTests : IDisposable
                 return selectedItems == 1 ? window : null;
             },
             "The active window did not have exactly one checked document in the Window menu.");
+    }
+
+    private static void SendEnterKey()
+    {
+        var input = new[]
+        {
+            new NativeInput
+            {
+                Type = 1,
+                Data = new InputUnion
+                {
+                    Keyboard = new KeyboardInput { VirtualKey = 0x0D }
+                }
+            },
+            new NativeInput
+            {
+                Type = 1,
+                Data = new InputUnion
+                {
+                    Keyboard = new KeyboardInput { VirtualKey = 0x0D, Flags = 0x0002 }
+                }
+            }
+        };
+
+        Assert.Equal((uint)input.Length, SendInput((uint)input.Length, input, Marshal.SizeOf<NativeInput>()));
+    }
+
+    private static int CountElementsWhoseNameContains(AutomationElement root, string value)
+    {
+        var elements = root.FindAll(TreeScope.Descendants, Condition.TrueCondition);
+        var count = 0;
+        foreach (AutomationElement element in elements)
+        {
+            try
+            {
+                if (element.Current.Name.Contains(value, StringComparison.Ordinal))
+                {
+                    count++;
+                }
+            }
+            catch (ElementNotAvailableException)
+            {
+                // A transcript element can be replaced while the chat updates.
+            }
+        }
+
+        return count;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint SendInput(uint count, NativeInput[] inputs, int size);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeInput
+    {
+        public uint Type;
+        public InputUnion Data;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size = 32)]
+    private struct InputUnion
+    {
+        [FieldOffset(0)]
+        public KeyboardInput Keyboard;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct KeyboardInput
+    {
+        public ushort VirtualKey;
+        public ushort ScanCode;
+        public uint Flags;
+        public uint Time;
+        public UIntPtr ExtraInfo;
     }
 }
 

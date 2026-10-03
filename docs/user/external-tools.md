@@ -128,10 +128,21 @@ The defaults are:
   zero and non-zero exit codes.
 - `stream` is empty, so every channel is applied after the tool exits.
 
-Use `prompt:<placeholder>` to show a multiline input box when the tool is run.
-The placeholder is displayed in the box; canceling the prompt skips the tool.
-The entered value becomes `${input}` and is sent to standard input only when
-`stdin` references it:
+Use `prompt:<placeholder>` to open a speech-bubble-style inline chat anchored
+to the end of the current selection, or to the caret when there is no
+selection. The bubble moves above the anchor when there is not enough room
+below. The placeholder is displayed in the input area. Press Enter or click ↑
+to send, or use Shift+Enter to insert a newline. Canceling before the first
+message skips the tool. While the tool runs, the input stays editable so you
+can draft another message; the send button shows a spinner. When the output
+uses `showPromptResponse`, each response is appended to the chat and the next
+message can be sent. Canceling after a response ends the conversation. Each
+message becomes `${input}` and is sent to standard input only when `stdin`
+references it:
+
+Chat entries are selectable. Each entry has a Copy button and an Insert button;
+Insert replaces the current editor selection, or inserts at the caret when
+there is no selection.
 
 ```toml
 [launch]
@@ -295,11 +306,14 @@ after the tool finishes.
 `output`, `stdout`, and `stderr` accept one action or an array of two actions.
 An array is ordered `[zero-exit-action, non-zero-exit-action]`; a single action
 is used for both exit statuses. All three fields support `ignore`,
-`replaceDocument`, `replaceSelection`, `newDocument`, `reloadFile`, and
-`showCompletion`.
+`replaceDocument`, `replaceSelection`, `newDocument`, `reloadFile`,
+`showCompletion`, and `showPromptResponse`.
 
 `showCompletion` treats each non-empty output line as one completion candidate
 and opens the completion window. Empty and whitespace-only lines are ignored.
+`showPromptResponse` appends the output to the inline chat opened by a prompt
+input, or opens the chat near the selection or caret if there is no prompt
+input.
 
 Shortcuts are available regardless of whether the tool is shown in the Tools
 menu, the context menu, or both.
@@ -334,9 +348,9 @@ to do, not only when its output appears:
   cannot choose its action by exit status. A streamed channel's action must be
   a single action rather than a `[zero, non-zero]` array.
 - Only `replaceDocument`, `replaceSelection`, and `newDocument` can stream.
-  `reloadFile` has no output to apply, and `showCompletion` needs the whole
-  candidate list before it opens a window; `stream` naming a channel that uses
-  either of them is an error.
+  `reloadFile` has no output to apply, while `showCompletion` and
+  `showPromptResponse` need the whole result before updating their UI; `stream`
+  naming a channel that uses any of these is an error.
 - `output` carries the same text as `stdout` and `stderr`, so `stream` may name
   `output`, or `stdout` and `stderr`, but not both at once.
 - Two streamed channels may not use the same action, since their text would be

@@ -232,7 +232,7 @@ public static class AzunoteSchemaCatalog
         new(
             name,
             AzunoteSchemaValueKind.Enum,
-            AllowedValues: ["ignore", "replaceDocument", "replaceSelection", "newDocument", "reloadFile", "showCompletion"],
+            AllowedValues: ["ignore", "replaceDocument", "replaceSelection", "newDocument", "reloadFile", "showCompletion", "showPromptResponse"],
             Documentation: "An action or [zero-action, non-zero-action].");
 
     private static AzunoteSchemaField EnumField(

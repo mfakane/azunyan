@@ -65,6 +65,12 @@ internal interface IEditorView : IEditorBuffer
 
     void ShowCompletion(CompletionResult completions);
 
+    Task<string?> PromptInlineChatAsync(string title, string placeholder);
+
+    void SetInlineChatProcessing(bool isProcessing);
+
+    void AppendInlineChatResponse(string response);
+
     void ApplyLanguage(EditorLanguageConfiguration configuration);
 
     void SetFontFamily(string fontFamily);
@@ -192,7 +198,7 @@ internal interface IExternalToolMenuView
     void Render(
         IReadOnlyList<ExternalToolMenuNode> nodes,
         Func<ExternalToolSettings, ExternalToolMenuState> getState,
-        Func<ExternalToolSettings, Task> onSelected,
+        Func<ExternalToolSettings, string, Task> onSelected,
         Func<string, Task> onEditDefinition,
         Func<string, Task> onShowInExplorer);
 }

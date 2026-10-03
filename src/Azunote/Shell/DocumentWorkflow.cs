@@ -266,6 +266,7 @@ internal sealed class DocumentWorkflow : IDisposable
 
     public async Task<ExternalToolResult> RunExternalToolAsync(
         ExternalToolDefinition definition,
+        string? promptTitle = null,
         CancellationToken cancellationToken = default)
     {
         if (_documents.Session.State.IsReadOnly)
@@ -275,7 +276,7 @@ internal sealed class DocumentWorkflow : IDisposable
         StopFileWatcher();
         try
         {
-            return await _externalTools.RunAsync(definition, cancellationToken);
+            return await _externalTools.RunAsync(definition, promptTitle, cancellationToken);
         }
         finally
         {

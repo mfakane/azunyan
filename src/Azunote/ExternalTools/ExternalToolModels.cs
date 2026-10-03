@@ -33,7 +33,8 @@ public enum ExternalToolOutputMode
     ReplaceSelection,
     NewDocument,
     ReloadFile,
-    ShowCompletion
+    ShowCompletion,
+    ShowPromptResponse
 }
 
 public sealed record ExternalToolPer(

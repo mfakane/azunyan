@@ -53,6 +53,8 @@ internal sealed class FakeEditorView : IEditorView
 
     public CompletionResult? LastCompletion { get; private set; }
 
+    public List<string> InlineChatResponses { get; } = [];
+
     public void SetText(string text)
     {
         _document.Changed -= OnDocumentChanged;
@@ -106,6 +108,15 @@ internal sealed class FakeEditorView : IEditorView
     }
 
     public void ShowCompletion(CompletionResult completions) => LastCompletion = completions;
+
+    public Task<string?> PromptInlineChatAsync(string title, string placeholder) => Task.FromResult<string?>(null);
+
+    public bool IsInlineChatProcessing { get; private set; }
+
+    public void SetInlineChatProcessing(bool isProcessing) =>
+        IsInlineChatProcessing = isProcessing;
+
+    public void AppendInlineChatResponse(string response) => InlineChatResponses.Add(response);
 
     public void ApplyLanguage(EditorLanguageConfiguration configuration) =>
         LanguageConfiguration = configuration;
@@ -284,7 +295,7 @@ internal sealed class FakeExternalToolMenuView : IExternalToolMenuView
     public void Render(
         IReadOnlyList<ExternalToolMenuNode> nodes,
         Func<ExternalToolSettings, ExternalToolMenuState> getState,
-        Func<ExternalToolSettings, Task> onSelected,
+        Func<ExternalToolSettings, string, Task> onSelected,
         Func<string, Task> onEditDefinition,
         Func<string, Task> onShowInExplorer)
     {
@@ -401,7 +412,7 @@ internal sealed class FakeUserPrompt : IUserPrompt
         return Task.FromResult(ExternalDecision);
     }
 
-    public Task<string?> PromptExternalToolInputAsync(string placeholder) =>
+    public Task<string?> PromptExternalToolInputAsync(string title, string placeholder) =>
         Task.FromResult(ExternalToolInput);
 
     public Task ShowErrorAsync(string title, string message)

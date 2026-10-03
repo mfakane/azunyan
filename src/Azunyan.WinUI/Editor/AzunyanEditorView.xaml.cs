@@ -114,6 +114,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     public AzunyanEditorView()
     {
         InitializeComponent();
+        InlinePromptChatPanel.SendRequested += (_, _) => SubmitInlinePrompt();
+        InlinePromptChatPanel.DismissRequested += (_, _) => DismissInlineChat();
+        InlinePromptChatPanel.InsertRequested += InsertInlineChatEntry;
         _colorScheme = AzunyanColorScheme.Default;
         _defaultRenderer = new AzunyanEditorRenderer(
             GutterDrawingSurface,

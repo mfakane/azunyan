@@ -104,7 +104,7 @@ public interface IUserPrompt
 
     Task<ExternalChangeDecision> ResolveExternalChangeAsync();
 
-    Task<string?> PromptExternalToolInputAsync(string placeholder);
+    Task<string?> PromptExternalToolInputAsync(string title, string placeholder);
 
     Task ShowErrorAsync(string title, string message);
 }

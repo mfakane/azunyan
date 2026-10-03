@@ -89,7 +89,7 @@ public sealed class SettingsWorkflowTests
                 prompt ?? new FakeUserPrompt(),
                 new FakeSettingsFolderOpener(),
                 () => null,
-                _ => Task.CompletedTask);
+                (_, _) => Task.CompletedTask);
         }
 
         /// <summary>Reports a change the way the watcher would, and waits for

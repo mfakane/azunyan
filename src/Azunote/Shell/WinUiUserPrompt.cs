@@ -6,10 +6,15 @@ namespace Azunote;
 internal sealed class WinUiUserPrompt : IUserPrompt
 {
     private readonly Func<XamlRoot?> _xamlRoot;
+    private readonly Func<string, string, Task<string?>> _promptInlineChat;
 
-    public WinUiUserPrompt(Func<XamlRoot?> xamlRoot)
+    public WinUiUserPrompt(
+        Func<XamlRoot?> xamlRoot,
+        Func<string, string, Task<string?>> promptInlineChat)
     {
         _xamlRoot = xamlRoot ?? throw new ArgumentNullException(nameof(xamlRoot));
+        _promptInlineChat = promptInlineChat
+            ?? throw new ArgumentNullException(nameof(promptInlineChat));
     }
 
     public async Task<PendingChangesDecision> ConfirmPendingChangesAsync()
@@ -52,32 +57,8 @@ internal sealed class WinUiUserPrompt : IUserPrompt
         };
     }
 
-    public async Task<string?> PromptExternalToolInputAsync(string placeholder)
-    {
-        var input = new TextBox
-        {
-            AcceptsReturn = true,
-            MinHeight = 112,
-            MaxHeight = 240,
-            PlaceholderText = placeholder,
-            TextWrapping = TextWrapping.Wrap
-        };
-        input.Loaded += (_, _) => input.Focus(FocusState.Programmatic);
-
-        var dialog = new ContentDialog
-        {
-            Title = "External tool input",
-            Content = input,
-            PrimaryButtonText = "Run",
-            CloseButtonText = "Cancel",
-            DefaultButton = ContentDialogButton.Primary,
-            XamlRoot = _xamlRoot()
-        };
-
-        return await dialog.ShowAsync() == ContentDialogResult.Primary
-            ? input.Text
-            : null;
-    }
+    public Task<string?> PromptExternalToolInputAsync(string title, string placeholder) =>
+        _promptInlineChat(title, placeholder);
 
     public async Task ShowErrorAsync(string title, string message)
     {
