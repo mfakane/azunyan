@@ -10,6 +10,7 @@ public sealed partial class AzunyanEditorView
 {
     private const double InlineChatShadowClearance = 16;
     private const double InlineChatViewportPadding = 8;
+    private const double InlineChatTailCenterFromLeft = 24;
     private TaskCompletionSource<ExternalToolPromptInput?>? _inlinePromptSubmission;
     private bool? _inlineChatPointAbove;
     private bool _inlineChatPositionUpdateQueued;
@@ -265,12 +266,12 @@ public sealed partial class AzunyanEditorView
         }
 
         var anchorX = inputOrigin.X + caretRect.X;
-        var minX = horizontalInset;
+        var minX = -GutterColumn.ActualWidth + horizontalInset;
         var maxX = Math.Max(
             minX,
             EditorHost.ActualWidth - InlinePromptChatPanel.BubbleWidth - horizontalInset);
         var x = Math.Clamp(
-            anchorX - InlinePromptChatPanel.BubbleWidth / 2,
+            anchorX - InlineChatTailCenterFromLeft,
             minX,
             maxX);
         InlinePromptPopup.HorizontalOffset = x;
