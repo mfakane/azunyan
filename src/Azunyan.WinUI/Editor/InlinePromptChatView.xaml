@@ -28,20 +28,29 @@
                         <StackPanel
                             Grid.Column="1"
                             Orientation="Horizontal"
+                            Padding="0,-4"
                             Spacing="4"
                             HorizontalAlignment="Right">
                             <Button
-                                Content="Insert"
-                                Padding="8,2"
                                 IsEnabled="{x:Bind CanInsert}"
                                 AutomationProperties.Name="Insert this entry into the editor selection"
+                                Padding="4"
                                 ToolTipService.ToolTip="Replace the editor selection, or insert at the caret"
-                                Click="InlinePromptInsertButton_Click" />
+                                Style="{StaticResource SubtleButtonStyle}"
+                                Click="InlinePromptInsertButton_Click">
+                                <FontIcon
+                                    Glyph="&#xEDE1;"
+                                    FontSize="14" />
+                            </Button>
                             <Button
-                                Content="Copy"
-                                Padding="8,2"
                                 AutomationProperties.Name="Copy this entry"
-                                Click="InlinePromptCopyButton_Click" />
+                                Padding="4"
+                                Style="{StaticResource SubtleButtonStyle}"
+                                Click="InlinePromptCopyButton_Click">
+                                <FontIcon
+                                    Glyph="&#xE8C8;"
+                                    FontSize="14" />
+                            </Button>
                         </StackPanel>
                         <TextBlock
                             Text="{x:Bind Text, Mode=OneWay}"
@@ -71,7 +80,8 @@
             MaxWidth="680"
             Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}"
             BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}"
-            BorderThickness="1,1,1,0"
+            BorderThickness="1"
+            Margin="0,0,0,1"
             CornerRadius="4,4,0,0">
             <Grid>
                 <Grid.RowDefinitions>
@@ -107,7 +117,7 @@
                     </ItemsControl>
                 </ScrollViewer>
                 <Grid Grid.Row="2"
-                      Margin="-1,-1,-1,0">
+                      Margin="-1">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
