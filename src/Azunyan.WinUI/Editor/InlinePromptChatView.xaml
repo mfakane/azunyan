@@ -193,6 +193,7 @@
         <Path
             x:Name="InlinePromptTopTailFill"
             Grid.Row="0"
+            Margin="0,-1,0,0"
             Width="18"
             Height="9"
             HorizontalAlignment="Left"
@@ -205,6 +206,7 @@
         <Path
             x:Name="InlinePromptTopTailOutline"
             Grid.Row="0"
+            Margin="0,-1,0,0"
             Width="18"
             Height="9"
             HorizontalAlignment="Left"
@@ -218,6 +220,7 @@
         <Path
             x:Name="InlinePromptBottomTailFill"
             Grid.Row="2"
+            Margin="0,0,0,-1"
             Width="18"
             Height="9"
             HorizontalAlignment="Left"
@@ -232,6 +235,7 @@
         <Path
             x:Name="InlinePromptBottomTailOutline"
             Grid.Row="2"
+            Margin="0,0,0,-1"
             Width="18"
             Height="9"
             HorizontalAlignment="Left"

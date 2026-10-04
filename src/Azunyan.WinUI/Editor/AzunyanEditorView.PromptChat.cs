@@ -1,7 +1,7 @@
 using Azunyan.Core;
-using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using Windows.Foundation;
 
 namespace Azunyan.WinUI;
@@ -13,6 +13,10 @@ public sealed partial class AzunyanEditorView
     private const double InlineChatTailCenterFromLeft = 24;
     private TaskCompletionSource<ExternalToolPromptInput?>? _inlinePromptSubmission;
     private bool? _inlineChatPointAbove;
+    private double? _inlineChatBubbleX;
+    private TextSnapshot? _inlineChatRenderedSnapshot;
+    private DocumentAnchor _inlineChatRenderedCaretAnchor;
+    private bool _inlineChatHasRenderedCaret;
     private bool _inlineChatPositionUpdateQueued;
 
     /// <summary>
@@ -33,6 +37,7 @@ public sealed partial class AzunyanEditorView
         }
 
         _inlineChatPointAbove = null;
+        _inlineChatBubbleX = null;
         var sameConversation = InlinePromptChatPanel.IsActiveConversation(conversationKey);
         InlinePromptChatPanel.PreparePrompt(
             conversationKey,
@@ -132,6 +137,7 @@ public sealed partial class AzunyanEditorView
         {
             InlinePromptChatPanel.ActivateConversation(conversationKey);
             _inlineChatPointAbove = null;
+            _inlineChatBubbleX = null;
         }
 
         if (!InlinePromptChatPanel.IsActiveConversation(conversationKey))
@@ -196,6 +202,7 @@ public sealed partial class AzunyanEditorView
         var pendingSubmission = _inlinePromptSubmission;
         _inlinePromptSubmission = null;
         _inlineChatPointAbove = null;
+        _inlineChatBubbleX = null;
         InlinePromptPopup.IsOpen = false;
         InlinePromptChatPanel.CloseConversation();
         InlinePromptChatPanel.FinishPrompt();
@@ -216,17 +223,23 @@ public sealed partial class AzunyanEditorView
 
     private void QueueInlineChatPopupPositionUpdate()
     {
-        if (_inlineChatPositionUpdateQueued)
+        if (!InlinePromptPopup.IsOpen || _inlineChatPositionUpdateQueued)
         {
             return;
         }
 
         _inlineChatPositionUpdateQueued = true;
-        if (!DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
-            {
-                _inlineChatPositionUpdateQueued = false;
-                UpdateInlineChatPopupPosition();
-            }))
+        CompositionTarget.Rendering += OnInlineChatRendering;
+    }
+
+    private void OnInlineChatRendering(object? sender, object args)
+    {
+        CompositionTarget.Rendering -= OnInlineChatRendering;
+        try
+        {
+            UpdateInlineChatPopupPosition();
+        }
+        finally
         {
             _inlineChatPositionUpdateQueued = false;
         }
@@ -240,12 +253,35 @@ public sealed partial class AzunyanEditorView
         }
 
         var anchor = Document.CaretSet.Primary.CaretAnchor;
+        if (_renderer is not null
+            && (!_inlineChatHasRenderedCaret
+                || !ReferenceEquals(_inlineChatRenderedSnapshot, Snapshot)
+                || !_inlineChatRenderedCaretAnchor.Equals(anchor)))
+        {
+            // A document change can queue this before its renderer pass. Keep
+            // the last aligned position until the matching caret geometry exists.
+            return;
+        }
+
+        var rasterizationScale = XamlRoot?.RasterizationScale ?? 1;
+        if (!double.IsFinite(rasterizationScale) || rasterizationScale <= 0)
+        {
+            rasterizationScale = 1;
+        }
+
         var inputOrigin = ProjectedSurfaceHost.TransformToVisual(EditorHost)
             .TransformPoint(new Point(0, 0));
         if (!TryGetRendererCaretRect(anchor, out var caretRect))
         {
-            InlinePromptPopup.HorizontalOffset = inputOrigin.X + InlineChatViewportPadding;
-            InlinePromptPopup.VerticalOffset = inputOrigin.Y + InlineChatViewportPadding;
+            _inlineChatBubbleX = null;
+            SetPopupOffset(
+                horizontal: true,
+                inputOrigin.X + InlineChatViewportPadding,
+                rasterizationScale);
+            SetPopupOffset(
+                horizontal: false,
+                inputOrigin.Y + InlineChatViewportPadding,
+                rasterizationScale);
             InlinePromptChatPanel.SetCalloutTail(
                 pointAbove: false,
                 showTail: false,
@@ -270,16 +306,29 @@ public sealed partial class AzunyanEditorView
         var maxX = Math.Max(
             minX,
             EditorHost.ActualWidth - InlinePromptChatPanel.BubbleWidth - horizontalInset);
-        var x = Math.Clamp(
-            anchorX - InlineChatTailCenterFromLeft,
-            minX,
-            maxX);
-        InlinePromptPopup.HorizontalOffset = x;
+        var maxTailOffset = Math.Max(0, InlinePromptChatPanel.BubbleWidth - 18);
+        var minXForTail = anchorX - maxTailOffset - 9;
+        var maxXForTail = anchorX - 9;
+        var tailCanStayAligned = minXForTail <= maxX && maxXForTail >= minX;
+        var minAlignedX = tailCanStayAligned
+            ? Math.Max(minX, minXForTail)
+            : minX;
+        var maxAlignedX = tailCanStayAligned
+            ? Math.Min(maxX, maxXForTail)
+            : maxX;
+        var previousX = _inlineChatBubbleX ?? (anchorX - InlineChatTailCenterFromLeft);
+        var x = SnapToPhysicalPixel(
+            Math.Clamp(previousX, minAlignedX, maxAlignedX),
+            rasterizationScale);
+        _inlineChatBubbleX = x;
+        SetPopupOffset(horizontal: true, x, rasterizationScale);
 
-        var tailOffset = Math.Clamp(
-            anchorX - x - 9,
-            0,
-            Math.Max(0, InlinePromptChatPanel.BubbleWidth - 18));
+        var tailOffset = SnapToPhysicalPixel(
+            Math.Clamp(
+                anchorX - x - 9,
+                0,
+                Math.Max(0, InlinePromptChatPanel.BubbleWidth - 18)),
+            rasterizationScale);
         var belowY = inputOrigin.Y + caretRect.Y + caretRect.Height + 2;
         var bubbleHeight = InlinePromptChatPanel.BubbleHeight;
         var aboveY = inputOrigin.Y + caretRect.Y - bubbleHeight - 2;
@@ -318,6 +367,31 @@ public sealed partial class AzunyanEditorView
         }
 
         var y = pointAbove ? aboveY : belowY;
-        InlinePromptPopup.VerticalOffset = y;
+        SetPopupOffset(horizontal: false, y, rasterizationScale);
     }
+
+    private void SetPopupOffset(bool horizontal, double value, double rasterizationScale)
+    {
+        var offset = SnapToPhysicalPixel(value, rasterizationScale);
+        var currentOffset = horizontal
+            ? InlinePromptPopup.HorizontalOffset
+            : InlinePromptPopup.VerticalOffset;
+        if (double.IsFinite(currentOffset) && Math.Abs(currentOffset - offset) < 0.001)
+        {
+            return;
+        }
+
+        if (horizontal)
+        {
+            InlinePromptPopup.HorizontalOffset = offset;
+        }
+        else
+        {
+            InlinePromptPopup.VerticalOffset = offset;
+        }
+    }
+
+    private static double SnapToPhysicalPixel(double value, double rasterizationScale) =>
+        Math.Round(value * rasterizationScale, MidpointRounding.AwayFromZero)
+        / rasterizationScale;
 }

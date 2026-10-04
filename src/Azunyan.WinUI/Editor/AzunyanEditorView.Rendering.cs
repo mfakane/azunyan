@@ -112,10 +112,12 @@ public sealed partial class AzunyanEditorView
         TextRenderLayer.Children.Clear();
         RenderOverlay.Children.Clear();
 
+        var frameSnapshot = Snapshot;
+        var frameCaretAnchor = Document.CaretSet.Primary.CaretAnchor;
         var frame = new AzunyanEditorRenderFrame(
-            Snapshot,
+            frameSnapshot,
             Document.Selection,
-            Document.CaretSet.Primary.CaretAnchor,
+            frameCaretAnchor,
             _blockSelection,
             Document.CaretSet.Count > 1 ? Document.CaretSet : null,
             CompositionRange,
@@ -148,6 +150,18 @@ public sealed partial class AzunyanEditorView
                 message);
         }
         _renderer?.Render(frame);
+        _inlineChatHasRenderedCaret = _renderer is not null;
+        if (_renderer is not null)
+        {
+            _inlineChatRenderedSnapshot = frameSnapshot;
+            _inlineChatRenderedCaretAnchor = frameCaretAnchor;
+        }
+
+        if (InlinePromptPopup.IsOpen)
+        {
+            UpdateInlineChatPopupPosition();
+        }
+
         if (TryGetRendererCaretRect(
                 Document.CaretSet.Primary.CaretAnchor,
                 out var caretRect))

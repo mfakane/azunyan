@@ -393,20 +393,39 @@ public sealed partial class InlinePromptChatView : UserControl
 
     public void SetCalloutTail(bool pointAbove, bool showTail, double horizontalOffset)
     {
-        InlinePromptTopTailFill.Visibility = showTail && !pointAbove
+        var topTailVisibility = showTail && !pointAbove
             ? Visibility.Visible
             : Visibility.Collapsed;
-        InlinePromptTopTailOutline.Visibility = InlinePromptTopTailFill.Visibility;
-        InlinePromptBottomTailFill.Visibility = showTail && pointAbove
+        var bottomTailVisibility = showTail && pointAbove
             ? Visibility.Visible
             : Visibility.Collapsed;
-        InlinePromptBottomTailOutline.Visibility = InlinePromptBottomTailFill.Visibility;
+        if (InlinePromptTopTailFill.Visibility != topTailVisibility)
+        {
+            InlinePromptTopTailFill.Visibility = topTailVisibility;
+            InlinePromptTopTailOutline.Visibility = topTailVisibility;
+        }
 
-        var margin = new Thickness(horizontalOffset, pointAbove ? 0 : -1, 0, pointAbove ? -1 : 0);
-        InlinePromptTopTailFill.Margin = margin;
-        InlinePromptTopTailOutline.Margin = margin;
-        InlinePromptBottomTailFill.Margin = margin;
-        InlinePromptBottomTailOutline.Margin = margin;
+        if (InlinePromptBottomTailFill.Visibility != bottomTailVisibility)
+        {
+            InlinePromptBottomTailFill.Visibility = bottomTailVisibility;
+            InlinePromptBottomTailOutline.Visibility = bottomTailVisibility;
+        }
+
+        SetTailHorizontalOffset(InlinePromptTopTailFill, horizontalOffset);
+        SetTailHorizontalOffset(InlinePromptTopTailOutline, horizontalOffset);
+        SetTailHorizontalOffset(InlinePromptBottomTailFill, horizontalOffset);
+        SetTailHorizontalOffset(InlinePromptBottomTailOutline, horizontalOffset);
+    }
+
+    private static void SetTailHorizontalOffset(
+        Microsoft.UI.Xaml.Shapes.Path tail,
+        double horizontalOffset)
+    {
+        if (tail.RenderTransform is Microsoft.UI.Xaml.Media.TranslateTransform transform
+            && Math.Abs(transform.X - horizontalOffset) >= 0.001)
+        {
+            transform.X = horizontalOffset;
+        }
     }
 
     private void InlinePromptInput_BeforeKeyDown(object sender, KeyRoutedEventArgs args)
