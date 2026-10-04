@@ -117,6 +117,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         InlinePromptChatPanel.SendRequested += (_, _) => SubmitInlinePrompt();
         InlinePromptChatPanel.DismissRequested += (_, _) => DismissInlineChat();
         InlinePromptChatPanel.InsertRequested += InsertInlineChatEntry;
+        InlinePromptChatPanel.SizeChanged += (_, _) => QueueInlineChatPopupPositionUpdate();
         _colorScheme = AzunyanColorScheme.Default;
         _defaultRenderer = new AzunyanEditorRenderer(
             GutterDrawingSurface,
@@ -1938,6 +1939,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     private void OnDocumentSelectionChanged(object? sender, EventArgs args)
     {
+        QueueInlineChatPopupPositionUpdate();
         if (_applyingDocumentCommand || _applyingInputChange)
         {
             _automationPeer?.NotifySelectionChanged();
@@ -1961,6 +1963,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     private void OnDocumentCaretSetChanged(object? sender, EventArgs args)
     {
+        QueueInlineChatPopupPositionUpdate();
         if (_applyingDocumentCommand || _applyingInputChange)
         {
             _automationPeer?.NotifySelectionChanged();

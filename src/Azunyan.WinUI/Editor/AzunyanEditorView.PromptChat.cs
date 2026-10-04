@@ -1,4 +1,5 @@
 using Azunyan.Core;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Windows.Foundation;
@@ -7,8 +8,11 @@ namespace Azunyan.WinUI;
 
 public sealed partial class AzunyanEditorView
 {
+    private const double InlineChatShadowClearance = 16;
+    private const double InlineChatViewportPadding = 8;
     private TaskCompletionSource<ExternalToolPromptInput?>? _inlinePromptSubmission;
-    private DocumentAnchor? _inlineChatAnchor;
+    private bool? _inlineChatPointAbove;
+    private bool _inlineChatPositionUpdateQueued;
 
     /// <summary>
     /// Opens the inline chat at the current caret and completes when the user
@@ -27,10 +31,7 @@ public sealed partial class AzunyanEditorView
                 "An inline chat prompt is already waiting for input.");
         }
 
-        var primaryCaret = Document.CaretSet.Primary;
-        _inlineChatAnchor = primaryCaret.Selection.IsEmpty
-            ? primaryCaret.CaretAnchor
-            : DocumentAnchor.After(primaryCaret.Selection.End);
+        _inlineChatPointAbove = null;
         var sameConversation = InlinePromptChatPanel.IsActiveConversation(conversationKey);
         InlinePromptChatPanel.PreparePrompt(
             conversationKey,
@@ -43,7 +44,7 @@ public sealed partial class AzunyanEditorView
         SetInlineChatProcessing(conversationKey, isProcessing: false);
 
         InlinePromptPopup.IsOpen = true;
-        UpdateInlineChatPopupPosition();
+        QueueInlineChatPopupPositionUpdate();
         DispatcherQueue.TryEnqueue(InlinePromptChatPanel.FocusInput);
         return _inlinePromptSubmission.Task;
     }
@@ -66,7 +67,7 @@ public sealed partial class AzunyanEditorView
             canInsert: !IsReadOnly);
         if (shouldDisplay)
         {
-            UpdateInlineChatPopupPosition();
+            QueueInlineChatPopupPositionUpdate();
         }
     }
 
@@ -85,7 +86,7 @@ public sealed partial class AzunyanEditorView
             canInsert: !IsReadOnly);
         if (shouldDisplay)
         {
-            UpdateInlineChatPopupPosition();
+            QueueInlineChatPopupPositionUpdate();
         }
     }
 
@@ -109,7 +110,7 @@ public sealed partial class AzunyanEditorView
             && InlinePromptPopup.IsOpen)
         {
             InlinePromptChatPanel.UpdateLayout();
-            UpdateInlineChatPopupPosition();
+            QueueInlineChatPopupPositionUpdate();
         }
     }
 
@@ -129,6 +130,7 @@ public sealed partial class AzunyanEditorView
         if (!InlinePromptPopup.IsOpen)
         {
             InlinePromptChatPanel.ActivateConversation(conversationKey);
+            _inlineChatPointAbove = null;
         }
 
         if (!InlinePromptChatPanel.IsActiveConversation(conversationKey))
@@ -136,7 +138,6 @@ public sealed partial class AzunyanEditorView
             return false;
         }
 
-        _inlineChatAnchor ??= Document.CaretSet.Primary.CaretAnchor;
         InlinePromptPopup.IsOpen = true;
         InlinePromptChatPanel.SetDismissButtonContent(
             _inlinePromptSubmission is null ? "Close" : "Cancel");
@@ -193,7 +194,7 @@ public sealed partial class AzunyanEditorView
     {
         var pendingSubmission = _inlinePromptSubmission;
         _inlinePromptSubmission = null;
-        _inlineChatAnchor = null;
+        _inlineChatPointAbove = null;
         InlinePromptPopup.IsOpen = false;
         InlinePromptChatPanel.CloseConversation();
         InlinePromptChatPanel.FinishPrompt();
@@ -212,6 +213,24 @@ public sealed partial class AzunyanEditorView
         ScrollSelectionIntoView();
     }
 
+    private void QueueInlineChatPopupPositionUpdate()
+    {
+        if (_inlineChatPositionUpdateQueued)
+        {
+            return;
+        }
+
+        _inlineChatPositionUpdateQueued = true;
+        if (!DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+            {
+                _inlineChatPositionUpdateQueued = false;
+                UpdateInlineChatPopupPosition();
+            }))
+        {
+            _inlineChatPositionUpdateQueued = false;
+        }
+    }
+
     private void UpdateInlineChatPopupPosition()
     {
         if (!InlinePromptPopup.IsOpen)
@@ -219,13 +238,13 @@ public sealed partial class AzunyanEditorView
             return;
         }
 
-        var anchor = _inlineChatAnchor ?? Document.CaretSet.Primary.CaretAnchor;
-        var inputOrigin = ProjectedSurfaceHost.TransformToVisual(RootGrid)
+        var anchor = Document.CaretSet.Primary.CaretAnchor;
+        var inputOrigin = ProjectedSurfaceHost.TransformToVisual(EditorHost)
             .TransformPoint(new Point(0, 0));
         if (!TryGetRendererCaretRect(anchor, out var caretRect))
         {
-            InlinePromptPopup.HorizontalOffset = Math.Max(8, inputOrigin.X + 8);
-            InlinePromptPopup.VerticalOffset = Math.Max(8, inputOrigin.Y + 8);
+            InlinePromptPopup.HorizontalOffset = inputOrigin.X + InlineChatViewportPadding;
+            InlinePromptPopup.VerticalOffset = inputOrigin.Y + InlineChatViewportPadding;
             InlinePromptChatPanel.SetCalloutTail(
                 pointAbove: false,
                 showTail: false,
@@ -233,39 +252,71 @@ public sealed partial class AzunyanEditorView
             return;
         }
 
+        var horizontalInset = InlineChatShadowClearance + InlineChatViewportPadding;
         var availableWidth = Math.Min(
             ProjectedSurfaceHost.ActualWidth,
-            RootGrid.ActualWidth);
-        InlinePromptChatPanel.BubbleWidth = Math.Max(
-            1,
-            Math.Min(680, availableWidth - 16));
+            EditorHost.ActualWidth) - horizontalInset * 2;
+        var bubbleWidth = Math.Max(1, Math.Min(680, availableWidth));
+        if (!double.IsFinite(InlinePromptChatPanel.BubbleWidth)
+            || Math.Abs(InlinePromptChatPanel.BubbleWidth - bubbleWidth) > 0.5)
+        {
+            InlinePromptChatPanel.BubbleWidth = bubbleWidth;
+            InlinePromptChatPanel.UpdateLayout();
+        }
 
         var anchorX = inputOrigin.X + caretRect.X;
-        var maxX = Math.Max(8, RootGrid.ActualWidth - InlinePromptChatPanel.BubbleWidth - 8);
-        var x = Math.Clamp(anchorX - 24, 8, maxX);
+        var minX = horizontalInset;
+        var maxX = Math.Max(
+            minX,
+            EditorHost.ActualWidth - InlinePromptChatPanel.BubbleWidth - horizontalInset);
+        var x = Math.Clamp(
+            anchorX - InlinePromptChatPanel.BubbleWidth / 2,
+            minX,
+            maxX);
         InlinePromptPopup.HorizontalOffset = x;
 
         var tailOffset = Math.Clamp(
             anchorX - x - 9,
-            12,
-            Math.Max(12, InlinePromptChatPanel.BubbleWidth - 30));
+            0,
+            Math.Max(0, InlinePromptChatPanel.BubbleWidth - 18));
         var belowY = inputOrigin.Y + caretRect.Y + caretRect.Height + 2;
         var bubbleHeight = InlinePromptChatPanel.BubbleHeight;
-        var pointAbove = bubbleHeight > 0
-            && belowY + bubbleHeight > RootGrid.ActualHeight - 8;
-        var y = pointAbove
-            ? inputOrigin.Y + caretRect.Y - bubbleHeight - 2
-            : belowY;
-        if (pointAbove && y < 8)
+        var aboveY = inputOrigin.Y + caretRect.Y - bubbleHeight - 2;
+        var safeTop = InlineChatShadowClearance + InlineChatViewportPadding;
+        var safeBottom = EditorHost.ActualHeight - safeTop;
+        var canFitAbove = aboveY >= safeTop;
+        var canFitBelow = belowY + bubbleHeight <= safeBottom;
+        // Keep the current side until it stops fitting so a growing input does not
+        // make the callout flip back and forth at the viewport boundary.
+        var pointAbove = _inlineChatPointAbove switch
         {
-            pointAbove = false;
-            y = belowY;
+            true when canFitAbove => true,
+            false when canFitBelow => false,
+            _ => !canFitBelow && canFitAbove
+        };
+        if (!canFitAbove && !canFitBelow)
+        {
+            var spaceAbove = inputOrigin.Y + caretRect.Y - safeTop;
+            var spaceBelow = safeBottom - belowY;
+            pointAbove = spaceAbove >= spaceBelow;
         }
+
+        var directionChanged = _inlineChatPointAbove != pointAbove;
+        _inlineChatPointAbove = pointAbove;
 
         InlinePromptChatPanel.SetCalloutTail(
             pointAbove,
             showTail: true,
             tailOffset);
-        InlinePromptPopup.VerticalOffset = Math.Max(8, y);
+        if (directionChanged)
+        {
+            InlinePromptChatPanel.UpdateLayout();
+            bubbleHeight = InlinePromptChatPanel.BubbleHeight;
+            belowY = inputOrigin.Y + caretRect.Y + caretRect.Height + 2;
+            aboveY = inputOrigin.Y + caretRect.Y - bubbleHeight - 2;
+        }
+
+        var y = pointAbove ? aboveY : belowY;
+        InlinePromptPopup.VerticalOffset = y;
     }
 }
