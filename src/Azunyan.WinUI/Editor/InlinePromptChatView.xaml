@@ -3,11 +3,7 @@
     x:Class="Azunyan.WinUI.InlinePromptChatView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="using:Azunyan.WinUI"
-    Translation="0,0,32">
-    <UserControl.Shadow>
-        <ThemeShadow />
-    </UserControl.Shadow>
+    xmlns:local="using:Azunyan.WinUI">
     <UserControl.Resources>
         <DataTemplate
             x:Key="InlinePromptChatEntryTemplate"
@@ -78,11 +74,15 @@
             x:Name="InlinePromptBorder"
             Grid.Row="1"
             MaxWidth="680"
+            Translation="0,0,32"
             Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}"
             BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}"
             BorderThickness="1"
             Margin="0,0,0,1"
             CornerRadius="4,4,0,0">
+            <Border.Shadow>
+                <ThemeShadow />
+            </Border.Shadow>
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
