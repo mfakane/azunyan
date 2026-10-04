@@ -183,7 +183,11 @@
             Height="9"
             HorizontalAlignment="Left"
             Fill="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}"
-            Data="M 0,9 L 9,0 L 18,9 Z" />
+            Data="M 0,9 L 9,0 L 18,9 Z">
+            <Path.RenderTransform>
+                <TranslateTransform Y="1" />
+            </Path.RenderTransform>
+        </Path>
         <Path
             x:Name="InlinePromptTopTailOutline"
             Grid.Row="0"
@@ -192,7 +196,11 @@
             HorizontalAlignment="Left"
             Stroke="{ThemeResource SystemControlForegroundBaseLowBrush}"
             StrokeThickness="1"
-            Data="M 0,9 L 9,0 L 18,9" />
+            Data="M 0,9 L 9,0 L 18,9">
+            <Path.RenderTransform>
+                <TranslateTransform Y="1" />
+            </Path.RenderTransform>
+        </Path>
         <Path
             x:Name="InlinePromptBottomTailFill"
             Grid.Row="2"
@@ -202,7 +210,11 @@
             VerticalAlignment="Top"
             Visibility="Collapsed"
             Fill="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}"
-            Data="M 0,0 L 9,9 L 18,0 Z" />
+            Data="M 0,0 L 9,9 L 18,0 Z">
+            <Path.RenderTransform>
+                <TranslateTransform Y="-1" />
+            </Path.RenderTransform>
+        </Path>
         <Path
             x:Name="InlinePromptBottomTailOutline"
             Grid.Row="2"
@@ -213,6 +225,10 @@
             Visibility="Collapsed"
             Stroke="{ThemeResource SystemControlForegroundBaseLowBrush}"
             StrokeThickness="1"
-            Data="M 0,0 L 9,9 L 18,0" />
+            Data="M 0,0 L 9,9 L 18,0">
+            <Path.RenderTransform>
+                <TranslateTransform Y="-1" />
+            </Path.RenderTransform>
+        </Path>
     </Grid>
 </UserControl>
