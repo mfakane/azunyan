@@ -65,17 +65,21 @@ internal interface IEditorView : IEditorBuffer
 
     void ShowCompletion(CompletionResult completions);
 
-    Task<string?> PromptInlineChatAsync(string title, string placeholder);
+    Task<ExternalToolPromptInput?> PromptInlineChatAsync(
+        string conversationKey,
+        string title,
+        string placeholder,
+        bool preserveChatHistory);
 
-    void SetInlineChatProcessing(bool isProcessing);
+    void SetInlineChatProcessing(string conversationKey, bool isProcessing);
 
-    void AppendInlineChatResponse(string response);
+    void AppendInlineChatResponse(string conversationKey, string response);
 
-    void BeginInlineChatResponse(Guid responseId);
+    void BeginInlineChatResponse(string conversationKey, Guid responseId);
 
-    void AppendInlineChatResponseChunk(Guid responseId, string text);
+    void AppendInlineChatResponseChunk(string conversationKey, Guid responseId, string text);
 
-    void CompleteInlineChatResponse(Guid responseId);
+    void CompleteInlineChatResponse(string conversationKey, Guid responseId);
 
     void ApplyLanguage(EditorLanguageConfiguration configuration);
 

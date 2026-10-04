@@ -24,7 +24,8 @@ public sealed partial class ExternalToolController
         private ExternalToolStreamingRun(
             ExternalToolController owner,
             ExternalToolDefinition definition,
-            TextSelection selection)
+            TextSelection selection,
+            string conversationKey)
         {
             _owner = owner;
             foreach (var (channel, actions) in new[]
@@ -44,7 +45,9 @@ public sealed partial class ExternalToolController
                     ExternalToolOutputMode.ReplaceDocument => new EditorStreamTarget(this, selection, wholeDocument: true),
                     ExternalToolOutputMode.ReplaceSelection => new EditorStreamTarget(this, selection, wholeDocument: false),
                     ExternalToolOutputMode.NewDocument => new NewDocumentStreamTarget(this),
-                    ExternalToolOutputMode.ShowPromptResponse => new PromptResponseStreamTarget(this),
+                    ExternalToolOutputMode.ShowPromptResponse => new PromptResponseStreamTarget(
+                        this,
+                        conversationKey),
                     _ => throw new InvalidOperationException(
                         $"An external-tool channel using {actions.OnSuccess} cannot stream.")
                 };
@@ -60,10 +63,11 @@ public sealed partial class ExternalToolController
         public static ExternalToolStreamingRun? TryCreate(
             ExternalToolController owner,
             ExternalToolDefinition definition,
-            TextSelection selection) =>
+            TextSelection selection,
+            string conversationKey) =>
             definition.Stream == ExternalToolStreamChannels.None
                 ? null
-                : new ExternalToolStreamingRun(owner, definition, selection);
+                : new ExternalToolStreamingRun(owner, definition, selection, conversationKey);
 
         public void Write(ExternalToolOutputChannel channel, string text)
         {
@@ -423,17 +427,24 @@ public sealed partial class ExternalToolController
         private sealed class PromptResponseStreamTarget : StreamTarget
         {
             private readonly ExternalToolStreamingRun _run;
+            private readonly string _conversationKey;
             private readonly Guid _responseId = Guid.NewGuid();
             private IEditorView? _view;
             private bool _started;
 
-            public PromptResponseStreamTarget(ExternalToolStreamingRun run) => _run = run;
+            public PromptResponseStreamTarget(
+                ExternalToolStreamingRun run,
+                string conversationKey)
+            {
+                _run = run;
+                _conversationKey = conversationKey;
+            }
 
             public override Task AppendAsync(string text)
             {
                 if (EnsureStarted())
                 {
-                    _view!.AppendInlineChatResponseChunk(_responseId, text);
+                    _view!.AppendInlineChatResponseChunk(_conversationKey, _responseId, text);
                 }
 
                 return Task.CompletedTask;
@@ -443,7 +454,7 @@ public sealed partial class ExternalToolController
             {
                 if (_started)
                 {
-                    _view!.CompleteInlineChatResponse(_responseId);
+                    _view!.CompleteInlineChatResponse(_conversationKey, _responseId);
                 }
 
                 return Task.CompletedTask;
@@ -453,7 +464,7 @@ public sealed partial class ExternalToolController
             {
                 if (_started)
                 {
-                    _view!.CompleteInlineChatResponse(_responseId);
+                    _view!.CompleteInlineChatResponse(_conversationKey, _responseId);
                 }
             }
 
@@ -471,7 +482,7 @@ public sealed partial class ExternalToolController
                 }
 
                 _view = view;
-                _view.BeginInlineChatResponse(_responseId);
+                _view.BeginInlineChatResponse(_conversationKey, _responseId);
                 _started = true;
                 return true;
             }

@@ -33,6 +33,7 @@ internal static class AzunotePlaceholderCatalog
         new("columnNumber", "Placeholder", "One-based column number of the caret.", "${columnNumber} -> 7"),
         new("selectedText", "Placeholder", "The currently selected text.", "${selectedText} -> selected text"),
         new("input", "Placeholder", "The input payload for the current external-tool invocation.", "${input} -> selected text"),
+        new("chatHistory", "Placeholder", "Prompt conversation messages as JSON.", "${chatHistory} -> [{\"role\":\"user\",\"content\":\"...\"}]"),
         new("input:1", "Placeholder", "The first capture group for the current regex per invocation.", "${input:1} -> captured text"),
         new("input:groupname", "Placeholder", "A named capture group for the current regex per invocation.", "${input:groupname} -> captured text"),
         new("execPath", "Placeholder", "Path to the running Azunote executable.", "${execPath} -> C:\\Program Files\\Azunote\\Azunote.exe"),

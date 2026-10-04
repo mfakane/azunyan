@@ -104,7 +104,11 @@ public interface IUserPrompt
 
     Task<ExternalChangeDecision> ResolveExternalChangeAsync();
 
-    Task<string?> PromptExternalToolInputAsync(string title, string placeholder);
+    Task<ExternalToolPromptInput?> PromptExternalToolInputAsync(
+        string conversationKey,
+        string title,
+        string placeholder,
+        bool preserveChatHistory);
 
     Task ShowErrorAsync(string title, string message);
 }

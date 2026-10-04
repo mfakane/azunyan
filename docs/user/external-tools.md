@@ -107,6 +107,7 @@ NODE_ENV = "development"
 | `pwsh` | Optional string or array of strings | One command line evaluated by PowerShell (`pwsh.exe`, falling back to `powershell.exe`). Array elements are joined with spaces; elements containing spaces are automatically quoted. Mutually exclusive with `command` and `cmd`. |
 | `workingDirectory` | Optional string | Working directory. Relative paths are resolved from the tool definition directory. If the expanded directory does not exist, the tool is not executable. If omitted, the current document's directory is used when available; otherwise the Azunote process directory is used. |
 | `input` | `none`, `filePath`, `document`, `selection`, `prompt:<placeholder>` | Selects the value exposed as `${input}`. A prompt asks for text when the tool runs. It is not written to standard input automatically. |
+| `preserveChatHistory` | Boolean | When true, keeps prompt chat history after the inline chat closes for up to 30 minutes of inactivity. Defaults to `false`. |
 | `per` | `none`, `line`, `regex:<pattern>` | Runs once for the input, each line, or each regex match. |
 | `stdin` | String | Text written to standard input after substitution expansion. Empty by default. |
 | `output` | Action or two-item array | Handles the mixed stdout/stderr stream. An array is `[zero, non-zero]`. |
@@ -122,6 +123,7 @@ The defaults are:
 - `workingDirectory` is omitted; the current document's directory is used when
   available, otherwise the Azunote process directory.
 - `input = "none"`
+- `preserveChatHistory = false`
 - `per = "none"`
 - `stdin` is empty, so nothing is sent to standard input.
 - `output = "ignore"`, `stdout = "ignore"`, and `stderr = "ignore"` for both
@@ -278,6 +280,23 @@ remains visible but is disabled in those cases.
 - `filePath`: expose the execution-file path.
 - `document`: expose the complete document text.
 - `selection`: expose the selected text.
+- `prompt:<placeholder>`: ask for text in the inline chat.
+
+For `input = "prompt:..."`, Azunote keeps the inline-chat conversation
+separate for each tool while the chat is open. Closing the chat clears its
+history by default. Set `preserveChatHistory = true` in `[launch]` to keep the
+history in memory for up to 30 minutes after its last activity. On every prompt
+run, `${chatHistory}` is available as a JSON array of `user` and `assistant`
+messages, including the latest user message; this does not depend on the
+preservation setting. The latest user message is also available as `${input}`.
+
+```toml
+[launch]
+input = "prompt:Ask or refine"
+preserveChatHistory = true
+stdin = "${chatHistory}"
+output = "showPromptResponse"
+```
 
 `per` controls how the selected input is partitioned. `none` runs the tool once.
 `line` removes CRLF/LF/CR separators and preserves empty parts. `regex:<pattern>`

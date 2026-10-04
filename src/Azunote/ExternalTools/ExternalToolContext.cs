@@ -147,6 +147,12 @@ public sealed partial record ExternalToolContext
     public string Input { get; init; } = string.Empty;
 
     /// <summary>
+    /// The current tool conversation as a JSON array of user and assistant
+    /// messages. Tools can opt into it with <c>${chatHistory}</c>.
+    /// </summary>
+    public string ChatHistory { get; init; } = "[]";
+
+    /// <summary>
     /// Captured groups for the current regex <c>per</c> invocation. Numeric
     /// group names, including group zero, are included alongside named groups.
     /// </summary>
@@ -267,6 +273,7 @@ public sealed partial record ExternalToolContext
                 "document" => Document,
                 "selectedText" => Selection,
                 "input" => Input,
+                "chatHistory" => ChatHistory,
                 "userHome" => UserHome,
                 "languageId" => LanguageId,
                 "encoding" => Encoding.ToString(),
@@ -321,6 +328,16 @@ public sealed partial record ExternalToolContext
         {
             Input = input,
             InputCaptures = captures ?? EmptyInputCaptures
+        };
+    }
+
+    public ExternalToolContext WithPromptInput(ExternalToolPromptInput promptInput)
+    {
+        ArgumentNullException.ThrowIfNull(promptInput);
+        return this with
+        {
+            Input = promptInput.Input,
+            ChatHistory = promptInput.ChatHistory
         };
     }
 

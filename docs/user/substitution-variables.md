@@ -81,6 +81,7 @@ an empty string.
 | `${tempFile}` | The temporary execution-file path when the document is dirty or untitled; empty otherwise. |
 | `${toolFolder}` | The directory containing the external tool definition. |
 | `${document}` | The complete document text. |
+| `${chatHistory}` | For prompt input, the current tool's conversation as a JSON array of role/content messages, including the latest user message. |
 | `${languageId}` | The active language-mode identifier. |
 | `${encoding}` | The current document encoding, such as `Utf8`. |
 | `${lineEnding}` | The current document line-ending style, such as `Lf`. |

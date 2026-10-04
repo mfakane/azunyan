@@ -111,22 +111,27 @@ internal sealed class FakeEditorView : IEditorView
 
     public void ShowCompletion(CompletionResult completions) => LastCompletion = completions;
 
-    public Task<string?> PromptInlineChatAsync(string title, string placeholder) => Task.FromResult<string?>(null);
+    public Task<ExternalToolPromptInput?> PromptInlineChatAsync(
+        string conversationKey,
+        string title,
+        string placeholder,
+        bool preserveChatHistory) => Task.FromResult<ExternalToolPromptInput?>(null);
 
     public bool IsInlineChatProcessing { get; private set; }
 
-    public void SetInlineChatProcessing(bool isProcessing) =>
+    public void SetInlineChatProcessing(string conversationKey, bool isProcessing) =>
         IsInlineChatProcessing = isProcessing;
 
-    public void AppendInlineChatResponse(string response) => InlineChatResponses.Add(response);
+    public void AppendInlineChatResponse(string conversationKey, string response) =>
+        InlineChatResponses.Add(response);
 
-    public void BeginInlineChatResponse(Guid responseId)
+    public void BeginInlineChatResponse(string conversationKey, Guid responseId)
     {
         _streamingChatResponseIndexes.Add(responseId, InlineChatResponses.Count);
         InlineChatResponses.Add(string.Empty);
     }
 
-    public void AppendInlineChatResponseChunk(Guid responseId, string text)
+    public void AppendInlineChatResponseChunk(string conversationKey, Guid responseId, string text)
     {
         if (_streamingChatResponseIndexes.TryGetValue(responseId, out var index))
         {
@@ -134,7 +139,7 @@ internal sealed class FakeEditorView : IEditorView
         }
     }
 
-    public void CompleteInlineChatResponse(Guid responseId) =>
+    public void CompleteInlineChatResponse(string conversationKey, Guid responseId) =>
         _streamingChatResponseIndexes.Remove(responseId);
 
     public void ApplyLanguage(EditorLanguageConfiguration configuration) =>
@@ -431,8 +436,14 @@ internal sealed class FakeUserPrompt : IUserPrompt
         return Task.FromResult(ExternalDecision);
     }
 
-    public Task<string?> PromptExternalToolInputAsync(string title, string placeholder) =>
-        Task.FromResult(ExternalToolInput);
+    public Task<ExternalToolPromptInput?> PromptExternalToolInputAsync(
+        string conversationKey,
+        string title,
+        string placeholder,
+        bool preserveChatHistory) =>
+        Task.FromResult(ExternalToolInput is null
+            ? null
+            : new ExternalToolPromptInput(ExternalToolInput, "[]"));
 
     public Task ShowErrorAsync(string title, string message)
     {

@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Windows.System;
 
@@ -236,7 +239,8 @@ public sealed record ExternalToolDefinition
         ExternalToolCommandMode commandMode = ExternalToolCommandMode.Executable,
         ExternalToolStreamChannels stream = ExternalToolStreamChannels.None,
         IReadOnlyList<string>? searchPath = null,
-        string? inputPrompt = null)
+        string? inputPrompt = null,
+        bool preserveChatHistory = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
         if (commandMode is not ExternalToolCommandMode.Executable
@@ -254,6 +258,7 @@ public sealed record ExternalToolDefinition
         InputPrompt = string.IsNullOrWhiteSpace(inputPrompt)
             ? "Type something"
             : inputPrompt;
+        PreserveChatHistory = preserveChatHistory;
         Per = ExternalToolPer.Parse(per);
         Stdin = stdin ?? string.Empty;
         Output = output ?? ExternalToolOutputActions.Ignore;
@@ -287,6 +292,9 @@ public sealed record ExternalToolDefinition
     /// </summary>
     public string InputPrompt { get; }
 
+    /// <summary>Whether this prompt tool retains its chat history after the inline chat closes.</summary>
+    public bool PreserveChatHistory { get; }
+
     public ExternalToolPer Per { get; }
 
     public string Stdin { get; }
@@ -309,6 +317,79 @@ public sealed record ExternalToolDefinition
     public IReadOnlyDictionary<string, string> Environment { get; }
 
     public string? DefinitionDirectory { get; }
+
+    /// <summary>
+    /// The source file for a configured tool. This metadata is not serialized
+    /// into tool configuration and identifies its inline-chat conversation.
+    /// </summary>
+    [JsonIgnore]
+    public string? DefinitionPath { get; internal set; }
+
+    /// <summary>Returns a stable, per-definition inline-chat conversation key.</summary>
+    public string GetConversationKey()
+    {
+        if (!string.IsNullOrWhiteSpace(DefinitionPath))
+        {
+            return "definition:" + Path.GetFullPath(DefinitionPath);
+        }
+
+        using var stream = new MemoryStream();
+        using (var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
+        {
+            void WriteString(string? value)
+            {
+                writer.Write(value is not null);
+                if (value is not null)
+                {
+                    writer.Write(value);
+                }
+            }
+
+            void WriteActions(ExternalToolOutputActions actions)
+            {
+                writer.Write((int)actions.OnSuccess);
+                writer.Write((int)actions.OnFailure);
+            }
+
+            WriteString(FileName);
+            writer.Write(Arguments.Length);
+            foreach (var argument in Arguments)
+            {
+                WriteString(argument);
+            }
+
+            writer.Write((int)CommandMode);
+            writer.Write((int)InputMode);
+            WriteString(InputPrompt);
+            writer.Write(PreserveChatHistory);
+            WriteString(Per.ToString());
+            WriteString(Stdin);
+            WriteActions(Output);
+            WriteActions(Stdout);
+            WriteActions(Stderr);
+            writer.Write((int)Stream);
+            WriteString(WorkingDirectory);
+            WriteString(DefinitionDirectory);
+            writer.Write(SearchPath.Count);
+            foreach (var path in SearchPath)
+            {
+                WriteString(path);
+            }
+
+            var environment = Environment
+                .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            writer.Write(environment.Length);
+            foreach (var pair in environment)
+            {
+                WriteString(pair.Key);
+                WriteString(pair.Value);
+            }
+        }
+
+        var fingerprint = SHA256.HashData(stream.ToArray());
+        return "adhoc:" + Convert.ToHexString(fingerprint);
+    }
 
     public static string[] ParseArguments(string arguments)
     {

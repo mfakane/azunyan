@@ -309,8 +309,12 @@ public sealed class DocumentControllerTests
 
         public ExternalChangeDecision ExternalDecision { get; set; } = ExternalChangeDecision.Reload;
 
-        public Task<string?> PromptExternalToolInputAsync(string title, string placeholder) =>
-            Task.FromResult<string?>(null);
+        public Task<ExternalToolPromptInput?> PromptExternalToolInputAsync(
+            string conversationKey,
+            string title,
+            string placeholder,
+            bool preserveChatHistory) =>
+            Task.FromResult<ExternalToolPromptInput?>(null);
 
         public Task<PendingChangesDecision> ConfirmPendingChangesAsync() =>
             Task.FromResult(PendingDecision);

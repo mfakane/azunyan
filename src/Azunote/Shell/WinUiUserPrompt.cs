@@ -1,3 +1,4 @@
+using Azunyan.Core;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
@@ -6,11 +7,11 @@ namespace Azunote;
 internal sealed class WinUiUserPrompt : IUserPrompt
 {
     private readonly Func<XamlRoot?> _xamlRoot;
-    private readonly Func<string, string, Task<string?>> _promptInlineChat;
+    private readonly Func<string, string, string, bool, Task<ExternalToolPromptInput?>> _promptInlineChat;
 
     public WinUiUserPrompt(
         Func<XamlRoot?> xamlRoot,
-        Func<string, string, Task<string?>> promptInlineChat)
+        Func<string, string, string, bool, Task<ExternalToolPromptInput?>> promptInlineChat)
     {
         _xamlRoot = xamlRoot ?? throw new ArgumentNullException(nameof(xamlRoot));
         _promptInlineChat = promptInlineChat
@@ -57,8 +58,12 @@ internal sealed class WinUiUserPrompt : IUserPrompt
         };
     }
 
-    public Task<string?> PromptExternalToolInputAsync(string title, string placeholder) =>
-        _promptInlineChat(title, placeholder);
+    public Task<ExternalToolPromptInput?> PromptExternalToolInputAsync(
+        string conversationKey,
+        string title,
+        string placeholder,
+        bool preserveChatHistory) =>
+        _promptInlineChat(conversationKey, title, placeholder, preserveChatHistory);
 
     public async Task ShowErrorAsync(string title, string message)
     {

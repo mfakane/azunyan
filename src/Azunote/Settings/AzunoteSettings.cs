@@ -606,6 +606,9 @@ public sealed class ExternalToolLaunchSettings
 
     public string Input { get; set; } = ExternalToolEnumValues.ToTomlValue(ExternalToolInputMode.None);
 
+    /// <summary>Whether prompt chat history remains available for 30 minutes after the inline chat closes.</summary>
+    public bool PreserveChatHistory { get; set; }
+
     public string Per { get; set; } = "none";
 
     public string Stdin { get; set; } = string.Empty;
@@ -694,7 +697,7 @@ public sealed class ExternalToolSettings
         };
 
         var input = ExternalToolInputSetting.Parse(Launch.Input, "launch.input");
-        return new ExternalToolDefinition(
+        var definition = new ExternalToolDefinition(
             command,
             Launch.Arguments ?? [],
             input.Mode,
@@ -709,7 +712,10 @@ public sealed class ExternalToolSettings
             commandMode,
             Launch.Stream,
             Launch.Path?.Values ?? [],
-            input.Prompt);
+            input.Prompt,
+            Launch.PreserveChatHistory);
+        definition.DefinitionPath = DefinitionPath;
+        return definition;
     }
 
     internal void Validate()

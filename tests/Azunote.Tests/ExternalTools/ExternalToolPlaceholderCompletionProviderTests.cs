@@ -22,6 +22,19 @@ public sealed class ExternalToolPlaceholderCompletionProviderTests
     }
 
     [Fact]
+    public void Completes_the_prompt_chat_history_placeholder()
+    {
+        const string text = "${chat";
+
+        var result = ExternalToolPlaceholderCompletionProvider.GetCompletions(
+            text,
+            text.Length);
+
+        Assert.NotNull(result);
+        Assert.Contains(result!.Items, item => item.Label == "${chatHistory}");
+    }
+
+    [Fact]
     public void Filters_the_input_placeholder_as_it_is_typed()
     {
         const string text = "${i";

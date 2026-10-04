@@ -1034,18 +1034,29 @@ public sealed partial class MainWindow
         public void Select(TextRange range) => _window.Select(range);
         public void RequestCompletion() => _window.RequestCompletion();
         public void ShowCompletion(CompletionResult completions) => _window.ShowCompletion(completions);
-        public Task<string?> PromptInlineChatAsync(string title, string placeholder) =>
-            _window._editor.PromptInlineChatAsync(title, placeholder);
-        public void SetInlineChatProcessing(bool isProcessing) =>
-            _window._editor.SetInlineChatProcessing(isProcessing);
-        public void AppendInlineChatResponse(string response) =>
-            _window._editor.AppendInlineChatResponse(response);
-        public void BeginInlineChatResponse(Guid responseId) =>
-            _window._editor.BeginInlineChatResponse(responseId);
-        public void AppendInlineChatResponseChunk(Guid responseId, string text) =>
-            _window._editor.AppendInlineChatResponseChunk(responseId, text);
-        public void CompleteInlineChatResponse(Guid responseId) =>
-            _window._editor.CompleteInlineChatResponse(responseId);
+        public Task<ExternalToolPromptInput?> PromptInlineChatAsync(
+            string conversationKey,
+            string title,
+            string placeholder,
+            bool preserveChatHistory) =>
+            _window._editor.PromptInlineChatAsync(
+                conversationKey,
+                title,
+                placeholder,
+                preserveChatHistory);
+        public void SetInlineChatProcessing(string conversationKey, bool isProcessing) =>
+            _window._editor.SetInlineChatProcessing(conversationKey, isProcessing);
+        public void AppendInlineChatResponse(string conversationKey, string response) =>
+            _window._editor.AppendInlineChatResponse(conversationKey, response);
+        public void BeginInlineChatResponse(string conversationKey, Guid responseId) =>
+            _window._editor.BeginInlineChatResponse(conversationKey, responseId);
+        public void AppendInlineChatResponseChunk(
+            string conversationKey,
+            Guid responseId,
+            string text) =>
+            _window._editor.AppendInlineChatResponseChunk(conversationKey, responseId, text);
+        public void CompleteInlineChatResponse(string conversationKey, Guid responseId) =>
+            _window._editor.CompleteInlineChatResponse(conversationKey, responseId);
         public void ApplyLanguage(EditorLanguageConfiguration configuration) =>
             _window.ApplyLanguage(configuration);
         public void SetFontFamily(string fontFamily) => _window.SetFontFamily(fontFamily);

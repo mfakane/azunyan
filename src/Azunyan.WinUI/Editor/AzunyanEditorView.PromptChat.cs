@@ -7,14 +7,18 @@ namespace Azunyan.WinUI;
 
 public sealed partial class AzunyanEditorView
 {
-    private TaskCompletionSource<string?>? _inlinePromptSubmission;
+    private TaskCompletionSource<ExternalToolPromptInput?>? _inlinePromptSubmission;
     private DocumentAnchor? _inlineChatAnchor;
 
     /// <summary>
     /// Opens the inline chat at the current caret and completes when the user
     /// submits one message or cancels the prompt.
     /// </summary>
-    public Task<string?> PromptInlineChatAsync(string title, string placeholder)
+    public Task<ExternalToolPromptInput?> PromptInlineChatAsync(
+        string conversationKey,
+        string title,
+        string placeholder,
+        bool preserveChatHistory)
     {
         ArgumentNullException.ThrowIfNull(placeholder);
         if (_inlinePromptSubmission is not null)
@@ -27,13 +31,16 @@ public sealed partial class AzunyanEditorView
         _inlineChatAnchor = primaryCaret.Selection.IsEmpty
             ? primaryCaret.CaretAnchor
             : DocumentAnchor.After(primaryCaret.Selection.End);
+        var sameConversation = InlinePromptChatPanel.IsActiveConversation(conversationKey);
         InlinePromptChatPanel.PreparePrompt(
+            conversationKey,
             title,
             placeholder,
-            clearInput: !InlinePromptPopup.IsOpen);
-        _inlinePromptSubmission = new TaskCompletionSource<string?>(
+            preserveChatHistory,
+            clearInput: !InlinePromptPopup.IsOpen || !sameConversation);
+        _inlinePromptSubmission = new TaskCompletionSource<ExternalToolPromptInput?>(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        SetInlineChatProcessing(isProcessing: false);
+        SetInlineChatProcessing(conversationKey, isProcessing: false);
 
         InlinePromptPopup.IsOpen = true;
         UpdateInlineChatPopupPosition();
@@ -42,81 +49,116 @@ public sealed partial class AzunyanEditorView
     }
 
     /// <summary>Appends a completed external-tool response to the inline chat.</summary>
-    public void AppendInlineChatResponse(string response)
+    public void AppendInlineChatResponse(string conversationKey, string response)
     {
         ArgumentNullException.ThrowIfNull(response);
         if (!DispatcherQueue.HasThreadAccess)
         {
-            DispatcherQueue.TryEnqueue(() => AppendInlineChatResponse(response));
+            DispatcherQueue.TryEnqueue(() => AppendInlineChatResponse(conversationKey, response));
             return;
         }
 
-        PrepareInlineChatResponseDisplay();
+        var shouldDisplay = PrepareInlineChatResponseDisplay(conversationKey);
         InlinePromptChatPanel.AppendEntry(
+            conversationKey,
             false,
             response,
             canInsert: !IsReadOnly);
-        UpdateInlineChatPopupPosition();
+        if (shouldDisplay)
+        {
+            UpdateInlineChatPopupPosition();
+        }
     }
 
-    public void BeginInlineChatResponse(Guid responseId)
+    public void BeginInlineChatResponse(string conversationKey, Guid responseId)
     {
         if (!DispatcherQueue.HasThreadAccess)
         {
-            DispatcherQueue.TryEnqueue(() => BeginInlineChatResponse(responseId));
+            DispatcherQueue.TryEnqueue(() => BeginInlineChatResponse(conversationKey, responseId));
             return;
         }
 
-        PrepareInlineChatResponseDisplay();
-        InlinePromptChatPanel.BeginStreamingEntry(responseId, canInsert: !IsReadOnly);
-        UpdateInlineChatPopupPosition();
+        var shouldDisplay = PrepareInlineChatResponseDisplay(conversationKey);
+        InlinePromptChatPanel.BeginStreamingEntry(
+            conversationKey,
+            responseId,
+            canInsert: !IsReadOnly);
+        if (shouldDisplay)
+        {
+            UpdateInlineChatPopupPosition();
+        }
     }
 
-    public void AppendInlineChatResponseChunk(Guid responseId, string text)
+    public void AppendInlineChatResponseChunk(
+        string conversationKey,
+        Guid responseId,
+        string text)
     {
         ArgumentNullException.ThrowIfNull(text);
         if (!DispatcherQueue.HasThreadAccess)
         {
-            DispatcherQueue.TryEnqueue(() => AppendInlineChatResponseChunk(responseId, text));
+            DispatcherQueue.TryEnqueue(() => AppendInlineChatResponseChunk(
+                conversationKey,
+                responseId,
+                text));
             return;
         }
 
-        InlinePromptChatPanel.AppendStreamingText(responseId, text);
-        InlinePromptChatPanel.UpdateLayout();
-        UpdateInlineChatPopupPosition();
+        InlinePromptChatPanel.AppendStreamingText(conversationKey, responseId, text);
+        if (InlinePromptChatPanel.IsActiveConversation(conversationKey)
+            && InlinePromptPopup.IsOpen)
+        {
+            InlinePromptChatPanel.UpdateLayout();
+            UpdateInlineChatPopupPosition();
+        }
     }
 
-    public void CompleteInlineChatResponse(Guid responseId)
+    public void CompleteInlineChatResponse(string conversationKey, Guid responseId)
     {
         if (!DispatcherQueue.HasThreadAccess)
         {
-            DispatcherQueue.TryEnqueue(() => CompleteInlineChatResponse(responseId));
+            DispatcherQueue.TryEnqueue(() => CompleteInlineChatResponse(conversationKey, responseId));
             return;
         }
 
-        InlinePromptChatPanel.FinishStreamingEntry(responseId);
+        InlinePromptChatPanel.FinishStreamingEntry(conversationKey, responseId);
     }
 
-    private void PrepareInlineChatResponseDisplay()
+    private bool PrepareInlineChatResponseDisplay(string conversationKey)
     {
+        if (!InlinePromptPopup.IsOpen)
+        {
+            InlinePromptChatPanel.ActivateConversation(conversationKey);
+        }
+
+        if (!InlinePromptChatPanel.IsActiveConversation(conversationKey))
+        {
+            return false;
+        }
+
         _inlineChatAnchor ??= Document.CaretSet.Primary.CaretAnchor;
         InlinePromptPopup.IsOpen = true;
         InlinePromptChatPanel.SetDismissButtonContent(
             _inlinePromptSubmission is null ? "Close" : "Cancel");
+        return true;
     }
 
     /// <summary>Updates the inline chat send button while an external tool runs.</summary>
-    public void SetInlineChatProcessing(bool isProcessing)
+    public void SetInlineChatProcessing(string conversationKey, bool isProcessing)
     {
         if (!DispatcherQueue.HasThreadAccess)
         {
-            DispatcherQueue.TryEnqueue(() => SetInlineChatProcessing(isProcessing));
+            DispatcherQueue.TryEnqueue(() => SetInlineChatProcessing(
+                conversationKey,
+                isProcessing));
             return;
         }
 
         InlinePromptChatPanel.SetProcessing(
+            conversationKey,
             isProcessing,
-            canSend: _inlinePromptSubmission is not null);
+            canSend: _inlinePromptSubmission is not null
+                && InlinePromptChatPanel.IsActiveConversation(conversationKey));
     }
 
     private void SubmitInlinePrompt()
@@ -126,13 +168,25 @@ public sealed partial class AzunyanEditorView
             return;
         }
 
+        var conversationKey = InlinePromptChatPanel.ActiveConversationKey;
+        if (conversationKey is null)
+        {
+            return;
+        }
+
         var text = InlinePromptChatPanel.InputText;
-        InlinePromptChatPanel.AppendEntry(true, text, canInsert: !IsReadOnly);
+        var promptInput = InlinePromptChatPanel.AppendUserEntryAndCreatePromptInput(
+            conversationKey,
+            text,
+            canInsert: !IsReadOnly);
         InlinePromptChatPanel.InputText = string.Empty;
         InlinePromptChatPanel.SetDismissButtonContent("Close");
         _inlinePromptSubmission = null;
-        SetInlineChatProcessing(isProcessing: true);
-        submission.TrySetResult(text);
+        InlinePromptChatPanel.SetProcessing(
+            conversationKey,
+            isProcessing: true,
+            canSend: false);
+        submission.TrySetResult(promptInput);
     }
 
     private void DismissInlineChat()
@@ -141,6 +195,7 @@ public sealed partial class AzunyanEditorView
         _inlinePromptSubmission = null;
         _inlineChatAnchor = null;
         InlinePromptPopup.IsOpen = false;
+        InlinePromptChatPanel.CloseConversation();
         InlinePromptChatPanel.FinishPrompt();
         pendingSubmission?.TrySetResult(null);
     }

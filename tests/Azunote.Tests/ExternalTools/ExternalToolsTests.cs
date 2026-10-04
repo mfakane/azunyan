@@ -1,5 +1,7 @@
 ﻿using Xunit;
 
+using Azunyan.Core;
+
 namespace Azunote.Tests;
 
 public sealed class ExternalToolsTests
@@ -112,11 +114,45 @@ public sealed class ExternalToolsTests
         var definition = new ExternalToolDefinition("formatter");
 
         Assert.Equal(ExternalToolInputMode.None, definition.InputMode);
+        Assert.False(definition.PreserveChatHistory);
         Assert.Equal(ExternalToolPerMode.None, definition.Per.Mode);
         Assert.Equal(string.Empty, definition.Stdin);
         Assert.Equal(ExternalToolOutputActions.Ignore, definition.Output);
         Assert.Equal(ExternalToolOutputActions.Ignore, definition.Stdout);
         Assert.Equal(ExternalToolOutputActions.Ignore, definition.Stderr);
+    }
+
+    [Fact]
+    public void Prompt_chat_history_is_always_available_separately_from_the_latest_input()
+    {
+        const string history = "[{\"role\":\"user\",\"content\":\"first\"}]";
+        var input = new ExternalToolPromptInput("follow up", history);
+        var context = new ExternalToolContext(null, null, "document", string.Empty);
+
+        var prompted = context.WithPromptInput(input);
+
+        Assert.Equal($"follow up|{history}", prompted.Expand("${input}|${chatHistory}"));
+    }
+
+    [Fact]
+    public void Preserve_chat_history_setting_is_copied_to_the_tool_definition()
+    {
+        var settings = new ExternalToolSettings
+        {
+            Name = "Assistant",
+            Launch = new ExternalToolLaunchSettings
+            {
+                Command = "assistant",
+                Input = "prompt:Ask something",
+                PreserveChatHistory = true
+            }
+        };
+
+        var definition = settings.ToDefinition();
+
+        Assert.Equal(ExternalToolInputMode.Prompt, definition.InputMode);
+        Assert.True(definition.PreserveChatHistory);
+        Assert.StartsWith("adhoc:", definition.GetConversationKey(), StringComparison.Ordinal);
     }
 
     [Fact]
