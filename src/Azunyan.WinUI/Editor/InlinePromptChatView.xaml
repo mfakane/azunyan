@@ -3,7 +3,11 @@
     x:Class="Azunyan.WinUI.InlinePromptChatView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="using:Azunyan.WinUI">
+    xmlns:local="using:Azunyan.WinUI"
+    Translation="0,0,32">
+    <UserControl.Shadow>
+        <ThemeShadow />
+    </UserControl.Shadow>
     <UserControl.Resources>
         <DataTemplate
             x:Key="InlinePromptChatEntryTemplate"
