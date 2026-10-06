@@ -371,16 +371,18 @@ public sealed partial class AzunyanTextInputWindow : UserControl
 
     private Rect GetNativeCaretRect()
     {
-        if (_synchronizedNativeText.Length == 0)
+        // TextChanged is raised asynchronously, so the synchronized mirror can
+        // be longer than the native text (e.g. while IME edits are pending).
+        // Character indexes must be bounded by the native text itself or
+        // GetRectFromCharacterIndex fails with E_INVALIDARG.
+        var nativeLength = NativeTextBox.Text.Length;
+        if (nativeLength == 0)
         {
             return new Rect(0, 0, 1, Math.Max(1, NativeTextBox.ActualHeight));
         }
 
-        var index = Math.Clamp(
-            NativeTextBox.SelectionStart,
-            0,
-            _synchronizedNativeText.Length);
-        if (index == _synchronizedNativeText.Length)
+        var index = Math.Clamp(NativeTextBox.SelectionStart, 0, nativeLength);
+        if (index == nativeLength)
         {
             return NativeTextBox.GetRectFromCharacterIndex(index - 1, trailingEdge: true);
         }
