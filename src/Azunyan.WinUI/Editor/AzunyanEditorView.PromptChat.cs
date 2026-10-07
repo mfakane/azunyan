@@ -146,8 +146,6 @@ public sealed partial class AzunyanEditorView
         }
 
         InlinePromptPopup.IsOpen = true;
-        InlinePromptChatPanel.SetDismissButtonContent(
-            _inlinePromptSubmission is null ? "Close" : "Cancel");
         return true;
     }
 
@@ -188,7 +186,6 @@ public sealed partial class AzunyanEditorView
             text,
             canInsert: !IsReadOnly);
         InlinePromptChatPanel.InputText = string.Empty;
-        InlinePromptChatPanel.SetDismissButtonContent("Close");
         _inlinePromptSubmission = null;
         InlinePromptChatPanel.SetProcessing(
             conversationKey,

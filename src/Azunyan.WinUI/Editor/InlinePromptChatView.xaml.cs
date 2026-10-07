@@ -80,7 +80,6 @@ public sealed partial class InlinePromptChatView : UserControl
         Title = title;
         InlinePromptInput.PlaceholderText = placeholder;
         InlinePromptInput.IsEnabled = true;
-        InlinePromptCancelButton.Content = "Cancel";
         _isComposing = false;
         SetProcessing(isProcessing: false, canSend: true);
     }
@@ -90,16 +89,12 @@ public sealed partial class InlinePromptChatView : UserControl
     public void FinishPrompt()
     {
         InlinePromptInput.IsEnabled = false;
-        InlinePromptCancelButton.Content = "Close";
         _isComposing = false;
         var isProcessing = _activeConversationKey is { } key
             && _sessions.TryGetValue(key, out var session)
             && session.IsBusy;
         SetProcessing(isProcessing, canSend: false);
     }
-
-    public void SetDismissButtonContent(string content) =>
-        InlinePromptCancelButton.Content = content;
 
     public void SetProcessing(bool isProcessing, bool canSend) =>
         SetProcessing(_activeConversationKey, isProcessing, canSend);

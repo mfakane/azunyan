@@ -36,7 +36,8 @@
                                 Click="InlinePromptInsertButton_Click">
                                 <FontIcon
                                     Glyph="&#xEDE1;"
-                                    FontSize="14" />
+                                    FontSize="14"
+                                    AutomationProperties.AccessibilityView="Raw" />
                             </Button>
                             <Button
                                 AutomationProperties.Name="Copy this entry"
@@ -45,7 +46,8 @@
                                 Click="InlinePromptCopyButton_Click">
                                 <FontIcon
                                     Glyph="&#xE8C8;"
-                                    FontSize="14" />
+                                    FontSize="14"
+                                    AutomationProperties.AccessibilityView="Raw" />
                             </Button>
                         </StackPanel>
                         <TextBlock
@@ -73,7 +75,7 @@
         <Border
             x:Name="InlinePromptBorder"
             Grid.Row="1"
-            MaxWidth="680"
+            MaxWidth="480"
             Translation="0,0,32"
             Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}"
             BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}"
@@ -94,9 +96,33 @@
                     Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}"
                     BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                     BorderThickness="0,0,0,1"
-                    CornerRadius="4,4,0,0"
-                    Padding="10,6,10,6">
-                    <TextBlock x:Name="InlinePromptTitle" />
+                    CornerRadius="4,4,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            x:Name="InlinePromptTitle"
+                            VerticalAlignment="Center"
+                            Margin="10,6,10,6" />
+                        <Button
+                            x:Name="InlinePromptCancelButton"
+                            Grid.Column="1"
+                            Margin="0,2,2,2"
+                            Width="23"
+                            Height="23"
+                            Padding="0"
+                            AutomationProperties.Name="Cancel"
+                            VerticalAlignment="Stretch"
+                            Style="{StaticResource SubtleButtonStyle}"
+                            Click="InlinePromptCancelButton_Click">
+                            <FontIcon
+                                Glyph="&#xE711;"
+                                FontSize="14"
+                                AutomationProperties.AccessibilityView="Raw" />
+                        </Button>
+                    </Grid>
                 </Border>
                 <ScrollViewer
                     x:Name="InlinePromptTranscriptScrollViewer"
@@ -118,17 +144,16 @@
                 </ScrollViewer>
                 <Grid Grid.Row="2"
                       Margin="-1">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
                     <local:CompletionTextBox
                         x:Name="InlinePromptInput"
-                        Grid.RowSpan="2"
-                        Padding="10,6,10,34"
+                        Grid.ColumnSpan="2"
+                        Padding="10,6,34,6"
                         BorderThickness="0,1"
                         CornerRadius="0,0,4,4"
-                        MinHeight="72"
                         MaxHeight="160"
                         IsEnabled="False"
                         AcceptsReturn="True"
@@ -137,56 +162,34 @@
                         TextCompositionStarted="InlinePromptInput_TextCompositionStarted"
                         TextCompositionEnded="InlinePromptInput_TextCompositionEnded"
                         BeforeKeyDown="InlinePromptInput_BeforeKeyDown" />
-                    <Grid Grid.Row="1"
-                          Padding="10,0,10,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock
-                            Margin="0,1,0,0"
-                            VerticalAlignment="Center"
-                            Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
-                            TextWrapping="Wrap"
-                            Text="Enter to send · Shift+Enter for a new line" />
-                        <Button
-                            x:Name="InlinePromptCancelButton"
-                            Grid.Column="1"
-                            Margin="0,0,8,0"
-                            Padding="6,0"
-                            Content="Cancel"
-                            VerticalAlignment="Stretch"
-                            Style="{StaticResource SubtleButtonStyle}"
-                            Click="InlinePromptCancelButton_Click" />
-                        <Button
-                            x:Name="InlinePromptSendButton"
-                            Grid.Column="2"
-                            Padding="0"
-                            IsEnabled="False"
-                            VerticalAlignment="Stretch"
-                            AutomationProperties.Name="Send message"
-                            Style="{StaticResource AccentButtonStyle}"
-                            Click="InlinePromptSendButton_Click">
-                            <Button.Content>
-                                <Grid Width="24" Height="24">
-                                    <FontIcon
-                                        x:Name="InlinePromptSendIcon"
-                                        Glyph="&#xE74A;"
-                                        Margin="1,0,0,0"
-                                        FontSize="14"
-                                        AutomationProperties.AccessibilityView="Raw" />
-                                    <ProgressRing
-                                        x:Name="InlinePromptBusyIndicator"
-                                        Width="14"
-                                        Height="14"
-                                        IsActive="False"
-                                        Visibility="Collapsed"
-                                        AutomationProperties.AccessibilityView="Raw" />
-                                </Grid>
-                            </Button.Content>
-                        </Button>
-                    </Grid>
+                    <Button
+                        x:Name="InlinePromptSendButton"
+                        Grid.Column="1"
+                        Margin="5"
+                        Padding="0"
+                        IsEnabled="False"
+                        VerticalAlignment="Top"
+                        AutomationProperties.Name="Send message"
+                        Style="{StaticResource AccentButtonStyle}"
+                        Click="InlinePromptSendButton_Click">
+                        <Button.Content>
+                            <Grid Width="22" Height="22">
+                                <FontIcon
+                                    x:Name="InlinePromptSendIcon"
+                                    Glyph="&#xE74A;"
+                                    Margin="1,0,0,0"
+                                    FontSize="14"
+                                    AutomationProperties.AccessibilityView="Raw" />
+                                <ProgressRing
+                                    x:Name="InlinePromptBusyIndicator"
+                                    Width="14"
+                                    Height="14"
+                                    IsActive="False"
+                                    Visibility="Collapsed"
+                                    AutomationProperties.AccessibilityView="Raw" />
+                            </Grid>
+                        </Button.Content>
+                    </Button>
                 </Grid>
             </Grid>
         </Border>
