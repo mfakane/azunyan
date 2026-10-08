@@ -20,7 +20,7 @@ jobs:
   build-test-package:
     # Win2D requires the Windows 10 SDK 19041, which is not present on the
     # Windows Server 2025 image currently selected by windows-latest.
-    runs-on: windows-2022
+    runs-on: windows-2025
     timeout-minutes: 60
 
     steps:
