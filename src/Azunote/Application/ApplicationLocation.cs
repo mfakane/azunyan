@@ -48,18 +48,33 @@ internal static class ApplicationLocation
             : Path.GetFullPath(shimExecutable);
     }
 
-    private static string ResolveDistributionDirectory()
+    private static string ResolveDistributionDirectory() =>
+        ResolveDistributionDirectory(
+            Environment.GetEnvironmentVariable(ShimRootVariable),
+            Environment.ProcessPath,
+            AppContext.BaseDirectory);
+
+    internal static string ResolveDistributionDirectory(
+        string? shimRoot, string? processPath, string baseDirectory)
     {
-        var shimRoot = Environment.GetEnvironmentVariable(ShimRootVariable);
         if (!string.IsNullOrWhiteSpace(shimRoot) && Directory.Exists(shimRoot))
         {
             return Path.GetFullPath(shimRoot);
         }
 
-        var processPath = Environment.ProcessPath;
-        var directory = string.IsNullOrEmpty(processPath)
-            ? null
-            : Path.GetDirectoryName(Path.GetFullPath(processPath));
-        return string.IsNullOrEmpty(directory) ? AppContext.BaseDirectory : directory;
+        // Started through the .NET host (dotnet Azunote.dll, or a test host on
+        // a platform without an apphost for it, such as win-arm64), the process
+        // is dotnet.exe, whose folder has nothing to do with this copy of Azunote.
+        if (string.IsNullOrEmpty(processPath) || IsDotnetHost(processPath))
+        {
+            return baseDirectory;
+        }
+
+        var directory = Path.GetDirectoryName(Path.GetFullPath(processPath));
+        return string.IsNullOrEmpty(directory) ? baseDirectory : directory;
     }
+
+    private static bool IsDotnetHost(string processPath) =>
+        string.Equals(Path.GetFileName(processPath), "dotnet.exe", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(Path.GetFileName(processPath), "dotnet", StringComparison.Ordinal);
 }
