@@ -213,7 +213,9 @@ internal static unsafe partial class NativeCrashReporter
         WithThreadInfo = 0x00001000
     }
 
-    [StructLayout(LayoutKind.Sequential)]
+    // minidumpapiset.h declares MINIDUMP_EXCEPTION_INFORMATION under
+    // pshpack4.h, so on 64-bit Windows ExceptionPointers sits at offset 4.
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
     private struct MiniDumpExceptionInformation
     {
         public uint ThreadId;
