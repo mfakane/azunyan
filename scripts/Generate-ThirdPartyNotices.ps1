@@ -111,7 +111,7 @@ $template = Get-Content (Join-Path $PSScriptRoot 'licensing/notices.template.md'
 $notice = $template.Replace('{{COMPONENT_TABLE}}', ($rows -join "`n")).
     Replace('{{REVIEW_DATE}}', $manifest.reviewDate).
     Replace('{{TARGET_FRAMEWORK}}', $manifest.targetFramework).
-    Replace('{{RUNTIME_IDENTIFIER}}', $manifest.runtimeIdentifier)
+    Replace('{{RUNTIME_IDENTIFIERS}}', (@($manifest.runtimeIdentifiers | ForEach-Object { "``$_``" }) -join ' and '))
 if ($notice -match '\{\{[A-Z_]+\}\}') { throw 'Unresolved template placeholder.' }
 foreach ($link in [regex]::Matches($notice, '\]\((licenses/[^)]+)\)')) {
     if ($link.Groups[1].Value -ne 'licenses/sources.json' -and

@@ -27,10 +27,24 @@
     "sha256": "6d15e10a101c6bfff2ab4429ed061bf76c456fc4b23ad6b03e0d0f8377148a21"
   },
   {
-    "component": "Microsoft.Graphics.Win2D/1.4.0-azunyan.25680382dd21",
-    "file": "licenses/Microsoft.Graphics.Win2D/1.4.0-azunyan.25680382dd21/LICENSE.txt",
+    "component": "Microsoft.Graphics.Win2D/1.4.0-azunyan.25680382dd21.2",
+    "file": "licenses/Microsoft.Graphics.Win2D/1.4.0-azunyan.25680382dd21.2/LICENSE.txt",
     "source": "https://raw.githubusercontent.com/microsoft/Win2D/25680382dd2136779e10ea6084f0c5ba437ae288/LICENSE.txt",
     "sha256": "c3ba493105fa52657c4c60d9b1680da7c01b188a8665d7a823c2a187fd259808"
+  },
+  {
+    "component": "microsoft.netcore.app.runtime.nativeaot.win-arm64/10.0.11",
+    "file": "licenses/microsoft.netcore.app.runtime.nativeaot.win-arm64/10.0.11/LICENSE.TXT",
+    "source": "https://www.nuget.org/packages/microsoft.netcore.app.runtime.nativeaot.win-arm64/10.0.11",
+    "packageFile": "LICENSE.TXT",
+    "sha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b"
+  },
+  {
+    "component": "microsoft.netcore.app.runtime.nativeaot.win-arm64/10.0.11",
+    "file": "licenses/microsoft.netcore.app.runtime.nativeaot.win-arm64/10.0.11/THIRD-PARTY-NOTICES.TXT",
+    "source": "https://www.nuget.org/packages/microsoft.netcore.app.runtime.nativeaot.win-arm64/10.0.11",
+    "packageFile": "THIRD-PARTY-NOTICES.TXT",
+    "sha256": "6d15e10a101c6bfff2ab4429ed061bf76c456fc4b23ad6b03e0d0f8377148a21"
   },
   {
     "component": "microsoft.netcore.app.runtime.nativeaot.win-x64/10.0.11",
@@ -43,6 +57,20 @@
     "component": "microsoft.netcore.app.runtime.nativeaot.win-x64/10.0.11",
     "file": "licenses/microsoft.netcore.app.runtime.nativeaot.win-x64/10.0.11/THIRD-PARTY-NOTICES.TXT",
     "source": "https://www.nuget.org/packages/microsoft.netcore.app.runtime.nativeaot.win-x64/10.0.11",
+    "packageFile": "THIRD-PARTY-NOTICES.TXT",
+    "sha256": "6d15e10a101c6bfff2ab4429ed061bf76c456fc4b23ad6b03e0d0f8377148a21"
+  },
+  {
+    "component": "microsoft.netcore.app.runtime.win-arm64/10.0.11",
+    "file": "licenses/microsoft.netcore.app.runtime.win-arm64/10.0.11/LICENSE.TXT",
+    "source": "https://www.nuget.org/packages/microsoft.netcore.app.runtime.win-arm64/10.0.11",
+    "packageFile": "LICENSE.TXT",
+    "sha256": "d7a68596ab69b06f51ca278a6545148e4269a9381c26d597c13df5d88e08cf5b"
+  },
+  {
+    "component": "microsoft.netcore.app.runtime.win-arm64/10.0.11",
+    "file": "licenses/microsoft.netcore.app.runtime.win-arm64/10.0.11/THIRD-PARTY-NOTICES.TXT",
+    "source": "https://www.nuget.org/packages/microsoft.netcore.app.runtime.win-arm64/10.0.11",
     "packageFile": "THIRD-PARTY-NOTICES.TXT",
     "sha256": "6d15e10a101c6bfff2ab4429ed061bf76c456fc4b23ad6b03e0d0f8377148a21"
   },

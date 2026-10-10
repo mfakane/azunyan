@@ -5,4 +5,37 @@
     <AzunoteRelease Condition="'$(AzunoteRelease)' == ''">false</AzunoteRelease>
     <DefineConstants Condition="'$(AzunoteRelease)' != 'true'">$(DefineConstants);AZUNOTE_DEV</DefineConstants>
   </PropertyGroup>
+
+  <!--
+    Projects that load the Windows App SDK, Win2D, or other native code are
+    architecture-specific. They build for win-x64 by default and for win-arm64
+    when asked by any of, in order of precedence:
+      - a RuntimeIdentifier (dotnet build/publish -r win-arm64),
+      - AzunoteRuntimeIdentifier, which reaches every project in a solution
+        build (dotnet build Azunyan.slnx -p:AzunoteRuntimeIdentifier=win-arm64),
+      - Platform=ARM64 (dotnet build -p:Platform=ARM64).
+  -->
+  <PropertyGroup>
+    <AzunoteArchitectureSpecific Condition="'$(AzunoteArchitectureSpecific)' == '' and
+        ('$(MSBuildProjectName)' == 'Azunote' or
+         '$(MSBuildProjectName)' == 'Azunote.Cli' or
+         '$(MSBuildProjectName)' == 'Azunyan.WinUI' or
+         '$(MSBuildProjectName)' == 'Azunote.Tests' or
+         '$(MSBuildProjectName)' == 'Azunote.UiTests' or
+         '$(MSBuildProjectName)' == 'Azunote.Performance')">true</AzunoteArchitectureSpecific>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(AzunoteArchitectureSpecific)' == 'true'">
+    <Platforms>x64;ARM64</Platforms>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">$(AzunoteRuntimeIdentifier)</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and '$(Platform)' == 'ARM64'">win-arm64</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
+    <PlatformTarget Condition="'$(RuntimeIdentifier)' == 'win-x64'">x64</PlatformTarget>
+    <PlatformTarget Condition="'$(RuntimeIdentifier)' == 'win-arm64'">ARM64</PlatformTarget>
+  </PropertyGroup>
+
+  <Target Name="AzunoteValidateRuntimeIdentifier" BeforeTargets="BeforeBuild"
+          Condition="'$(AzunoteArchitectureSpecific)' == 'true' and '$(RuntimeIdentifier)' != 'win-x64' and '$(RuntimeIdentifier)' != 'win-arm64'">
+    <Error Text="$(MSBuildProjectName) supports the win-x64 and win-arm64 runtime identifiers only; got '$(RuntimeIdentifier)'." />
+  </Target>
 </Project>

@@ -31,7 +31,7 @@ pwsh ./scripts/Test-AzunoteUiTestsInSandbox.ps1
 ```
 
 The script requires Windows 11 version 24H2 or later with Windows Sandbox and its
-`wsb.exe` CLI installed, plus an x64 .NET 10 SDK. Keep the host desktop unlocked
+`wsb.exe` CLI installed, plus a .NET 10 SDK for the host architecture. Keep the host desktop unlocked
 while it runs. By default, the script builds the solution on the host, finds the
 `dotnet.exe` root from `PATH`, and mounts that directory read-only as a portable SDK
 inside the Sandbox. An extracted SDK can be selected explicitly:
@@ -41,7 +41,8 @@ pwsh ./scripts/Test-AzunoteUiTestsInSandbox.ps1 `
     -DotNetRoot C:\tools\dotnet-sdk-10
 ```
 
-Pass `-NoBuild` to reuse existing `Debug` outputs, or `-Configuration Release` to
+Pass `-RuntimeIdentifier win-arm64` on an ARM64 host to build and test ARM64
+outputs. Pass `-NoBuild` to reuse existing `Debug` outputs, or `-Configuration Release` to
 build and test Release outputs. Each run writes its available TRX, log, and exit-code
 artifacts under `artifacts/ui-tests-sandbox/<run-id>`.
 

@@ -6,9 +6,6 @@
     <RootNamespace>Azunote</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
-    <Platforms>x64</Platforms>
-    <PlatformTarget>x64</PlatformTarget>
-    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <PublishAot>true</PublishAot>
     <PublishTrimmed>true</PublishTrimmed>
     <CsWin32RunAsBuildTask>true</CsWin32RunAsBuildTask>
@@ -51,8 +48,8 @@
     <ProjectReference Include="..\Azunyan.Core\Azunyan.Core.csproj" />
     <ProjectReference Include="..\Azunyan.Syntax\Azunyan.Syntax.csproj" />
     <ProjectReference Include="..\Azunyan.WinUI\Azunyan.WinUI.csproj" />
-    <PackageReference Include="Microsoft.Graphics.Win2D" Version="[1.4.0-azunyan.25680382dd21]" />
-    <PackageReference Include="PublishShim.MSBuild" Version="0.1.1" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Graphics.Win2D" Version="[1.4.0-azunyan.25680382dd21.2]" />
+    <PackageReference Include="PublishShim.MSBuild" Version="0.1.2" PrivateAssets="all" />
     <PackageReference Include="Microsoft.Windows.CsWin32" Version="0.3.360" PrivateAssets="all" />
     <!-- Windows App SDK: provides WinUI 3, app lifecycle, windowing, and other modern Windows APIs -->
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
@@ -68,8 +65,11 @@
 
   <PropertyGroup>
     <AzunoteCliProject>$(MSBuildThisFileDirectory)..\Azunote.Cli\Azunote.Cli.csproj</AzunoteCliProject>
-    <AzunoteCliOutputPath>$(MSBuildThisFileDirectory)..\Azunote.Cli\bin\$(Configuration)\net10.0\win-x64\</AzunoteCliOutputPath>
-    <AzunoteCliPublishPath>$(AzunoteCliOutputPath)publish\</AzunoteCliPublishPath>
+    <!-- A Platform given to this build (for example -p:Platform=ARM64) reaches the client's build too. -->
+    <_AzunoteCliPlatformDirectory Condition="'$(Platform)' != '' and '$(Platform)' != 'AnyCPU'">$(Platform)\</_AzunoteCliPlatformDirectory>
+    <AzunoteCliOutputPath>$(MSBuildThisFileDirectory)..\Azunote.Cli\bin\$(_AzunoteCliPlatformDirectory)$(Configuration)\net10.0\$(RuntimeIdentifier)\</AzunoteCliOutputPath>
+    <!-- BundleAzunoteCliForPublish publishes the client without a Platform. -->
+    <AzunoteCliPublishPath>$(MSBuildThisFileDirectory)..\Azunote.Cli\bin\$(Configuration)\net10.0\$(RuntimeIdentifier)\publish\</AzunoteCliPublishPath>
   </PropertyGroup>
 
   <!--
@@ -101,7 +101,7 @@
   </Target>
 
   <Target Name="BundleAzunoteCliForPublish" AfterTargets="Publish">
-    <Exec Command="dotnet publish &quot;$(AzunoteCliProject)&quot; -c $(Configuration) -r win-x64 -p:AzunoteRelease=$(AzunoteRelease) --nologo" />
+    <Exec Command="dotnet publish &quot;$(AzunoteCliProject)&quot; -c $(Configuration) -r $(RuntimeIdentifier) -p:AzunoteRelease=$(AzunoteRelease) --nologo" />
     <Copy SourceFiles="$(AzunoteCliPublishPath)azu.exe"
           DestinationFolder="$(PublishDir)"
           SkipUnchangedFiles="true" />

@@ -55,7 +55,7 @@ First run `git submodule update --init external/Win2D` and
 `./scripts/Build-Win2D.ps1` from the repository root to generate the pinned local
 Win2D package. See [build prerequisites](../../scripts/Win2D-build.md).
 
-The application targets Windows x64. Build it from the repository root with:
+The application targets Windows x64 and ARM64. Build it from the repository root with:
 
 ```powershell
 dotnet build Azunyan.slnx -c Debug
@@ -66,10 +66,13 @@ Windows App SDK runtime:
 
 ```powershell
 dotnet publish src/Azunote/Azunote.csproj -c Release -r win-x64 --self-contained true
+dotnet publish src/Azunote/Azunote.csproj -c Release -r win-arm64 --self-contained true
 ```
 
 The runnable output is written below
-`src/Azunote/bin/Release/net10.0-windows10.0.19041.0/win-x64/publish`.
+`src/Azunote/bin/Release/net10.0-windows10.0.19041.0/<rid>/publish`. Publishing
+`win-arm64` from an x64 machine needs the Visual Studio MSVC ARM64 build tools
+(`Microsoft.VisualStudio.Component.VC.Tools.ARM64`) for the Native AOT linker.
 
 ### WinApp CLI development workflows
 

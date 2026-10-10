@@ -12,19 +12,20 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    # Win2D requires the Windows 10 SDK 19041, which is not present on the
-    # Windows Server 2025 image currently selected by windows-latest.
-    runs-on: windows-2022
-    timeout-minutes: 120
+  validate:
+    name: Validate version
+    runs-on: ubuntu-latest
+    outputs:
+      package_version: ${{ steps.version.outputs.package_version }}
+      release_tag: ${{ steps.version.outputs.release_tag }}
+      release_version: ${{ steps.version.outputs.release_version }}
 
     steps:
-      - name: Check out repository and pinned submodules
+      - name: Check out repository
         uses: actions/checkout@v7
-        with:
-          submodules: recursive
 
       - name: Validate version
+        id: version
         shell: pwsh
         env:
           REQUESTED_VERSION: ${{ inputs.version }}
@@ -42,103 +43,50 @@ jobs:
           if ($existing) {
               throw "Tag $tag already exists."
           }
-          "PACKAGE_VERSION=$version.$env:GITHUB_RUN_NUMBER.0" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "package_version=$version.$env:GITHUB_RUN_NUMBER.0" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "release_tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "release_version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
-      - name: Install Win2D Visual Studio components
-        shell: pwsh
-        run: |
-          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
-          $installer = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/setup.exe'
-          $installPath = & $vswhere -latest -products '*' -property installationPath
-          if ([string]::IsNullOrWhiteSpace($installPath)) {
-              throw 'Visual Studio installation was not found.'
-          }
+  build:
+    name: Build, test, and package
+    needs: validate
+    uses: ./.github/workflows/build-msix.yml
+    with:
+      version: ${{ needs.validate.outputs.package_version }}
+      release: true
 
-          $configPath = Join-Path $env:GITHUB_WORKSPACE 'scripts/win2d.vsconfig'
-          $arguments = @(
-              'modify'
-              '--installPath'
-              "`"$installPath`""
-              '--config'
-              "`"$configPath`""
-              '--passive'
-              '--norestart'
-          )
-          $process = Start-Process -FilePath $installer -ArgumentList $arguments -WorkingDirectory $env:GITHUB_WORKSPACE -Wait -PassThru
-          if ($process.ExitCode) {
-              throw "Visual Studio component installation failed with exit code $($process.ExitCode)."
-          }
+  release:
+    name: Tag and open a draft release
+    needs: [validate, build]
+    runs-on: ubuntu-latest
 
-          $deadline = (Get-Date).AddMinutes(10)
-          do {
-              $msbuild = & $vswhere -latest -products '*' -requiresAny `
-                  -requires Microsoft.VisualStudio.ComponentGroup.UWP.VC.v143 Microsoft.VisualStudio.ComponentGroup.UWP.VC `
-                  -find 'MSBuild\Current\Bin\MSBuild.exe'
-              if ($msbuild) {
-                  break
-              }
-              Start-Sleep -Seconds 5
-          } while ((Get-Date) -lt $deadline)
-          if (!$msbuild) {
-              throw 'Visual Studio UWP C++ components were not available after installation.'
-          }
-
-      - name: Set up .NET 10
-        uses: actions/setup-dotnet@v6
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v8
         with:
-          dotnet-version: 10.0.x
-
-      - name: Set up WinApp CLI
-        uses: microsoft/setup-WinAppCli@v0.2
-        with:
-          version: v0.7.1
-
-      - name: Verify WinApp CLI
-        shell: pwsh
-        run: winapp --version
-
-      - name: Build pinned Win2D package
-        shell: pwsh
-        run: ./scripts/Build-Win2D.ps1
-
-      - name: Restore solution
-        shell: pwsh
-        run: dotnet restore Azunyan.slnx
-
-      - name: Build solution
-        shell: pwsh
-        run: dotnet build Azunyan.slnx -c Debug --no-restore
-
-      - name: Run tests
-        shell: pwsh
-        run: dotnet test Azunyan.slnx -c Debug --no-build --no-restore
-
-      - name: Package unsigned MSIX and portable ZIP
-        shell: pwsh
-        run: |
-          ./scripts/Package-AzunoteMsix.ps1 `
-              -Release `
-              -Version $env:PACKAGE_VERSION `
-              -OutputDirectory artifacts/distributions
-          ./scripts/Package-AzunoteZip.ps1 `
-              -Release `
-              -Version $env:PACKAGE_VERSION `
-              -OutputDirectory artifacts/distributions
+          pattern: azunote-win-*
+          path: artifacts/distributions
+          merge-multiple: true
 
       - name: Tag and open a draft release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          PACKAGE_VERSION: ${{ needs.validate.outputs.package_version }}
+          RELEASE_TAG: ${{ needs.validate.outputs.release_tag }}
+          RELEASE_VERSION: ${{ needs.validate.outputs.release_version }}
         run: |
           $notes = @"
-          Unsigned MSIX and portable ZIP.
+          Unsigned MSIX and portable ZIP for x64 and ARM64 (win-x64 / win-arm64).
           Package version: $env:PACKAGE_VERSION
           "@
           $files = @(Get-ChildItem -LiteralPath artifacts/distributions -File)
-          if ($files.Count -lt 2) {
-              throw 'Expected MSIX and ZIP outputs.'
+          foreach ($rid in @('win-x64', 'win-arm64')) {
+              foreach ($extension in @('msix', 'zip')) {
+                  $name = "Azunote-$env:PACKAGE_VERSION-$rid.$extension"
+                  if ($files.Name -notcontains $name) { throw "Expected $name." }
+                  if ($files.Name -notcontains "$name.sha256") { throw "Expected $name.sha256." }
+              }
           }
           gh release create $env:RELEASE_TAG `
               --repo $env:GITHUB_REPOSITORY `

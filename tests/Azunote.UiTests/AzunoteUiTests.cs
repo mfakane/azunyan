@@ -1203,7 +1203,8 @@ public sealed class AzunoteUiFixture : IDisposable
             "bin",
             "Debug",
             "net10.0-windows10.0.19041.0",
-            "win-x64",
+            // The tests are built for the same runtime identifier as the app.
+            RuntimeInformation.ProcessArchitecture == Architecture.Arm64 ? "win-arm64" : "win-x64",
             "Azunote.exe");
         return File.Exists(defaultPath)
             ? defaultPath

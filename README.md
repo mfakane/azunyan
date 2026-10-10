@@ -26,12 +26,13 @@ redistribution requirements.
 | `Azunote` | Application shell, file I/O, settings, language modes, external tools, and command-line integration |
 
 `Azunyan.Core` and `Azunyan.Syntax` target `net10.0` and do not depend on WinUI.
-`Azunyan.WinUI` and Azunote target Windows x64 and use Windows App SDK 2.4.0.
+`Azunyan.WinUI` and Azunote target Windows x64 and ARM64 (`win-x64`, the default, and
+`win-arm64`) and use Windows App SDK 2.4.0.
 
 ## Requirements
 
 - .NET 10 SDK
-- Windows x64 for the full solution, `Azunyan.WinUI`, and Azunote
+- Windows x64 or ARM64 for the full solution, `Azunyan.WinUI`, and Azunote
 
 If the plain .NET CLI cannot locate the Visual Studio Appx/PRI build tasks, run
 the command from a Visual Studio Developer PowerShell or pass the installed
@@ -54,6 +55,12 @@ Build the complete solution from the repository root:
 ```powershell
 dotnet build Azunyan.slnx -c Debug
 ```
+
+Windows-specific projects build for `win-x64` by default. To build the whole
+solution for ARM64, pass `-p:AzunoteRuntimeIdentifier=win-arm64` to restore,
+build, and test; a single project also accepts `-r win-arm64` or
+`-p:Platform=ARM64`. ARM64 output runs natively on Windows on Arm; use a native
+ARM64 .NET SDK and PowerShell there rather than x64 ones running under emulation.
 
 After building, run all normal tests with:
 
