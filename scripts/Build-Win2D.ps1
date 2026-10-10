@@ -24,9 +24,12 @@ $previousLanguage = $env:NUGET_CLI_LANGUAGE
 Push-Location $source
 try {
     $env:NUGET_CLI_LANGUAGE = 'en-US'
-    # %3B keeps MSBuild from splitting the platform list into separate properties.
-    & $msbuild Win2D.proj /p:BuildPlatforms=x64%3BARM64 /p:BuildConfigurations=Release /p:BuildTests=false /p:BuildTools=false /p:BuildDocs=false /p:RunTests=false /nr:false /v:minimal
-    if ($LASTEXITCODE) { throw 'Win2D native build failed.' }
+    # One platform per invocation: a platform list cannot pass through the
+    # command line without being split or reaching the projects verbatim.
+    foreach ($platform in @('x64', 'ARM64')) {
+        & $msbuild Win2D.proj /p:BuildPlatforms=$platform /p:BuildConfigurations=Release /p:BuildTests=false /p:BuildTools=false /p:BuildDocs=false /p:RunTests=false /nr:false /v:minimal
+        if ($LASTEXITCODE) { throw "Win2D native build failed for $platform." }
+    }
     & $msbuild winrt/projection/winrt.projection.csproj /restore /p:Configuration=Release /p:Platform=x64 /p:BuildProjectReferences=false /p:EnableSourceControlManagerQueries=false /p:EnableSourceLink=false /nr:false /v:minimal
     if ($LASTEXITCODE) { throw 'Win2D projection build failed.' }
     # The projection is AnyCPU; building it once (under the x64 output directory) serves both architectures.
