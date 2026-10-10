@@ -6,8 +6,8 @@ Azunyan and Azunote's original code is licensed under the [zlib license](LICENSE
 Dependencies are licensed separately. The zlib license does not replace or
 grant additional rights to third-party components.
 
-This inventory was reviewed on 2026-09-21 against Azunote's restored
-`net10.0-windows10.0.19041.0` / `win-x64` dependencies, with Native AOT and
+This inventory was reviewed on 2026-10-11 against Azunote's restored
+`net10.0-windows10.0.19041.0` / `win-x64` and `win-arm64` dependencies, with Native AOT and
 self-contained Windows App SDK deployment enabled. It conservatively includes
 notices for runtime dependencies even when trimming or unused SDK features may
 exclude some code. It is not a claim that every listed component is in every
@@ -19,10 +19,10 @@ binary, or that all redistribution conditions have been satisfied.
 | --- | --- | --- |
 | Microsoft.Extensions.Caching.Memory, Caching.Abstractions, DependencyInjection.Abstractions, Logging.Abstractions, Options, and Primitives | 10.0.0 | MIT; [license](licenses/Microsoft.Extensions/10.0.0/LICENSE.TXT), [shared package notices](licenses/Microsoft.Extensions/10.0.0/THIRD-PARTY-NOTICES.TXT). All six packages declare MIT and contain identical third-party notices. |
 | Tomlyn | 2.10.1 | BSD-2-Clause; [copyright, conditions, and disclaimer](licenses/Tomlyn/2.10.1/LICENSE.txt) |
-| PublishShim.MSBuild | 0.1.0 | 0BSD, declared as a [license expression](https://licenses.nuget.org/0BSD) with no document in the package. The native shim it generates carries the name of each executable in the portable distribution and starts the application beside it. |
+| PublishShim.MSBuild | 0.1.2 | 0BSD, declared as a [license expression](https://licenses.nuget.org/0BSD) with no document in the package. The native shim it generates carries the name of each executable in the portable distribution and starts the application beside it. |
 | System.CommandLine | 2.0.12 | MIT; [license](licenses/System.CommandLine/2.0.12/LICENSE.TXT). The package carries no license document; the text is the one its dotnet/dotnet build commit publishes. |
-| .NET Native AOT runtime | 10.0.11 | MIT and third-party terms; [license](licenses/microsoft.netcore.app.runtime.nativeaot.win-x64/10.0.11/LICENSE.TXT), [notices](licenses/microsoft.netcore.app.runtime.nativeaot.win-x64/10.0.11/THIRD-PARTY-NOTICES.TXT) |
-| .NET runtime (non-AOT self-contained builds) | 10.0.11 | MIT and third-party terms; [license](licenses/microsoft.netcore.app.runtime.win-x64/10.0.11/LICENSE.TXT), [notices](licenses/microsoft.netcore.app.runtime.win-x64/10.0.11/THIRD-PARTY-NOTICES.TXT) |
+| .NET Native AOT runtime | 10.0.11 | MIT and third-party terms; win-x64 [license](licenses/microsoft.netcore.app.runtime.nativeaot.win-x64/10.0.11/LICENSE.TXT) and [notices](licenses/microsoft.netcore.app.runtime.nativeaot.win-x64/10.0.11/THIRD-PARTY-NOTICES.TXT); win-arm64 [license](licenses/microsoft.netcore.app.runtime.nativeaot.win-arm64/10.0.11/LICENSE.TXT) and [notices](licenses/microsoft.netcore.app.runtime.nativeaot.win-arm64/10.0.11/THIRD-PARTY-NOTICES.TXT) |
+| .NET runtime (non-AOT self-contained builds) | 10.0.11 | MIT and third-party terms; win-x64 [license](licenses/microsoft.netcore.app.runtime.win-x64/10.0.11/LICENSE.TXT) and [notices](licenses/microsoft.netcore.app.runtime.win-x64/10.0.11/THIRD-PARTY-NOTICES.TXT); win-arm64 [license](licenses/microsoft.netcore.app.runtime.win-arm64/10.0.11/LICENSE.TXT) and [notices](licenses/microsoft.netcore.app.runtime.win-arm64/10.0.11/THIRD-PARTY-NOTICES.TXT) |
 | System.Numerics.Tensors | 9.0.0 | MIT; [license](licenses/System.Numerics.Tensors/9.0.0/LICENSE.TXT), [notices](licenses/System.Numerics.Tensors/9.0.0/THIRD-PARTY-NOTICES.TXT) |
 | Microsoft.Extensions.FileSystemGlobbing | 9.0.4 | MIT; [license](licenses/Microsoft.Extensions.FileSystemGlobbing/9.0.4/LICENSE.TXT), [notices](licenses/Microsoft.Extensions.FileSystemGlobbing/9.0.4/THIRD-PARTY-NOTICES.TXT) |
 | Microsoft.Web.WebView2 SDK | 1.0.3719.77 | BSD-style three-clause terms; [license](licenses/Microsoft.Web.WebView2/1.0.3719.77/LICENSE.txt), [notices](licenses/Microsoft.Web.WebView2/1.0.3719.77/NOTICE.txt). This is the SDK, not a license for a separately distributed browser runtime. |
@@ -39,7 +39,7 @@ binary, or that all redistribution conditions have been satisfied.
 | Microsoft.WindowsAppSDK.ML | 2.1.74 | [License](licenses/Microsoft.WindowsAppSDK.ML/2.1.74/license.txt), [notices](licenses/Microsoft.WindowsAppSDK.ML/2.1.74/ThirdPartyNotices.txt) |
 | Microsoft.Windows.AI.MachineLearning | 2.1.74 | [License](licenses/Microsoft.Windows.AI.MachineLearning/2.1.74/license.txt), [notices](licenses/Microsoft.Windows.AI.MachineLearning/2.1.74/ThirdPartyNotices.txt) |
 | Microsoft.Windows.SDK.NET.Ref | 10.0.19041.57 | Windows SDK terms, including redistribution terms for supplied code; [license (RTF)](licenses/Microsoft.Windows.SDK.NET.Ref/10.0.19041.57/sdk_license.rtf), obtained through the package's [license URL](https://aka.ms/WinSDKLicenseURL) |
-| Microsoft.Graphics.Win2D | 1.4.0-azunyan.25680382dd21 | MIT; locally built from commit 25680382dd2136779e10ea6084f0c5ba437ae288; [license](licenses/Microsoft.Graphics.Win2D/1.4.0-azunyan.25680382dd21/LICENSE.txt) |
+| Microsoft.Graphics.Win2D | 1.4.0-azunyan.25680382dd21.2 | MIT; locally built from commit 25680382dd2136779e10ea6084f0c5ba437ae288; [license](licenses/Microsoft.Graphics.Win2D/1.4.0-azunyan.25680382dd21.2/LICENSE.txt) |
 
 The files in `licenses` preserve upstream license and notice documents.
 [sources.json](licenses/sources.json) records their package versions or source

@@ -14,6 +14,20 @@
       ],
       "problemMatcher": "$msCompile",
       "group": "build"
+    },
+    {
+      "label": "build Azunote ARM64 Debug",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "${workspaceFolder}/src/Azunote/Azunote.csproj",
+        "-c",
+        "Debug",
+        "-p:Platform=ARM64"
+      ],
+      "problemMatcher": "$msCompile",
+      "group": "build"
     }
   ]
 }

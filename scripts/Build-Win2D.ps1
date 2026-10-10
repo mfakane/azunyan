@@ -5,7 +5,7 @@ $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
 $source = Join-Path $repo 'external/Win2D'
 $commit = '25680382dd2136779e10ea6084f0c5ba437ae288'
-$version = '1.4.0-azunyan.25680382dd21'
+$version = '1.4.0-azunyan.25680382dd21.2'
 $feed = Join-Path $repo 'artifacts/packages'
 $nuget = Join-Path $source 'build/nuget/nuget.exe'
 $msbuild = & "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe" `
@@ -24,11 +24,13 @@ $previousLanguage = $env:NUGET_CLI_LANGUAGE
 Push-Location $source
 try {
     $env:NUGET_CLI_LANGUAGE = 'en-US'
-    & $msbuild Win2D.proj /p:BuildPlatforms=x64 /p:BuildConfigurations=Release /p:BuildTests=false /p:BuildTools=false /p:BuildDocs=false /p:RunTests=false /nr:false /v:minimal
+    # %3B keeps MSBuild from splitting the platform list into separate properties.
+    & $msbuild Win2D.proj /p:BuildPlatforms=x64%3BARM64 /p:BuildConfigurations=Release /p:BuildTests=false /p:BuildTools=false /p:BuildDocs=false /p:RunTests=false /nr:false /v:minimal
     if ($LASTEXITCODE) { throw 'Win2D native build failed.' }
     & $msbuild winrt/projection/winrt.projection.csproj /restore /p:Configuration=Release /p:Platform=x64 /p:BuildProjectReferences=false /p:EnableSourceControlManagerQueries=false /p:EnableSourceLink=false /nr:false /v:minimal
     if ($LASTEXITCODE) { throw 'Win2D projection build failed.' }
-    # Package only the x64/.NET assets used by Azunyan, preserving upstream build integration.
+    # The projection is AnyCPU; building it once (under the x64 output directory) serves both architectures.
+    # Package only the x64/ARM64 .NET assets used by Azunyan, preserving upstream build integration.
     $spec = @"
 <?xml version="1.0"?>
 <package>
@@ -36,7 +38,7 @@ try {
     <id>Microsoft.Graphics.Win2D</id>
     <version>$version</version>
     <authors>Microsoft</authors>
-    <description>Win2D built from pinned source for Azunyan; win-x64 only.</description>
+    <description>Win2D built from pinned source for Azunyan; win-x64 and win-arm64.</description>
     <license type="file">LICENSE.txt</license>
     <repository type="git" url="https://github.com/microsoft/Win2D" commit="$commit" />
     <dependencies><dependency id="Microsoft.WindowsAppSDK.WinUI" version="1.8.260204000" /></dependencies>
@@ -45,6 +47,7 @@ try {
     <file src="LICENSE.txt" target="LICENSE.txt" />
     <file src="obj/Win2D.githash.txt" target="Win2D.githash.txt" />
     <file src="bin/uapx64/release/winrt.dll.uap/Microsoft.Graphics.Canvas.dll" target="runtimes/win-x64/native" />
+    <file src="bin/uaparm64/release/winrt.dll.uap/Microsoft.Graphics.Canvas.dll" target="runtimes/win-arm64/native" />
     <file src="bin/uapx64/release/winrt.dll.uap/Microsoft.Graphics.Canvas.winmd" target="lib/uap10.0" />
     <file src="bin/x64/release/winrt.projection/Microsoft.Graphics.Canvas.Interop.dll" target="lib/net6.0-windows10.0.19041.0" />
     <file src="build/nuget/Microsoft.Graphics.Win2D-WinUI3.props" target="buildTransitive/net6.0-windows10.0.19041.0/Microsoft.Graphics.Win2D.props" />
@@ -52,6 +55,15 @@ try {
   </files>
 </package>
 "@
+    foreach ($native in @(
+        @{ Path = 'bin/uapx64/release/winrt.dll.uap/Microsoft.Graphics.Canvas.dll'; Machine = 0x8664 },
+        @{ Path = 'bin/uaparm64/release/winrt.dll.uap/Microsoft.Graphics.Canvas.dll'; Machine = 0xAA64 })) {
+        $bytes = [IO.File]::ReadAllBytes((Join-Path $source $native.Path))
+        $machine = [BitConverter]::ToUInt16($bytes, [BitConverter]::ToInt32($bytes, 0x3C) + 4)
+        if ($machine -ne $native.Machine) {
+            throw ('{0} has PE machine 0x{1:X4}; expected 0x{2:X4}.' -f $native.Path, $machine, $native.Machine)
+        }
+    }
     $specPath = Join-Path $source 'obj/Azunyan.Win2D.nuspec'
     [IO.File]::WriteAllText($specPath, $spec)
     & $nuget pack $specPath -BasePath $source -OutputDirectory $feed -NoPackageAnalysis -NonInteractive

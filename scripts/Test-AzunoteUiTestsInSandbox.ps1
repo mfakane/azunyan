@@ -3,6 +3,8 @@
 param(
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Debug',
+    [ValidateSet('win-x64', 'win-arm64')]
+    [string]$RuntimeIdentifier = 'win-x64',
     [string]$DotNetRoot,
     [string]$OutputRoot,
     [switch]$NoBuild
@@ -40,10 +42,10 @@ if (!$OutputRoot) {
 
 $OutputRoot = [IO.Path]::GetFullPath($OutputRoot)
 $targetFramework = 'net10.0-windows10.0.19041.0'
-$appOutput = Join-Path $repo "src/Azunote/bin/$Configuration/$targetFramework/win-x64"
-$testOutput = Join-Path $repo "tests/Azunote.UiTests/bin/$Configuration/$targetFramework/win-x64"
+$appOutput = Join-Path $repo "src/Azunote/bin/$Configuration/$targetFramework/$RuntimeIdentifier"
+$testOutput = Join-Path $repo "tests/Azunote.UiTests/bin/$Configuration/$targetFramework/$RuntimeIdentifier"
 if (!$NoBuild) {
-    & $dotnet build $solution -c $Configuration
+    & $dotnet build $solution -c $Configuration "-p:AzunoteRuntimeIdentifier=$RuntimeIdentifier"
     if ($LASTEXITCODE) { throw 'The host build failed.' }
 }
 
@@ -82,9 +84,10 @@ try {
 
     $framework = 'net10.0-windows10.0.19041.0'
     $configuration = '__CONFIGURATION__'
-    $appSource = "C:\azunyan-input\src\Azunote\bin\$configuration\$framework\win-x64"
-    $testSource = "C:\azunyan-input\tests\Azunote.UiTests\bin\$configuration\$framework\win-x64"
-    $localTests = Join-Path $localRepo "tests\Azunote.UiTests\bin\$configuration\$framework\win-x64"
+    $runtimeIdentifier = '__RUNTIME_IDENTIFIER__'
+    $appSource = "C:\azunyan-input\src\Azunote\bin\$configuration\$framework\$runtimeIdentifier"
+    $testSource = "C:\azunyan-input\tests\Azunote.UiTests\bin\$configuration\$framework\$runtimeIdentifier"
+    $localTests = Join-Path $localRepo "tests\Azunote.UiTests\bin\$configuration\$framework\$runtimeIdentifier"
 
     & robocopy.exe $appSource (Join-Path $work 'app') /E /NFL /NDL /NJH /NJS /NP 2>&1 |
         Out-File -LiteralPath $log -Append -Encoding utf8
@@ -116,7 +119,7 @@ catch {
 }
 
 exit 0
-'@.Replace('__CONFIGURATION__', $Configuration)
+'@.Replace('__CONFIGURATION__', $Configuration).Replace('__RUNTIME_IDENTIFIER__', $RuntimeIdentifier)
 
 $guestScriptPath = Join-Path $runDirectory 'run-ui-tests.ps1'
 [IO.File]::WriteAllText($guestScriptPath, $guestScript, [Text.UTF8Encoding]::new($false))

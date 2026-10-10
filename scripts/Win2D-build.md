@@ -19,7 +19,10 @@ output. See the submodule's build scripts for the complete build requirements.
 The required tools were installed on 2026-09-10 into Visual Studio Enterprise
 2026. Import [win2d.vsconfig](win2d.vsconfig) through Visual Studio Installer
 to add the v143 UWP tools and v143 x64/x86 Spectre libraries. These components
-installed MSVC 14.44.35207 alongside the existing compiler.
+installed MSVC 14.44.35207 alongside the existing compiler. The configuration
+now also adds the v143 ARM64 compiler, ARM64 Spectre libraries, and ARM64 UWP
+support, because Win2D compiles with `/Qspectre` for each platform, plus the
+latest MSVC ARM64 tools that Native AOT uses to link `win-arm64` publishes.
 
 Windows SDK 19041 is not listed in this Visual Studio catalog. Obtain its
 installer from the [official Windows SDK archive](https://learn.microsoft.com/en-us/windows/apps/windows-sdk/downloads-archive).
@@ -30,6 +33,10 @@ components (run with administrator privileges):
 ```text
 /quiet /norestart /features OptionId.DesktopCPPx64 OptionId.DesktopCPPx86 OptionId.UWPCPP OptionId.UWPManaged
 ```
+
+For the ARM64 build, also include `OptionId.DesktopCPParm64` so the ARM64
+libraries are present. CI uses the `windows-2022` image, whose Visual Studio
+2022 already provides SDK 19041 for every platform.
 
 Both installers completed with exit code 0. The native `winrt.lib.uap.vcxproj`
 Release/x64 build then succeeded without SDK or toolset overrides, producing
@@ -46,7 +53,7 @@ git submodule update --init external/Win2D
 dotnet build src/Azunote/Azunote.csproj -c Debug
 ```
 
-The script creates `artifacts/packages/Microsoft.Graphics.Win2D.1.4.0-azunyan.25680382dd21.nupkg`.
+The script creates `artifacts/packages/Microsoft.Graphics.Win2D.1.4.0-azunyan.25680382dd21.2.nupkg`.
 Both application and control reference this exact version. Root `NuGet.Config`
 maps Win2D exclusively to that local feed; other dependencies use nuget.org.
 Generate the package before the first restore on a fresh clone or CI worker.
@@ -54,8 +61,10 @@ The ignored package can be cached between builds; do not replace its contents
 with binaries from a different source revision. Bump the local version when
 changing the source or packaging recipe.
 
-This package supports only win-x64 and .NET consumers. It contains the native
-DLL, generated .NET projection, WinMD, upstream build integration, MIT license,
+The script builds Release for x64 and ARM64 and checks each native DLL's PE
+machine type before packing. This package supports win-x64, win-arm64, and .NET
+consumers. It contains the native DLL for each architecture (under
+`runtimes/<rid>/native`), the AnyCPU generated .NET projection, WinMD, upstream build integration, MIT license,
 and source commit. The upstream source stays unmodified. Azure-specific
 SourceLink is disabled for this GitHub build; provenance is recorded in NuGet
 repository metadata and `Win2D.githash.txt` instead.

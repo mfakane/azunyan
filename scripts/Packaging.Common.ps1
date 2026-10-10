@@ -6,7 +6,38 @@ $ErrorActionPreference = 'Stop'
 # PublishShimDirectory in src/Azunote/Azunote.csproj.
 $AzunoteShimDirectory = '.app'
 
-function New-AzunoteDistribution([string] $OutputDirectory, [string] $Version, [switch] $Release) {
+# Runtime identifiers the distributions support, with the MSIX architecture
+# name and the PE machine type their executables must carry.
+$AzunoteRuntimeIdentifiers = @{
+    'win-x64' = @{ Architecture = 'x64'; Machine = 0x8664 }
+    'win-arm64' = @{ Architecture = 'arm64'; Machine = 0xAA64 }
+}
+
+function Get-AzunotePeMachine([string] $Path) {
+    $stream = [IO.File]::OpenRead($Path)
+    try {
+        $reader = [IO.BinaryReader]::new($stream)
+        if ($reader.ReadUInt16() -ne 0x5A4D) { throw "$Path is not a PE image." }
+        $stream.Position = 0x3C
+        $stream.Position = $reader.ReadInt32()
+        if ($reader.ReadUInt32() -ne 0x00004550) { throw "$Path has no PE header." }
+        return [int] $reader.ReadUInt16()
+    } finally { $stream.Dispose() }
+}
+
+function Assert-AzunoteExecutableArchitecture($Context, [string] $Path) {
+    $machine = Get-AzunotePeMachine $Path
+    if ($machine -ne $Context.Machine) {
+        throw ('{0} has PE machine 0x{1:X4}; {2} needs 0x{3:X4}.' -f $Path, $machine, $Context.RuntimeIdentifier, $Context.Machine)
+    }
+}
+
+function New-AzunoteDistribution([string] $OutputDirectory, [string] $Version, [switch] $Release,
+        [string] $RuntimeIdentifier = 'win-x64') {
+    if (!$AzunoteRuntimeIdentifiers.ContainsKey($RuntimeIdentifier)) {
+        throw "Unsupported runtime identifier '$RuntimeIdentifier'; use $(($AzunoteRuntimeIdentifiers.Keys | Sort-Object) -join ' or ')."
+    }
+    $target = $AzunoteRuntimeIdentifiers[$RuntimeIdentifier]
     $repo = Split-Path $PSScriptRoot -Parent
     [xml] $manifest = Get-Content (Join-Path $repo 'src/Azunote/Package.appxmanifest') -Raw
     if (!$Release) {
@@ -29,6 +60,7 @@ function New-AzunoteDistribution([string] $OutputDirectory, [string] $Version, [
     return [pscustomobject]@{
         Repo = $repo; Output = $output; Work = $work; Version = $Version
         Publish = Join-Path $work 'publish'; Manifest = $manifest; Release = $Release.IsPresent
+        RuntimeIdentifier = $RuntimeIdentifier; Architecture = $target.Architecture; Machine = $target.Machine
     }
 }
 
@@ -56,7 +88,7 @@ function Publish-AzunoteDistribution($Context, [switch] $Portable) {
     try {
         # Native AOT's linker discovery invokes vswhere by name.
         $env:PATH = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer;$previousPath"
-        & dotnet publish $project -c Release -r win-x64 --self-contained true `
+        & dotnet publish $project -c Release -r $Context.RuntimeIdentifier --self-contained true `
             @publishProperties `
             "-p:Version=$($Context.Version)" -o $Context.Publish
         if ($LASTEXITCODE) { throw "Azunote publish failed ($LASTEXITCODE)." }
@@ -77,6 +109,11 @@ function Publish-AzunoteDistribution($Context, [switch] $Portable) {
         if (!(Test-Path -LiteralPath (Join-Path $Context.Publish $file))) {
             throw "Publish output is missing $file."
         }
+    }
+    # Every executable a user can start, including the portable shims, must be
+    # native for the requested architecture rather than relying on emulation.
+    foreach ($file in $requiredFiles | Where-Object { $_ -like '*.exe' }) {
+        Assert-AzunoteExecutableArchitecture $Context (Join-Path $Context.Publish $file)
     }
     if ($Portable) {
         # Nothing but the shims and the documents they are read beside may be
@@ -214,6 +251,21 @@ function Find-AzunoteWinApp($Context, [string] $PreferredPath) {
         if (Test-Path -LiteralPath $tool) { return $tool }
     }
     throw 'The restored WinApp CLI executable is missing.'
+}
+
+function Assert-AzunotePackageArchitecture($Context, [string] $Package) {
+    $archive = [IO.Compression.ZipFile]::OpenRead($Package)
+    try {
+        $entry = $archive.GetEntry('AppxManifest.xml')
+        if ($null -eq $entry) { throw "$Package has no AppxManifest.xml." }
+        $reader = [IO.StreamReader]::new($entry.Open())
+        try { [xml] $packageManifest = $reader.ReadToEnd() } finally { $reader.Dispose() }
+    } finally { $archive.Dispose() }
+    $architecture = $packageManifest.Package.Identity.GetAttribute('ProcessorArchitecture')
+    if ($architecture -ne $Context.Architecture) {
+        throw "$Package declares ProcessorArchitecture '$architecture'; expected '$($Context.Architecture)'."
+    }
+    Write-Host "Package ProcessorArchitecture: $architecture"
 }
 
 function Complete-AzunoteDistribution([string] $Path) {

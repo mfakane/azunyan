@@ -12,16 +12,29 @@ on:
         description: Optional four-part package version (for example, 0.1.42.0)
         required: false
         type: string
+  # release.yml reuses this workflow to build its draft release.
+  workflow_call:
+    inputs:
+      version:
+        description: Four-part package version
+        required: false
+        type: string
+      release:
+        description: Package release identities instead of development ones
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
-  build-test-package:
+  build-test:
+    name: Build Win2D, build and test (x64)
     # Win2D requires the Windows 10 SDK 19041, which is not present on the
     # Windows Server 2025 image currently selected by windows-latest.
     runs-on: windows-2022
-    timeout-minutes: 60
+    timeout-minutes: 75
 
     steps:
       - name: Check out repository and pinned submodules
@@ -73,18 +86,16 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Set up WinApp CLI
-        uses: microsoft/setup-WinAppCli@v0.2
-        with:
-          version: v0.7.1
-
-      - name: Verify WinApp CLI
-        shell: pwsh
-        run: winapp --version
-
-      - name: Build pinned Win2D package
+      - name: Build pinned Win2D package (x64 and ARM64)
         shell: pwsh
         run: ./scripts/Build-Win2D.ps1
+
+      - name: Upload Win2D package
+        uses: actions/upload-artifact@v7
+        with:
+          name: win2d-package
+          path: artifacts/packages/Microsoft.Graphics.Win2D.*.nupkg
+          if-no-files-found: error
 
       - name: Restore solution
         shell: pwsh
@@ -98,25 +109,172 @@ jobs:
         shell: pwsh
         run: dotnet test Azunyan.slnx -c Debug --no-build --no-restore
 
-      - name: Package unsigned MSIX
+  test-arm64:
+    name: Build and test (ARM64, native)
+    needs: build-test
+    # The ARM64 image lacks Windows SDK 19041, so it consumes the Win2D package
+    # built on windows-2022 instead of building Win2D itself.
+    runs-on: windows-11-arm
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Check runner architecture
+        shell: pwsh
+        run: |
+          $os = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
+          Write-Host "OSArchitecture=$os PROCESSOR_ARCHITECTURE=$env:PROCESSOR_ARCHITECTURE"
+          dotnet --info
+          if ($os -ne 'Arm64') { throw 'This job must run on an ARM64 runner.' }
+
+      - name: Download Win2D package
+        uses: actions/download-artifact@v8
+        with:
+          name: win2d-package
+          path: artifacts/packages
+
+      - name: Restore solution
+        shell: pwsh
+        run: dotnet restore Azunyan.slnx -p:AzunoteRuntimeIdentifier=win-arm64
+
+      - name: Build solution
+        shell: pwsh
+        run: dotnet build Azunyan.slnx -c Debug --no-restore -p:AzunoteRuntimeIdentifier=win-arm64
+
+      - name: Check build output architecture
+        shell: pwsh
+        run: |
+          . ./scripts/Packaging.Common.ps1
+          $context = [pscustomobject]@{ RuntimeIdentifier = 'win-arm64'; Machine = 0xAA64 }
+          foreach ($exe in @(
+              'src/Azunote/bin/Debug/net10.0-windows10.0.19041.0/win-arm64/Azunote.exe',
+              'src/Azunote.Cli/bin/Debug/net10.0/win-arm64/azu.exe')) {
+              Assert-AzunoteExecutableArchitecture $context $exe
+              Write-Host "$exe is ARM64."
+          }
+
+      - name: Run tests
+        shell: pwsh
+        run: dotnet test Azunyan.slnx -c Debug --no-build --no-restore -p:AzunoteRuntimeIdentifier=win-arm64
+
+  package:
+    name: Package (${{ matrix.rid }})
+    needs: build-test
+    runs-on: windows-2022
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [win-x64, win-arm64]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Ensure MSVC ARM64 build tools for Native AOT
+        if: matrix.rid == 'win-arm64'
+        shell: pwsh
+        run: |
+          # Native AOT links win-arm64 output with the MSVC ARM64 tools, even on an x64 host.
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
+          $installer = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/setup.exe'
+          $component = 'Microsoft.VisualStudio.Component.VC.Tools.ARM64'
+          $installPath = & $vswhere -latest -products '*' -property installationPath
+          if ([string]::IsNullOrWhiteSpace($installPath)) {
+              throw 'Visual Studio installation was not found.'
+          }
+          if (& $vswhere -latest -products '*' -requires $component -property installationPath) {
+              Write-Host "$component is already installed."
+              exit 0
+          }
+          $arguments = @('modify', '--installPath', "`"$installPath`"", '--add', $component, '--passive', '--norestart')
+          $process = Start-Process -FilePath $installer -ArgumentList $arguments -Wait -PassThru
+          if ($process.ExitCode) {
+              throw "Visual Studio component installation failed with exit code $($process.ExitCode)."
+          }
+          $deadline = (Get-Date).AddMinutes(10)
+          while (!(& $vswhere -latest -products '*' -requires $component -property installationPath)) {
+              if ((Get-Date) -gt $deadline) { throw "$component was not available after installation." }
+              Start-Sleep -Seconds 5
+          }
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Set up WinApp CLI
+        uses: microsoft/setup-WinAppCli@v0.2
+        with:
+          version: v0.7.1
+
+      - name: Verify WinApp CLI
+        shell: pwsh
+        run: winapp --version
+
+      - name: Download Win2D package
+        uses: actions/download-artifact@v8
+        with:
+          name: win2d-package
+          path: artifacts/packages
+
+      - name: Package unsigned MSIX and portable ZIP
         shell: pwsh
         env:
           REQUESTED_VERSION: ${{ inputs.version }}
+          RELEASE_BUILD: ${{ inputs.release && 'true' || 'false' }}
+          RID: ${{ matrix.rid }}
         run: |
           $version = $env:REQUESTED_VERSION
           if ([string]::IsNullOrWhiteSpace($version)) {
               $version = "0.1.$env:GITHUB_RUN_NUMBER.0"
           }
+          $release = $env:RELEASE_BUILD -eq 'true'
 
           ./scripts/Package-AzunoteMsix.ps1 `
+              -Release:$release `
               -Version $version `
+              -RuntimeIdentifier $env:RID `
+              -OutputDirectory artifacts/distributions
+          ./scripts/Package-AzunoteZip.ps1 `
+              -Release:$release `
+              -Version $version `
+              -RuntimeIdentifier $env:RID `
               -OutputDirectory artifacts/distributions
 
-      - name: Upload MSIX artifact
+      - name: Upload distributions
         uses: actions/upload-artifact@v7
         with:
-          name: azunote-msix
+          name: azunote-${{ matrix.rid }}
           path: |
             artifacts/distributions/*.msix
+            artifacts/distributions/*.zip
             artifacts/distributions/*.sha256
           if-no-files-found: error
+
+  smoke-arm64:
+    name: Smoke test portable ZIP (ARM64, native)
+    needs: package
+    runs-on: windows-11-arm
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Download ARM64 distributions
+        uses: actions/download-artifact@v8
+        with:
+          name: azunote-win-arm64
+          path: artifacts/distributions
+
+      - name: Run portable ZIP
+        shell: pwsh
+        run: ./scripts/Test-AzunotePortableSmoke.ps1 -RuntimeIdentifier win-arm64 -Path (Get-Item artifacts/distributions/*.zip).FullName

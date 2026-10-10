@@ -4,6 +4,7 @@ param(
     [switch] $Release,
     [string] $Version,
     [string] $OutputDirectory,
+    [ValidateSet('win-x64', 'win-arm64')] [string] $RuntimeIdentifier = 'win-x64',
     [ValidateSet('msix', 'appx')] [string] $Format = 'msix',
     [string] $IdentityName,
     [string] $Publisher,
@@ -14,8 +15,8 @@ param(
     [uri] $TimestampUrl
 )
 . (Join-Path $PSScriptRoot 'Packaging.Common.ps1')
-$context = New-AzunoteDistribution $OutputDirectory $Version -Release:$Release
-$package = Join-Path $context.Output "Azunote-$($context.Version)-win-x64.$Format"
+$context = New-AzunoteDistribution $OutputDirectory $Version -Release:$Release -RuntimeIdentifier $RuntimeIdentifier
+$package = Join-Path $context.Output "Azunote-$($context.Version)-$($context.RuntimeIdentifier).$Format"
 if (Test-Path -LiteralPath $package) { throw "Output already exists: $package" }
 if ($CertificatePath -and $CertificateThumbprint) {
     throw 'CertificatePath and CertificateThumbprint are mutually exclusive.'
@@ -36,6 +37,8 @@ $manifest = $context.Manifest
 $manifest.Package.Identity.Version = $context.Version
 if ($IdentityName) { $manifest.Package.Identity.Name = $IdentityName }
 if ($Publisher) { $manifest.Package.Identity.Publisher = $Publisher }
+# WinApp would infer this from Azunote.exe; stating it keeps both formats explicit.
+$manifest.Package.Identity.SetAttribute('ProcessorArchitecture', $context.Architecture)
 New-AzunotePackageResources $context $payload $winapp $manifest.Package.Identity.Name
 # Keep user documentation with the package without adding it to the PRI index.
 Copy-AzunotePackageDocumentation $context $payload
@@ -51,12 +54,12 @@ if ($Format -eq 'msix') {
     } finally { Pop-Location }
 } else {
     # WinApp package emits MSIX; use its MakeAppx wrapper for explicit APPX requests.
-    $manifest.Package.Identity.SetAttribute('ProcessorArchitecture', 'x64')
     $manifest.Package.Applications.Application.Executable = 'Azunote.exe'
     $manifest.Save((Join-Path $payload 'AppxManifest.xml'))
     & $winapp tool makeappx pack /d $payload /p $package
     if ($LASTEXITCODE) { throw "MakeAppx failed ($LASTEXITCODE)." }
 }
+Assert-AzunotePackageArchitecture $context $package
 if ($CertificatePath) {
     $signArguments = @('sign', $package, $CertificatePath, '--password', $CertificatePassword)
     if ($TimestampUrl) { $signArguments += @('--timestamp', $TimestampUrl.AbsoluteUri) }

@@ -7,7 +7,7 @@ Dependencies are licensed separately. The zlib license does not replace or
 grant additional rights to third-party components.
 
 This inventory was reviewed on {{REVIEW_DATE}} against Azunote's restored
-`{{TARGET_FRAMEWORK}}` / `{{RUNTIME_IDENTIFIER}}` dependencies, with Native AOT and
+`{{TARGET_FRAMEWORK}}` / {{RUNTIME_IDENTIFIERS}} dependencies, with Native AOT and
 self-contained Windows App SDK deployment enabled. It conservatively includes
 notices for runtime dependencies even when trimming or unused SDK features may
 exclude some code. It is not a claim that every listed component is in every

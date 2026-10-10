@@ -14,9 +14,12 @@ git submodule update --init external/Win2D
 ./scripts/Build-Win2D.ps1
 ./scripts/Package-AzunoteZip.ps1
 ./scripts/Package-AzunoteMsix.ps1
+./scripts/Package-AzunoteZip.ps1 -RuntimeIdentifier win-arm64
+./scripts/Package-AzunoteMsix.ps1 -RuntimeIdentifier win-arm64
 ```
 
-Both scripts publish Release/win-x64 as self-contained Native AOT deployments
+Both scripts publish Release for `-RuntimeIdentifier` (`win-x64` by default, or
+`win-arm64`) as self-contained Native AOT deployments
 using the development identity by default. Normal local builds and CI packages
 display `Azunote (Dev)`, use package ID `45929MFAlie.Azunote.Dev`, the
 `azu-dev.exe` execution alias, and `%LOCALAPPDATA%/Azunote.Dev` for user data.
@@ -33,6 +36,17 @@ program and its documents rather than the runtime. Each run uses a new staging
 directory under `artifacts/packaging` to avoid including stale files. PDBs
 remain in staging but are omitted from distributions.
 
+Each distribution is for one architecture; there is no MSIX bundle. Output
+names end in the runtime identifier (`Azunote-<version>-win-arm64.msix`). The
+scripts check that every executable, including the portable shims, is native
+for that architecture, and that the MSIX/APPX manifest declares the matching
+`ProcessorArchitecture` (`x64` or `arm64`). Cross-publishing `win-arm64` on an
+x64 machine needs the MSVC ARM64 build tools
+(`Microsoft.VisualStudio.Component.VC.Tools.ARM64`).
+`./scripts/Test-AzunotePortableSmoke.ps1 -Path <zip> -RuntimeIdentifier <rid>`
+extracts a ZIP on a machine of that architecture, checks its native images,
+runs `azu --help`, and starts the editor briefly; CI runs it on ARM64.
+
 Outputs default to `artifacts/distributions`, with a SHA-256 sidecar for each
 archive. The default version comes from `src/Azunote/Package.appxmanifest`.
 Existing output files are not overwritten. Neither script installs the app.
@@ -42,7 +56,7 @@ Existing output files are not overwritten. Neither script installs the app.
 ./scripts/Package-AzunoteMsix.ps1 -Version 0.2.0.0 -Format appx
 ```
 
-The ZIP contains a top-level `Azunote-<version>-win-x64` folder. Its visible
+The ZIP contains a top-level `Azunote-<version>-<rid>` folder. Its visible
 top level contains the `Azunote.exe` and `azu.exe` shims,
 `Register-AzunoteCompletion.ps1`, `README.md`, `LICENSE`,
 `THIRD-PARTY-NOTICES.md`, an empty `appdata/` directory, and `docs/` with the
