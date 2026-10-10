@@ -37,7 +37,7 @@ jobs:
           if (@($parts | Where-Object { [long]$_ -gt 65535 }).Count) {
               throw 'Each version part must be between 0 and 65535.'
           }
-          $tag = "v$version"
+          $tag = "v$version.$env:GITHUB_RUN_NUMBER"
           $existing = git ls-remote --tags origin "refs/tags/$tag"
           if ($existing) {
               throw "Tag $tag already exists."
