@@ -18,7 +18,7 @@ public sealed class DocumentStatusPresenterTests
 
         presenter.RefreshTitle();
 
-        Assert.Equal("LICENSE [READONLY] - Azunote", chrome.Title);
+        Assert.Equal($"LICENSE [READONLY] - {ApplicationIdentity.DisplayName}", chrome.Title);
     }
 
     [Fact]
@@ -47,7 +47,7 @@ public sealed class DocumentStatusPresenterTests
         Assert.Equal("LF", status.State?.LineEnding);
         Assert.Equal("Spaces: 8", status.State?.Indentation);
         Assert.True(status.State?.HasFilePath);
-        Assert.Equal("notes.txt - Azunote", chrome.Title);
+        Assert.Equal($"notes.txt - {ApplicationIdentity.DisplayName}", chrome.Title);
     }
 
     [Fact]

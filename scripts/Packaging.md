@@ -17,7 +17,15 @@ git submodule update --init external/Win2D
 ```
 
 Both scripts publish Release/win-x64 as self-contained Native AOT deployments
-and keep the self-contained Windows App SDK runtime as loose files. The ZIP
+using the development identity by default. Normal local builds and CI packages
+display `Azunote (Dev)`, use package ID `45929MFAlie.Azunote.Dev`, the
+`azu-dev.exe` execution alias, and `%LOCALAPPDATA%/Azunote.Dev` for user data.
+They use a separate mutex and command pipe from the release application.
+Pass `-Release` to either packaging script to create a production distribution;
+the release workflow does this explicitly. For a direct production build,
+pass `-p:AzunoteRelease=true`, regardless of the Debug/Release configuration.
+
+Both scripts keep the self-contained Windows App SDK runtime as loose files. The ZIP
 script additionally moves the published application into an `.app`
 subdirectory and leaves a [publish shim](https://www.nuget.org/packages/PublishShim.MSBuild/)
 named after each executable in its place, so the folder a user opens holds the

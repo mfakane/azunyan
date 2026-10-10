@@ -16,7 +16,7 @@ internal sealed class MainWindowViewModel :
 {
     private readonly IMainWindowCommandFactory _commandFactory;
     private IMainWindowActions? _actions;
-    private string _title = "Azunote";
+    private string _title = ApplicationIdentity.DisplayName;
     private bool _isWordWrapEnabled;
     private bool _isStatusBarVisible = true;
     private bool _isAlwaysOnTop;

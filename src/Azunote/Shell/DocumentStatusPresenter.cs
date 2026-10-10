@@ -52,6 +52,6 @@ internal sealed class DocumentStatusPresenter
             : Path.GetFileName(_session.State.FilePath);
         var dirtyMarker = _session.State.IsDirty ? " *" : string.Empty;
         var readOnlyMarker = _session.State.IsReadOnly ? " [READONLY]" : string.Empty;
-        _window.SetTitle($"{name}{dirtyMarker}{readOnlyMarker} - Azunote");
+        _window.SetTitle($"{name}{dirtyMarker}{readOnlyMarker} - {ApplicationIdentity.DisplayName}");
     }
 }

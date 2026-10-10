@@ -869,7 +869,7 @@ public sealed class ExternalToolCatalog
 
 public static class SettingsFileService
 {
-    public const string SettingsDirectoryName = "Azunote";
+    public const string SettingsDirectoryName = ApplicationIdentity.InstanceName;
     public const string PortableDataDirectoryName = "appdata";
     public const string SettingsFileName = "settings.toml";
     public const string ToolsDirectoryName = "tools";

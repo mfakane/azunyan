@@ -1,6 +1,7 @@
 #requires -Version 7.0
 [CmdletBinding()]
 param(
+    [switch] $Release,
     [string] $Version,
     [string] $OutputDirectory,
     [ValidateSet('msix', 'appx')] [string] $Format = 'msix',
@@ -13,7 +14,7 @@ param(
     [uri] $TimestampUrl
 )
 . (Join-Path $PSScriptRoot 'Packaging.Common.ps1')
-$context = New-AzunoteDistribution $OutputDirectory $Version
+$context = New-AzunoteDistribution $OutputDirectory $Version -Release:$Release
 $package = Join-Path $context.Output "Azunote-$($context.Version)-win-x64.$Format"
 if (Test-Path -LiteralPath $package) { throw "Output already exists: $package" }
 if ($CertificatePath -and $CertificateThumbprint) {

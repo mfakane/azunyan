@@ -66,7 +66,7 @@ public sealed class SingleInstanceResponse
 /// </summary>
 public static class SingleInstanceProtocol
 {
-    public const string DefaultInstanceName = "Azunote";
+    public const string DefaultInstanceName = ApplicationIdentity.InstanceName;
     // A command line can name a document for every file in a folder, so the
     // guard against a nonsense frame has to leave room for a real one.
     public const int MaxArgumentCount = 1024;

@@ -6,9 +6,16 @@ $ErrorActionPreference = 'Stop'
 # PublishShimDirectory in src/Azunote/Azunote.csproj.
 $AzunoteShimDirectory = '.app'
 
-function New-AzunoteDistribution([string] $OutputDirectory, [string] $Version) {
+function New-AzunoteDistribution([string] $OutputDirectory, [string] $Version, [switch] $Release) {
     $repo = Split-Path $PSScriptRoot -Parent
     [xml] $manifest = Get-Content (Join-Path $repo 'src/Azunote/Package.appxmanifest') -Raw
+    if (!$Release) {
+        $manifest.Package.Identity.Name += '.Dev'
+        $manifest.Package.Properties.DisplayName = 'Azunote (Dev)'
+        $manifest.SelectSingleNode("//*[local-name()='VisualElements']").SetAttribute('DisplayName', 'Azunote (Dev)')
+        $manifest.SelectSingleNode("//*[local-name()='FileTypeAssociation']/*[local-name()='DisplayName']").InnerText = 'Azunote (Dev) text files'
+        $manifest.SelectSingleNode("//*[local-name()='ExecutionAlias']").SetAttribute('Alias', 'azu-dev.exe')
+    }
     if (!$Version) { $Version = $manifest.Package.Identity.Version }
     if ($Version -notmatch '^\d+\.\d+\.\d+\.\d+$' -or
         @($Version.Split('.') | Where-Object { [long]$_ -gt 65535 }).Count) {
@@ -21,7 +28,7 @@ function New-AzunoteDistribution([string] $OutputDirectory, [string] $Version) {
     New-Item -ItemType Directory -Force $work | Out-Null
     return [pscustomobject]@{
         Repo = $repo; Output = $output; Work = $work; Version = $Version
-        Publish = Join-Path $work 'publish'; Manifest = $manifest
+        Publish = Join-Path $work 'publish'; Manifest = $manifest; Release = $Release.IsPresent
     }
 }
 
@@ -29,6 +36,7 @@ function Publish-AzunoteDistribution($Context, [switch] $Portable) {
     & (Join-Path $PSScriptRoot 'Generate-ThirdPartyNotices.ps1') -Check
     $project = Join-Path $Context.Repo 'src/Azunote/Azunote.csproj'
     $publishProperties = @(
+        "-p:AzunoteRelease=$($Context.Release.ToString().ToLowerInvariant())"
         '-p:WindowsPackageType=None'
         '-p:EnableMsixTooling=true'
         '-p:PublishAot=true'

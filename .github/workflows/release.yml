@@ -119,9 +119,11 @@ jobs:
         shell: pwsh
         run: |
           ./scripts/Package-AzunoteMsix.ps1 `
+              -Release `
               -Version $env:PACKAGE_VERSION `
               -OutputDirectory artifacts/distributions
           ./scripts/Package-AzunoteZip.ps1 `
+              -Release `
               -Version $env:PACKAGE_VERSION `
               -OutputDirectory artifacts/distributions
 

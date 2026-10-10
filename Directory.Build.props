@@ -2,5 +2,7 @@
   <PropertyGroup>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <AnalysisMode>Recommended</AnalysisMode>
+    <AzunoteRelease Condition="'$(AzunoteRelease)' == ''">false</AzunoteRelease>
+    <DefineConstants Condition="'$(AzunoteRelease)' != 'true'">$(DefineConstants);AZUNOTE_DEV</DefineConstants>
   </PropertyGroup>
 </Project>

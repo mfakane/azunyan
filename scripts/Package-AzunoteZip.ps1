@@ -1,8 +1,8 @@
 #requires -Version 7.0
 [CmdletBinding()]
-param([string] $Version, [string] $OutputDirectory)
+param([string] $Version, [string] $OutputDirectory, [switch] $Release)
 . (Join-Path $PSScriptRoot 'Packaging.Common.ps1')
-$context = New-AzunoteDistribution $OutputDirectory $Version
+$context = New-AzunoteDistribution $OutputDirectory $Version -Release:$Release
 $name = "Azunote-$($context.Version)-win-x64"
 $archive = Join-Path $context.Output "$name.zip"
 if (Test-Path -LiteralPath $archive) { throw "Output already exists: $archive" }

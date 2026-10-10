@@ -101,7 +101,7 @@
   </Target>
 
   <Target Name="BundleAzunoteCliForPublish" AfterTargets="Publish">
-    <Exec Command="dotnet publish &quot;$(AzunoteCliProject)&quot; -c $(Configuration) -r win-x64 --nologo" />
+    <Exec Command="dotnet publish &quot;$(AzunoteCliProject)&quot; -c $(Configuration) -r win-x64 -p:AzunoteRelease=$(AzunoteRelease) --nologo" />
     <Copy SourceFiles="$(AzunoteCliPublishPath)azu.exe"
           DestinationFolder="$(PublishDir)"
           SkipUnchangedFiles="true" />
@@ -192,4 +192,34 @@
            Text="The app resource index is missing from both OutputPath and PublishDir." />
   </Target>
 
+  <Target Name="SelectAzunoteRunManifest" BeforeTargets="_WinAppValidateRunSupport">
+    <PropertyGroup>
+      <WinAppManifestPath>$(OutputPath)AppxManifest.xml</WinAppManifestPath>
+    </PropertyGroup>
+  </Target>
+
+  <Target Name="PrepareAzunoteDevManifest" BeforeTargets="PrepareForBuild"
+          Condition="'$(AzunoteRelease)' != 'true'">
+    <PropertyGroup>
+      <_AzunoteDevManifest>$(IntermediateOutputPath)Package.Dev.appxmanifest</_AzunoteDevManifest>
+    </PropertyGroup>
+    <MakeDir Directories="$(IntermediateOutputPath)" />
+    <Copy SourceFiles="Package.appxmanifest" DestinationFiles="$(_AzunoteDevManifest)" />
+    <XmlPoke XmlInputPath="$(_AzunoteDevManifest)"
+             Query="/*[local-name()='Package']/*[local-name()='Identity']/@Name"
+             Value="45929MFAlie.Azunote.Dev" />
+    <XmlPoke XmlInputPath="$(_AzunoteDevManifest)"
+             Query="/*[local-name()='Package']/*[local-name()='Properties']/*[local-name()='DisplayName'] | //*[local-name()='VisualElements']/@DisplayName"
+             Value="Azunote (Dev)" />
+    <XmlPoke XmlInputPath="$(_AzunoteDevManifest)"
+             Query="//*[local-name()='FileTypeAssociation']/*[local-name()='DisplayName']"
+             Value="Azunote (Dev) text files" />
+    <XmlPoke XmlInputPath="$(_AzunoteDevManifest)"
+             Query="//*[local-name()='ExecutionAlias']/@Alias"
+             Value="azu-dev.exe" />
+    <ItemGroup>
+      <AppxManifest Remove="@(AppxManifest)" />
+      <AppxManifest Include="$(_AzunoteDevManifest)" />
+    </ItemGroup>
+  </Target>
 </Project>
