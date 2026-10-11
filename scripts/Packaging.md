@@ -16,6 +16,7 @@ git submodule update --init external/Win2D
 ./scripts/Package-AzunoteMsix.ps1
 ./scripts/Package-AzunoteZip.ps1 -RuntimeIdentifier win-arm64
 ./scripts/Package-AzunoteMsix.ps1 -RuntimeIdentifier win-arm64
+./scripts/Package-AzunoteMsixBundle.ps1
 ```
 
 Both scripts publish Release for `-RuntimeIdentifier` (`win-x64` by default, or
@@ -36,8 +37,8 @@ program and its documents rather than the runtime. Each run uses a new staging
 directory under `artifacts/packaging` to avoid including stale files. PDBs
 remain in staging but are omitted from distributions.
 
-Each distribution is for one architecture; there is no MSIX bundle. Output
-names end in the runtime identifier (`Azunote-<version>-win-arm64.msix`). The
+Each ZIP and MSIX/APPX is for one architecture, and its name ends in the
+runtime identifier (`Azunote-<version>-win-arm64.msix`). The
 scripts check that every executable, including the portable shims, is native
 for that architecture, and that the MSIX/APPX manifest declares the matching
 `ProcessorArchitecture` (`x64` or `arm64`). Cross-publishing `win-arm64` on an
@@ -75,6 +76,34 @@ tools are stored below that directory instead of the normal
 `%LOCALAPPDATA%/Azunote` directory. Removing `appdata/` before launching again
 restores the normal user configuration location. This is a folder-local data
 mode, not a separate USB-local settings mode.
+
+## MSIX bundle
+
+`./scripts/Package-AzunoteMsixBundle.ps1` combines the `win-x64` and
+`win-arm64` MSIX packages into `Azunote-<version>.msixbundle`, from which
+Windows installs the package matching the device. By default it reads both
+packages from `artifacts/distributions` and writes the bundle there; it picks
+the only version with a package for every architecture, or takes `-Version`,
+`-InputDirectory`, or explicit `-Path` packages. It refuses packages whose
+identity name, publisher, or version differ, or that do not cover exactly `x64`
+and `arm64`. The bundle is made with `winapp tool makeappx bundle`, with the
+bundle version set to the package version (`/bv`) instead of MakeAppx's
+clock-based default.
+
+After bundling, the script reads `AppxMetadata/AppxBundleManifest.xml`, checks
+that it lists one application package per architecture, and opens each inner
+package to check that its identity, version, and `ProcessorArchitecture` match
+the bundle manifest. Like the MSIX script, it writes a SHA-256 sidecar, leaves
+the bundle unsigned by default, and accepts `-CertificatePath` or
+`-CertificateThumbprint` (with `-TimestampUrl`) to sign the bundle itself; the
+inner packages need not be signed separately.
+
+`./scripts/Test-AzunoteMsixBundle.ps1 -Path <bundle>` repeats the manifest
+checks, verifies the sidecar, and unbundles with MakeAppx to confirm both
+packages come back with the right architecture (`-SkipUnbundle` omits that
+step). CI runs both scripts in the `Bundle MSIX (x64 + ARM64)` job after the
+per-architecture packages and uploads the bundle as the `azunote-msixbundle`
+artifact. The bundle is not installed in CI because it is unsigned.
 
 ## Package identity and signing
 
@@ -129,9 +158,13 @@ packages can also be handed to an external signing service.
 ## Draft release
 
 `.github/workflows/release.yml` is started by hand. Enter a `major.minor`
-version, such as `0.2`. It tests the selected commit, packages an unsigned MSIX
-and a portable ZIP as `major.minor.<run number>.0`, then tags `v<major>.<minor>` and opens
-a draft release with those files. A failed package does not create the tag.
+version, such as `0.2`. It tests the selected commit, packages unsigned MSIX
+and portable ZIPs for both architectures as `major.minor.<run number>.0`,
+bundles the MSIX packages, then tags `v<major>.<minor>.<run number>` and opens
+a draft release with the MSIX bundle and the `win-x64` and `win-arm64` ZIPs,
+each with its SHA-256 sidecar. The bundle is the release's only installer;
+per-architecture MSIX packages remain in the workflow's CI artifacts. A failed
+package or bundle does not create the tag.
 
 The scripts verify the generated notice inventory before publishing. The
 distribution review items in `THIRD-PARTY-NOTICES.md` still apply.
