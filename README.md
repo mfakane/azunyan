@@ -7,6 +7,10 @@ Azunyan is the set of reusable text-editor components it is built from.
 Azunote-specific build, usage, configuration, and runtime documentation is
 maintained in [src/Azunote/README.md](src/Azunote/README.md).
 
+Releases provide an `.msixbundle` installer covering x64 and ARM64 and a
+portable ZIP for each architecture; see
+[Installation](src/Azunote/README.md#installation).
+
 ![Screenshot of Azunote](assets/screenshots/completion.png)
 
 ## License

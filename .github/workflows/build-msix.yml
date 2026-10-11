@@ -259,6 +259,48 @@ jobs:
             artifacts/distributions/*.sha256
           if-no-files-found: error
 
+  bundle:
+    name: Bundle MSIX (x64 + ARM64)
+    needs: package
+    runs-on: windows-2022
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up WinApp CLI
+        uses: microsoft/setup-WinAppCli@v0.2
+        with:
+          version: v0.7.1
+
+      - name: Download per-architecture distributions
+        uses: actions/download-artifact@v8
+        with:
+          pattern: azunote-win-*
+          path: artifacts/per-rid
+          merge-multiple: true
+
+      - name: Create unsigned MSIX bundle
+        shell: pwsh
+        run: |
+          ./scripts/Package-AzunoteMsixBundle.ps1 `
+              -InputDirectory artifacts/per-rid `
+              -OutputDirectory artifacts/distributions
+
+      - name: Validate MSIX bundle
+        shell: pwsh
+        run: ./scripts/Test-AzunoteMsixBundle.ps1 -Path (Get-Item artifacts/distributions/*.msixbundle).FullName
+
+      - name: Upload MSIX bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: azunote-msixbundle
+          path: |
+            artifacts/distributions/*.msixbundle
+            artifacts/distributions/*.msixbundle.sha256
+          if-no-files-found: error
+
   smoke-arm64:
     name: Smoke test portable ZIP (ARM64, native)
     needs: package

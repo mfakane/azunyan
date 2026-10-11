@@ -12,6 +12,22 @@ framework-independent layout APIs live in `Azunyan.Core` under the
 shell, external tools, TOML settings, file I/O, language modes, and theme are
 kept here.
 
+## Installation
+
+GitHub releases provide two kinds of download, for Windows x64 and ARM64:
+
+- `Azunote-<version>.msixbundle` is the installer. It contains the x64 and
+  ARM64 MSIX packages, and Windows installs the one matching the device. The
+  bundle is currently unsigned, so it must be signed with a certificate the
+  machine trusts before it can be installed.
+- `Azunote-<version>-win-x64.zip` and `Azunote-<version>-win-arm64.zip` are
+  portable ZIPs. Extract the whole folder for your device's architecture and run
+  `Azunote.exe`; nothing is installed.
+
+Each file has a `.sha256` sidecar. Per-architecture MSIX packages are kept as
+CI artifacts only. See [distribution scripts](../../scripts/Packaging.md) to
+build these files locally.
+
 ## Non-goals
 
 Azunote is intended to remain a lightweight document-per-window text editor.

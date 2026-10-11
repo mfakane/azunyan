@@ -253,19 +253,80 @@ function Find-AzunoteWinApp($Context, [string] $PreferredPath) {
     throw 'The restored WinApp CLI executable is missing.'
 }
 
-function Assert-AzunotePackageArchitecture($Context, [string] $Package) {
-    $archive = [IO.Compression.ZipFile]::OpenRead($Package)
+function Read-AzunoteArchiveXml([string] $Archive, [string] $EntryName) {
+    $zip = [IO.Compression.ZipFile]::OpenRead($Archive)
     try {
-        $entry = $archive.GetEntry('AppxManifest.xml')
-        if ($null -eq $entry) { throw "$Package has no AppxManifest.xml." }
+        $entry = $zip.GetEntry($EntryName)
+        if ($null -eq $entry) { throw "$Archive has no $EntryName." }
         $reader = [IO.StreamReader]::new($entry.Open())
-        try { [xml] $packageManifest = $reader.ReadToEnd() } finally { $reader.Dispose() }
-    } finally { $archive.Dispose() }
-    $architecture = $packageManifest.Package.Identity.GetAttribute('ProcessorArchitecture')
+        try { [xml] $document = $reader.ReadToEnd() } finally { $reader.Dispose() }
+    } finally { $zip.Dispose() }
+    return $document
+}
+
+function Get-AzunotePackageIdentity([string] $Package) {
+    $identity = (Read-AzunoteArchiveXml $Package 'AppxManifest.xml').Package.Identity
+    return [pscustomobject]@{
+        Path = [IO.Path]::GetFullPath($Package)
+        Name = $identity.GetAttribute('Name')
+        Publisher = $identity.GetAttribute('Publisher')
+        Version = $identity.GetAttribute('Version')
+        Architecture = $identity.GetAttribute('ProcessorArchitecture')
+    }
+}
+
+function Assert-AzunotePackageArchitecture($Context, [string] $Package) {
+    $architecture = (Get-AzunotePackageIdentity $Package).Architecture
     if ($architecture -ne $Context.Architecture) {
         throw "$Package declares ProcessorArchitecture '$architecture'; expected '$($Context.Architecture)'."
     }
     Write-Host "Package ProcessorArchitecture: $architecture"
+}
+
+# Checks that an MSIX bundle holds exactly one application package per
+# supported architecture, that the bundle manifest describes each of them, and
+# that every inner package carries the bundle's name, publisher, and version.
+function Assert-AzunoteMsixBundle([string] $Bundle) {
+    $bundleManifest = Read-AzunoteArchiveXml $Bundle 'AppxMetadata/AppxBundleManifest.xml'
+    $bundleIdentity = $bundleManifest.Bundle.Identity
+    $name = $bundleIdentity.GetAttribute('Name')
+    $publisher = $bundleIdentity.GetAttribute('Publisher')
+    $bundleVersion = $bundleIdentity.GetAttribute('Version')
+    $entries = @($bundleManifest.Bundle.Packages.Package | Where-Object { $_.GetAttribute('Type') -eq 'application' })
+    $expected = @($AzunoteRuntimeIdentifiers.Values | ForEach-Object { $_.Architecture } | Sort-Object)
+    $listed = @($entries | ForEach-Object { $_.GetAttribute('Architecture') } | Sort-Object)
+    if (($listed -join ',') -ne ($expected -join ',')) {
+        throw "$Bundle lists application architectures '$($listed -join ', ')'; expected '$($expected -join ', ')'."
+    }
+    $work = Join-Path ([IO.Path]::GetTempPath()) ('azunote-bundle-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Force $work | Out-Null
+    $zip = [IO.Compression.ZipFile]::OpenRead($Bundle)
+    try {
+        foreach ($entry in $entries) {
+            $fileName = $entry.GetAttribute('FileName')
+            $architecture = $entry.GetAttribute('Architecture')
+            $zipEntry = $zip.GetEntry($fileName)
+            if ($null -eq $zipEntry) { throw "$Bundle does not contain $fileName listed in its manifest." }
+            $inner = Join-Path $work $fileName
+            [IO.Compression.ZipFileExtensions]::ExtractToFile($zipEntry, $inner)
+            $identity = Get-AzunotePackageIdentity $inner
+            foreach ($field in @(
+                    @('Name', $name), @('Publisher', $publisher),
+                    @('Version', $entry.GetAttribute('Version')), @('Architecture', $architecture))) {
+                if ($identity.($field[0]) -ne $field[1]) {
+                    throw "$fileName in $Bundle has $($field[0]) '$($identity.($field[0]))'; the bundle manifest says '$($field[1])'."
+                }
+            }
+            if ($identity.Version -ne $bundleVersion) {
+                throw "$fileName in $Bundle has version $($identity.Version); the bundle is $bundleVersion."
+            }
+            Write-Host "Bundle package: $fileName ($architecture, $($identity.Name) $($identity.Version))"
+        }
+    } finally {
+        $zip.Dispose()
+        Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    return [pscustomobject]@{ Name = $name; Publisher = $publisher; Version = $bundleVersion; Architectures = $listed }
 }
 
 function Complete-AzunoteDistribution([string] $Path) {
