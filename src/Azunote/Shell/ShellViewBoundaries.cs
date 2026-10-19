@@ -59,6 +59,12 @@ internal interface IEditorView : IEditorBuffer
 
     void MoveToMatchingBracket();
 
+    void MoveLines(bool down);
+
+    void DuplicateLines(bool down);
+
+    void DeleteLines();
+
     void Select(TextRange range);
 
     void RequestCompletion();

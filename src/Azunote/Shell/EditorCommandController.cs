@@ -28,6 +28,12 @@ internal sealed class EditorCommandController
 
     public void MoveToMatchingBracket() => Execute(_editor.MoveToMatchingBracket);
 
+    public void MoveLines(bool down) => Execute(() => _editor.MoveLines(down));
+
+    public void DuplicateLines(bool down) => Execute(() => _editor.DuplicateLines(down));
+
+    public void DeleteLines() => Execute(_editor.DeleteLines);
+
     public void ShowCompletion()
     {
         _editor.Focus();

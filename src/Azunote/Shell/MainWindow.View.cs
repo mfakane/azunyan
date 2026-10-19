@@ -40,6 +40,7 @@ public sealed partial class MainWindow
     private AzunyanEditorBuffer _editorBuffer = null!;
     private IntPtr _windowHandle;
     private readonly List<KeyboardAccelerator> _externalToolAccelerators = [];
+    private readonly Dictionary<ExternalToolShortcut, Func<Action?>> _externalToolShortcuts = [];
     private IReadOnlyList<ExternalToolMenuNode>? _renderedToolNodes;
     private Dictionary<ExternalToolSettings, ExternalToolMenuState> _renderedToolStates = [];
     private readonly Dictionary<ExternalToolSettings, List<MenuFlyoutItemBase>> _toolControls = [];
@@ -646,6 +647,7 @@ public sealed partial class MainWindow
         }
 
         _externalToolAccelerators.Clear();
+        _externalToolShortcuts.Clear();
     }
 
     private void ClearExternalToolMenuItems()
@@ -693,6 +695,18 @@ public sealed partial class MainWindow
 
         foreach (var (shortcut, candidates) in candidatesByShortcut)
         {
+            // Returns the run of the highest-priority enabled tool, or null.
+            Action? Resolve()
+            {
+                var tool = ExternalToolMenuBuilder.SelectByPriority(
+                    candidates,
+                    candidate => _runtime.GetExternalToolMenuState(candidate).IsEnabled);
+                return tool is null
+                    ? null
+                    : () => _ = onSelected(tool, promptTitles.GetValueOrDefault(tool) ?? string.Empty);
+            }
+
+            _externalToolShortcuts.Add(shortcut, Resolve);
             var accelerator = new KeyboardAccelerator
             {
                 Key = shortcut.Key,
@@ -700,16 +714,11 @@ public sealed partial class MainWindow
             };
             accelerator.Invoked += (sender, args) =>
             {
-                var tool = ExternalToolMenuBuilder.SelectByPriority(
-                    candidates,
-                    candidate => _runtime.GetExternalToolMenuState(candidate).IsEnabled);
-                if (tool is null)
+                if (Resolve() is { } run)
                 {
-                    return;
+                    args.Handled = true;
+                    run();
                 }
-
-                args.Handled = true;
-                _ = onSelected(tool, promptTitles.GetValueOrDefault(tool) ?? string.Empty);
             };
             _rootGrid.KeyboardAccelerators.Add(accelerator);
             _externalToolAccelerators.Add(accelerator);
@@ -1031,6 +1040,9 @@ public sealed partial class MainWindow
         public void SelectAll() => _window.SelectAll();
         public void ScrollSelectionIntoView() => _window._editor.ScrollSelectionIntoView();
         public void MoveToMatchingBracket() => _window.MoveToMatchingBracket();
+        public void MoveLines(bool down) => _window._editor.MoveLines(down);
+        public void DuplicateLines(bool down) => _window._editor.DuplicateLines(down);
+        public void DeleteLines() => _window._editor.DeleteLines();
         public void Select(TextRange range) => _window.Select(range);
         public void RequestCompletion() => _window.RequestCompletion();
         public void ShowCompletion(CompletionResult completions) => _window.ShowCompletion(completions);

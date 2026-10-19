@@ -1,5 +1,6 @@
 using Microsoft.UI.Input;
 using Azunyan.Core;
+using Azunyan.WinUI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -20,6 +21,18 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     private readonly MainWindowRuntime _runtime;
     private AppWindow? _appWindow;
     private bool _allowClose;
+    private static readonly Dictionary<ExternalToolShortcut, Action<MainWindowRuntime>> LineCommandShortcuts = new()
+    {
+        [new(VirtualKey.Up, VirtualKeyModifiers.Menu)] = runtime => runtime.MoveLines(down: false),
+        [new(VirtualKey.Down, VirtualKeyModifiers.Menu)] = runtime => runtime.MoveLines(down: true),
+        [new(VirtualKey.Up, VirtualKeyModifiers.Menu | VirtualKeyModifiers.Shift)] =
+            runtime => runtime.DuplicateLines(down: false),
+        [new(VirtualKey.Down, VirtualKeyModifiers.Menu | VirtualKeyModifiers.Shift)] =
+            runtime => runtime.DuplicateLines(down: true),
+        [new(VirtualKey.K, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift)] =
+            runtime => runtime.DeleteLines(),
+    };
+
     private bool _completionShortcutInvoked;
     private bool _duplicateWindowShortcutInvoked;
     private bool _matchingBracketShortcutInvoked;
@@ -111,6 +124,11 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         goToMatchingBracket.Invoked += GoToMatchingBracketAccelerator_Invoked;
         RootGrid.KeyboardAccelerators.Add(goToMatchingBracket);
 
+        // The native text input handles arrow keys before window accelerators,
+        // so shortcuts that the editor would otherwise consume are resolved
+        // through the editor's own key pipeline.
+        Editor.HostKeyCommand = ResolveEditorKeyCommand;
+
         var findNext = new KeyboardAccelerator { Key = VirtualKey.F3 };
         findNext.Invoked += FindNextAccelerator_Invoked;
         RootGrid.KeyboardAccelerators.Add(findNext);
@@ -149,6 +167,24 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         args.Handled = true;
         _matchingBracketShortcutInvoked = true;
         _runtime.MoveToMatchingBracket();
+    }
+
+    /// <summary>
+    /// Gives an enabled external tool precedence over the editor for its
+    /// shortcut, and binds the line commands when no such tool is enabled.
+    /// </summary>
+    private EditorKeyCommand? ResolveEditorKeyCommand(VirtualKey key, VirtualKeyModifiers modifiers)
+    {
+        var shortcut = new ExternalToolShortcut(key, modifiers);
+        if (_externalToolShortcuts.TryGetValue(shortcut, out var resolveTool)
+            && resolveTool() is { } runTool)
+        {
+            return new EditorKeyCommand(runTool, Repeatable: false);
+        }
+
+        return LineCommandShortcuts.TryGetValue(shortcut, out var command)
+            ? new EditorKeyCommand(() => command(_runtime), Repeatable: true)
+            : null;
     }
 
     private void FindNextAccelerator_Invoked(
@@ -518,6 +554,12 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         textBox => textBox.SelectAll());
 
     void IMainWindowActions.GoToMatchingBracket() => _runtime.MoveToMatchingBracket();
+
+    void IMainWindowActions.MoveLines(bool down) => _runtime.MoveLines(down);
+
+    void IMainWindowActions.DuplicateLines(bool down) => _runtime.DuplicateLines(down);
+
+    void IMainWindowActions.DeleteLines() => _runtime.DeleteLines();
 
     void IMainWindowActions.ShowFind() => _runtime.ShowFindPanel(replace: false);
 

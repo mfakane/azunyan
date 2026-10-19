@@ -19,6 +19,20 @@ public sealed class EditorCommandControllerTests
     }
 
     [Fact]
+    public void Line_commands_focus_and_delegate_to_the_editor()
+    {
+        var editor = new FakeEditorView();
+        var commands = new EditorCommandController(editor, new FakeWindowChromeView());
+
+        commands.MoveLines(down: true);
+        commands.DuplicateLines(down: false);
+        commands.DeleteLines();
+
+        Assert.Equal(3, editor.FocusCount);
+        Assert.Equal(new[] { "move-down", "duplicate-up", "delete" }, editor.LineCommands);
+    }
+
+    [Fact]
     public void Word_wrap_and_status_bar_commands_update_the_view()
     {
         var editor = new FakeEditorView();

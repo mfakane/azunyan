@@ -442,6 +442,13 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     public Action<AzunyanDiagnosticCategory, string>? DiagnosticSink { get; set; }
 
     /// <summary>
+    /// Lets the host claim a key chord before the editor's own key handling.
+    /// A returned command runs after KeyDown returns, like the editor's key
+    /// commands; <see langword="null"/> leaves the key to the editor.
+    /// </summary>
+    public Func<VirtualKey, VirtualKeyModifiers, EditorKeyCommand?>? HostKeyCommand { get; set; }
+
+    /// <summary>
     /// Receives caught callback and operation exceptions independently of the
     /// detailed operation-log category filter.
     /// </summary>
@@ -2412,6 +2419,18 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         var control = IsKeyDown(VirtualKey.Control);
         var menu = IsKeyDown(VirtualKey.Menu);
         var extendSelection = IsKeyDown(VirtualKey.Shift);
+        if (!IsComposing
+            && HostKeyCommand?.Invoke(
+                args.Key,
+                (control ? VirtualKeyModifiers.Control : VirtualKeyModifiers.None)
+                | (menu ? VirtualKeyModifiers.Menu : VirtualKeyModifiers.None)
+                | (extendSelection ? VirtualKeyModifiers.Shift : VirtualKeyModifiers.None)) is { } hostCommand)
+        {
+            QueueKeyEdit(args.Key, hostCommand.Execute, hostCommand.Repeatable);
+            args.Handled = true;
+            return;
+        }
+
         if (args.Key == VirtualKey.V && control)
         {
             var pasteMode = _blockSelection is not null
@@ -2544,18 +2563,6 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                         }
                     });
                 }, repeatable: true);
-                args.Handled = true;
-                break;
-            case VirtualKey.Up or VirtualKey.Down when !IsComposing && menu && !control:
-                var down = args.Key == VirtualKey.Down;
-                QueueKeyEdit(
-                    args.Key,
-                    extendSelection ? () => DuplicateLines(down) : () => MoveLines(down),
-                    repeatable: true);
-                args.Handled = true;
-                break;
-            case VirtualKey.K when !IsComposing && control && extendSelection && !menu:
-                QueueKeyEdit(args.Key, DeleteLines, repeatable: true);
                 args.Handled = true;
                 break;
             case VirtualKey.Up

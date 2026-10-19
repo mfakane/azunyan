@@ -576,6 +576,37 @@
                 />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem
+                    Text="Move Line Up"
+                    KeyboardAcceleratorTextOverride="Alt+Up"
+                    Command="{x:Bind ViewModel.MoveLineUpCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
+                />
+                <MenuFlyoutItem
+                    Text="Move Line Down"
+                    KeyboardAcceleratorTextOverride="Alt+Down"
+                    Command="{x:Bind ViewModel.MoveLineDownCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
+                />
+                <MenuFlyoutItem
+                    Text="Copy Line Up"
+                    KeyboardAcceleratorTextOverride="Shift+Alt+Up"
+                    Command="{x:Bind ViewModel.CopyLineUpCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
+                />
+                <MenuFlyoutItem
+                    Text="Copy Line Down"
+                    KeyboardAcceleratorTextOverride="Shift+Alt+Down"
+                    Command="{x:Bind ViewModel.CopyLineDownCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
+                />
+                <MenuFlyoutItem
+                    Text="Delete Line"
+                    KeyboardAcceleratorTextOverride="Ctrl+Shift+K"
+                    Command="{x:Bind ViewModel.DeleteLineCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
+                />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem
                     Text="Select All"
                     Command="{x:Bind ViewModel.SelectAllCommand}"
                 >

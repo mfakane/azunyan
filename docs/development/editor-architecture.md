@@ -438,10 +438,8 @@ Keyboard ownership follows the same boundary. While composition is active,
 the native control owns composition-sensitive navigation and editing keys so
 candidate selection, segment movement, commit, and cancellation retain their
 platform behavior. Outside composition, the projected editor owns document
-navigation, selection, deletion, line insertion, indentation, clipboard,
-undo/redo, and whole-line commands (Alt+Up/Down moves the caret lines,
-Shift+Alt+Up/Down duplicates them, and Ctrl+Shift+K deletes them); the
-native control receives only the remaining
+navigation, selection, deletion, line insertion, indentation, clipboard, and
+undo/redo commands; the native control receives only the remaining
 text-producing/dead-key path. Ctrl+Alt is treated as AltGr rather than as an
 editor shortcut.
 
@@ -449,6 +447,15 @@ Application-level commands are owned by the shell menu and its keyboard
 accelerators. For example, Edit > Go to Matching Bracket registers Ctrl+[ and
 invokes the editor's command API; the reusable editor component does not
 recognize that chord in its native-input key handler.
+
+Chords that the native input would consume before window accelerators run,
+such as Alt+arrow keys, reach the host through `HostKeyCommand`. The editor
+asks it before its own handling outside composition, and a returned command is
+scheduled like the editor's key commands, so the native TextBox never sees an
+unmatched release. Azunote uses it to give an enabled external tool precedence
+over the editor for the tool's shortcut, and otherwise to bind the whole-line
+commands: Alt+Up/Down moves the caret lines, Shift+Alt+Up/Down copies them,
+and Ctrl+Shift+K deletes them.
 
 Managed commands are scheduled immediately after KeyDown returns, including
 repeat KeyDown events. KeyUp never performs the document command: it only

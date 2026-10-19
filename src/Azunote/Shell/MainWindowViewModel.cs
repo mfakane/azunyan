@@ -62,6 +62,11 @@ internal sealed class MainWindowViewModel :
         PasteCommand = Command(() => Actions.Paste());
         SelectAllCommand = Command(() => Actions.SelectAll());
         GoToMatchingBracketCommand = Command(() => Actions.GoToMatchingBracket());
+        MoveLineUpCommand = Command(() => Actions.MoveLines(down: false));
+        MoveLineDownCommand = Command(() => Actions.MoveLines(down: true));
+        CopyLineUpCommand = Command(() => Actions.DuplicateLines(down: false));
+        CopyLineDownCommand = Command(() => Actions.DuplicateLines(down: true));
+        DeleteLineCommand = Command(() => Actions.DeleteLines());
         ShowFindCommand = Command(() => Actions.ShowFind());
         ShowReplaceCommand = Command(() => Actions.ShowReplace());
         ShowCompletionCommand = Command(() => Actions.ShowCompletion());
@@ -189,6 +194,11 @@ internal sealed class MainWindowViewModel :
     public ICommand PasteCommand { get; }
     public ICommand SelectAllCommand { get; }
     public ICommand GoToMatchingBracketCommand { get; }
+    public ICommand MoveLineUpCommand { get; }
+    public ICommand MoveLineDownCommand { get; }
+    public ICommand CopyLineUpCommand { get; }
+    public ICommand CopyLineDownCommand { get; }
+    public ICommand DeleteLineCommand { get; }
     public ICommand ShowFindCommand { get; }
     public ICommand ShowReplaceCommand { get; }
     public ICommand ShowCompletionCommand { get; }
@@ -520,6 +530,9 @@ internal interface IMainWindowActions
     void Paste();
     void SelectAll();
     void GoToMatchingBracket();
+    void MoveLines(bool down);
+    void DuplicateLines(bool down);
+    void DeleteLines();
     void ShowFind();
     void ShowReplace();
     void ShowCompletion();

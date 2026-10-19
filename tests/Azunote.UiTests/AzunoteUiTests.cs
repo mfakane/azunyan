@@ -421,10 +421,72 @@ public sealed class AzunoteUiTests : IDisposable
 
             SendKeyChord(Control, Shift, K);
             AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "second\nfirst\nthird");
+
+            AzunoteUiFixture.InvokeMenuItem(_fixture.Window, "Edit", "Move Line Up");
+            AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "first\nsecond\nthird");
         }
         finally
         {
             AzunoteUiFixture.WaitForValuePattern(editor).SetValue(original);
+        }
+    }
+
+    [AzunoteUiFact]
+    public void External_tool_shortcut_takes_precedence_over_line_shortcut_only_when_enabled()
+    {
+        const ushort Alt = 0x12, Down = 0x28;
+        var tools = Path.Combine(Path.GetDirectoryName(AzunoteUiFixture.ResolveExecutablePath())!, "appdata", "tools");
+        Directory.CreateDirectory(tools);
+        var name = "Shortcut precedence test " + Guid.NewGuid().ToString("N");
+        var definition = Path.Combine(tools, name + ".tool.toml");
+        File.WriteAllText(definition, $"""
+            name = "{name}"
+            shortcut = "Alt+Down"
+            visibility = "always"
+            [when]
+            selection = "nonEmpty"
+            [launch]
+            cmd = "echo TOOL"
+            output = "replaceSelection"
+            """);
+        try
+        {
+            // Wait until the settings watcher has loaded the definition.
+            AzunoteUiFixture.OpenMenu(_fixture.Window, "Tools");
+            AzunoteUiFixture.WaitForElement(_fixture.Window, AutomationElement.NameProperty, name);
+            AzunoteUiFixture.CloseMenu(_fixture.Window, "Tools");
+
+            var editor = _fixture.Editor;
+            var editorValue = AzunoteUiFixture.WaitForValuePattern(editor);
+            editorValue.SetValue("first\nsecond\nthird");
+            var textPattern = AzunoteUiFixture.WaitForTextPattern(editor);
+            AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "first\nsecond\nthird");
+
+            // With a selection, the enabled tool owns the shortcut.
+            textPattern.DocumentRange.FindText("first", false, false)!.Select();
+            editor.SetFocus();
+            SendKeyChord(Alt, Down);
+            AzunoteUiFixture.WaitForDocumentText(textPattern, text => text.StartsWith("TOOL", StringComparison.Ordinal));
+            // Neither a second tool run nor the line command may follow.
+            Thread.Sleep(1000);
+            var afterTool = AzunoteUiFixture.WaitForDocumentText(textPattern, _ => true);
+            Assert.Single(afterTool.Split("TOOL"), part => part.EndsWith("\nsecond\nthird", StringComparison.Ordinal));
+            Assert.Equal(2, afterTool.Split("TOOL").Length);
+
+            // Without a selection, the tool is unavailable and the editor moves the line.
+            editorValue.SetValue("first\nsecond\nthird");
+            AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "first\nsecond\nthird");
+            var caret = textPattern.DocumentRange.FindText("first", false, false)!;
+            caret.MoveEndpointByRange(TextPatternRangeEndpoint.End, caret, TextPatternRangeEndpoint.Start);
+            caret.Select();
+            editor.SetFocus();
+            SendKeyChord(Alt, Down);
+            AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "second\nfirst\nthird");
+        }
+        finally
+        {
+            _fixture.Dispose();
+            File.Delete(definition);
         }
     }
 
@@ -931,6 +993,16 @@ public sealed class AzunoteUiFixture : IDisposable
         }
 
         Invoke(menu);
+    }
+
+    public static void CloseMenu(AutomationElement window, string name)
+    {
+        var menu = FindRequired(window, AutomationElement.NameProperty, name);
+        var pattern = (ExpandCollapsePattern)menu.GetCurrentPattern(ExpandCollapsePattern.Pattern);
+        if (pattern.Current.ExpandCollapseState != ExpandCollapseState.Collapsed)
+        {
+            pattern.Collapse();
+        }
     }
 
     public static void InvokeMenuItem(

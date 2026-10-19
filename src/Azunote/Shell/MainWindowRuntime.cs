@@ -306,6 +306,12 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public void MoveToMatchingBracket() => _editorCommands.MoveToMatchingBracket();
 
+    public void MoveLines(bool down) => _editorCommands.MoveLines(down);
+
+    public void DuplicateLines(bool down) => _editorCommands.DuplicateLines(down);
+
+    public void DeleteLines() => _editorCommands.DeleteLines();
+
     public void ToggleWordWrap()
     {
         _recordWordWrap(_editorCommands.ToggleWordWrap());

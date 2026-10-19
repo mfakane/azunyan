@@ -31,6 +31,8 @@ internal sealed class FakeEditorView : IEditorView
 
     public int MoveToMatchingBracketCount { get; private set; }
 
+    public List<string> LineCommands { get; } = [];
+
     public int ScrollSelectionIntoViewCount { get; private set; }
 
     public int RefreshProvidersCount { get; private set; }
@@ -102,6 +104,12 @@ internal sealed class FakeEditorView : IEditorView
     public void ScrollSelectionIntoView() => ScrollSelectionIntoViewCount++;
 
     public void MoveToMatchingBracket() => MoveToMatchingBracketCount++;
+
+    public void MoveLines(bool down) => LineCommands.Add(down ? "move-down" : "move-up");
+
+    public void DuplicateLines(bool down) => LineCommands.Add(down ? "duplicate-down" : "duplicate-up");
+
+    public void DeleteLines() => LineCommands.Add("delete");
 
     public void Select(TextRange range) => _document.Select(range);
 
