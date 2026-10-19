@@ -261,9 +261,12 @@ public sealed class AzunoteUiTests : IDisposable
         })
         {
             AzunoteUiFixture.InvokeMenuItem(source, "Help", menu);
+            // Development builds append " (Dev)" to the application name.
             var title = $"{fileName} [READONLY] - Azunote";
-            var legalWindow = _fixture.WaitForWindows(windows => windows.Any(w => w.Current.Name == title))
-                .First(w => w.Current.Name == title);
+            bool IsLegalWindow(AutomationElement window) =>
+                window.Current.Name.StartsWith(title, StringComparison.Ordinal);
+            var legalWindow = _fixture.WaitForWindows(windows => windows.Any(IsLegalWindow))
+                .First(IsLegalWindow);
             using var process = Process.GetProcessById(legalWindow.Current.ProcessId);
             try
             {
