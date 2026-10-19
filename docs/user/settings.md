@@ -81,6 +81,12 @@ order. The supported rule types are `delimited`, `line`, `literal`, `keyword`,
 and `regex`. A pattern without a path separator matches the file name; when
 multiple modes match, the most specific matching suffix wins.
 
+Edit > Toggle Comment (Ctrl+/) uses the first `line` rule classified as
+`comment` to comment or uncomment the selected lines. A mode without one wraps
+the lines in the first `delimited` rule classified as `comment`, such as
+`<!--` and `-->`. Plain Text has no comment syntax, so the command does nothing
+there.
+
 When a file is opened, its path is matched against the built-in and custom
 patterns; unmatched files use Plain Text. A manual menu selection is kept
 until another file is opened. Plain Text is the default mode and its supported

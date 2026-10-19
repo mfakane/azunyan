@@ -15,7 +15,9 @@ public sealed class SyntaxLanguageDefinition : ISyntaxAnalysisProvider, IIncreme
         IEnumerable<ISyntaxProvider> sources,
         IEnumerable<string>? completionTriggerCharacters = null,
         string? definitionPath = null,
-        IFoldingProvider? foldingProvider = null)
+        IFoldingProvider? foldingProvider = null,
+        string? lineComment = null,
+        BlockCommentDelimiters? blockComment = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(id);
         ArgumentException.ThrowIfNullOrEmpty(displayName);
@@ -42,6 +44,14 @@ public sealed class SyntaxLanguageDefinition : ISyntaxAnalysisProvider, IIncreme
             .ToArray();
         FoldingProvider = foldingProvider;
         _provider = new CompositeSyntaxProvider(sources);
+        LineComment = lineComment ?? _provider.Sources
+            .OfType<LineRemainderSyntaxRule>()
+            .FirstOrDefault(rule => rule.Classification == "comment")?.Token;
+        BlockComment = blockComment ?? _provider.Sources
+            .OfType<DelimitedSyntaxRule>()
+            .Where(rule => rule.Classification == "comment")
+            .Select(rule => new BlockCommentDelimiters(rule.OpeningToken, rule.ClosingToken))
+            .FirstOrDefault();
     }
 
     public string Id { get; }
@@ -73,6 +83,18 @@ public sealed class SyntaxLanguageDefinition : ISyntaxAnalysisProvider, IIncreme
     /// Optional document-scoped folding provider associated with this language.
     /// </summary>
     public IFoldingProvider? FoldingProvider { get; }
+
+    /// <summary>
+    /// The token that starts a line comment. Unless given explicitly, it is
+    /// taken from the first line rule classified as <c>comment</c>.
+    /// </summary>
+    public string? LineComment { get; }
+
+    /// <summary>
+    /// The delimiters of a block comment. Unless given explicitly, they are
+    /// taken from the first delimited rule classified as <c>comment</c>.
+    /// </summary>
+    public BlockCommentDelimiters? BlockComment { get; }
 
     public IReadOnlyList<ISyntaxProvider> Sources => _provider.Sources;
 
@@ -209,3 +231,5 @@ internal static class SyntaxPatternMatcher
         return hasMatch ? score : -1;
     }
 }
+
+public sealed record BlockCommentDelimiters(string Open, string Close);

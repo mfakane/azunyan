@@ -1,4 +1,5 @@
 using Azunyan.Core;
+using Azunyan.Syntax;
 
 namespace Azunote;
 
@@ -33,6 +34,24 @@ internal sealed class EditorCommandController
     public void DuplicateLines(bool down) => Execute(() => _editor.DuplicateLines(down));
 
     public void DeleteLines() => Execute(_editor.DeleteLines);
+
+    public void AddNextOccurrence() => Execute(_editor.AddNextOccurrence);
+
+    /// <summary>
+    /// Toggles line comments when the language has a line-comment token, and
+    /// otherwise wraps the lines in its block-comment delimiters.
+    /// </summary>
+    public void ToggleComment(string? lineComment, BlockCommentDelimiters? blockComment)
+    {
+        if (lineComment is not null)
+        {
+            Execute(() => _editor.ToggleLineComment(lineComment));
+        }
+        else if (blockComment is not null)
+        {
+            Execute(() => _editor.ToggleBlockComment(blockComment.Open, blockComment.Close));
+        }
+    }
 
     public void ShowCompletion()
     {

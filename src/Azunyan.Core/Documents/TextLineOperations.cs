@@ -154,6 +154,183 @@ public static class TextLineOperations
             collapse: true);
     }
 
+    /// <summary>
+    /// Removes <paramref name="token"/> and one following space from the
+    /// selected lines when every non-blank one starts with it after its
+    /// indentation; otherwise inserts the token and a space into each non-blank
+    /// line at the smallest indentation among them. Returns
+    /// <see langword="null"/> when every selected line is blank.
+    /// </summary>
+    public static TextCaretEdit? ToggleLineComment(
+        TextSnapshot snapshot,
+        TextCaretSet carets,
+        string token)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(carets);
+        ArgumentException.ThrowIfNullOrEmpty(token);
+
+        var lines = snapshot.Lines;
+        var contentLines = GetLineBlocks(snapshot, carets, mergeAdjacent: true)
+            .SelectMany(block => Enumerable.Range(block.First, block.Last - block.First + 1))
+            .Select(line => (Start: lines.GetLineStart(line), Text: snapshot.GetText(lines.GetLineRange(line))))
+            .Where(line => !string.IsNullOrWhiteSpace(line.Text))
+            .ToList();
+        if (contentLines.Count == 0)
+        {
+            return null;
+        }
+
+        var edits = new List<(TextRange Range, string Text)>(contentLines.Count);
+        if (contentLines.All(line => line.Text.AsSpan(GetIndentation(line.Text))
+            .StartsWith(token, StringComparison.Ordinal)))
+        {
+            foreach (var (start, text) in contentLines)
+            {
+                var indentation = GetIndentation(text);
+                var end = indentation + token.Length;
+                if (end < text.Length && text[end] == ' ')
+                {
+                    end++;
+                }
+
+                edits.Add((TextRange.FromBounds(start + indentation, start + end), string.Empty));
+            }
+        }
+        else
+        {
+            var indentation = contentLines.Min(line => GetIndentation(line.Text));
+            foreach (var (start, _) in contentLines)
+            {
+                edits.Add((TextRange.Empty(start + indentation), token + " "));
+            }
+        }
+
+        return BuildTextEdit(snapshot, carets, edits);
+    }
+
+    /// <summary>
+    /// Wraps the non-blank text of each selected block of lines in
+    /// <paramref name="open"/> and <paramref name="close"/>, separated by a
+    /// space, or removes them when the text is already wrapped. Returns
+    /// <see langword="null"/> when every selected line is blank.
+    /// </summary>
+    public static TextCaretEdit? ToggleBlockComment(
+        TextSnapshot snapshot,
+        TextCaretSet carets,
+        string open,
+        string close)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(carets);
+        ArgumentException.ThrowIfNullOrEmpty(open);
+        ArgumentException.ThrowIfNullOrEmpty(close);
+
+        var lines = snapshot.Lines;
+        var edits = new List<(TextRange Range, string Text)>();
+        foreach (var block in GetLineBlocks(snapshot, carets, mergeAdjacent: false))
+        {
+            var lineStart = lines.GetLineStart(block.First);
+            var text = snapshot.GetText(TextRange.FromBounds(lineStart, lines.GetLineEnd(block.Last)));
+            var start = text.Length - text.TrimStart().Length;
+            var end = text.TrimEnd().Length;
+            if (start >= end)
+            {
+                continue;
+            }
+
+            var content = text[start..end];
+            if (content.Length >= open.Length + close.Length
+                && content.StartsWith(open, StringComparison.Ordinal)
+                && content.EndsWith(close, StringComparison.Ordinal))
+            {
+                var openLength = open.Length;
+                if (openLength < content.Length - close.Length && content[openLength] == ' ')
+                {
+                    openLength++;
+                }
+
+                var closeStart = content.Length - close.Length;
+                if (closeStart > openLength && content[closeStart - 1] == ' ')
+                {
+                    closeStart--;
+                }
+
+                edits.Add((new TextRange(lineStart + start, openLength), string.Empty));
+                edits.Add((TextRange.FromBounds(lineStart + start + closeStart, lineStart + end), string.Empty));
+            }
+            else
+            {
+                edits.Add((TextRange.Empty(lineStart + start), open + " "));
+                edits.Add((TextRange.Empty(lineStart + end), " " + close));
+            }
+        }
+
+        return edits.Count == 0 ? null : BuildTextEdit(snapshot, carets, edits);
+    }
+
+    private static int GetIndentation(string line)
+    {
+        var length = 0;
+        while (length < line.Length && line[length] is ' ' or '\t')
+        {
+            length++;
+        }
+
+        return length;
+    }
+
+    /// <summary>
+    /// Combines ordered, non-overlapping edits into one replacement. An empty
+    /// caret at an insertion point moves past the inserted text; a selection
+    /// endpoint there stays before it, so the selection grows to include it.
+    /// </summary>
+    private static TextCaretEdit BuildTextEdit(
+        TextSnapshot snapshot,
+        TextCaretSet carets,
+        List<(TextRange Range, string Text)> edits)
+    {
+        edits.Sort((left, right) => left.Range.Start.CompareTo(right.Range.Start));
+        var range = TextRange.FromBounds(edits[0].Range.Start, edits[^1].Range.End);
+        var builder = new System.Text.StringBuilder();
+        var cursor = range.Start;
+        foreach (var (editRange, text) in edits)
+        {
+            builder.Append(snapshot.GetText(TextRange.FromBounds(cursor, editRange.Start)));
+            builder.Append(text);
+            cursor = editRange.End;
+        }
+
+        int MapPosition(int position, bool emptyCaret)
+        {
+            var delta = 0;
+            foreach (var (editRange, text) in edits)
+            {
+                if (position < editRange.Start
+                    || (position == editRange.Start && editRange.IsEmpty && !emptyCaret))
+                {
+                    break;
+                }
+
+                if (position < editRange.End)
+                {
+                    return editRange.Start + delta;
+                }
+
+                delta += text.Length - editRange.Length;
+            }
+
+            return position + delta;
+        }
+
+        var states = carets
+            .Select(caret => caret.WithSelection(new TextSelection(
+                MapPosition(caret.Selection.Anchor, caret.Selection.IsEmpty),
+                MapPosition(caret.Selection.Active, caret.Selection.IsEmpty))))
+            .ToList();
+        return new TextCaretEdit(range, builder.ToString(), new TextCaretSet(states, carets.PrimaryIndex));
+    }
+
     private static List<LineBlock> GetLineBlocks(
         TextSnapshot snapshot,
         TextCaretSet carets,

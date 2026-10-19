@@ -67,6 +67,8 @@ internal sealed class MainWindowViewModel :
         CopyLineUpCommand = Command(() => Actions.DuplicateLines(down: false));
         CopyLineDownCommand = Command(() => Actions.DuplicateLines(down: true));
         DeleteLineCommand = Command(() => Actions.DeleteLines());
+        AddNextOccurrenceCommand = Command(() => Actions.AddNextOccurrence());
+        ToggleCommentCommand = Command(() => Actions.ToggleComment());
         ShowFindCommand = Command(() => Actions.ShowFind());
         ShowReplaceCommand = Command(() => Actions.ShowReplace());
         ShowCompletionCommand = Command(() => Actions.ShowCompletion());
@@ -199,6 +201,8 @@ internal sealed class MainWindowViewModel :
     public ICommand CopyLineUpCommand { get; }
     public ICommand CopyLineDownCommand { get; }
     public ICommand DeleteLineCommand { get; }
+    public ICommand AddNextOccurrenceCommand { get; }
+    public ICommand ToggleCommentCommand { get; }
     public ICommand ShowFindCommand { get; }
     public ICommand ShowReplaceCommand { get; }
     public ICommand ShowCompletionCommand { get; }
@@ -533,6 +537,8 @@ internal interface IMainWindowActions
     void MoveLines(bool down);
     void DuplicateLines(bool down);
     void DeleteLines();
+    void AddNextOccurrence();
+    void ToggleComment();
     void ShowFind();
     void ShowReplace();
     void ShowCompletion();

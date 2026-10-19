@@ -342,6 +342,70 @@ public static class TextCaretSetOperations
             : carets;
     }
 
+    /// <summary>
+    /// Selects the word at every empty caret. When every caret already has a
+    /// selection, adds a selection for the next ordinal occurrence of the
+    /// primary selection's text, wrapping at the end of the document, and makes
+    /// it primary. Returns the same set when there is no further occurrence.
+    /// </summary>
+    public static TextCaretSet AddNextOccurrence(
+        TextSnapshot snapshot,
+        TextCaretSet carets,
+        int tabDisplaySize)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(carets);
+        ArgumentOutOfRangeException.ThrowIfLessThan(tabDisplaySize, 1);
+
+        if (carets.Any(caret => caret.Selection.IsEmpty))
+        {
+            var expanded = carets
+                .Select(caret => caret.Selection.IsEmpty
+                    && GetWordRangeAtCaret(snapshot.Text, caret.CaretPosition) is { IsEmpty: false } word
+                        ? CreateSelectionState(snapshot, word, tabDisplaySize)
+                        : caret)
+                .ToList();
+            return Deduplicate(expanded, carets.PrimaryIndex);
+        }
+
+        var primary = carets.Primary.Selection.Range;
+        var query = snapshot.GetText(primary);
+        var match = snapshot.Find(query, primary.End) ?? snapshot.Find(query);
+        while (match is { } candidate && candidate != primary)
+        {
+            if (carets.All(caret => !Overlaps(caret.Selection.Range, candidate)))
+            {
+                var states = carets.ToList();
+                var index = states.FindIndex(caret => caret.Selection.Start > candidate.Start);
+                index = index < 0 ? states.Count : index;
+                states.Insert(index, CreateSelectionState(snapshot, candidate, tabDisplaySize));
+                return new TextCaretSet(states, index);
+            }
+
+            match = snapshot.Find(query, candidate.Start + 1) ?? snapshot.Find(query);
+        }
+
+        return carets;
+    }
+
+    private static TextRange? GetWordRangeAtCaret(string text, int position)
+    {
+        var word = position < text.Length
+            ? UnicodeText.GetWordRange(text, position)
+            : TextRange.Empty(position);
+        return word.IsEmpty && position > 0
+            ? UnicodeText.GetWordRange(text, position - 1)
+            : word;
+    }
+
+    private static TextCaretState CreateSelectionState(
+        TextSnapshot snapshot,
+        TextRange range,
+        int tabDisplaySize) =>
+        new(
+            new TextSelection(range.Start, range.End),
+            TextBlockSelectionOperations.GetDisplayColumn(snapshot, range.End, tabDisplaySize));
+
     public static TextCaretEdit CreateReplacement(
         TextSnapshot snapshot,
         TextCaretSet carets,

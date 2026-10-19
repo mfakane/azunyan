@@ -11,7 +11,9 @@ public sealed record LanguageModeEntry(
     IReadOnlyList<string> FileExtensions,
     IReadOnlyList<string> Patterns,
     string? DefinitionPath,
-    IFoldingProvider? FoldingProvider = null);
+    IFoldingProvider? FoldingProvider = null,
+    string? LineComment = null,
+    BlockCommentDelimiters? BlockComment = null);
 
 /// <summary>
 /// Application-owned language mode definitions. It contains no menu or other
@@ -106,7 +108,8 @@ public sealed class LanguageModeCatalog
                 [".toml"],
                 AzunoteLanguageDefinition.Patterns,
                 null,
-                new AzunoteFoldingProvider())
+                new AzunoteFoldingProvider(),
+                LineComment: "#")
         };
 
         entries.AddRange(BuiltInSyntaxLanguages.All.Select(CreateEntry));
@@ -134,7 +137,9 @@ public sealed class LanguageModeCatalog
             definition.FileExtensions,
             definition.Patterns,
             definition.DefinitionPath,
-            definition.FoldingProvider);
+            definition.FoldingProvider,
+            definition.LineComment,
+            definition.BlockComment);
 
     private static string[] NormalizeFileExtensions(IEnumerable<string> extensions) =>
         extensions

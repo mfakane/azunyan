@@ -334,4 +334,35 @@ public sealed class TextCaretSetTests
 
         Assert.Equal("aXa\nbYb\nZ", result);
     }
+
+    [Fact]
+    public void Add_next_occurrence_first_selects_the_word_at_an_empty_caret()
+    {
+        var snapshot = new TextSnapshot("foo bar foo");
+
+        var atEnd = TextCaretSetOperations.AddNextOccurrence(snapshot, Selections(TextSelection.Caret(3)), 4);
+        var inside = TextCaretSetOperations.AddNextOccurrence(snapshot, Selections(TextSelection.Caret(5)), 4);
+
+        Assert.Equal(new TextSelection(0, 3), Assert.Single(atEnd).Selection);
+        Assert.Equal(new TextSelection(4, 7), Assert.Single(inside).Selection);
+    }
+
+    [Fact]
+    public void Add_next_occurrence_adds_the_following_match_as_primary_and_wraps()
+    {
+        var snapshot = new TextSnapshot("foo bar foo foo");
+
+        var second = TextCaretSetOperations.AddNextOccurrence(snapshot, Selections(new TextSelection(8, 11)), 4);
+        var third = TextCaretSetOperations.AddNextOccurrence(snapshot, second, 4);
+        var none = TextCaretSetOperations.AddNextOccurrence(snapshot, third, 4);
+
+        Assert.Equal(new[] { new TextSelection(8, 11), new TextSelection(12, 15) }, second.Select(caret => caret.Selection));
+        Assert.Equal(1, second.PrimaryIndex);
+        Assert.Equal(new TextSelection(0, 3), third.Primary.Selection);
+        Assert.Equal(new[] { 0, 8, 12 }, third.Select(caret => caret.Selection.Start));
+        Assert.Same(third, none);
+    }
+
+    private static TextCaretSet Selections(params TextSelection[] selections) =>
+        new(selections.Select(selection => new TextCaretState(selection, 0)));
 }

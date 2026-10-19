@@ -1082,6 +1082,36 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     public void DeleteLines() =>
         ApplyLineEdit(caretSet => TextLineOperations.DeleteLines(Snapshot, caretSet));
 
+    public void ToggleLineComment(string token) =>
+        ApplyLineEdit(caretSet => TextLineOperations.ToggleLineComment(Snapshot, caretSet, token));
+
+    public void ToggleBlockComment(string open, string close) =>
+        ApplyLineEdit(caretSet => TextLineOperations.ToggleBlockComment(Snapshot, caretSet, open, close));
+
+    public void AddNextOccurrence()
+    {
+        RunAfterComposition(() =>
+        {
+            ApplyNavigationCommand(() =>
+            {
+                var caretSet = Document.CaretSet;
+                if (_blockSelection is { } blockSelection)
+                {
+                    if (!TryCreateBlockSelectionCaretSet(blockSelection, out caretSet))
+                    {
+                        return;
+                    }
+
+                    _blockSelection = null;
+                }
+
+                _document.SetCaretSet(
+                    TextCaretSetOperations.AddNextOccurrence(Snapshot, caretSet, TabDisplaySize));
+            });
+            ScrollSelectionIntoView();
+        });
+    }
+
     private void ApplyLineEdit(Func<TextCaretSet, TextCaretEdit?> createEdit)
     {
         RunAfterComposition(() =>

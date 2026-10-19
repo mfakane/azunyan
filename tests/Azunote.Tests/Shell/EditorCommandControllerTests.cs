@@ -1,5 +1,6 @@
 using Azunote;
 using Azunyan.Core;
+using Azunyan.Syntax;
 using Xunit;
 
 namespace Azunote.Tests.Shell;
@@ -30,6 +31,20 @@ public sealed class EditorCommandControllerTests
 
         Assert.Equal(3, editor.FocusCount);
         Assert.Equal(new[] { "move-down", "duplicate-up", "delete" }, editor.LineCommands);
+    }
+
+    [Fact]
+    public void Toggle_comment_prefers_line_comments_and_falls_back_to_block_comments()
+    {
+        var editor = new FakeEditorView();
+        var commands = new EditorCommandController(editor, new FakeWindowChromeView());
+
+        commands.ToggleComment("//", new BlockCommentDelimiters("/*", "*/"));
+        commands.ToggleComment(null, new BlockCommentDelimiters("<!--", "-->"));
+        commands.ToggleComment(null, null);
+
+        Assert.Equal(new[] { "line-comment //", "block-comment <!-- -->" }, editor.LineCommands);
+        Assert.Equal(2, editor.FocusCount);
     }
 
     [Fact]

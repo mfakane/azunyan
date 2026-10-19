@@ -143,6 +143,81 @@ public sealed class TextLineOperationsTests
         Assert.Equal("a\nb", document.Text);
     }
 
+    [Fact]
+    public void Line_comment_is_inserted_at_the_smallest_indentation_and_skips_blank_lines()
+    {
+        var snapshot = new TextSnapshot("    a\n\n  b\nc");
+
+        var edit = TextLineOperations.ToggleLineComment(snapshot, Carets(new TextSelection(0, 10)), "//");
+
+        Assert.Equal("  //   a\n\n  // b\nc", Apply(snapshot, edit));
+        Assert.Equal(new TextSelection(0, 16), edit!.Value.CaretSet.Primary.Selection);
+    }
+
+    [Fact]
+    public void Line_comment_moves_an_empty_caret_past_the_inserted_token()
+    {
+        var snapshot = new TextSnapshot("value");
+
+        var edit = TextLineOperations.ToggleLineComment(snapshot, Carets(TextSelection.Caret(0)), "#");
+
+        Assert.Equal("# value", Apply(snapshot, edit));
+        Assert.Equal(TextSelection.Caret(2), edit!.Value.CaretSet.Primary.Selection);
+    }
+
+    [Fact]
+    public void Line_comment_is_removed_when_every_non_blank_line_is_commented()
+    {
+        var snapshot = new TextSnapshot("  // a\n//b\n\nc");
+
+        var edit = TextLineOperations.ToggleLineComment(snapshot, Carets(new TextSelection(4, 10)), "//");
+
+        Assert.Equal("  a\nb\n\nc", Apply(snapshot, edit));
+        Assert.Equal(new TextSelection(2, 5), edit!.Value.CaretSet.Primary.Selection);
+    }
+
+    [Fact]
+    public void Line_comment_is_added_when_only_some_lines_are_commented()
+    {
+        var snapshot = new TextSnapshot("// a\nb");
+
+        var edit = TextLineOperations.ToggleLineComment(snapshot, Carets(new TextSelection(0, 6)), "//");
+
+        Assert.Equal("// // a\n// b", Apply(snapshot, edit));
+    }
+
+    [Fact]
+    public void Line_comment_does_nothing_on_blank_lines()
+    {
+        Assert.Null(TextLineOperations.ToggleLineComment(
+            new TextSnapshot("  \n"),
+            Carets(TextSelection.Caret(0)),
+            "//"));
+    }
+
+    [Fact]
+    public void Block_comment_wraps_and_unwraps_the_text_of_the_selected_lines()
+    {
+        var snapshot = new TextSnapshot("  <a>\n  </a>\nz");
+
+        var wrapped = TextLineOperations.ToggleBlockComment(
+            snapshot,
+            Carets(new TextSelection(3, 9)),
+            "<!--",
+            "-->");
+
+        var wrappedText = Apply(snapshot, wrapped);
+        Assert.Equal("  <!-- <a>\n  </a> -->\nz", wrappedText);
+
+        var commented = new TextSnapshot(wrappedText);
+        var unwrapped = TextLineOperations.ToggleBlockComment(
+            commented,
+            Carets(new TextSelection(0, 21)),
+            "<!--",
+            "-->");
+        Assert.Equal("  <a>\n  </a>\nz", Apply(commented, unwrapped));
+    }
+
     private static TextCaretSet Carets(params TextSelection[] selections) =>
         new(selections.Select(selection => new TextCaretState(selection, 0)));
 

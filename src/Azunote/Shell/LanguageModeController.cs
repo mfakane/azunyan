@@ -47,6 +47,12 @@ internal sealed class LanguageModeController
             ? mode.DisplayName
             : _currentModeId;
 
+    /// <summary>The comment tokens of the current mode; Plain Text has none.</summary>
+    public (string? Line, BlockCommentDelimiters? Block) CurrentModeComments =>
+        _catalog.TryGet(_currentModeId, out var mode)
+            ? (mode.LineComment, mode.BlockComment)
+            : (null, null);
+
     public bool IsManuallySelected => _manuallySelected;
 
     public event EventHandler? Changed;

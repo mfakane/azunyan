@@ -65,6 +65,12 @@ internal interface IEditorView : IEditorBuffer
 
     void DeleteLines();
 
+    void AddNextOccurrence();
+
+    void ToggleLineComment(string token);
+
+    void ToggleBlockComment(string open, string close);
+
     void Select(TextRange range);
 
     void RequestCompletion();

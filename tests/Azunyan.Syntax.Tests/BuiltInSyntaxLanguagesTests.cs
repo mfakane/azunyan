@@ -5,6 +5,21 @@ namespace Azunyan.Syntax.Tests;
 
 public sealed class BuiltInSyntaxLanguagesTests
 {
+    [Fact]
+    public void Comment_tokens_come_from_comment_rules_or_explicit_delimiters()
+    {
+        var tokens = BuiltInSyntaxLanguages.All.ToDictionary(
+            language => language.Id,
+            language => (language.LineComment, language.BlockComment));
+
+        Assert.Equal(("//", new BlockCommentDelimiters("/*", "*/")), tokens["csharp"]);
+        Assert.Equal(("#", (BlockCommentDelimiters?)null), tokens["python"]);
+        Assert.Equal(("#", (BlockCommentDelimiters?)null), tokens["yaml"]);
+        Assert.Equal(((string?)null, new BlockCommentDelimiters("<!--", "-->")), tokens["xml"]);
+        Assert.Equal(((string?)null, new BlockCommentDelimiters("<!--", "-->")), tokens["markdown"]);
+        Assert.Equal(("#", new BlockCommentDelimiters("<#", "#>")), tokens["powershell"]);
+    }
+
     public static IEnumerable<object[]> RepresentativeSnippets()
     {
         yield return new object[]

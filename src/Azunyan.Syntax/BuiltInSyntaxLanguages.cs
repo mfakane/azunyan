@@ -159,7 +159,8 @@ public static class BuiltInSyntaxLanguages
             [".xml"],
             [new XmlSyntaxProvider()],
             CommonCompletionTriggers,
-            foldingProvider: new XmlFoldingProvider());
+            foldingProvider: new XmlFoldingProvider(),
+            blockComment: new BlockCommentDelimiters("<!--", "-->"));
 
     private static SyntaxLanguageDefinition CreateYaml() =>
         new(
@@ -167,7 +168,8 @@ public static class BuiltInSyntaxLanguages
             "YAML",
             [".yaml", ".yml"],
             [new YamlSyntaxProvider()],
-            foldingProvider: new YamlFoldingProvider());
+            foldingProvider: new YamlFoldingProvider(),
+            lineComment: "#");
 
     private static SyntaxLanguageDefinition CreateToml() =>
         new("toml", "TOML", ["*.toml"],

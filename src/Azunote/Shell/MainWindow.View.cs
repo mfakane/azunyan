@@ -1043,6 +1043,10 @@ public sealed partial class MainWindow
         public void MoveLines(bool down) => _window._editor.MoveLines(down);
         public void DuplicateLines(bool down) => _window._editor.DuplicateLines(down);
         public void DeleteLines() => _window._editor.DeleteLines();
+        public void AddNextOccurrence() => _window._editor.AddNextOccurrence();
+        public void ToggleLineComment(string token) => _window._editor.ToggleLineComment(token);
+        public void ToggleBlockComment(string open, string close) =>
+            _window._editor.ToggleBlockComment(open, close);
         public void Select(TextRange range) => _window.Select(range);
         public void RequestCompletion() => _window.RequestCompletion();
         public void ShowCompletion(CompletionResult completions) => _window.ShowCompletion(completions);

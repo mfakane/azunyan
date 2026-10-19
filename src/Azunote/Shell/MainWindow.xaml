@@ -605,6 +605,18 @@
                     Command="{x:Bind ViewModel.DeleteLineCommand}"
                     IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
                 />
+                <MenuFlyoutItem
+                    Text="Toggle Comment"
+                    KeyboardAcceleratorTextOverride="Ctrl+/"
+                    Command="{x:Bind ViewModel.ToggleCommentCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
+                />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem
+                    Text="Add Next Occurrence"
+                    KeyboardAcceleratorTextOverride="Ctrl+D"
+                    Command="{x:Bind ViewModel.AddNextOccurrenceCommand}"
+                />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem
                     Text="Select All"

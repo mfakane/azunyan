@@ -312,6 +312,14 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public void DeleteLines() => _editorCommands.DeleteLines();
 
+    public void AddNextOccurrence() => _editorCommands.AddNextOccurrence();
+
+    public void ToggleComment()
+    {
+        var (line, block) = _languageModes.CurrentModeComments;
+        _editorCommands.ToggleComment(line, block);
+    }
+
     public void ToggleWordWrap()
     {
         _recordWordWrap(_editorCommands.ToggleWordWrap());

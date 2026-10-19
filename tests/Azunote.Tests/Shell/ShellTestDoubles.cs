@@ -111,6 +111,13 @@ internal sealed class FakeEditorView : IEditorView
 
     public void DeleteLines() => LineCommands.Add("delete");
 
+    public void AddNextOccurrence() => LineCommands.Add("add-next-occurrence");
+
+    public void ToggleLineComment(string token) => LineCommands.Add("line-comment " + token);
+
+    public void ToggleBlockComment(string open, string close) =>
+        LineCommands.Add($"block-comment {open} {close}");
+
     public void Select(TextRange range) => _document.Select(range);
 
     public void RequestCompletion()

@@ -16,12 +16,13 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
 {
     private const VirtualKey OemBackslashKey = (VirtualKey)0xdc;
     private const VirtualKey OemOpenBracketKey = (VirtualKey)0xdb;
+    private const VirtualKey OemSlashKey = (VirtualKey)0xbf;
 
     private readonly ApplicationCoordinator _application;
     private readonly MainWindowRuntime _runtime;
     private AppWindow? _appWindow;
     private bool _allowClose;
-    private static readonly Dictionary<ExternalToolShortcut, Action<MainWindowRuntime>> LineCommandShortcuts = new()
+    private static readonly Dictionary<ExternalToolShortcut, Action<MainWindowRuntime>> EditorCommandShortcuts = new()
     {
         [new(VirtualKey.Up, VirtualKeyModifiers.Menu)] = runtime => runtime.MoveLines(down: false),
         [new(VirtualKey.Down, VirtualKeyModifiers.Menu)] = runtime => runtime.MoveLines(down: true),
@@ -31,6 +32,8 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
             runtime => runtime.DuplicateLines(down: true),
         [new(VirtualKey.K, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift)] =
             runtime => runtime.DeleteLines(),
+        [new(VirtualKey.D, VirtualKeyModifiers.Control)] = runtime => runtime.AddNextOccurrence(),
+        [new(OemSlashKey, VirtualKeyModifiers.Control)] = runtime => runtime.ToggleComment(),
     };
 
     private bool _completionShortcutInvoked;
@@ -171,7 +174,7 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
 
     /// <summary>
     /// Gives an enabled external tool precedence over the editor for its
-    /// shortcut, and binds the line commands when no such tool is enabled.
+    /// shortcut, and binds the editing commands when no such tool is enabled.
     /// </summary>
     private EditorKeyCommand? ResolveEditorKeyCommand(VirtualKey key, VirtualKeyModifiers modifiers)
     {
@@ -182,7 +185,7 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
             return new EditorKeyCommand(runTool, Repeatable: false);
         }
 
-        return LineCommandShortcuts.TryGetValue(shortcut, out var command)
+        return EditorCommandShortcuts.TryGetValue(shortcut, out var command)
             ? new EditorKeyCommand(() => command(_runtime), Repeatable: true)
             : null;
     }
@@ -560,6 +563,10 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     void IMainWindowActions.DuplicateLines(bool down) => _runtime.DuplicateLines(down);
 
     void IMainWindowActions.DeleteLines() => _runtime.DeleteLines();
+
+    void IMainWindowActions.AddNextOccurrence() => _runtime.AddNextOccurrence();
+
+    void IMainWindowActions.ToggleComment() => _runtime.ToggleComment();
 
     void IMainWindowActions.ShowFind() => _runtime.ShowFindPanel(replace: false);
 

@@ -432,6 +432,41 @@ public sealed class AzunoteUiTests : IDisposable
     }
 
     [AzunoteUiFact]
+    public void Add_next_occurrence_edits_every_match_and_toggle_comment_uses_the_language()
+    {
+        const ushort Control = 0x11, D = 0x44, X = 0x58, Slash = 0xBF;
+        var root = Directory.CreateTempSubdirectory("azunote-occurrence-");
+        var document = Path.Combine(root.FullName, "test.cs");
+        File.WriteAllText(document, "foo bar foo");
+        using var fixture = new AzunoteUiFixture(document);
+        try
+        {
+            var editor = fixture.Editor;
+            var textPattern = AzunoteUiFixture.WaitForTextPattern(editor);
+            AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "foo bar foo");
+            var caret = textPattern.DocumentRange.FindText("foo", false, false)!;
+            caret.MoveEndpointByRange(TextPatternRangeEndpoint.End, caret, TextPatternRangeEndpoint.Start);
+            caret.Select();
+            editor.SetFocus();
+
+            SendKeyChord(Control, D);
+            SendKeyChord(Control, D);
+            SendKeyChord(X);
+            AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "x bar x");
+
+            SendKeyChord(Control, Slash);
+            AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "// x bar x");
+            SendKeyChord(Control, Slash);
+            AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "x bar x");
+        }
+        finally
+        {
+            fixture.Dispose();
+            root.Delete(recursive: true);
+        }
+    }
+
+    [AzunoteUiFact]
     public void External_tool_shortcut_takes_precedence_over_line_shortcut_only_when_enabled()
     {
         const ushort Alt = 0x12, Down = 0x28;
