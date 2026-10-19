@@ -1062,6 +1062,45 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         });
     }
 
+    public void MoveLines(bool down) =>
+        ApplyLineEdit(caretSet => TextLineOperations.MoveLines(Snapshot, caretSet, down));
+
+    public void DuplicateLines(bool down) =>
+        ApplyLineEdit(caretSet => TextLineOperations.DuplicateLines(
+            Snapshot,
+            caretSet,
+            down,
+            _preferredLineEnding));
+
+    public void DeleteLines() =>
+        ApplyLineEdit(caretSet => TextLineOperations.DeleteLines(Snapshot, caretSet));
+
+    private void ApplyLineEdit(Func<TextCaretSet, TextCaretEdit?> createEdit)
+    {
+        RunAfterComposition(() =>
+        {
+            ApplyDocumentCommand(() =>
+            {
+                var caretSet = Document.CaretSet;
+                if (_blockSelection is { } blockSelection)
+                {
+                    if (!TryCreateBlockSelectionCaretSet(blockSelection, out caretSet))
+                    {
+                        return;
+                    }
+
+                    _blockSelection = null;
+                }
+
+                if (createEdit(caretSet) is { } edit)
+                {
+                    _document.Replace(edit.Range, edit.Replacement, edit.CaretSet);
+                }
+            });
+            ScrollSelectionIntoView();
+        });
+    }
+
     public void Select(int start, int length)
     {
         RunAfterComposition(() =>
@@ -2505,6 +2544,18 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                         }
                     });
                 }, repeatable: true);
+                args.Handled = true;
+                break;
+            case VirtualKey.Up or VirtualKey.Down when !IsComposing && menu && !control:
+                var down = args.Key == VirtualKey.Down;
+                QueueKeyEdit(
+                    args.Key,
+                    extendSelection ? () => DuplicateLines(down) : () => MoveLines(down),
+                    repeatable: true);
+                args.Handled = true;
+                break;
+            case VirtualKey.K when !IsComposing && control && extendSelection && !menu:
+                QueueKeyEdit(args.Key, DeleteLines, repeatable: true);
                 args.Handled = true;
                 break;
             case VirtualKey.Up

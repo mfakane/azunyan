@@ -395,6 +395,37 @@ public sealed class AzunoteUiTests : IDisposable
     }
 
     [AzunoteUiFact]
+    public void Line_shortcuts_move_duplicate_and_delete_the_caret_line()
+    {
+        const ushort Shift = 0x10, Control = 0x11, Alt = 0x12, Up = 0x26, Down = 0x28, K = 0x4B;
+        var editor = _fixture.Editor;
+        var editorValue = AzunoteUiFixture.WaitForValuePattern(editor);
+        var original = editorValue.Current.Value;
+
+        try
+        {
+            editorValue.SetValue("first\nsecond\nthird");
+            var textPattern = AzunoteUiFixture.WaitForTextPattern(editor);
+            AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "first\nsecond\nthird");
+            textPattern.DocumentRange.FindText("first", false, false)!.Select();
+            editor.SetFocus();
+
+            SendKeyChord(Alt, Down);
+            AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "second\nfirst\nthird");
+
+            SendKeyChord(Shift, Alt, Up);
+            AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "second\nfirst\nfirst\nthird");
+
+            SendKeyChord(Control, Shift, K);
+            AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "second\nfirst\nthird");
+        }
+        finally
+        {
+            AzunoteUiFixture.WaitForValuePattern(editor).SetValue(original);
+        }
+    }
+
+    [AzunoteUiFact]
     public void Find_and_replace_modes_are_exposed()
     {
         var window = _fixture.Window;
@@ -680,28 +711,30 @@ public sealed class AzunoteUiTests : IDisposable
             "The active window did not have exactly one checked document in the Window menu.");
     }
 
-    private static void SendEnterKey()
+    private static void SendEnterKey() => SendKeyChord(0x0D);
+
+    /// <summary>
+    /// Presses the keys in order and releases them in reverse order.
+    /// </summary>
+    private static void SendKeyChord(params ushort[] keys)
     {
-        var input = new[]
+        static NativeInput Key(ushort key, bool up) => new()
         {
-            new NativeInput
+            Type = 1,
+            Data = new InputUnion
             {
-                Type = 1,
-                Data = new InputUnion
+                Keyboard = new KeyboardInput
                 {
-                    Keyboard = new KeyboardInput { VirtualKey = 0x0D }
-                }
-            },
-            new NativeInput
-            {
-                Type = 1,
-                Data = new InputUnion
-                {
-                    Keyboard = new KeyboardInput { VirtualKey = 0x0D, Flags = 0x0002 }
+                    VirtualKey = key,
+                    // Arrow keys are extended keys; KEYEVENTF_KEYUP is 0x0002.
+                    Flags = (key is >= 0x25 and <= 0x28 ? 0x0001u : 0u) | (up ? 0x0002u : 0u)
                 }
             }
         };
 
+        var input = keys.Select(key => Key(key, up: false))
+            .Concat(keys.Reverse().Select(key => Key(key, up: true)))
+            .ToArray();
         Assert.Equal((uint)input.Length, SendInput((uint)input.Length, input, Marshal.SizeOf<NativeInput>()));
     }
 

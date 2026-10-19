@@ -438,8 +438,10 @@ Keyboard ownership follows the same boundary. While composition is active,
 the native control owns composition-sensitive navigation and editing keys so
 candidate selection, segment movement, commit, and cancellation retain their
 platform behavior. Outside composition, the projected editor owns document
-navigation, selection, deletion, line insertion, indentation, clipboard, and
-undo/redo commands; the native control receives only the remaining
+navigation, selection, deletion, line insertion, indentation, clipboard,
+undo/redo, and whole-line commands (Alt+Up/Down moves the caret lines,
+Shift+Alt+Up/Down duplicates them, and Ctrl+Shift+K deletes them); the
+native control receives only the remaining
 text-producing/dead-key path. Ctrl+Alt is treated as AltGr rather than as an
 editor shortcut.
 
