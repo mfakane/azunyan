@@ -14,7 +14,11 @@ internal sealed class ApplicationCoordinator : IDisposable
         new(SettingsFileService.GetDefaultDirectory());
     private DispatcherQueue? _dispatcherQueue;
     private int _nextWindowGroupAccentIndex;
+    private bool _closingAll;
     private bool _disposed;
+
+    internal DocumentBackupStore Backups { get; } =
+        new(Path.Combine(SettingsFileService.GetDefaultDirectory(), "backups"));
 
     public MainWindow? Window => _windows.Active?.Window;
 
@@ -70,6 +74,14 @@ internal sealed class ApplicationCoordinator : IDisposable
         var runtime = registration.Window.Runtime;
 
         var target = registration;
+        var plainLaunch = !options.ReadStandardInput
+            && options.FilePaths.Count == 0
+            && !options.WaitForExit
+            && options.Output.Count == 0;
+        if (await RestoreBackupsAsync(plainLaunch ? registration : null) is { } restored)
+        {
+            target = plainLaunch ? restored : target;
+        }
         if (options.ReadStandardInput)
         {
             await OpenStandardInputAsync(runtime, options);
@@ -367,6 +379,83 @@ internal sealed class ApplicationCoordinator : IDisposable
         ActivateWindow(duplicateRegistration);
     }
 
+    /// <summary>
+    /// Closing the last window, File &gt; Exit, and Windows shutdown keep unsaved
+    /// changes as backups instead of asking about them. A window a command
+    /// line waits on still asks, because the command line reports its result.
+    /// </summary>
+    internal bool CanCloseKeepingBackup(MainWindow window) =>
+        FindRegistration(window) is { IsWaitedOn: false }
+        && window.Runtime.CanKeepBackup
+        && (_closingAll || _windows.Windows.Count == 1);
+
+    /// <summary>
+    /// Closes every window, keeping unsaved changes as backups. Stops at a
+    /// window whose confirmation is cancelled.
+    /// </summary>
+    internal async Task CloseAllWindowsAsync()
+    {
+        _closingAll = true;
+        try
+        {
+            foreach (var registration in _windows.Windows.ToArray())
+            {
+                if (!await registration.Window.TryCloseAsync())
+                {
+                    return;
+                }
+            }
+        }
+        finally
+        {
+            _closingAll = false;
+        }
+    }
+
+    /// <summary>
+    /// Windows is ending the session and may stop the process without
+    /// closing its windows, so every unsaved document is backed up now.
+    /// </summary>
+    internal void PrepareForSessionEnd()
+    {
+        _closingAll = true;
+        foreach (var registration in _windows.Windows)
+        {
+            registration.Window.Runtime.KeepBackup();
+        }
+    }
+
+    /// <summary>
+    /// Opens a window for each backup left by the previous session and
+    /// returns the last one. <paramref name="initial"/>, when given, hosts the
+    /// first backup instead of a new window.
+    /// </summary>
+    private async Task<WindowRegistration?> RestoreBackupsAsync(WindowRegistration? initial)
+    {
+        IReadOnlyList<DocumentBackup> backups;
+        try
+        {
+            backups = Backups.ReadAll();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            ErrorReporter.LogException("Restore document backups", exception);
+            return null;
+        }
+
+        WindowRegistration? restored = null;
+        foreach (var backup in backups)
+        {
+            var registration = initial is { IsClosed: false } ? initial : CreateWindowRegistration();
+            initial = null;
+            await registration.Window.Runtime.RestoreBackupAsync(backup);
+            ActivateWindow(registration);
+            restored = registration;
+        }
+
+        return restored;
+    }
+
     internal bool HasOtherView(MainWindow source)
     {
         ArgumentNullException.ThrowIfNull(source);
@@ -609,6 +698,7 @@ internal sealed class ApplicationCoordinator : IDisposable
         _windows.Register(registration);
         _windows.MarkActive(registration);
         window.EnableWindowSnapping();
+        SessionEndWatcher.Install(window.WindowHandle, PrepareForSessionEnd);
         _ = window.Runtime.InitializeSettingsAsync();
         window.RenderRecentFiles(_state.Current.RecentFiles);
         RefreshWindowMenus();
@@ -692,6 +782,7 @@ internal sealed class ApplicationCoordinator : IDisposable
     {
         if (options.WaitForExit)
         {
+            registration.IsWaitedOn = true;
             await registration.Closed.ConfigureAwait(false);
         }
     }
@@ -786,6 +877,8 @@ internal sealed class ApplicationCoordinator : IDisposable
         public Task Closed => _closed.Task;
 
         public bool IsClosed => _closed.Task.IsCompleted;
+
+        public bool IsWaitedOn { get; set; }
 
         public CommandLineDocumentOutput? ClosedDocument { get; private set; }
 

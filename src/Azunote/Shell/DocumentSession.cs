@@ -19,6 +19,12 @@ public sealed class DocumentSession
 
     public DocumentSessionState State => _state;
 
+    /// <summary>
+    /// Names this document's backup. A restored document keeps the id of the
+    /// backup it came from, so that backup is updated rather than duplicated.
+    /// </summary>
+    public string BackupId { get; internal set; } = Guid.NewGuid().ToString("N");
+
     public event EventHandler? StateChanged;
 
     public bool IsSameAsSaved(string text)

@@ -294,7 +294,8 @@ public sealed class AzunoteUiTests : IDisposable
                     legalWindow, AutomationElement.NameProperty, "Save").Current.IsEnabled);
                 Assert.False(AzunoteUiFixture.WaitForElement(
                     legalWindow, AutomationElement.NameProperty, "Save As...").Current.IsEnabled);
-                AzunoteUiFixture.InvokeMenuItem(legalWindow, "File", "Exit");
+                AzunoteUiFixture.CloseMenu(legalWindow, "File");
+                ((WindowPattern)legalWindow.GetCurrentPattern(WindowPattern.Pattern)).Close();
             }
             catch (Exception exception)
             {
@@ -569,6 +570,90 @@ public sealed class AzunoteUiTests : IDisposable
     private static void SetElementValue(AutomationElement window, string name, string value) =>
         ((ValuePattern)AzunoteUiFixture.WaitForElement(window, AutomationElement.NameProperty, name)
             .GetCurrentPattern(ValuePattern.Pattern)).SetValue(value);
+
+    [AzunoteUiFact]
+    public void Closing_the_last_window_keeps_unsaved_text_without_asking()
+    {
+        var root = Directory.CreateTempSubdirectory("azunote-hot-exit-");
+        var document = Path.Combine(root.FullName, "note.txt");
+        File.WriteAllText(document, "saved");
+        using var fixture = new AzunoteUiFixture(document);
+        try
+        {
+            var editor = fixture.Editor;
+            AzunoteUiFixture.WaitForValuePattern(editor, text => text == "saved").SetValue("unsaved");
+            AzunoteUiFixture.WaitForDocumentText(AzunoteUiFixture.WaitForTextPattern(editor), text => text == "unsaved");
+
+            var window = fixture.Window;
+            AzunoteUiFixture.WaitFor(
+                () => window.Current.Name.StartsWith("note.txt *", StringComparison.Ordinal) ? window : null,
+                "The edited document did not become dirty.");
+            ((WindowPattern)window.GetCurrentPattern(WindowPattern.Pattern)).Close();
+
+            Assert.True(fixture.WaitForExit(10000), "Closing the last dirty window did not exit without a prompt.");
+            var appData = Path.GetDirectoryName(AzunoteUiFixture.BackupDirectory)!;
+            var backups = Directory.Exists(AzunoteUiFixture.BackupDirectory)
+                ? Directory.GetFiles(AzunoteUiFixture.BackupDirectory, "*.backup")
+                : [];
+            Assert.True(
+                backups.Length == 1,
+                "Backups: " + string.Join(", ", Directory.GetFileSystemEntries(appData, "*", SearchOption.AllDirectories)));
+            var backup = File.ReadAllText(backups[0]);
+            Assert.Equal($"Azunote backup 1\n{document}\n\nunsaved", backup);
+            Assert.Equal("saved", File.ReadAllText(document));
+        }
+        finally
+        {
+            fixture.Dispose();
+            root.Delete(recursive: true);
+        }
+    }
+
+    [AzunoteUiFact]
+    public void Exit_closes_every_window_and_keeps_unsaved_text()
+    {
+        var window = _fixture.Window;
+        var editor = _fixture.Editor;
+        AzunoteUiFixture.WaitForValuePattern(editor).SetValue("exit draft");
+        AzunoteUiFixture.WaitFor(
+            () => window.Current.Name.Contains(" *", StringComparison.Ordinal) ? window : null,
+            "The edited document did not become dirty.");
+        AzunoteUiFixture.InvokeMenuItem(window, "File", "New");
+        _fixture.WaitForWindows(windows => windows.Length == 2);
+
+        AzunoteUiFixture.InvokeMenuItem(window, "File", "Exit");
+
+        Assert.True(_fixture.WaitForExit(10000), "File > Exit did not close every window.");
+        var backup = File.ReadAllText(Assert.Single(Directory.GetFiles(AzunoteUiFixture.BackupDirectory, "*.backup")));
+        Assert.EndsWith("\n\nexit draft", backup);
+    }
+
+    [AzunoteUiFact]
+    public void Launch_restores_backed_up_documents_in_their_own_windows()
+    {
+        Directory.CreateDirectory(AzunoteUiFixture.BackupDirectory);
+        File.WriteAllText(
+            Path.Combine(AzunoteUiFixture.BackupDirectory, Guid.NewGuid().ToString("N") + ".backup"),
+            "Azunote backup 1\n\n\nrestored draft");
+        using var fixture = new AzunoteUiFixture(keepBackups: true);
+        try
+        {
+            _ = fixture.Window;
+            var restored = fixture.WaitForWindows(windows => windows.Any(IsRestoredWindow)).First(IsRestoredWindow);
+            var editor = AzunoteUiFixture.WaitForElement(restored, AutomationElement.NameProperty, "Document editor");
+            AzunoteUiFixture.WaitForDocumentText(
+                AzunoteUiFixture.WaitForTextPattern(editor),
+                text => text == "restored draft");
+        }
+        finally
+        {
+            fixture.Dispose();
+            Directory.Delete(AzunoteUiFixture.BackupDirectory, recursive: true);
+        }
+
+        static bool IsRestoredWindow(AutomationElement window) =>
+            window.Current.Name.StartsWith("Untitled *", StringComparison.Ordinal);
+    }
 
     [AzunoteUiFact]
     public void Find_and_replace_modes_are_exposed()
@@ -936,7 +1021,23 @@ public sealed class AzunoteUiTests : IDisposable
 public sealed class AzunoteUiFixture : IDisposable
 {
     private readonly string? _verificationDocument;
-    public AzunoteUiFixture(string? verificationDocument = null) => _verificationDocument = verificationDocument;
+    private readonly bool _keepBackups;
+
+    /// <summary>
+    /// Unsaved documents left by an earlier test would be restored as extra
+    /// windows, so backups are removed before each launch unless
+    /// <paramref name="keepBackups"/> asks to restore them.
+    /// </summary>
+    public AzunoteUiFixture(string? verificationDocument = null, bool keepBackups = false)
+    {
+        _verificationDocument = verificationDocument;
+        _keepBackups = keepBackups;
+    }
+
+    public static string BackupDirectory =>
+        Path.Combine(Path.GetDirectoryName(ResolveExecutablePath())!, "appdata", "backups");
+
+    public bool WaitForExit(int milliseconds) => _process?.WaitForExit(milliseconds) ?? true;
     private const string EnabledVariable = "AZUNOTE_UI_TESTS";
     private const string ExecutableVariable = "AZUNOTE_EXE";
     private Process? _process;
@@ -1163,6 +1264,14 @@ public sealed class AzunoteUiFixture : IDisposable
         }
 
         var executablePath = ResolveExecutablePath();
+        // An appdata directory beside the executable makes Azunote keep its
+        // settings and backups there, where the tests can clean them up.
+        Directory.CreateDirectory(Path.GetDirectoryName(BackupDirectory)!);
+        if (!_keepBackups && Directory.Exists(BackupDirectory))
+        {
+            Directory.Delete(BackupDirectory, recursive: true);
+        }
+
         var verificationDocument = _verificationDocument ?? ResolveVerificationDocument();
         var startInfo = new ProcessStartInfo(executablePath)
         {

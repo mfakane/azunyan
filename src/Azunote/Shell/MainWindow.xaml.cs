@@ -66,6 +66,7 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
             application.RecordRecentFile,
             application.RecordWordWrap,
             application.RecordStatusBarVisible,
+            application.Backups,
             session,
             document,
             path => application.OpenFileAsync(this, path),
@@ -246,7 +247,7 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
 
     private async void AppWindow_Closing(AppWindow sender, AppWindowClosingEventArgs args)
     {
-        if (_allowClose || !_runtime.IsDirty || _application.HasOtherView(this))
+        if (_allowClose || !NeedsCloseConfirmation())
         {
             return;
         }
@@ -257,8 +258,51 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
             return;
         }
 
+        _runtime.DiscardBackup();
         _allowClose = true;
         Close();
+    }
+
+    /// <summary>
+    /// Closes the window, asking about unsaved changes as closing it from its
+    /// title bar would. Returns false when the user cancels.
+    /// </summary>
+    internal async Task<bool> TryCloseAsync()
+    {
+        if (!_allowClose && NeedsCloseConfirmation())
+        {
+            if (!await _runtime.TryConfirmCloseAsync())
+            {
+                return false;
+            }
+
+            _runtime.DiscardBackup();
+        }
+
+        _allowClose = true;
+        Close();
+        return true;
+    }
+
+    /// <summary>
+    /// Returns false when the window can close as it is: its document is
+    /// saved, still shown in another window, or kept as a backup to restore
+    /// on the next launch.
+    /// </summary>
+    private bool NeedsCloseConfirmation()
+    {
+        if (!_runtime.IsDirty || _application.HasOtherView(this))
+        {
+            return false;
+        }
+
+        if (!_application.CanCloseKeepingBackup(this))
+        {
+            return true;
+        }
+
+        _runtime.KeepBackup();
+        return false;
     }
 
     private void MainWindow_Activated(
@@ -534,7 +578,7 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
 
     async Task IMainWindowActions.SaveAsAsync() => await _runtime.SaveAsAsync();
 
-    void IMainWindowActions.Exit() => Close();
+    void IMainWindowActions.Exit() => _ = _application.CloseAllWindowsAsync();
 
     void IMainWindowActions.Undo() => _runtime.Undo();
 

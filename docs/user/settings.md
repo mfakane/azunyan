@@ -10,6 +10,7 @@ created on first launch and contains:
 | `state.toml` | Application-managed window, view, and recent-file state. |
 | `tools/` | [External tool definitions](external-tools.md). |
 | `modes/` | Custom language-mode definitions. |
+| `backups/` | [Unsaved documents](#unsaved-documents) kept for the next launch. |
 
 Azunote watches this directory recursively and reloads valid external changes.
 If a tool or language-mode definition is invalid, the previous menu remains in
@@ -66,6 +67,24 @@ shell.
 `state.toml` is rewritten automatically and should not be edited. It stores
 the last window layout, Word Wrap and Status Bar preferences, and up to 10
 recently opened file paths.
+
+## Unsaved documents
+
+While a document has unsaved changes, Azunote copies its text into `backups/`
+a moment after each edit, and removes the copy once the document is saved or
+its changes are discarded. Closing the last window, File > Exit (which closes
+every window), and a Windows shutdown or restart therefore close without
+asking about unsaved changes. Closing any other window still asks.
+
+On the next launch, each backed-up document opens in its own window with its
+changes still unsaved. A document that has a file reopens that file with the
+changes applied on top, so Undo returns to the file as it is on disk; if the
+file no longer exists, the text opens as an untitled document. The same
+restore happens after Azunote stops unexpectedly.
+
+A window that a command line waits on (`--wait`) still asks before closing,
+because the command line reports what became of its document. Untitled text
+that a command line reads back (`--output`) is never backed up.
 
 ## Custom language modes
 

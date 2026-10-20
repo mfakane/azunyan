@@ -30,6 +30,8 @@ internal sealed class MainWindowRuntime : IDisposable
     private readonly Action<string> _recordRecentFile;
     private readonly Action<bool> _recordWordWrap;
     private readonly Action<bool> _recordStatusBarVisible;
+    private readonly DocumentBackupTracker _backups;
+    private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer _backupTimer;
     private int _runningExternalToolCount;
     private bool _disposed;
 
@@ -44,6 +46,7 @@ internal sealed class MainWindowRuntime : IDisposable
         Action<string> recordRecentFile,
         Action<bool> recordWordWrap,
         Action<bool> recordStatusBarVisible,
+        DocumentBackupStore backups,
         DocumentSession? session = null,
         Document? document = null,
         Func<string, Task>? openFileRequest = null,
@@ -148,6 +151,12 @@ internal sealed class MainWindowRuntime : IDisposable
         _messageDialog = new WinUiMessageDialog(() => _view.XamlRoot);
         _externalToolDialog = new WinUiExternalToolDialog(() => _view.XamlRoot);
 
+        _backups = new DocumentBackupTracker(backups, _session, () => _view.Text);
+        _backupTimer = _view.DispatcherQueue.CreateTimer();
+        _backupTimer.Interval = BackupDelay;
+        _backupTimer.IsRepeating = false;
+        _backupTimer.Tick += (_, _) => _backups.Flush();
+
         _documents.Changed += Documents_Changed;
         _languageModes.Changed += LanguageModes_Changed;
         _session.StateChanged += Session_StateChanged;
@@ -164,7 +173,54 @@ internal sealed class MainWindowRuntime : IDisposable
 
     internal bool IsEmptyDocument => _view.Snapshot.Length == 0;
 
-    internal void AllowCommandLineClose() => _documents.AllowUntitledCloseWithoutPrompt();
+    internal void AllowCommandLineClose()
+    {
+        _documents.AllowUntitledCloseWithoutPrompt();
+        _backupTimer.Stop();
+        _backups.Disable();
+    }
+
+    /// <summary>How long editing pauses before unsaved changes are backed up.</summary>
+    private static readonly TimeSpan BackupDelay = TimeSpan.FromSeconds(1);
+
+    /// <summary>Whether closing can keep this document's unsaved changes as a backup.</summary>
+    internal bool CanKeepBackup => _backups.IsEnabled;
+
+    internal void KeepBackup()
+    {
+        _backupTimer.Stop();
+        _backups.Flush();
+    }
+
+    internal void DiscardBackup()
+    {
+        _backupTimer.Stop();
+        _backups.Discard();
+    }
+
+    /// <summary>
+    /// Opens a backed-up document. A document with a file reopens that file
+    /// and applies the unsaved text as an edit, so it is dirty against what is
+    /// on disk now and undo returns to the file. A missing file restores the
+    /// text as an untitled document.
+    /// </summary>
+    internal async Task RestoreBackupAsync(DocumentBackup backup)
+    {
+        ArgumentNullException.ThrowIfNull(backup);
+        _session.BackupId = backup.Id;
+        if (backup.FilePath is { } path && File.Exists(path))
+        {
+            await _documents.OpenStartupDocumentAsync(path);
+            _view.Replace(new TextRange(0, _view.Snapshot.Length), backup.Text);
+        }
+        else
+        {
+            await _documents.OpenStartupTextAsync(backup.Text);
+        }
+
+        ObserveTextChanged();
+        _backups.Flush();
+    }
 
     /// <summary>
     /// Captures the document as it stands for a command line that asked for
@@ -499,6 +555,12 @@ internal sealed class MainWindowRuntime : IDisposable
         using var measurement = ShellPerformance.Measure("text.changed");
         var previousState = _session.State;
         _documents.ObserveTextChanged();
+        if (_backups.IsEnabled)
+        {
+            _backupTimer.Stop();
+            _backupTimer.Start();
+        }
+
         // StateChanged already refreshed the view when dirty/file state changed.
         if (previousState == _session.State)
         {
@@ -590,6 +652,8 @@ internal sealed class MainWindowRuntime : IDisposable
         }
 
         _disposed = true;
+        _backupTimer.Stop();
+        _backups.Dispose();
         _powerShellWarmPool.Dispose();
         _toolUpdates.Dispose();
         _ = DisposeToolCacheAsync();
