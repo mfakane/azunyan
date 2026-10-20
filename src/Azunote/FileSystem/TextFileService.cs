@@ -64,6 +64,28 @@ public static class TextFileService
         return new TextFileData(text, encoding, DetectLineEnding(text));
     }
 
+    /// <summary>
+    /// Decodes a file with <paramref name="encoding"/> instead of detecting
+    /// one. A byte order mark for that encoding is skipped; bytes that are not
+    /// valid UTF-8 make a UTF-8 read fail rather than change the text.
+    /// </summary>
+    public static async Task<TextFileData> ReadWithEncodingAsync(
+        string path,
+        TextEncodingKind encoding,
+        CancellationToken cancellationToken = default)
+    {
+        var bytes = await File.ReadAllBytesAsync(path, cancellationToken);
+        var decoder = GetEncoding(encoding);
+        var byteOrderMark = encoding is TextEncodingKind.Utf8 or TextEncodingKind.Utf8Bom
+            ? Utf8Bom.GetPreamble()
+            : decoder.GetPreamble();
+        var body = bytes.AsSpan().StartsWith(byteOrderMark)
+            ? bytes.AsSpan(byteOrderMark.Length)
+            : bytes;
+        var text = decoder.GetString(body);
+        return new TextFileData(text, encoding, DetectLineEnding(text));
+    }
+
     public static async Task WriteAsync(
         string path,
         string text,

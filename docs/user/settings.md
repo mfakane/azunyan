@@ -82,6 +82,17 @@ changes applied on top, so Undo returns to the file as it is on disk; if the
 file no longer exists, the text opens as an untitled document. The same
 restore happens after Azunote stops unexpectedly.
 
+Besides edits to the text, two things leave a document unsaved:
+
+- Choosing a line ending from Edit > Line Ending or the status bar. It
+  applies from the next save.
+- Another program deleting the file. The title shows `(deleted)` until the
+  document is saved or the file reappears unchanged.
+
+File > Save with Encoding saves in the chosen encoding at once, and File >
+Reopen with Encoding reads the file again in the chosen encoding instead of
+the detected one. Both are also available from the encoding in the status bar.
+
 A window that a command line waits on (`--wait`) still asks before closing,
 because the command line reports what became of its document. Untitled text
 that a command line reads back (`--output`) is never backed up.

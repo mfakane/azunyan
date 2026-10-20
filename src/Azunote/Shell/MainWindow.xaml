@@ -490,6 +490,73 @@
                         />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
+                <MenuFlyoutSubItem Text="Reopen with Encoding">
+                    <MenuFlyoutItem
+                        Text="UTF-8"
+                        Command="{x:Bind ViewModel.ReopenWithEncodingCommand}"
+                        CommandParameter="Utf8"
+                    />
+                    <MenuFlyoutItem
+                        Text="UTF-8 BOM"
+                        Command="{x:Bind ViewModel.ReopenWithEncodingCommand}"
+                        CommandParameter="Utf8Bom"
+                    />
+                    <MenuFlyoutItem
+                        Text="UTF-16 LE"
+                        Command="{x:Bind ViewModel.ReopenWithEncodingCommand}"
+                        CommandParameter="Utf16LittleEndian"
+                    />
+                    <MenuFlyoutItem
+                        Text="UTF-16 BE"
+                        Command="{x:Bind ViewModel.ReopenWithEncodingCommand}"
+                        CommandParameter="Utf16BigEndian"
+                    />
+                    <MenuFlyoutItem
+                        Text="Latin-1"
+                        Command="{x:Bind ViewModel.ReopenWithEncodingCommand}"
+                        CommandParameter="Latin1"
+                    />
+                    <MenuFlyoutItem
+                        Text="System default"
+                        Command="{x:Bind ViewModel.ReopenWithEncodingCommand}"
+                        CommandParameter="SystemDefault"
+                    />
+                </MenuFlyoutSubItem>
+                <MenuFlyoutSubItem
+                    Text="Save with Encoding"
+                    IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
+                >
+                    <MenuFlyoutItem
+                        Text="UTF-8"
+                        Command="{x:Bind ViewModel.SaveWithEncodingCommand}"
+                        CommandParameter="Utf8"
+                    />
+                    <MenuFlyoutItem
+                        Text="UTF-8 BOM"
+                        Command="{x:Bind ViewModel.SaveWithEncodingCommand}"
+                        CommandParameter="Utf8Bom"
+                    />
+                    <MenuFlyoutItem
+                        Text="UTF-16 LE"
+                        Command="{x:Bind ViewModel.SaveWithEncodingCommand}"
+                        CommandParameter="Utf16LittleEndian"
+                    />
+                    <MenuFlyoutItem
+                        Text="UTF-16 BE"
+                        Command="{x:Bind ViewModel.SaveWithEncodingCommand}"
+                        CommandParameter="Utf16BigEndian"
+                    />
+                    <MenuFlyoutItem
+                        Text="Latin-1"
+                        Command="{x:Bind ViewModel.SaveWithEncodingCommand}"
+                        CommandParameter="Latin1"
+                    />
+                    <MenuFlyoutItem
+                        Text="System default"
+                        Command="{x:Bind ViewModel.SaveWithEncodingCommand}"
+                        CommandParameter="SystemDefault"
+                    />
+                </MenuFlyoutSubItem>
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem
                     Text="Exit"
@@ -611,6 +678,26 @@
                     Command="{x:Bind ViewModel.ToggleCommentCommand}"
                     IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
                 />
+                <MenuFlyoutSubItem
+                    Text="Line Ending"
+                    IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
+                >
+                    <MenuFlyoutItem
+                        Text="CRLF"
+                        Command="{x:Bind ViewModel.ChangeLineEndingCommand}"
+                        CommandParameter="CrLf"
+                    />
+                    <MenuFlyoutItem
+                        Text="LF"
+                        Command="{x:Bind ViewModel.ChangeLineEndingCommand}"
+                        CommandParameter="Lf"
+                    />
+                    <MenuFlyoutItem
+                        Text="CR"
+                        Command="{x:Bind ViewModel.ChangeLineEndingCommand}"
+                        CommandParameter="Cr"
+                    />
+                </MenuFlyoutSubItem>
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem
                     Text="Add Next Occurrence"
@@ -1090,11 +1177,13 @@
                     x:Name="EncodingStatus"
                     Grid.Column="1"
                     Text="{x:Bind ViewModel.EncodingStatus, Mode=OneWay}"
+                    Tapped="EncodingStatus_Tapped"
                 />
                 <TextBlock
                     x:Name="LineEndingStatus"
                     Grid.Column="2"
                     Text="{x:Bind ViewModel.LineEndingStatus, Mode=OneWay}"
+                    Tapped="LineEndingStatus_Tapped"
                 />
                 <TextBlock
                     x:Name="IndentationStatus"

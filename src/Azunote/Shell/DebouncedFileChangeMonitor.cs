@@ -48,6 +48,13 @@ internal sealed class DebouncedFileChangeMonitor : IFileChangeMonitor
         _watcher.Deleted += OnChanged;
         _watcher.Renamed += OnRenamed;
         _watcher.EnableRaisingEvents = true;
+
+        // A watch starts after the file was written or a tool ran, so a file
+        // removed in between would never raise an event. Report it instead.
+        if (!includeSubdirectories && !File.Exists(fullPath))
+        {
+            QueueNotification(fullPath);
+        }
     }
 
     public event EventHandler<FileChangeDetectedEventArgs>? Changed;

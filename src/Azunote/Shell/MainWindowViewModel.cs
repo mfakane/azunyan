@@ -70,6 +70,27 @@ internal sealed class MainWindowViewModel :
         DeleteLineCommand = Command(() => Actions.DeleteLines());
         AddNextOccurrenceCommand = Command(() => Actions.AddNextOccurrence());
         ToggleCommentCommand = Command(() => Actions.ToggleComment());
+        ReopenWithEncodingCommand = Command(parameter =>
+        {
+            if (Enum.TryParse<TextEncodingKind>(parameter?.ToString(), out var encoding))
+            {
+                Actions.ReopenWithEncoding(encoding);
+            }
+        });
+        SaveWithEncodingCommand = Command(parameter =>
+        {
+            if (Enum.TryParse<TextEncodingKind>(parameter?.ToString(), out var encoding))
+            {
+                Actions.SaveWithEncoding(encoding);
+            }
+        });
+        ChangeLineEndingCommand = Command(parameter =>
+        {
+            if (Enum.TryParse<LineEndingKind>(parameter?.ToString(), out var lineEnding))
+            {
+                Actions.ChangeLineEnding(lineEnding);
+            }
+        });
         ShowFindCommand = Command(() => Actions.ShowFind());
         ShowReplaceCommand = Command(() => Actions.ShowReplace());
         ShowCompletionCommand = Command(() => Actions.ShowCompletion());
@@ -209,6 +230,9 @@ internal sealed class MainWindowViewModel :
     public ICommand DeleteLineCommand { get; }
     public ICommand AddNextOccurrenceCommand { get; }
     public ICommand ToggleCommentCommand { get; }
+    public ICommand ReopenWithEncodingCommand { get; }
+    public ICommand SaveWithEncodingCommand { get; }
+    public ICommand ChangeLineEndingCommand { get; }
     public ICommand ShowFindCommand { get; }
     public ICommand ShowReplaceCommand { get; }
     public ICommand ShowCompletionCommand { get; }
@@ -547,6 +571,9 @@ internal interface IMainWindowActions
     void DeleteLines();
     void AddNextOccurrence();
     void ToggleComment();
+    void ReopenWithEncoding(TextEncodingKind encoding);
+    void SaveWithEncoding(TextEncodingKind encoding);
+    void ChangeLineEnding(LineEndingKind lineEnding);
     void ShowFind();
     void ShowReplace();
     void ShowCompletion();

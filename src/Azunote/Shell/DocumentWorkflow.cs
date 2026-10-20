@@ -228,6 +228,62 @@ internal sealed class DocumentWorkflow : IDisposable
         }
     }
 
+    /// <summary>
+    /// Rereads the file with an encoding the user chose. Unsaved changes are
+    /// confirmed first, because the reread text replaces them.
+    /// </summary>
+    public async Task ReopenWithEncodingAsync(TextEncodingKind encoding)
+    {
+        if (CurrentFilePath is null || (IsDirty && !await ConfirmPendingChangesAsync()))
+        {
+            return;
+        }
+
+        StopFileWatcher();
+        try
+        {
+            await ApplyDocumentAsync(() => _documents.ReopenWithEncodingAsync(encoding));
+            ApplyEditorConfig(_editorConfig.WithExplicitFileFormat(encoding, CurrentLineEnding));
+            NotifyChanged(TextFileService.DetectLineEnding(_editor.Text), opened: false);
+        }
+        catch (Exception exception)
+        {
+            await _prompt.ShowErrorAsync("Could not reopen the file", exception.Message);
+        }
+        finally
+        {
+            StartFileWatcher();
+        }
+    }
+
+    /// <summary>Saves the document in another encoding.</summary>
+    public async Task<bool> SaveWithEncodingAsync(TextEncodingKind encoding)
+    {
+        ChangeFileFormat(encoding, lineEnding: null);
+        return await SaveAsync();
+    }
+
+    /// <summary>
+    /// Writes the document with another line ending from its next save on.
+    /// New lines typed until then use it as well.
+    /// </summary>
+    public void ChangeLineEnding(LineEndingKind lineEnding)
+    {
+        ChangeFileFormat(encoding: null, lineEnding);
+        NotifyChanged(CurrentLineEnding, opened: false);
+    }
+
+    private void ChangeFileFormat(TextEncodingKind? encoding, LineEndingKind? lineEnding)
+    {
+        if (_documents.Session.State.IsReadOnly)
+        {
+            return;
+        }
+
+        _documents.Session.ChangeFormat(encoding, lineEnding);
+        ApplyEditorConfig(_editorConfig.WithExplicitFileFormat(CurrentEncoding, CurrentLineEnding));
+    }
+
     public async Task ReloadFromDiskAsync()
     {
         if (CurrentFilePath is not { } currentPath)
@@ -485,9 +541,14 @@ internal sealed class DocumentWorkflow : IDisposable
                 || !string.Equals(
                     Path.GetFullPath(expectedPath),
                     Path.GetFullPath(path),
-                    StringComparison.OrdinalIgnoreCase)
-                || !File.Exists(path))
+                    StringComparison.OrdinalIgnoreCase))
             {
+                return;
+            }
+
+            if (!File.Exists(path))
+            {
+                _documents.Session.MarkDeletedOnDisk();
                 return;
             }
 
@@ -495,6 +556,7 @@ internal sealed class DocumentWorkflow : IDisposable
             var document = await _documents.ReadAsync(
                 path,
                 encodingHint: editorConfig.Encoding);
+            _documents.Session.MarkPresentOnDisk(_editor.Text);
             if (_documents.Session.IsSameAsSaved(document.Text))
             {
                 return;

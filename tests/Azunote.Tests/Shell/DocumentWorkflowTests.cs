@@ -338,6 +338,117 @@ public sealed class DocumentWorkflowTests
     }
 
     [Fact]
+    public async Task Deleted_file_marks_the_document_until_it_returns_unchanged()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            var editor = new FakeEditorView();
+            var session = new DocumentSession();
+            var files = new FakeTextFileStore();
+            files.Files[Path.GetFullPath(path)] = new TextFileData("text", TextEncodingKind.Utf8, LineEndingKind.Lf);
+            var factory = new FakeFileChangeMonitorFactory();
+            var workflow = CreateWorkflow(
+                editor,
+                session,
+                files,
+                new FakeUserPrompt(),
+                new FakeFileDialogService { OpenPath = path },
+                factory);
+            await workflow.OpenFileAsync();
+
+            File.Delete(path);
+            factory.Monitors[^1].Trigger(path);
+            await Task.Delay(30);
+            Assert.True(session.State.IsDeletedOnDisk);
+            Assert.True(workflow.IsDirty);
+
+            File.WriteAllText(path, "text");
+            factory.Monitors[^1].Trigger(path);
+            await Task.Delay(30);
+            Assert.False(session.State.IsDeletedOnDisk);
+            Assert.False(workflow.IsDirty);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task A_file_deleted_while_saving_is_noticed_when_the_watch_restarts()
+    {
+        var root = Directory.CreateTempSubdirectory("azunote-save-delete-");
+        var path = Path.Combine(root.FullName, "note.txt");
+        File.WriteAllText(path, "text");
+        try
+        {
+            var editor = new FakeEditorView();
+            var session = new DocumentSession();
+            var prompt = new FakeUserPrompt();
+            var files = new DeletingAfterWriteFileStore();
+            var documents = new DocumentController(editor, session, files, prompt);
+            var workflow = new DocumentWorkflow(
+                editor,
+                documents,
+                new ExternalToolController(editor, documents, files, prompt, _ => Task.CompletedTask),
+                new FakeFileDialogService { OpenPath = path },
+                new DefaultFileChangeMonitorFactory(),
+                new FakeUiDispatcher(),
+                prompt,
+                LanguageModeCatalog.Create().GetFileDialogFilters,
+                () => "plain-text",
+                () => Task.CompletedTask,
+                _ => Task.CompletedTask);
+            await workflow.OpenFileAsync();
+            Assert.True(await workflow.SaveWithEncodingAsync(TextEncodingKind.Utf16LittleEndian));
+
+            for (var attempt = 0; attempt < 40 && !session.State.IsDeletedOnDisk; attempt++)
+            {
+                await Task.Delay(50);
+            }
+
+            Assert.True(session.State.IsDeletedOnDisk, $"Errors: {string.Join(" | ", prompt.Errors)}");
+        }
+        finally
+        {
+            root.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Format_changes_stay_unsaved_until_the_document_is_saved_with_them()
+    {
+        var path = Path.GetFullPath(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".txt"));
+        var editor = new FakeEditorView();
+        var session = new DocumentSession();
+        var files = new FakeTextFileStore();
+        files.Files[path] = new TextFileData("a\r\nb", TextEncodingKind.Utf8, LineEndingKind.CrLf);
+        var workflow = CreateWorkflow(
+            editor,
+            session,
+            files,
+            new FakeUserPrompt(),
+            new FakeFileDialogService { OpenPath = path });
+        await workflow.OpenFileAsync();
+
+        workflow.ChangeLineEnding(LineEndingKind.Lf);
+        Assert.True(workflow.IsDirty);
+        editor.Replace(new Azunyan.Core.TextRange(0, 0), "");
+        workflow.ObserveTextChanged();
+        Assert.True(workflow.IsDirty);
+
+        Assert.True(await workflow.SaveWithEncodingAsync(TextEncodingKind.Utf16LittleEndian));
+        Assert.Equal(TextEncodingKind.Utf16LittleEndian, files.Files[path].Encoding);
+        Assert.Equal(LineEndingKind.Lf, files.Files[path].LineEnding);
+        Assert.False(workflow.IsDirty);
+
+        await workflow.ReopenWithEncodingAsync(TextEncodingKind.Latin1);
+        Assert.Equal(TextEncodingKind.Latin1, session.State.Encoding);
+        Assert.False(workflow.IsDirty);
+    }
+
+    [Fact]
     public async Task File_change_reload_uses_current_monitor_and_prompt_decision()
     {
         var path = Path.GetTempFileName();
@@ -472,5 +583,37 @@ public sealed class DocumentWorkflowTests
             () => "plain-text",
             createNewWindow ?? (() => Task.CompletedTask),
             openFileInNewWindow ?? (_ => Task.CompletedTask));
+    }
+
+    /// <summary>Removes the file right after writing it, before the save restarts its watch.</summary>
+    private sealed class DeletingAfterWriteFileStore : ITextFileStore
+    {
+        private readonly TextFileStore _files = new();
+
+        public Task<TextFileData> ReadAsync(string path, CancellationToken cancellationToken = default) =>
+            _files.ReadAsync(path, cancellationToken);
+
+        public Task<TextFileData> ReadAsync(
+            string path,
+            TextEncodingKind? encodingHint,
+            CancellationToken cancellationToken = default) =>
+            _files.ReadAsync(path, encodingHint, cancellationToken);
+
+        public Task<TextFileData> ReadWithEncodingAsync(
+            string path,
+            TextEncodingKind encoding,
+            CancellationToken cancellationToken = default) =>
+            _files.ReadWithEncodingAsync(path, encoding, cancellationToken);
+
+        public async Task WriteAsync(
+            string path,
+            string text,
+            TextEncodingKind encoding,
+            LineEndingKind lineEnding,
+            CancellationToken cancellationToken = default)
+        {
+            await _files.WriteAsync(path, text, encoding, lineEnding, cancellationToken);
+            File.Delete(path);
+        }
     }
 }

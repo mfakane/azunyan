@@ -480,6 +480,12 @@ internal sealed class FakeTextFileStore : ITextFileStore
         CancellationToken cancellationToken = default) =>
         Task.FromResult(Files[Path.GetFullPath(path)]);
 
+    public Task<TextFileData> ReadWithEncodingAsync(
+        string path,
+        TextEncodingKind encoding,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(Files[Path.GetFullPath(path)] with { Encoding = encoding });
+
     public Task WriteAsync(
         string path,
         string text,

@@ -408,6 +408,29 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public void ShowIndentationSizeMenu() => _window.ShowIndentationSizeMenu();
 
+    public void ShowEncodingMenu() =>
+        _window.ShowEncodingMenu(
+            _session.State.Encoding,
+            canReopen: _session.State.FilePath is not null,
+            canSave: !_session.State.IsReadOnly,
+            ReopenWithEncoding,
+            SaveWithEncoding);
+
+    public void ShowLineEndingMenu() =>
+        _window.ShowLineEndingMenu(
+            _session.State.LineEnding,
+            canChange: !_session.State.IsReadOnly,
+            ChangeLineEnding);
+
+    public void ReopenWithEncoding(TextEncodingKind encoding) =>
+        _ = _documents.ReopenWithEncodingAsync(encoding);
+
+    public void SaveWithEncoding(TextEncodingKind encoding) =>
+        _ = _documents.SaveWithEncodingAsync(encoding);
+
+    public void ChangeLineEnding(LineEndingKind lineEnding) =>
+        _documents.ChangeLineEnding(lineEnding);
+
     public void ShowFilePathMenu() => _window.ShowFilePathMenu();
 
     public void CopyFilePath() =>

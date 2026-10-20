@@ -118,4 +118,21 @@ public sealed class DocumentSessionTests
         Assert.Equal(LineEndingKind.CrLf, session.State.LineEnding);
         Assert.False(session.State.IsDirty);
     }
+
+    [Fact]
+    public void Format_from_editorconfig_is_not_an_unsaved_change_but_a_chosen_one_is()
+    {
+        var session = new DocumentSession();
+        session.MarkSaved("test.txt", "text", TextEncodingKind.Utf8, LineEndingKind.CrLf);
+
+        session.ApplyEditorConfig(EditorConfigSettings.Empty with { LineEnding = LineEndingKind.Lf });
+        Assert.False(session.State.IsDirty);
+
+        session.ChangeFormat(TextEncodingKind.Utf8Bom, lineEnding: null);
+        session.ObserveText("text");
+        Assert.True(session.State.IsDirty);
+
+        session.MarkSaved("test.txt", "text", TextEncodingKind.Utf8Bom, LineEndingKind.Lf);
+        Assert.False(session.State.IsDirty);
+    }
 }

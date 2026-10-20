@@ -181,6 +181,25 @@ public sealed class DocumentController
         return true;
     }
 
+    /// <summary>
+    /// Rereads the file decoded with <paramref name="encoding"/>. The text is
+    /// replaced as an edit, so undo returns to the previous decoding.
+    /// </summary>
+    public async Task<bool> ReopenWithEncodingAsync(
+        TextEncodingKind encoding,
+        CancellationToken cancellationToken = default)
+    {
+        if (_session.State.FilePath is not { } path)
+        {
+            return false;
+        }
+
+        var data = await _files.ReadWithEncodingAsync(path, encoding, cancellationToken);
+        ReplaceEditorTextAsEdit(data.Text);
+        _session.ApplyDiskReload(path, data);
+        return true;
+    }
+
     public Task<bool> ReloadFromTemporaryFileAsync(
         string path,
         CancellationToken cancellationToken = default) =>

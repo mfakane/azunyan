@@ -11,6 +11,13 @@ namespace Azunote;
 public sealed class DocumentSession
 {
     private string _savedText = string.Empty;
+
+    /// <summary>
+    /// The user chose an encoding or line ending that is not saved yet. A
+    /// change taken from .editorconfig is not counted: it applies on the next
+    /// save without making the document dirty.
+    /// </summary>
+    private bool _formatChanged;
     private DocumentSessionState _state = new(
         FilePath: null,
         Encoding: TextEncodingKind.Utf8,
@@ -52,8 +59,61 @@ public sealed class DocumentSession
     public void ObserveText(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
-        Update(_state with { IsDirty = !IsSameAsSaved(text) });
+        Update(_state with { IsDirty = IsDirtyWith(text) });
     }
+
+    /// <summary>
+    /// Changes how the document is written on its next save. The document is
+    /// dirty until then, so the choice is not lost on close.
+    /// </summary>
+    public void ChangeFormat(TextEncodingKind? encoding, LineEndingKind? lineEnding)
+    {
+        var state = _state with
+        {
+            Encoding = encoding ?? _state.Encoding,
+            LineEnding = lineEnding is { } kind ? GetLineEndingOrDefault(kind) : _state.LineEnding
+        };
+        if (state == _state)
+        {
+            return;
+        }
+
+        _formatChanged = true;
+        Update(state with { IsDirty = true });
+    }
+
+    /// <summary>
+    /// The file was removed from disk. The document stays open with its path
+    /// and counts as unsaved, so closing it asks or keeps a backup.
+    /// </summary>
+    public void MarkDeletedOnDisk()
+    {
+        if (_state.FilePath is null)
+        {
+            return;
+        }
+
+        Update(_state with { IsDeletedOnDisk = true, IsDirty = true });
+    }
+
+    /// <summary>The file exists on disk again.</summary>
+    public void MarkPresentOnDisk(string currentText)
+    {
+        ArgumentNullException.ThrowIfNull(currentText);
+        if (!_state.IsDeletedOnDisk)
+        {
+            return;
+        }
+
+        Update(_state with
+        {
+            IsDeletedOnDisk = false,
+            IsDirty = _formatChanged || !IsSameAsSaved(currentText)
+        });
+    }
+
+    private bool IsDirtyWith(string text) =>
+        _formatChanged || _state.IsDeletedOnDisk || !IsSameAsSaved(text);
 
     public void SetUntitled(
         string currentText,
@@ -62,6 +122,7 @@ public sealed class DocumentSession
     {
         ArgumentNullException.ThrowIfNull(currentText);
         _savedText = string.Empty;
+        _formatChanged = false;
         Update(new DocumentSessionState(
             FilePath: null,
             Encoding: encoding,
@@ -85,6 +146,7 @@ public sealed class DocumentSession
         ArgumentException.ThrowIfNullOrWhiteSpace(fullPath);
         ArgumentNullException.ThrowIfNull(currentText);
         _savedText = NormalizeLineEndings(currentText);
+        _formatChanged = false;
         Update(new DocumentSessionState(
             FilePath: Path.GetFullPath(fullPath),
             Encoding: encoding,
@@ -111,7 +173,7 @@ public sealed class DocumentSession
         {
             Encoding = data.Encoding,
             LineEnding = GetLineEndingOrDefault(data.LineEnding),
-            IsDirty = !IsSameAsSaved(currentText)
+            IsDirty = IsDirtyWith(currentText)
         });
     }
 
@@ -138,6 +200,7 @@ public sealed class DocumentSession
     private void SetSavedState(string fullPath, TextFileData data, bool isReadOnly)
     {
         _savedText = NormalizeLineEndings(data.Text);
+        _formatChanged = false;
         Update(new DocumentSessionState(
             FilePath: Path.GetFullPath(fullPath),
             Encoding: data.Encoding,
@@ -191,4 +254,5 @@ public sealed record DocumentSessionState(
     TextEncodingKind Encoding,
     LineEndingKind LineEnding,
     bool IsDirty,
-    bool IsReadOnly = false);
+    bool IsReadOnly = false,
+    bool IsDeletedOnDisk = false);

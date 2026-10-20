@@ -402,6 +402,56 @@ public sealed partial class MainWindow
         menu.ShowAt(_indentationStatus);
     }
 
+    internal void ShowEncodingMenu(
+        TextEncodingKind current,
+        bool canReopen,
+        bool canSave,
+        Action<TextEncodingKind> reopen,
+        Action<TextEncodingKind> save)
+    {
+        var reopenMenu = new MenuFlyoutSubItem { Text = "Reopen with Encoding", IsEnabled = canReopen };
+        var saveMenu = new MenuFlyoutSubItem { Text = "Save with Encoding", IsEnabled = canSave };
+        foreach (var encoding in Enum.GetValues<TextEncodingKind>())
+        {
+            reopenMenu.Items.Add(CreateFormatItem(
+                TextFileService.GetEncodingDisplayName(encoding),
+                encoding == current,
+                () => reopen(encoding)));
+            saveMenu.Items.Add(CreateFormatItem(
+                TextFileService.GetEncodingDisplayName(encoding),
+                encoding == current,
+                () => save(encoding)));
+        }
+
+        new MenuFlyout { Items = { reopenMenu, saveMenu } }.ShowAt(EncodingStatus);
+    }
+
+    internal void ShowLineEndingMenu(
+        LineEndingKind current,
+        bool canChange,
+        Action<LineEndingKind> change)
+    {
+        var menu = new MenuFlyout();
+        foreach (var lineEnding in new[] { LineEndingKind.CrLf, LineEndingKind.Lf, LineEndingKind.Cr })
+        {
+            var item = CreateFormatItem(
+                TextFileService.GetLineEndingDisplayName(lineEnding),
+                lineEnding == current,
+                () => change(lineEnding));
+            item.IsEnabled = canChange;
+            menu.Items.Add(item);
+        }
+
+        menu.ShowAt(LineEndingStatus);
+    }
+
+    private static ToggleMenuFlyoutItem CreateFormatItem(string text, bool isCurrent, Action select)
+    {
+        var item = new ToggleMenuFlyoutItem { Text = text, IsChecked = isCurrent };
+        item.Click += (_, _) => select();
+        return item;
+    }
+
     private void ApplyWindowSizeView(WindowLayoutState size)
     {
         ArgumentNullException.ThrowIfNull(size);

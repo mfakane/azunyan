@@ -149,6 +149,12 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     private void IndentationStatus_Tapped(object sender, TappedRoutedEventArgs e) =>
         _runtime.ShowIndentationSizeMenu();
 
+    private void EncodingStatus_Tapped(object sender, TappedRoutedEventArgs e) =>
+        _runtime.ShowEncodingMenu();
+
+    private void LineEndingStatus_Tapped(object sender, TappedRoutedEventArgs e) =>
+        _runtime.ShowLineEndingMenu();
+
     private void FilePathStatus_Tapped(object sender, TappedRoutedEventArgs e) =>
         _runtime.ShowFilePathMenu();
 
@@ -611,6 +617,15 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     void IMainWindowActions.AddNextOccurrence() => _runtime.AddNextOccurrence();
 
     void IMainWindowActions.ToggleComment() => _runtime.ToggleComment();
+
+    void IMainWindowActions.ReopenWithEncoding(TextEncodingKind encoding) =>
+        _runtime.ReopenWithEncoding(encoding);
+
+    void IMainWindowActions.SaveWithEncoding(TextEncodingKind encoding) =>
+        _runtime.SaveWithEncoding(encoding);
+
+    void IMainWindowActions.ChangeLineEnding(LineEndingKind lineEnding) =>
+        _runtime.ChangeLineEnding(lineEnding);
 
     void IMainWindowActions.ShowFind() => _runtime.ShowFindPanel(replace: false);
 

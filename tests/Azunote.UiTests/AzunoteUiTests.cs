@@ -661,6 +661,62 @@ public sealed class AzunoteUiTests : IDisposable
     }
 
     [AzunoteUiFact]
+    public void Menus_change_the_saved_encoding_and_line_ending()
+    {
+        var root = Directory.CreateTempSubdirectory("azunote-format-");
+        var document = Path.Combine(root.FullName, "format.txt");
+        File.WriteAllText(document, "a\r\nb");
+        using var fixture = new AzunoteUiFixture(document);
+        try
+        {
+            var window = fixture.Window;
+            AzunoteUiFixture.WaitForDocumentText(AzunoteUiFixture.WaitForTextPattern(fixture.Editor), text => text == "a\r\nb");
+
+            AzunoteUiFixture.OpenMenu(window, "Edit");
+            InvokeSubmenuItem(window, "Line Ending", "LF");
+            AzunoteUiFixture.WaitFor(
+                () => window.Current.Name.StartsWith("format.txt *", StringComparison.Ordinal) ? window : null,
+                "Choosing LF did not leave the document unsaved.");
+
+            AzunoteUiFixture.OpenMenu(window, "File");
+            InvokeSubmenuItem(window, "Save with Encoding", "UTF-16 LE");
+            AzunoteUiFixture.WaitFor(
+                () => File.ReadAllBytes(document) is [0xFF, 0xFE, ..] ? document : null,
+                "Save with Encoding did not write UTF-16 LE.");
+            Assert.Equal("a\nb", File.ReadAllText(document));
+        }
+        finally
+        {
+            fixture.Dispose();
+            root.Delete(recursive: true);
+        }
+    }
+
+    [AzunoteUiFact]
+    public void Title_marks_a_document_whose_file_was_deleted()
+    {
+        var root = Directory.CreateTempSubdirectory("azunote-deleted-");
+        var document = Path.Combine(root.FullName, "gone.txt");
+        File.WriteAllText(document, "text");
+        using var fixture = new AzunoteUiFixture(document);
+        try
+        {
+            var window = fixture.Window;
+            AzunoteUiFixture.WaitForDocumentText(AzunoteUiFixture.WaitForTextPattern(fixture.Editor), text => text == "text");
+
+            File.Delete(document);
+            AzunoteUiFixture.WaitFor(
+                () => window.Current.Name.StartsWith("gone.txt * (deleted)", StringComparison.Ordinal) ? window : null,
+                $"The title did not mark the deleted file: {window.Current.Name}");
+        }
+        finally
+        {
+            fixture.Dispose();
+            root.Delete(recursive: true);
+        }
+    }
+
+    [AzunoteUiFact]
     public void Launch_restores_backed_up_documents_in_their_own_windows()
     {
         Directory.CreateDirectory(AzunoteUiFixture.BackupDirectory);
@@ -1024,6 +1080,58 @@ public sealed class AzunoteUiTests : IDisposable
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern uint SendInput(uint count, NativeInput[] inputs, int size);
+
+    /// <summary>Expands a submenu of an open flyout and invokes one of its items.</summary>
+    private static void InvokeSubmenuItem(AutomationElement window, string submenuName, string itemName)
+    {
+        var submenu = AzunoteUiFixture.WaitFor(
+            () => FindMenuItem(window, submenuName),
+            $"Could not find the {submenuName} submenu.");
+        ((ExpandCollapsePattern)submenu.GetCurrentPattern(ExpandCollapsePattern.Pattern)).Expand();
+        InvokeFlyoutItem(window, itemName);
+    }
+
+    /// <summary>Invokes an item of an open flyout.</summary>
+    private static void InvokeFlyoutItem(AutomationElement window, string itemName)
+    {
+        var item = AzunoteUiFixture.WaitFor(
+            () => FindMenuItem(window, itemName),
+            $"Could not find the {itemName} menu item.");
+        if (item.TryGetCurrentPattern(InvokePattern.Pattern, out var invoke))
+        {
+            ((InvokePattern)invoke).Invoke();
+        }
+        else
+        {
+            ((TogglePattern)item.GetCurrentPattern(TogglePattern.Pattern)).Toggle();
+        }
+    }
+
+    /// <summary>
+    /// A submenu can be hosted in its own popup window, so every top-level
+    /// window of the process is searched for a visible item.
+    /// </summary>
+    private static AutomationElement? FindMenuItem(AutomationElement window, string name)
+    {
+        var condition = new AndCondition(
+            new PropertyCondition(AutomationElement.NameProperty, name),
+            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.MenuItem));
+        var processWindows = AutomationElement.RootElement.FindAll(
+            TreeScope.Children,
+            new PropertyCondition(AutomationElement.ProcessIdProperty, window.Current.ProcessId));
+        foreach (AutomationElement candidate in processWindows)
+        {
+            foreach (AutomationElement item in candidate.FindAll(TreeScope.Descendants, condition))
+            {
+                if (!item.Current.IsOffscreen)
+                {
+                    return item;
+                }
+            }
+        }
+
+        return null;
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct NativeInput
