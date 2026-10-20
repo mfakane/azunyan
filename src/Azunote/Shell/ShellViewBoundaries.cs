@@ -16,7 +16,8 @@ internal sealed record StatusBarState(
     string Indentation,
     string LanguageMode,
     string FilePath,
-    bool HasFilePath = false);
+    bool HasFilePath = false,
+    LineEndingKind LineEndingKind = LineEndingKind.None);
 
 internal sealed record WindowMenuEntry(
     string Id,

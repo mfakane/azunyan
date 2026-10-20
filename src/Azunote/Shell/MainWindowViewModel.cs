@@ -159,6 +159,9 @@ internal sealed class MainWindowViewModel :
     public string PositionStatus => _status.Position;
     public string EncodingStatus => _status.Encoding;
     public string LineEndingStatus => _status.LineEnding;
+    public bool IsLineEndingCrLf => _status.LineEndingKind == LineEndingKind.CrLf;
+    public bool IsLineEndingLf => _status.LineEndingKind == LineEndingKind.Lf;
+    public bool IsLineEndingCr => _status.LineEndingKind == LineEndingKind.Cr;
     public string IndentationStatus => _status.Indentation;
     public string LanguageModeStatus => _status.LanguageMode;
     public string FilePathStatus => _status.FilePath;
@@ -296,6 +299,9 @@ internal sealed class MainWindowViewModel :
         OnPropertyChanged(nameof(PositionStatus));
         OnPropertyChanged(nameof(EncodingStatus));
         OnPropertyChanged(nameof(LineEndingStatus));
+        OnPropertyChanged(nameof(IsLineEndingCrLf));
+        OnPropertyChanged(nameof(IsLineEndingLf));
+        OnPropertyChanged(nameof(IsLineEndingCr));
         OnPropertyChanged(nameof(IndentationStatus));
         OnPropertyChanged(nameof(LanguageModeStatus));
         OnPropertyChanged(nameof(FilePathStatus));
@@ -548,6 +554,8 @@ internal sealed class MainWindowRadioGroupNames
     public string TabDisplaySize => $"TabDisplaySize-{_suffix}";
     public string IndentSize => $"IndentSize-{_suffix}";
     public string IndentationInputMode => $"IndentationInputMode-{_suffix}";
+    public string LineEnding => $"LineEnding-{_suffix}";
+    public string StatusLineEnding => $"StatusLineEnding-{_suffix}";
     public string LanguageModes => $"LanguageModes-{_suffix}";
     public string OpenWindows => $"OpenWindows-{_suffix}";
 }

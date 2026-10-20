@@ -370,6 +370,32 @@
             >
                 <TextBlock Padding="12,8" MaxWidth="360" TextWrapping="Wrap" />
             </Flyout>
+            <MenuFlyout x:Name="StatusLineEndingMenu">
+                <RadioMenuFlyoutItem
+                    Text="CRLF"
+                    Command="{x:Bind ViewModel.ChangeLineEndingCommand}"
+                    CommandParameter="CrLf"
+                    IsChecked="{x:Bind ViewModel.IsLineEndingCrLf, Mode=OneWay}"
+                    GroupName="{x:Bind ViewModel.Groups.StatusLineEnding}"
+                    IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
+                />
+                <RadioMenuFlyoutItem
+                    Text="LF"
+                    Command="{x:Bind ViewModel.ChangeLineEndingCommand}"
+                    CommandParameter="Lf"
+                    IsChecked="{x:Bind ViewModel.IsLineEndingLf, Mode=OneWay}"
+                    GroupName="{x:Bind ViewModel.Groups.StatusLineEnding}"
+                    IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
+                />
+                <RadioMenuFlyoutItem
+                    Text="CR"
+                    Command="{x:Bind ViewModel.ChangeLineEndingCommand}"
+                    CommandParameter="Cr"
+                    IsChecked="{x:Bind ViewModel.IsLineEndingCr, Mode=OneWay}"
+                    GroupName="{x:Bind ViewModel.Groups.StatusLineEnding}"
+                    IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
+                />
+            </MenuFlyout>
             <MenuFlyout x:Name="StatusTabDisplaySizeMenu">
                 <RadioMenuFlyoutItem
                     Text="2"
@@ -678,26 +704,6 @@
                     Command="{x:Bind ViewModel.ToggleCommentCommand}"
                     IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
                 />
-                <MenuFlyoutSubItem
-                    Text="Line Ending"
-                    IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
-                >
-                    <MenuFlyoutItem
-                        Text="CRLF"
-                        Command="{x:Bind ViewModel.ChangeLineEndingCommand}"
-                        CommandParameter="CrLf"
-                    />
-                    <MenuFlyoutItem
-                        Text="LF"
-                        Command="{x:Bind ViewModel.ChangeLineEndingCommand}"
-                        CommandParameter="Lf"
-                    />
-                    <MenuFlyoutItem
-                        Text="CR"
-                        Command="{x:Bind ViewModel.ChangeLineEndingCommand}"
-                        CommandParameter="Cr"
-                    />
-                </MenuFlyoutSubItem>
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem
                     Text="Add Next Occurrence"
@@ -830,6 +836,32 @@
                         CommandParameter="spaces"
                         IsChecked="{x:Bind ViewModel.IsIndentationModeSpaces, Mode=OneWay}"
                         GroupName="{x:Bind ViewModel.Groups.IndentationInputMode}"
+                    />
+                </MenuFlyoutSubItem>
+                <MenuFlyoutSubItem
+                    Text="Line Ending"
+                    IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
+                >
+                    <RadioMenuFlyoutItem
+                        Text="CRLF"
+                        Command="{x:Bind ViewModel.ChangeLineEndingCommand}"
+                        CommandParameter="CrLf"
+                        IsChecked="{x:Bind ViewModel.IsLineEndingCrLf, Mode=OneWay}"
+                        GroupName="{x:Bind ViewModel.Groups.LineEnding}"
+                    />
+                    <RadioMenuFlyoutItem
+                        Text="LF"
+                        Command="{x:Bind ViewModel.ChangeLineEndingCommand}"
+                        CommandParameter="Lf"
+                        IsChecked="{x:Bind ViewModel.IsLineEndingLf, Mode=OneWay}"
+                        GroupName="{x:Bind ViewModel.Groups.LineEnding}"
+                    />
+                    <RadioMenuFlyoutItem
+                        Text="CR"
+                        Command="{x:Bind ViewModel.ChangeLineEndingCommand}"
+                        CommandParameter="Cr"
+                        IsChecked="{x:Bind ViewModel.IsLineEndingCr, Mode=OneWay}"
+                        GroupName="{x:Bind ViewModel.Groups.LineEnding}"
                     />
                 </MenuFlyoutSubItem>
                 <MenuFlyoutSeparator />

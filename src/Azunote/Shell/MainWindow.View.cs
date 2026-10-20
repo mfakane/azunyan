@@ -426,24 +426,7 @@ public sealed partial class MainWindow
         new MenuFlyout { Items = { reopenMenu, saveMenu } }.ShowAt(EncodingStatus);
     }
 
-    internal void ShowLineEndingMenu(
-        LineEndingKind current,
-        bool canChange,
-        Action<LineEndingKind> change)
-    {
-        var menu = new MenuFlyout();
-        foreach (var lineEnding in new[] { LineEndingKind.CrLf, LineEndingKind.Lf, LineEndingKind.Cr })
-        {
-            var item = CreateFormatItem(
-                TextFileService.GetLineEndingDisplayName(lineEnding),
-                lineEnding == current,
-                () => change(lineEnding));
-            item.IsEnabled = canChange;
-            menu.Items.Add(item);
-        }
-
-        menu.ShowAt(LineEndingStatus);
-    }
+    internal void ShowLineEndingMenu() => StatusLineEndingMenu.ShowAt(LineEndingStatus);
 
     private static ToggleMenuFlyoutItem CreateFormatItem(string text, bool isCurrent, Action select)
     {

@@ -416,11 +416,7 @@ internal sealed class MainWindowRuntime : IDisposable
             ReopenWithEncoding,
             SaveWithEncoding);
 
-    public void ShowLineEndingMenu() =>
-        _window.ShowLineEndingMenu(
-            _session.State.LineEnding,
-            canChange: !_session.State.IsReadOnly,
-            ChangeLineEnding);
+    public void ShowLineEndingMenu() => _window.ShowLineEndingMenu();
 
     public void ReopenWithEncoding(TextEncodingKind encoding) =>
         _ = _documents.ReopenWithEncodingAsync(encoding);

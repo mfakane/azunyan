@@ -29,11 +29,11 @@ internal sealed class DocumentStatusPresenter
         var snapshot = _editor.Snapshot;
         var selectionStart = Math.Clamp(_editor.Selection.Start, 0, snapshot.Length);
         var lineColumn = snapshot.Lines.GetLineColumn(selectionStart);
+        var currentLineEnding = lineEnding ?? _session.State.LineEnding;
         var state = new StatusBarState(
             $"Ln {lineColumn.Line + 1}, Col {lineColumn.Column + 1}",
             TextFileService.GetEncodingDisplayName(_session.State.Encoding),
-            TextFileService.GetLineEndingDisplayName(
-                lineEnding ?? _session.State.LineEnding),
+            TextFileService.GetLineEndingDisplayName(currentLineEnding),
             TextEditorCommands.GetDocumentIndentationSettings(
                 snapshot,
                 _editor.IndentSize,
@@ -41,7 +41,8 @@ internal sealed class DocumentStatusPresenter
                 _editor.IndentationInputMode).DisplayName,
             _languageModeDisplayName(),
             _session.State.FilePath ?? "Untitled",
-            _session.State.FilePath is not null);
+            _session.State.FilePath is not null,
+            currentLineEnding);
         _statusBar.Apply(state);
     }
 

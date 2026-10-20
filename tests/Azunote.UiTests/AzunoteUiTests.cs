@@ -672,7 +672,7 @@ public sealed class AzunoteUiTests : IDisposable
             var window = fixture.Window;
             AzunoteUiFixture.WaitForDocumentText(AzunoteUiFixture.WaitForTextPattern(fixture.Editor), text => text == "a\r\nb");
 
-            AzunoteUiFixture.OpenMenu(window, "Edit");
+            AzunoteUiFixture.OpenMenu(window, "View");
             InvokeSubmenuItem(window, "Line Ending", "LF");
             AzunoteUiFixture.WaitFor(
                 () => window.Current.Name.StartsWith("format.txt *", StringComparison.Ordinal) ? window : null,

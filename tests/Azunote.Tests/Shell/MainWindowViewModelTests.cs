@@ -53,11 +53,14 @@ public sealed class MainWindowViewModelTests
         var viewModel = CreateViewModel();
 
         viewModel.ApplyStatus(new StatusBarState(
-            "Ln 3, Col 5", "UTF-16 LE", "CRLF", "Tabs: 4", "C#", "file.cs", true));
+            "Ln 3, Col 5", "UTF-16 LE", "CRLF", "Tabs: 4", "C#", "file.cs", true, LineEndingKind.CrLf));
 
         Assert.Equal("Ln 3, Col 5", viewModel.PositionStatus);
         Assert.Equal("file.cs", viewModel.FilePathStatus);
         Assert.True(viewModel.HasFilePath);
+        Assert.True(viewModel.IsLineEndingCrLf);
+        Assert.False(viewModel.IsLineEndingLf);
+        Assert.False(viewModel.IsLineEndingCr);
     }
 
     [Fact]
