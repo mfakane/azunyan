@@ -693,6 +693,64 @@ public sealed class AzunoteUiTests : IDisposable
     }
 
     [AzunoteUiFact]
+    public void Save_as_dialog_places_the_encoding_beside_the_save_button()
+    {
+        const ushort Control = 0x11, Shift = 0x10, S = 0x53, Escape = 0x1B;
+        var window = _fixture.Window;
+        _fixture.Editor.SetFocus();
+        SendKeyChord(Control, Shift, S);
+
+        // The dialog follows the system language, so its Save button is found
+        // by its IDOK automation id, and a combo box is named by its selection.
+        var encoding = AzunoteUiFixture.WaitFor(
+            () => FindInProcess(window, new AndCondition(
+                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.ComboBox),
+                new PropertyCondition(AutomationElement.NameProperty, "UTF-8"))),
+            "The Save As dialog did not show the encoding combo box.");
+        var save = AzunoteUiFixture.WaitFor(
+            () => FindInProcess(window, new AndCondition(
+                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Button),
+                new PropertyCondition(AutomationElement.AutomationIdProperty, "1"))),
+            "The Save As dialog did not show its Save button.");
+        try
+        {
+            var encodingBounds = encoding.Current.BoundingRectangle;
+            var saveBounds = save.Current.BoundingRectangle;
+            Assert.True(
+                Math.Abs((encodingBounds.Top + encodingBounds.Bottom) / 2 - (saveBounds.Top + saveBounds.Bottom) / 2) < saveBounds.Height,
+                $"Encoding {encodingBounds} is not on the Save button's row {saveBounds}.");
+
+            ((ExpandCollapsePattern)encoding.GetCurrentPattern(ExpandCollapsePattern.Pattern)).Expand();
+            AzunoteUiFixture.WaitFor(
+                () => encoding.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, "Latin-1")),
+                "The encoding combo box does not offer Latin-1.");
+            ((ExpandCollapsePattern)encoding.GetCurrentPattern(ExpandCollapsePattern.Pattern)).Collapse();
+        }
+        finally
+        {
+            SendKeyChord(Escape);
+            AzunoteUiFixture.WaitFor(
+                () => FindInProcess(window, new PropertyCondition(AutomationElement.AutomationIdProperty, "1")) is null ? window : null,
+                "The Save As dialog did not close.");
+        }
+
+        static AutomationElement? FindInProcess(AutomationElement window, Condition condition)
+        {
+            foreach (AutomationElement candidate in AutomationElement.RootElement.FindAll(
+                TreeScope.Children,
+                new PropertyCondition(AutomationElement.ProcessIdProperty, window.Current.ProcessId)))
+            {
+                if (candidate.FindFirst(TreeScope.Descendants, condition) is { } element)
+                {
+                    return element;
+                }
+            }
+
+            return null;
+        }
+    }
+
+    [AzunoteUiFact]
     public void Title_marks_a_document_whose_file_was_deleted()
     {
         var root = Directory.CreateTempSubdirectory("azunote-deleted-");

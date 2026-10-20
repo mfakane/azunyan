@@ -27,6 +27,7 @@ public static class NativeSaveFileDialog
     private const uint Utf16LittleEndianItemId = 3;
     private const uint Utf16BigEndianItemId = 4;
     private const uint SystemDefaultItemId = 5;
+    private const uint Latin1ItemId = 6;
 
     private const uint CrLfItemId = 11;
     private const uint LfItemId = 12;
@@ -165,8 +166,12 @@ public static class NativeSaveFileDialog
         customize.AddControlItem(EncodingControlId, Utf8BomItemId, "UTF-8 BOM");
         customize.AddControlItem(EncodingControlId, Utf16LittleEndianItemId, "UTF-16 LE");
         customize.AddControlItem(EncodingControlId, Utf16BigEndianItemId, "UTF-16 BE");
+        customize.AddControlItem(EncodingControlId, Latin1ItemId, "Latin-1");
         customize.AddControlItem(EncodingControlId, SystemDefaultItemId, "System default");
         customize.SetSelectedControlItem(EncodingControlId, GetEncodingItemId(defaultEncoding));
+        // As in Notepad, the encoding sits beside the Save button. The dialog
+        // allows only one control there, so the line ending stays below.
+        customize.MakeProminent(EncodingControlId);
 
         customize.AddComboBox(LineEndingControlId);
         customize.SetControlLabel(LineEndingControlId, "Line ending");
@@ -196,6 +201,7 @@ public static class NativeSaveFileDialog
         TextEncodingKind.Utf8Bom => Utf8BomItemId,
         TextEncodingKind.Utf16LittleEndian => Utf16LittleEndianItemId,
         TextEncodingKind.Utf16BigEndian => Utf16BigEndianItemId,
+        TextEncodingKind.Latin1 => Latin1ItemId,
         TextEncodingKind.SystemDefault => SystemDefaultItemId,
         _ => Utf8ItemId
     };
@@ -206,6 +212,7 @@ public static class NativeSaveFileDialog
         Utf8BomItemId => TextEncodingKind.Utf8Bom,
         Utf16LittleEndianItemId => TextEncodingKind.Utf16LittleEndian,
         Utf16BigEndianItemId => TextEncodingKind.Utf16BigEndian,
+        Latin1ItemId => TextEncodingKind.Latin1,
         SystemDefaultItemId => TextEncodingKind.SystemDefault,
         _ => throw new InvalidOperationException("The Save dialog returned an unknown encoding.")
     };
