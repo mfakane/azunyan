@@ -24,7 +24,7 @@ public sealed class DocumentControllerTests
         editor.SetText("host update");
         Assert.False(await controller.SaveAsync());
         await Assert.ThrowsAsync<InvalidOperationException>(() => controller.SaveAsAsync(
-            new SaveFileDialogResult("copy.txt", TextEncodingKind.Utf8, LineEndingKind.Lf)));
+            new SaveFileDialogResult("copy.txt", TextEncodingKind.Utf8)));
         Assert.Equal("original license", files.Files[path].Text);
         Assert.Single(files.Files);
 
@@ -45,7 +45,7 @@ public sealed class DocumentControllerTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => controller.SaveAsAsync(
             new SaveFileDialogResult(Path.Combine(AppContext.BaseDirectory, "LICENSE"),
-                TextEncodingKind.Utf8, LineEndingKind.Lf)));
+                TextEncodingKind.Utf8)));
 
         Assert.Empty(files.Files);
         Assert.True(controller.Session.State.IsDirty);
@@ -160,7 +160,7 @@ public sealed class DocumentControllerTests
     }
 
     [Fact]
-    public async Task SaveAs_uses_the_dialog_encoding_and_line_ending_over_editorconfig()
+    public async Task SaveAs_uses_the_dialog_encoding_and_the_editorconfig_line_ending()
     {
         var editor = new FakeEditorBuffer();
         var session = new DocumentSession();
@@ -177,16 +177,15 @@ public sealed class DocumentControllerTests
         await controller.SaveAsAsync(
             new SaveFileDialogResult(
                 "saved.txt",
-                TextEncodingKind.Utf8,
-                LineEndingKind.Lf),
+                TextEncodingKind.Utf8),
             editorConfig: settings);
 
         var saved = files.Files[Path.GetFullPath("saved.txt")];
         Assert.Equal(TextEncodingKind.Utf8, saved.Encoding);
-        Assert.Equal(LineEndingKind.Lf, saved.LineEnding);
-        Assert.Equal("first\nsecond\n", saved.Text);
+        Assert.Equal(LineEndingKind.CrLf, saved.LineEnding);
+        Assert.Equal("first\nsecond\r\n", saved.Text);
         Assert.Equal(TextEncodingKind.Utf8, session.State.Encoding);
-        Assert.Equal(LineEndingKind.Lf, session.State.LineEnding);
+        Assert.Equal(LineEndingKind.CrLf, session.State.LineEnding);
     }
 
     [Fact]

@@ -18,8 +18,7 @@ public sealed class DocumentWorkflowTests
             OpenPath = "notes.txt",
             SaveResult = new SaveFileDialogResult(
                 "renamed.txt",
-                TextEncodingKind.Utf8Bom,
-                LineEndingKind.CrLf)
+                TextEncodingKind.Utf8Bom)
         };
         files.Files[Path.GetFullPath("notes.txt")] = new TextFileData(
             "hello",
@@ -284,7 +283,7 @@ public sealed class DocumentWorkflowTests
     }
 
     [Fact]
-    public async Task Save_as_uses_target_editorconfig_but_keeps_dialog_file_format()
+    public async Task Save_as_uses_target_editorconfig_but_keeps_the_dialog_encoding()
     {
         var root = Path.Combine(
             Path.GetTempPath(),
@@ -313,20 +312,19 @@ public sealed class DocumentWorkflowTests
             {
                 SaveResult = new SaveFileDialogResult(
                     path,
-                    TextEncodingKind.Utf8,
-                    LineEndingKind.CrLf)
+                    TextEncodingKind.Utf8)
             };
             var workflow = CreateWorkflow(editor, session, files, prompt, dialogs);
             await workflow.OpenStartupTextAsync("first  \nsecond");
 
             Assert.True(await workflow.SaveAsAsync());
 
-            Assert.Equal("first\nsecond\r\n", files.Files[Path.GetFullPath(path)].Text);
+            Assert.Equal("first\nsecond\n", files.Files[Path.GetFullPath(path)].Text);
             Assert.Equal(TextEncodingKind.Utf8, workflow.CurrentEncoding);
-            Assert.Equal(LineEndingKind.CrLf, workflow.CurrentLineEnding);
+            Assert.Equal(LineEndingKind.Lf, workflow.CurrentLineEnding);
             Assert.Equal(8, editor.TabDisplaySize);
             Assert.Equal(IndentationInputMode.Tab, editor.IndentationInputMode);
-            Assert.Equal("\r\n", editor.PreferredLineEnding);
+            Assert.Equal("\n", editor.PreferredLineEnding);
         }
         finally
         {

@@ -15,14 +15,12 @@ internal sealed class NativeFileDialogService : IFileDialogService
     public SaveFileDialogResult? ShowSave(
         string suggestedFileName,
         TextEncodingKind defaultEncoding,
-        LineEndingKind defaultLineEnding,
         IReadOnlyList<FileDialogFilter> filters,
         string defaultFilterId) =>
         NativeSaveFileDialog.Show(
             _ownerWindowHandle,
             suggestedFileName,
             defaultEncoding,
-            defaultLineEnding,
             filters,
             defaultFilterId);
 }

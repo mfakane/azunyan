@@ -204,7 +204,6 @@ internal sealed class DocumentWorkflow : IDisposable
             var save = _fileDialogs.ShowSave(
                 CurrentFilePath is null ? "Untitled.txt" : Path.GetFileName(CurrentFilePath),
                 CurrentEncoding,
-                CurrentLineEnding,
                 _fileDialogFilters(),
                 _languageModeId());
             if (save is null)
@@ -214,9 +213,7 @@ internal sealed class DocumentWorkflow : IDisposable
 
             var targetConfig = await _editorConfigResolver.ResolveAsync(save.Path);
             await _documents.SaveAsAsync(save, editorConfig: targetConfig);
-            ApplyEditorConfig(targetConfig.WithExplicitFileFormat(
-                save.Encoding,
-                DocumentSession.GetLineEndingOrDefault(save.LineEnding)));
+            ApplyEditorConfig(targetConfig.WithExplicitFileFormat(save.Encoding, CurrentLineEnding));
             NotifyChanged(lineEnding: null, opened: false);
             StartFileWatcher();
             return true;

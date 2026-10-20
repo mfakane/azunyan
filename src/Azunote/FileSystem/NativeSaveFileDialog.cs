@@ -9,8 +9,7 @@ namespace Azunote;
 
 public sealed record SaveFileDialogResult(
     string Path,
-    TextEncodingKind Encoding,
-    LineEndingKind LineEnding);
+    TextEncodingKind Encoding);
 
 /// <summary>
 /// Shows the Windows common Save dialog and adds the format controls used by
@@ -19,8 +18,8 @@ public sealed record SaveFileDialogResult(
 /// </summary>
 public static class NativeSaveFileDialog
 {
+    private const uint EncodingGroupId = 1000;
     private const uint EncodingControlId = 1001;
-    private const uint LineEndingControlId = 1002;
 
     private const uint Utf8ItemId = 1;
     private const uint Utf8BomItemId = 2;
@@ -29,17 +28,12 @@ public static class NativeSaveFileDialog
     private const uint SystemDefaultItemId = 5;
     private const uint Latin1ItemId = 6;
 
-    private const uint CrLfItemId = 11;
-    private const uint LfItemId = 12;
-    private const uint CrItemId = 13;
-
     private const int HResultCancelled = unchecked((int)0x800704C7);
 
     public static SaveFileDialogResult? Show(
         IntPtr ownerWindowHandle,
         string suggestedFileName,
         TextEncodingKind defaultEncoding,
-        LineEndingKind defaultLineEnding,
         IReadOnlyList<FileDialogFilter> filters,
         string defaultFilterId)
     {
@@ -72,18 +66,14 @@ public static class NativeSaveFileDialog
             fileSaveDialog.SetOptions(options | FILEOPENDIALOGOPTIONS.FOS_FORCEFILESYSTEM | FILEOPENDIALOGOPTIONS.FOS_OVERWRITEPROMPT);
 
             customize = (IFileDialogCustomize)fileSaveDialog;
-            AddFormatControls(customize, defaultEncoding, defaultLineEnding);
+            AddEncodingControl(customize, defaultEncoding);
 
             fileSaveDialog.Show(new HWND(ownerWindowHandle));
             fileSaveDialog.GetResult(out resultItem);
             var path = GetFileSystemPath(resultItem);
             customize.GetSelectedControlItem(EncodingControlId, out var encodingItemId);
-            customize.GetSelectedControlItem(LineEndingControlId, out var lineEndingItemId);
 
-            return new SaveFileDialogResult(
-                path,
-                GetEncoding(encodingItemId),
-                GetLineEnding(lineEndingItemId));
+            return new SaveFileDialogResult(path, GetEncoding(encodingItemId));
         }
         catch (COMException exception) when (exception.HResult == HResultCancelled)
         {
@@ -155,13 +145,17 @@ public static class NativeSaveFileDialog
         return extension?.TrimStart('.').TrimStart('*') ?? "txt";
     }
 
-    private static void AddFormatControls(
+    /// <summary>
+    /// Places the encoding beside the Save button, as Notepad does. Only one
+    /// control, or a visual group holding one, can go there; the group shows
+    /// its label next to the combo box.
+    /// </summary>
+    private static void AddEncodingControl(
         IFileDialogCustomize customize,
-        TextEncodingKind defaultEncoding,
-        LineEndingKind defaultLineEnding)
+        TextEncodingKind defaultEncoding)
     {
+        customize.StartVisualGroup(EncodingGroupId, "Encoding:");
         customize.AddComboBox(EncodingControlId);
-        customize.SetControlLabel(EncodingControlId, "Encoding");
         customize.AddControlItem(EncodingControlId, Utf8ItemId, "UTF-8");
         customize.AddControlItem(EncodingControlId, Utf8BomItemId, "UTF-8 BOM");
         customize.AddControlItem(EncodingControlId, Utf16LittleEndianItemId, "UTF-16 LE");
@@ -169,16 +163,8 @@ public static class NativeSaveFileDialog
         customize.AddControlItem(EncodingControlId, Latin1ItemId, "Latin-1");
         customize.AddControlItem(EncodingControlId, SystemDefaultItemId, "System default");
         customize.SetSelectedControlItem(EncodingControlId, GetEncodingItemId(defaultEncoding));
-        // As in Notepad, the encoding sits beside the Save button. The dialog
-        // allows only one control there, so the line ending stays below.
-        customize.MakeProminent(EncodingControlId);
-
-        customize.AddComboBox(LineEndingControlId);
-        customize.SetControlLabel(LineEndingControlId, "Line ending");
-        customize.AddControlItem(LineEndingControlId, CrLfItemId, "Windows (CRLF)");
-        customize.AddControlItem(LineEndingControlId, LfItemId, "Unix (LF)");
-        customize.AddControlItem(LineEndingControlId, CrItemId, "Classic Mac (CR)");
-        customize.SetSelectedControlItem(LineEndingControlId, GetLineEndingItemId(defaultLineEnding));
+        customize.EndVisualGroup();
+        customize.MakeProminent(EncodingGroupId);
     }
 
     private static unsafe string GetFileSystemPath(IShellItem shellItem)
@@ -215,22 +201,6 @@ public static class NativeSaveFileDialog
         Latin1ItemId => TextEncodingKind.Latin1,
         SystemDefaultItemId => TextEncodingKind.SystemDefault,
         _ => throw new InvalidOperationException("The Save dialog returned an unknown encoding.")
-    };
-
-    private static uint GetLineEndingItemId(LineEndingKind lineEnding) => lineEnding switch
-    {
-        LineEndingKind.CrLf => CrLfItemId,
-        LineEndingKind.Lf => LfItemId,
-        LineEndingKind.Cr => CrItemId,
-        _ => OperatingSystem.IsWindows() ? CrLfItemId : LfItemId
-    };
-
-    private static LineEndingKind GetLineEnding(uint itemId) => itemId switch
-    {
-        CrLfItemId => LineEndingKind.CrLf,
-        LfItemId => LineEndingKind.Lf,
-        CrItemId => LineEndingKind.Cr,
-        _ => throw new InvalidOperationException("The Save dialog returned an unknown line ending.")
     };
 
     private static void ReleaseComObject(object? value)

@@ -147,7 +147,11 @@ public sealed class DocumentController
         {
             throw new InvalidOperationException("The document is read-only.");
         }
-        var lineEnding = DocumentSession.GetLineEndingOrDefault(save.LineEnding);
+        // The dialog chooses only the encoding. The line ending follows the
+        // target's .editorconfig, or else stays the document's.
+        var lineEnding = editorConfig?.LineEnding is { } configured
+            ? DocumentSession.GetLineEndingOrDefault(configured)
+            : _session.State.LineEnding;
         var textToSave = EditorConfigTextNormalizer.NormalizeForSave(
             _editor.Text,
             editorConfig,
@@ -156,7 +160,7 @@ public sealed class DocumentController
             path,
             textToSave,
             save.Encoding,
-            save.LineEnding,
+            lineEnding,
             cancellationToken);
         ApplySavedText(textToSave);
         _session.MarkSaved(path, _editor.Text, save.Encoding, lineEnding);

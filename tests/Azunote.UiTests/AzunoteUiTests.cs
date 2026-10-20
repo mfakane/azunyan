@@ -705,20 +705,33 @@ public sealed class AzunoteUiTests : IDisposable
         var encoding = AzunoteUiFixture.WaitFor(
             () => FindInProcess(window, new AndCondition(
                 new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.ComboBox),
-                new PropertyCondition(AutomationElement.NameProperty, "UTF-8"))),
+                new OrCondition(
+                    new PropertyCondition(AutomationElement.NameProperty, "UTF-8"),
+                    new PropertyCondition(AutomationElement.NameProperty, "Encoding:")))),
             "The Save As dialog did not show the encoding combo box.");
         var save = AzunoteUiFixture.WaitFor(
             () => FindInProcess(window, new AndCondition(
                 new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Button),
                 new PropertyCondition(AutomationElement.AutomationIdProperty, "1"))),
             "The Save As dialog did not show its Save button.");
+        var label = AzunoteUiFixture.WaitFor(
+            () => FindInProcess(window, new PropertyCondition(AutomationElement.NameProperty, "Encoding:")),
+            "The Save As dialog did not label the encoding.");
         try
         {
-            var encodingBounds = encoding.Current.BoundingRectangle;
             var saveBounds = save.Current.BoundingRectangle;
-            Assert.True(
-                Math.Abs((encodingBounds.Top + encodingBounds.Bottom) / 2 - (saveBounds.Top + saveBounds.Bottom) / 2) < saveBounds.Height,
-                $"Encoding {encodingBounds} is not on the Save button's row {saveBounds}.");
+            foreach (var element in new[] { encoding, label })
+            {
+                var bounds = element.Current.BoundingRectangle;
+                Assert.True(
+                    Math.Abs((bounds.Top + bounds.Bottom) / 2 - (saveBounds.Top + saveBounds.Bottom) / 2) < saveBounds.Height,
+                    $"{element.Current.ControlType.ProgrammaticName} {bounds} is not on the Save button's row {saveBounds}.");
+            }
+
+            foreach (var lineEnding in new[] { "Windows (CRLF)", "Unix (LF)", "Classic Mac (CR)" })
+            {
+                Assert.Null(FindInProcess(window, new PropertyCondition(AutomationElement.NameProperty, lineEnding)));
+            }
 
             ((ExpandCollapsePattern)encoding.GetCurrentPattern(ExpandCollapsePattern.Pattern)).Expand();
             AzunoteUiFixture.WaitFor(

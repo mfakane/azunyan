@@ -92,6 +92,9 @@ Besides edits to the text, two things leave a document unsaved:
 File > Save with Encoding saves in the chosen encoding at once, and File >
 Reopen with Encoding reads the file again in the chosen encoding instead of
 the detected one. Both are also available from the encoding in the status bar.
+The Save As dialog chooses the encoding beside its Save button; the line
+ending follows `end_of_line` in the target folder's `.editorconfig`, or else
+stays the document's.
 
 A window that a command line waits on (`--wait`) still asks before closing,
 because the command line reports what became of its document. Untitled text
