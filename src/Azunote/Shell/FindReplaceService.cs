@@ -10,6 +10,13 @@ public readonly record struct SearchMatch(int Start, int Length)
 
 public readonly record struct SearchResult(SearchMatch Match, bool Wrapped);
 
+/// <summary>
+/// One replacement covering every match of a Replace All: <see cref="Range"/>
+/// spans the first through the last match, and <see cref="Replacement"/> is
+/// its new text.
+/// </summary>
+public readonly record struct ReplaceAllEdit(SearchMatch Range, string Replacement, int Count);
+
 [Flags]
 public enum FindReplaceOptions
 {
@@ -21,7 +28,11 @@ public enum FindReplaceOptions
 
 /// <summary>
 /// Text-only find and replace operations used by the shell search panel.
-/// Selection and focus remain UI concerns.
+/// Selection and focus remain UI concerns. Every operation sees the matches
+/// that <see cref="FindAll"/> enumerates: non-overlapping, left to right, and
+/// limited to an optional scope. A regular expression is matched against the
+/// whole text even inside a scope, so lookarounds and anchors see the
+/// surrounding text.
 /// </summary>
 public static class FindReplaceService
 {
@@ -37,39 +48,26 @@ public static class FindReplaceService
             || CreateRegex(query, options) is not null;
     }
 
-    public static bool IsMatch(
+    public static IReadOnlyList<SearchMatch> FindAll(
         string text,
         string query,
-        FindReplaceOptions options = FindReplaceOptions.None)
-    {
-        ArgumentNullException.ThrowIfNull(text);
-        ArgumentNullException.ThrowIfNull(query);
-        if (query.Length == 0)
-        {
-            return false;
-        }
+        FindReplaceOptions options = FindReplaceOptions.None,
+        SearchMatch? scope = null) =>
+        EnumerateMatches(text, query, options, scope)
+            .Select(match => match.Match)
+            .ToArray();
 
-        if (options.HasFlag(FindReplaceOptions.RegularExpression))
-        {
-            var regex = CreateRegex(query, options);
-            if (regex is null)
-            {
-                return false;
-            }
-
-            try
-            {
-                var match = regex.Match(text);
-                return match.Success && match.Index == 0 && match.Length == text.Length;
-            }
-            catch (RegexMatchTimeoutException)
-            {
-                return false;
-            }
-        }
-
-        return string.Equals(text, query, GetComparison(options));
-    }
+    /// <summary>
+    /// Reports whether <paramref name="candidate"/> is exactly one of the
+    /// matches of <paramref name="query"/> in <paramref name="text"/>.
+    /// </summary>
+    public static bool IsMatchAt(
+        string text,
+        string query,
+        SearchMatch candidate,
+        FindReplaceOptions options = FindReplaceOptions.None) =>
+        EnumerateMatches(text, query, options, candidate)
+            .Any(match => match.Match == candidate);
 
     public static SearchMatch? FindNext(
         string text,
@@ -78,61 +76,32 @@ public static class FindReplaceService
         FindReplaceOptions options = FindReplaceOptions.None)
         => FindNextResult(text, query, start, options)?.Match;
 
+    /// <summary>
+    /// Finds the first match starting at or after <paramref name="start"/>,
+    /// wrapping to the first match of the scope.
+    /// </summary>
     public static SearchResult? FindNextResult(
         string text,
         string query,
         int start,
-        FindReplaceOptions options = FindReplaceOptions.None)
+        FindReplaceOptions options = FindReplaceOptions.None,
+        SearchMatch? scope = null)
     {
-        ArgumentNullException.ThrowIfNull(text);
-        ArgumentNullException.ThrowIfNull(query);
-        if (query.Length == 0)
+        var matches = FindAll(text, query, options, scope);
+        if (matches.Count == 0)
         {
             return null;
         }
 
-        var clampedStart = Math.Clamp(start, 0, text.Length);
-        if (options.HasFlag(FindReplaceOptions.RegularExpression))
+        foreach (var match in matches)
         {
-            var regex = CreateRegex(query, options);
-            if (regex is null)
+            if (match.Start >= start)
             {
-                return null;
-            }
-
-            try
-            {
-                var match = regex.Match(text, clampedStart);
-                var regexWrapped = false;
-                if (!match.Success && clampedStart > 0)
-                {
-                    match = regex.Match(text, 0);
-                    regexWrapped = match.Success;
-                }
-
-                return match.Success
-                    ? new SearchResult(
-                        new SearchMatch(match.Index, match.Length),
-                        regexWrapped)
-                    : null;
-            }
-            catch (RegexMatchTimeoutException)
-            {
-                return null;
+                return new SearchResult(match, false);
             }
         }
 
-        var index = FindLiteralNext(text, query, clampedStart, options);
-        var wrapped = false;
-        if (index < 0 && clampedStart > 0)
-        {
-            index = FindLiteralNext(text, query, 0, options);
-            wrapped = index >= 0;
-        }
-
-        return index < 0
-            ? null
-            : new SearchResult(new SearchMatch(index, query.Length), wrapped);
+        return new SearchResult(matches[0], true);
     }
 
     public static SearchMatch? FindPrevious(
@@ -142,241 +111,157 @@ public static class FindReplaceService
         FindReplaceOptions options = FindReplaceOptions.None)
         => FindPreviousResult(text, query, endExclusive, options)?.Match;
 
+    /// <summary>
+    /// Finds the last match starting before <paramref name="endExclusive"/>,
+    /// wrapping to the last match of the scope.
+    /// </summary>
     public static SearchResult? FindPreviousResult(
         string text,
         string query,
         int endExclusive,
-        FindReplaceOptions options = FindReplaceOptions.None)
+        FindReplaceOptions options = FindReplaceOptions.None,
+        SearchMatch? scope = null)
     {
-        ArgumentNullException.ThrowIfNull(text);
-        ArgumentNullException.ThrowIfNull(query);
-        if (query.Length == 0 || text.Length == 0)
+        var matches = FindAll(text, query, options, scope);
+        if (matches.Count == 0)
         {
             return null;
         }
 
-        var clampedEndExclusive = Math.Clamp(endExclusive, 0, text.Length);
-        if (options.HasFlag(FindReplaceOptions.RegularExpression))
+        for (var index = matches.Count - 1; index >= 0; index--)
         {
-            var regex = CreateRegex(query, options);
-            if (regex is null)
+            if (matches[index].Start < endExclusive)
             {
-                return null;
-            }
-
-            try
-            {
-                var match = FindLastRegexMatch(regex, text, clampedEndExclusive);
-                var regexWrapped = false;
-                if (match is null)
-                {
-                    match = FindLastRegexMatch(regex, text, text.Length + 1);
-                    regexWrapped = match is not null;
-                }
-
-                return match is { } found
-                    ? new SearchResult(
-                        new SearchMatch(found.Index, found.Length),
-                        regexWrapped)
-                    : null;
-            }
-            catch (RegexMatchTimeoutException)
-            {
-                return null;
+                return new SearchResult(matches[index], false);
             }
         }
 
-        var index = FindLiteralPrevious(text, query, clampedEndExclusive, options);
-        var wrapped = false;
-        if (index < 0)
-        {
-            index = FindLiteralPrevious(text, query, text.Length, options);
-            wrapped = index >= 0;
-        }
-
-        return index < 0
-            ? null
-            : new SearchResult(new SearchMatch(index, query.Length), wrapped);
+        return new SearchResult(matches[^1], true);
     }
 
     public static int Count(
         string text,
         string query,
-        FindReplaceOptions options = FindReplaceOptions.None)
-    {
-        ArgumentNullException.ThrowIfNull(text);
-        ArgumentNullException.ThrowIfNull(query);
-        if (query.Length == 0)
-        {
-            return 0;
-        }
-
-        if (options.HasFlag(FindReplaceOptions.RegularExpression))
-        {
-            var regex = CreateRegex(query, options);
-            if (regex is null)
-            {
-                return 0;
-            }
-
-            try
-            {
-                return regex.Count(text);
-            }
-            catch (RegexMatchTimeoutException)
-            {
-                return 0;
-            }
-        }
-
-        var count = 0;
-        var position = 0;
-        while ((position = FindLiteralNext(text, query, position, options)) >= 0)
-        {
-            count++;
-            position += Math.Max(query.Length, 1);
-        }
-
-        return count;
-    }
+        FindReplaceOptions options = FindReplaceOptions.None,
+        SearchMatch? scope = null) =>
+        FindAll(text, query, options, scope).Count;
 
     public static int CountBefore(
         string text,
         string query,
         int start,
+        FindReplaceOptions options = FindReplaceOptions.None,
+        SearchMatch? scope = null) =>
+        FindAll(text, query, options, scope).Count(match => match.Start < start);
+
+    /// <summary>
+    /// Returns the text that replaces <paramref name="match"/>. A regular
+    /// expression expands substitutions such as <c>$1</c> from the match in
+    /// the context of the whole text.
+    /// </summary>
+    public static string GetReplacement(
+        string text,
+        string query,
+        string replacement,
+        SearchMatch match,
         FindReplaceOptions options = FindReplaceOptions.None)
+    {
+        ArgumentNullException.ThrowIfNull(replacement);
+        return EnumerateMatches(text, query, options, match)
+            .Where(candidate => candidate.Match == match)
+            .Select(candidate => candidate.Regex?.Result(replacement) ?? replacement)
+            .FirstOrDefault(replacement);
+    }
+
+    /// <summary>
+    /// Builds one replacement for every match in the scope, or returns
+    /// <see langword="null"/> when there is none.
+    /// </summary>
+    public static ReplaceAllEdit? ReplaceAll(
+        string text,
+        string query,
+        string replacement,
+        FindReplaceOptions options = FindReplaceOptions.None,
+        SearchMatch? scope = null)
+    {
+        ArgumentNullException.ThrowIfNull(replacement);
+        var matches = EnumerateMatches(text, query, options, scope).ToArray();
+        if (matches.Length == 0)
+        {
+            return null;
+        }
+
+        var start = matches[0].Match.Start;
+        var builder = new StringBuilder();
+        var copiedThrough = start;
+        foreach (var (match, regexMatch) in matches)
+        {
+            builder.Append(text, copiedThrough, match.Start - copiedThrough);
+            builder.Append(regexMatch?.Result(replacement) ?? replacement);
+            copiedThrough = match.End;
+        }
+
+        return new ReplaceAllEdit(
+            new SearchMatch(start, copiedThrough - start),
+            builder.ToString(),
+            matches.Length);
+    }
+
+    private static IEnumerable<(SearchMatch Match, Match? Regex)> EnumerateMatches(
+        string text,
+        string query,
+        FindReplaceOptions options,
+        SearchMatch? scope)
     {
         ArgumentNullException.ThrowIfNull(text);
         ArgumentNullException.ThrowIfNull(query);
         if (query.Length == 0)
         {
-            return 0;
+            yield break;
         }
 
-        var clampedStart = Math.Clamp(start, 0, text.Length);
+        var start = Math.Clamp(scope?.Start ?? 0, 0, text.Length);
+        var end = Math.Clamp(scope?.End ?? text.Length, start, text.Length);
         if (options.HasFlag(FindReplaceOptions.RegularExpression))
         {
             var regex = CreateRegex(query, options);
             if (regex is null)
             {
-                return 0;
+                yield break;
             }
 
+            var results = new List<(SearchMatch, Match?)>();
             try
             {
-                var count = 0;
-                foreach (Match match in regex.Matches(text))
+                for (var match = regex.Match(text, start);
+                    match.Success && match.Index <= end;
+                    match = match.NextMatch())
                 {
-                    if (match.Index >= clampedStart)
+                    if (match.Index + match.Length <= end)
                     {
-                        break;
+                        results.Add((new SearchMatch(match.Index, match.Length), match));
                     }
-
-                    count++;
                 }
-
-                return count;
             }
             catch (RegexMatchTimeoutException)
             {
-                return 0;
+                yield break;
             }
-        }
 
-        var literalCount = 0;
-        var position = 0;
-        var matchPosition = FindLiteralNext(text, query, position, options);
-        while (matchPosition >= 0 && matchPosition < clampedStart)
-        {
-            literalCount++;
-            position = matchPosition + Math.Max(query.Length, 1);
-            matchPosition = FindLiteralNext(text, query, position, options);
-        }
-
-        return literalCount;
-    }
-
-    public static string ReplaceAll(
-        string text,
-        string query,
-        string replacement,
-        FindReplaceOptions options = FindReplaceOptions.None)
-    {
-        ArgumentNullException.ThrowIfNull(text);
-        ArgumentNullException.ThrowIfNull(query);
-        ArgumentNullException.ThrowIfNull(replacement);
-        if (query.Length == 0)
-        {
-            return text;
-        }
-
-        if (options.HasFlag(FindReplaceOptions.RegularExpression))
-        {
-            var regex = CreateRegex(query, options);
-            if (regex is null)
+            foreach (var result in results)
             {
-                return text;
+                yield return result;
             }
 
-            try
-            {
-                return regex.Replace(text, replacement);
-            }
-            catch (RegexMatchTimeoutException)
-            {
-                return text;
-            }
+            yield break;
         }
 
-        if (!options.HasFlag(FindReplaceOptions.MatchWholeWord))
+        var position = start;
+        while ((position = FindLiteralNext(text, query, position, options)) >= 0
+            && position + query.Length <= end)
         {
-            return text.Replace(query, replacement, GetComparison(options));
-        }
-
-        var builder = new StringBuilder(text.Length);
-        var copiedThrough = 0;
-        var searchFrom = 0;
-        var match = FindLiteralNext(text, query, searchFrom, options);
-        while (match >= 0)
-        {
-            builder.Append(text, copiedThrough, match - copiedThrough);
-            builder.Append(replacement);
-            copiedThrough = match + query.Length;
-            searchFrom = copiedThrough;
-            match = FindLiteralNext(text, query, searchFrom, options);
-        }
-
-        builder.Append(text, copiedThrough, text.Length - copiedThrough);
-        return builder.ToString();
-    }
-
-    public static string ReplaceMatch(
-        string text,
-        string query,
-        string replacement,
-        FindReplaceOptions options = FindReplaceOptions.None)
-    {
-        ArgumentNullException.ThrowIfNull(text);
-        ArgumentNullException.ThrowIfNull(query);
-        ArgumentNullException.ThrowIfNull(replacement);
-        if (!options.HasFlag(FindReplaceOptions.RegularExpression))
-        {
-            return replacement;
-        }
-
-        var regex = CreateRegex(query, options);
-        if (regex is null)
-        {
-            return text;
-        }
-
-        try
-        {
-            return regex.Replace(text, replacement, 1);
-        }
-        catch (RegexMatchTimeoutException)
-        {
-            return text;
+            yield return (new SearchMatch(position, query.Length), null);
+            position += query.Length;
         }
     }
 
@@ -402,34 +287,6 @@ public static class FindReplaceService
             }
 
             position += Math.Max(query.Length, 1);
-        }
-
-        return -1;
-    }
-
-    private static int FindLiteralPrevious(
-        string text,
-        string query,
-        int endExclusive,
-        FindReplaceOptions options)
-    {
-        var comparison = GetComparison(options);
-        var position = Math.Min(endExclusive, text.Length) - 1;
-        while (position >= 0)
-        {
-            position = text.LastIndexOf(query, position, comparison);
-            if (position < 0)
-            {
-                return -1;
-            }
-
-            if (!options.HasFlag(FindReplaceOptions.MatchWholeWord)
-                || IsWholeWord(text, position, query.Length))
-            {
-                return position;
-            }
-
-            position--;
         }
 
         return -1;
@@ -461,21 +318,5 @@ public static class FindReplaceService
         {
             return null;
         }
-    }
-
-    private static Match? FindLastRegexMatch(Regex regex, string text, int endExclusive)
-    {
-        Match? last = null;
-        foreach (Match match in regex.Matches(text))
-        {
-            if (match.Index >= endExclusive)
-            {
-                break;
-            }
-
-            last = match;
-        }
-
-        return last;
     }
 }

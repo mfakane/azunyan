@@ -526,6 +526,51 @@ public sealed class AzunoteUiTests : IDisposable
     }
 
     [AzunoteUiFact]
+    public void Replace_all_in_selection_is_undone_in_one_step()
+    {
+        var window = _fixture.Window;
+        var editor = _fixture.Editor;
+        var editorValue = AzunoteUiFixture.WaitForValuePattern(editor);
+        var original = editorValue.Current.Value;
+
+        try
+        {
+            editorValue.SetValue("one one one");
+            var textPattern = AzunoteUiFixture.WaitForTextPattern(editor);
+            AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "one one one");
+            textPattern.DocumentRange.FindText("one one", false, false)!.Select();
+
+            AzunoteUiFixture.InvokeMenuItem(window, "Edit", "Replace...");
+            var inSelection = AzunoteUiFixture.WaitForElement(
+                window,
+                AutomationElement.NameProperty,
+                "Find in Selection");
+            ((TogglePattern)inSelection.GetCurrentPattern(TogglePattern.Pattern)).Toggle();
+            AzunoteUiFixture.WaitForToggleState(inSelection, ToggleState.On);
+            SetElementValue(window, "Find text", "one");
+            SetElementValue(window, "Replace text", "1");
+            ((InvokePattern)AzunoteUiFixture.WaitForElement(
+                    window,
+                    AutomationElement.NameProperty,
+                    "Replace all")
+                .GetCurrentPattern(InvokePattern.Pattern)).Invoke();
+            AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "1 1 one");
+
+            AzunoteUiFixture.InvokeMenuItem(window, "Edit", "Undo");
+            AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "one one one");
+        }
+        finally
+        {
+            AzunoteUiFixture.TryCloseFindReplace(window);
+            AzunoteUiFixture.WaitForValuePattern(editor).SetValue(original);
+        }
+    }
+
+    private static void SetElementValue(AutomationElement window, string name, string value) =>
+        ((ValuePattern)AzunoteUiFixture.WaitForElement(window, AutomationElement.NameProperty, name)
+            .GetCurrentPattern(ValuePattern.Pattern)).SetValue(value);
+
+    [AzunoteUiFact]
     public void Find_and_replace_modes_are_exposed()
     {
         var window = _fixture.Window;

@@ -79,13 +79,9 @@ internal sealed class FakeEditorView : IEditorView
 
     public void EndUndoGroup() => _document.EndUndoGroup();
 
-    public void Undo()
-    {
-    }
+    public void Undo() => _document.Undo();
 
-    public void Redo()
-    {
-    }
+    public void Redo() => _document.Redo();
 
     public void Cut()
     {
@@ -265,6 +261,8 @@ internal sealed class FakeFindReplaceView : IFindReplaceState, IFindReplaceHost
     public string ReplaceText { get; set; } = string.Empty;
 
     public FindReplaceOptions Options { get; set; }
+
+    public bool IsInSelection { get; set; }
 
     public bool IsReplaceMode { get; private set; }
 

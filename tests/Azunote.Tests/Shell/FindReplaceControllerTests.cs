@@ -196,6 +196,81 @@ public sealed class FindReplaceControllerTests
     }
 
     [Fact]
+    public void Replace_all_is_one_undoable_edit()
+    {
+        var editor = new FakeEditorView("a foo b foo c");
+        var view = new FakeFindReplaceView { FindText = "foo", ReplaceText = "bar" };
+        var controller = new FindReplaceController(editor, view, view, () => { }, () => { });
+
+        controller.ReplaceAll();
+        Assert.Equal("a bar b bar c", editor.Text);
+
+        editor.Undo();
+        Assert.Equal("a foo b foo c", editor.Text);
+    }
+
+    [Fact]
+    public void In_selection_limits_find_and_replace_to_the_captured_selection_as_it_is_edited()
+    {
+        var editor = new FakeEditorView("x x x x");
+        editor.SetSelection(new Azunyan.Core.TextSelection(2, 5));
+        var view = new FakeFindReplaceView { FindText = "x", ReplaceText = "yy", IsInSelection = true };
+        var controller = new FindReplaceController(editor, view, view, () => { }, () => { });
+        controller.Show(replace: true);
+
+        controller.FindNext();
+        Assert.Equal(new Azunyan.Core.TextSelection(2, 3), editor.Selection);
+        Assert.Equal("1/2", view.Result);
+        Assert.Null(view.Notification);
+
+        controller.FindNext();
+        Assert.Equal(new Azunyan.Core.TextSelection(4, 5), editor.Selection);
+        Assert.Equal("2/2", view.Result);
+
+        controller.ReplaceCurrent();
+        Assert.Equal("x x yy x", editor.Text);
+        Assert.Equal(new Azunyan.Core.TextSelection(2, 3), editor.Selection);
+
+        controller.ReplaceAll();
+        Assert.Equal("x yy yy x", editor.Text);
+        Assert.Equal("0/1", view.Result);
+    }
+
+    [Fact]
+    public void Replace_current_expands_regex_substitutions_with_lookbehind_context()
+    {
+        var editor = new FakeEditorView("ab cb");
+        var view = new FakeFindReplaceView
+        {
+            FindText = "(?<=a)(b)",
+            ReplaceText = "[$1]",
+            Options = FindReplaceOptions.RegularExpression
+        };
+        var controller = new FindReplaceController(editor, view, view, () => { }, () => { });
+
+        controller.FindNext();
+        controller.ReplaceCurrent();
+
+        Assert.Equal("a[b] cb", editor.Text);
+    }
+
+    [Fact]
+    public void Scope_shifts_before_it_grows_inside_it_and_ignores_edits_after_it()
+    {
+        var scope = new SearchMatch(4, 4);
+
+        Assert.Equal(
+            new SearchMatch(6, 4),
+            FindReplaceController.MapScope(scope, new Azunyan.Core.TextChange(Azunyan.Core.TextRange.Empty(4), "", "ab")));
+        Assert.Equal(
+            new SearchMatch(4, 6),
+            FindReplaceController.MapScope(scope, new Azunyan.Core.TextChange(new Azunyan.Core.TextRange(5, 1), "x", "yyy")));
+        Assert.Equal(
+            scope,
+            FindReplaceController.MapScope(scope, new Azunyan.Core.TextChange(Azunyan.Core.TextRange.Empty(8), "", "z")));
+    }
+
+    [Fact]
     public void Find_previous_selects_the_match_before_the_current_selection()
     {
         var editor = new FakeEditorView("one two one");

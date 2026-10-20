@@ -875,7 +875,7 @@
                     <Grid Grid.Column="1">
                         <local:CompletionTextBox
                             x:Name="FindTextBox"
-                            Padding="10,6,72,6"
+                            Padding="10,6,96,6"
                             PlaceholderText="Search text"
                             AcceptsReturn="True"
                             TextWrapping="Wrap"
@@ -939,6 +939,18 @@
                                     FontSize="12"
                                     FontWeight="SemiBold"
                                 />
+                            </ToggleButton>
+                            <ToggleButton
+                                VerticalAlignment="Stretch"
+                                Width="22"
+                                Padding="0"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                IsChecked="{x:Bind ViewModel.IsInSelection, Mode=TwoWay}"
+                                ToolTipService.ToolTip="Find in Selection"
+                                AutomationProperties.Name="Find in Selection"
+                            >
+                                <FontIcon Glyph="&#xE8A9;" FontSize="12" />
                             </ToggleButton>
                         </StackPanel>
                     </Grid>

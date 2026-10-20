@@ -177,6 +177,8 @@ internal interface IFindReplaceState
 
     FindReplaceOptions Options { get; }
 
+    bool IsInSelection { get; }
+
     bool IsReplaceMode { get; }
 
     void Show(bool replace);

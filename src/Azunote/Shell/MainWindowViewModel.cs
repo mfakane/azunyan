@@ -33,6 +33,7 @@ internal sealed class MainWindowViewModel :
     private bool _isReadOnly;
     private int _runningExternalToolCount;
     private bool _isMatchCase;
+    private bool _isInSelection;
     private bool _isMatchWholeWord;
     private bool _isRegularExpression;
     private IReadOnlyList<WindowMenuItemViewModel> _windowItems = [];
@@ -179,6 +180,11 @@ internal sealed class MainWindowViewModel :
         get => _isRegularExpression;
         set => SetFindOption(ref _isRegularExpression, value);
     }
+    public bool IsInSelection
+    {
+        get => _isInSelection;
+        set => SetFindOption(ref _isInSelection, value);
+    }
     public IReadOnlyList<WindowMenuItemViewModel> WindowItems => _windowItems;
     public IReadOnlyList<LanguageModeMenuItemViewModel> LanguageModeItems => _languageModeItems;
     public IReadOnlyList<RecentFileMenuItemViewModel> RecentFileItems => _recentFileItems;
@@ -293,6 +299,8 @@ internal sealed class MainWindowViewModel :
         (IsMatchCase ? FindReplaceOptions.MatchCase : FindReplaceOptions.None)
         | (IsMatchWholeWord ? FindReplaceOptions.MatchWholeWord : FindReplaceOptions.None)
         | (IsRegularExpression ? FindReplaceOptions.RegularExpression : FindReplaceOptions.None);
+
+    bool IFindReplaceState.IsInSelection => IsInSelection;
 
     bool IFindReplaceState.IsReplaceMode => IsReplaceMode;
 
