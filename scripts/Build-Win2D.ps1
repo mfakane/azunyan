@@ -1,6 +1,8 @@
 #requires -Version 7.0
 [CmdletBinding()]
-param()
+param(
+    [string] $WindowsTargetPlatformVersion
+)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
 $source = Join-Path $repo 'external/Win2D'
@@ -27,7 +29,12 @@ try {
     # One platform per invocation: a platform list cannot pass through the
     # command line without being split or reaching the projects verbatim.
     foreach ($platform in @('x64', 'ARM64')) {
-        & $msbuild Win2D.proj /p:BuildPlatforms=$platform /p:BuildConfigurations=Release /p:BuildTests=false /p:BuildTools=false /p:BuildDocs=false /p:RunTests=false /nr:false /v:minimal
+        $msbuildArgs = @('Win2D.proj', '/m:1', "/p:BuildPlatforms=$platform", '/p:BuildConfigurations=Release', '/p:BuildTests=false', '/p:BuildTools=false', '/p:BuildDocs=false', '/p:RunTests=false')
+        if ($WindowsTargetPlatformVersion) {
+            $msbuildArgs += "/p:WindowsTargetPlatformVersion=$WindowsTargetPlatformVersion"
+        }
+        $msbuildArgs += @('/nr:false', '/v:minimal')
+        & $msbuild @msbuildArgs
         if ($LASTEXITCODE) { throw "Win2D native build failed for $platform." }
     }
     & $msbuild winrt/projection/winrt.projection.csproj /restore /p:Configuration=Release /p:Platform=x64 /p:BuildProjectReferences=false /p:EnableSourceControlManagerQueries=false /p:EnableSourceLink=false /nr:false /v:minimal
