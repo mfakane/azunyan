@@ -52,7 +52,7 @@ internal sealed class DocumentStatusPresenter
             : Path.GetFileName(_session.State.FilePath);
         var dirtyMarker = _session.State.IsDirty ? " *" : string.Empty;
         var readOnlyMarker = _session.State.IsReadOnly ? " [READONLY]" : string.Empty;
-        var deletedMarker = _session.State.IsDeletedOnDisk ? " (deleted)" : string.Empty;
+        var deletedMarker = _session.State.IsDeletedOnDisk ? " [DELETED]" : string.Empty;
         _window.SetTitle(
             $"{name}{dirtyMarker}{readOnlyMarker}{deletedMarker} - {ApplicationIdentity.DisplayName}");
     }

@@ -86,7 +86,7 @@ Besides edits to the text, two things leave a document unsaved:
 
 - Choosing a line ending from Edit > Line Ending or the status bar. It
   applies from the next save.
-- Another program deleting the file. The title shows `(deleted)` until the
+- Another program deleting the file. The title shows `[DELETED]` until the
   document is saved or the file reappears unchanged.
 
 File > Save with Encoding saves in the chosen encoding at once, and File >

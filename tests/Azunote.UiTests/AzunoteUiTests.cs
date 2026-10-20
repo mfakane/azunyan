@@ -706,7 +706,7 @@ public sealed class AzunoteUiTests : IDisposable
 
             File.Delete(document);
             AzunoteUiFixture.WaitFor(
-                () => window.Current.Name.StartsWith("gone.txt * (deleted)", StringComparison.Ordinal) ? window : null,
+                () => window.Current.Name.StartsWith("gone.txt * [DELETED]", StringComparison.Ordinal) ? window : null,
                 $"The title did not mark the deleted file: {window.Current.Name}");
         }
         finally
