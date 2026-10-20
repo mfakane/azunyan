@@ -241,9 +241,9 @@ internal sealed class ApplicationCoordinator : IDisposable
         foreach (var named in options.FilePaths)
         {
             var path = ResolvePath(named, workingDirectory);
-            // A launch fills the window it was given; nothing else is open yet
-            // for that first document to be found in.
-            var existing = initial is null ? FindWindowForFile(path) : null;
+            // Even a launch can find the document open already: restoring the
+            // previous session's unsaved documents comes first.
+            var existing = FindWindowForFile(path);
             var target = existing;
             if (target is null)
             {
@@ -262,6 +262,13 @@ internal sealed class ApplicationCoordinator : IDisposable
 
             last = target;
             isNew = existing is null;
+        }
+
+        // The window a launch made is not left behind blank when every
+        // document it named was already open.
+        if (initial is not null && last is not null && IsReusable(initial))
+        {
+            initial.Window.Close();
         }
 
         return (last, isNew);
@@ -291,11 +298,6 @@ internal sealed class ApplicationCoordinator : IDisposable
     /// </summary>
     private WindowRegistration? TakeReusableWindow()
     {
-        static bool IsReusable(WindowRegistration registration) =>
-            registration.Window.Runtime.Session.State.FilePath is null
-            && !registration.Window.Runtime.IsDirty
-            && registration.Window.Runtime.IsEmptyDocument;
-
         if (_windows.Active is { } active && IsReusable(active))
         {
             return active;
@@ -730,6 +732,11 @@ internal sealed class ApplicationCoordinator : IDisposable
     private WindowRegistration? FindRegistration(MainWindow window) =>
         _windows.Windows.FirstOrDefault(
             registration => ReferenceEquals(registration.Window, window));
+
+    private static bool IsReusable(WindowRegistration registration) =>
+        registration.Window.Runtime.Session.State.FilePath is null
+        && !registration.Window.Runtime.IsDirty
+        && registration.Window.Runtime.IsEmptyDocument;
 
     private WindowRegistration? FindWindowForFile(string path)
     {

@@ -629,6 +629,38 @@ public sealed class AzunoteUiTests : IDisposable
     }
 
     [AzunoteUiFact]
+    public void Launching_with_a_backed_up_file_shows_its_restored_window_only()
+    {
+        var root = Directory.CreateTempSubdirectory("azunote-restore-same-file-");
+        var document = Path.Combine(root.FullName, "note.txt");
+        File.WriteAllText(document, "saved");
+        Directory.CreateDirectory(AzunoteUiFixture.BackupDirectory);
+        File.WriteAllText(
+            Path.Combine(AzunoteUiFixture.BackupDirectory, Guid.NewGuid().ToString("N") + ".backup"),
+            $"Azunote backup 1\n{document}\n\nunsaved");
+        using var fixture = new AzunoteUiFixture(document, keepBackups: true);
+        try
+        {
+            _ = fixture.Window;
+            var window = fixture.WaitForWindows(windows =>
+                    windows.Length == 1
+                    && windows[0].Current.Name.StartsWith("note.txt *", StringComparison.Ordinal))
+                .Single();
+            var editor = AzunoteUiFixture.WaitForElement(window, AutomationElement.NameProperty, "Document editor");
+            AzunoteUiFixture.WaitForDocumentText(AzunoteUiFixture.WaitForTextPattern(editor), text => text == "unsaved");
+
+            ((WindowPattern)window.GetCurrentPattern(WindowPattern.Pattern)).Close();
+            Assert.True(fixture.WaitForExit(10000), "Another window kept Azunote running.");
+        }
+        finally
+        {
+            fixture.Dispose();
+            Directory.Delete(AzunoteUiFixture.BackupDirectory, recursive: true);
+            root.Delete(recursive: true);
+        }
+    }
+
+    [AzunoteUiFact]
     public void Launch_restores_backed_up_documents_in_their_own_windows()
     {
         Directory.CreateDirectory(AzunoteUiFixture.BackupDirectory);
