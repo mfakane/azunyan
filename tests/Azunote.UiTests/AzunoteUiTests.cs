@@ -423,7 +423,8 @@ public sealed class AzunoteUiTests : IDisposable
             SendKeyChord(Control, Shift, K);
             AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "second\nfirst\nthird");
 
-            AzunoteUiFixture.InvokeMenuItem(_fixture.Window, "Edit", "Move Line Up");
+            AzunoteUiFixture.OpenMenu(_fixture.Window, "Edit");
+            InvokeSubmenuItem(_fixture.Window, "Line", "Move Line Up");
             AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "first\nsecond\nthird");
         }
         finally
