@@ -159,7 +159,7 @@ pipeline input and output, and shell completion.
 
 ## Command palette
 
-Tools > Command Palette... (Ctrl+Shift+P or F1) opens a search box over the
+Help > Command Palette... (Ctrl+Shift+P or F1) opens a search box over the
 editor with `>` already typed. Text that starts with `>` searches the menu
 commands, including external tools and the choices in submenus such as
 View > Line Ending; any other text searches the documents of the other

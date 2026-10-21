@@ -881,11 +881,6 @@
             </MenuBarItem>
             <MenuBarItem x:Name="ToolsMenuItem" Title="Tools">
                 <MenuFlyoutItem
-                    Text="Command Palette..."
-                    KeyboardAcceleratorTextOverride="Ctrl+Shift+P"
-                    Command="{x:Bind ViewModel.ShowCommandPaletteCommand}"
-                />
-                <MenuFlyoutItem
                     Text="Run External Tool..."
                     Command="{x:Bind ViewModel.RunExternalToolCommand}"
                     IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
@@ -931,6 +926,12 @@
                 <MenuFlyoutSeparator />
             </MenuBarItem>
             <MenuBarItem Title="Help">
+                <MenuFlyoutItem
+                    Text="Command Palette..."
+                    KeyboardAcceleratorTextOverride="Ctrl+Shift+P"
+                    Command="{x:Bind ViewModel.ShowCommandPaletteCommand}"
+                />
+                <MenuFlyoutSeparator />
                 <MenuFlyoutItem
                     Text="View License"
                     Command="{x:Bind ViewModel.ViewLicenseCommand}"
