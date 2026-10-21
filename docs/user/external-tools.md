@@ -52,12 +52,15 @@ Invalid definitions are reported and do not replace the last valid tool menu.
 
 ## Default tools
 
-Azunote ships tools for common edits, formatting, and Git under `Edit`,
-`Format`, and `Git`, and brings them up to date in the tools folder each time
-it starts. A new default tool is copied in, and an update replaces a default
-tool's file while the file is as Azunote wrote it. A file that has been edited is left as it is, and a
-default tool whose file was deleted is not copied back. `default-tools.toml`
-in the settings directory records what was offered.
+Azunote ships tools for common edits, insertions, formatting, and Git under
+`Edit`, `Insert`, `Format`, and `Git`, and brings them up to date in the tools
+folder each time it starts. Insert Date/Time (F5) inserts the current date and
+time as `2026-10-22 14:30`.
+
+A new default tool is copied in, and an update replaces a default tool's file
+while the file is as Azunote wrote it. A file that has been edited is left as
+it is, and a default tool whose file was deleted is not copied back.
+`default-tools.toml` in the settings directory records what was offered.
 
 ## Condition evaluation
 
@@ -338,6 +341,10 @@ is used for both exit statuses. All three fields support `ignore`,
 `replaceDocument`, `replaceSelection`, `newDocument`, `reloadFile`,
 `showCompletion`, and `showPromptResponse`.
 
+`replaceSelection` replaces the selection and leaves the output selected. With
+no selection it inserts the output at the caret and leaves the caret after it,
+as typing would.
+
 `showCompletion` treats each non-empty output line as one completion candidate
 and opens the completion window. Empty and whitespace-only lines are ignored.
 `showPromptResponse` appends the output to the inline chat opened by a prompt
@@ -402,8 +409,8 @@ split across updates.
 `newDocument` opens its window when the first output arrives rather than when
 the tool starts, so a tool that produces nothing opens no window. The other two
 actions apply their first output as the replacement they describe and append
-what follows, so `replaceSelection` leaves the selection covering the whole
-output once the tool has exited, exactly as it does without `stream`.
+what follows, so `replaceSelection` ends with the whole output selected, or the
+caret after it, exactly as it does without `stream`.
 
 A streamed document edit is one undo step, including a `per` run that launched
 several processes, and including a run that was cancelled or exited non-zero:

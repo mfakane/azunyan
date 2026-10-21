@@ -1,0 +1,14 @@
+name = "Join Lines"
+menus = ["tools", "context"]
+visibility = "whenAvailable"
+
+[launch]
+# Keeps the first line's indentation and joins the non-empty lines with one space.
+pwsh = '&{ [regex]::Match($input[0], "^\s*").Value + (($input.Trim() | Where-Object { $_ }) -join " ") }'
+input = "selection"
+stdin = "${input}"
+stdout = ["replaceSelection", "ignore"]
+stderr = ["ignore", "newDocument"]
+
+[when]
+selection = "nonEmpty"

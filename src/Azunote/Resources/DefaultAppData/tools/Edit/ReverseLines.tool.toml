@@ -1,0 +1,13 @@
+name = "Reverse Selected Lines"
+menus = ["tools", "context"]
+visibility = "whenAvailable"
+
+[launch]
+pwsh = '&{ $input[($input.Count - 1)..0] }'
+input = "selection"
+stdin = "${input}"
+stdout = ["replaceSelection", "ignore"]
+stderr = ["ignore", "newDocument"]
+
+[when]
+selection = "nonEmpty"

@@ -107,6 +107,14 @@ public sealed class ExternalToolControllerTests
 
             Assert.Equal(new TextSelection(12, 4), editor.Selection);
             Assert.Equal("REPLACED", editor.SelectedText);
+
+            // Output inserted at a caret leaves the caret after it.
+            editor.SetText("one two three");
+            editor.SetSelection(TextSelection.Caret(4));
+            await controller.RunAsync(definition);
+
+            Assert.Equal("one REPLACEDtwo three", editor.Text);
+            Assert.Equal(TextSelection.Caret(12), editor.Selection);
             Assert.Empty(prompt.Errors);
         }
         finally

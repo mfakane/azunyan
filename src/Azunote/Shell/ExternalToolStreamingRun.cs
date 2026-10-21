@@ -287,9 +287,11 @@ public sealed partial class ExternalToolController
                 if (!_wholeDocument && editor.Text.Length == _expectedLength)
                 {
                     var end = _regionStart + _regionLength;
-                    editor.SetSelection(_selection.IsReversed
-                        ? new TextSelection(end, _regionStart)
-                        : new TextSelection(_regionStart, end));
+                    editor.SetSelection(_selection.IsEmpty
+                        ? TextSelection.Caret(end)
+                        : _selection.IsReversed
+                            ? new TextSelection(end, _regionStart)
+                            : new TextSelection(_regionStart, end));
                 }
 
                 _run._owner._documents.Session.ObserveText(editor.Text);

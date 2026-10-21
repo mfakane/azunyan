@@ -291,10 +291,19 @@ public sealed partial class ExternalToolController
     /// Keeps the replaced text selected, preserving the direction the original
     /// selection was made in.
     /// </summary>
+    /// <summary>
+    /// Output inserted at a caret leaves the caret after it, as typing does;
+    /// output that replaced a selection stays selected.
+    /// </summary>
     private static TextSelection SelectReplacement(TextSelection selection, int length)
     {
         var start = selection.Start;
         var end = start + length;
+        if (selection.IsEmpty)
+        {
+            return TextSelection.Caret(end);
+        }
+
         return selection.IsReversed
             ? new TextSelection(end, start)
             : new TextSelection(start, end);

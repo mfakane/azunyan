@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using System.Windows.Automation;
 using System.Windows.Automation.Text;
 using Xunit;
@@ -631,6 +632,38 @@ public sealed class AzunoteUiTests : IDisposable
         AzunoteUiFixture.WaitFor(
             () => GetForegroundWindow() == originalHandle ? original : null,
             "Choosing the other window did not activate it.");
+    }
+
+    [AzunoteUiFact]
+    public void F5_inserts_the_date_and_time_and_typing_continues_after_it()
+    {
+        const ushort F5 = 0x74, X = 0x58;
+        var editor = _fixture.Editor;
+        var editorValue = AzunoteUiFixture.WaitForValuePattern(editor);
+        var original = editorValue.Current.Value;
+
+        try
+        {
+            editorValue.SetValue("at ");
+            var textPattern = AzunoteUiFixture.WaitForTextPattern(editor);
+            AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "at ");
+            textPattern.DocumentRange.FindText("at ", false, false)!.Select();
+            editor.SetFocus();
+            SendKeyChord(0x23); // End
+
+            SendKeyChord(F5);
+            AzunoteUiFixture.WaitForDocumentText(
+                textPattern,
+                text => Regex.IsMatch(text, @"^at \d{4}-\d{2}-\d{2} \d{2}:\d{2}$"));
+            SendKeyChord(X);
+            AzunoteUiFixture.WaitForDocumentText(
+                textPattern,
+                text => Regex.IsMatch(text, @"^at \d{4}-\d{2}-\d{2} \d{2}:\d{2}x$", RegexOptions.IgnoreCase));
+        }
+        finally
+        {
+            AzunoteUiFixture.WaitForValuePattern(editor).SetValue(original);
+        }
     }
 
     private static AutomationElement? FindCommandPalette(AutomationElement window) =>

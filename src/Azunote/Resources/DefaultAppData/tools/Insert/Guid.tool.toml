@@ -1,0 +1,8 @@
+name = "Insert GUID"
+menus = ["tools", "context"]
+visibility = "whenAvailable"
+
+[launch]
+pwsh = '[guid]::NewGuid().ToString()'
+stdout = ["replaceSelection", "ignore"]
+stderr = ["ignore", "newDocument"]

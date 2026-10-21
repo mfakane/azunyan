@@ -1,0 +1,9 @@
+name = "Insert Date/Time"
+shortcut = "F5"
+menus = ["tools", "context"]
+visibility = "whenAvailable"
+
+[launch]
+pwsh = 'Get-Date -Format "yyyy-MM-dd HH:mm"'
+stdout = ["replaceSelection", "ignore"]
+stderr = ["ignore", "newDocument"]
