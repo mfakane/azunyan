@@ -568,6 +568,93 @@ public sealed class AzunoteUiTests : IDisposable
         }
     }
 
+    [AzunoteUiFact]
+    public void Command_palette_runs_menu_commands_and_switches_to_recent_files()
+    {
+        const ushort Shift = 0x10, Control = 0x11, P = 0x50, F1 = 0x70, Escape = 0x1B;
+        var window = _fixture.Window;
+        var editor = _fixture.Editor;
+        var editorValue = AzunoteUiFixture.WaitForValuePattern(editor);
+        var original = editorValue.Current.Value;
+
+        try
+        {
+            editorValue.SetValue("first\nsecond");
+            var textPattern = AzunoteUiFixture.WaitForTextPattern(editor);
+            AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "first\nsecond");
+            textPattern.DocumentRange.FindText("second", false, false)!.Select();
+            editor.SetFocus();
+
+            SendKeyChord(Control, Shift, P);
+            SetCommandPaletteText(WaitForCommandPalette(window, text => text == ">"), ">mlu");
+            AzunoteUiFixture.WaitForElement(window, AutomationElement.NameProperty, "Move Line Up");
+            SendEnterKey();
+            AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "second\nfirst");
+
+            SendKeyChord(F1);
+            SetCommandPaletteText(WaitForCommandPalette(window, text => text == ">"), ">open recent");
+            AzunoteUiFixture.WaitForElement(window, AutomationElement.NameProperty, "Open Recent");
+            SendEnterKey();
+            WaitForCommandPalette(window, text => text.Length == 0);
+
+            SendKeyChord(Escape);
+            AzunoteUiFixture.WaitFor(
+                () => FindCommandPalette(window) is null ? window : null,
+                "Escape did not close the command palette.");
+        }
+        finally
+        {
+            AzunoteUiFixture.WaitForValuePattern(editor).SetValue(original);
+        }
+    }
+
+    [AzunoteUiFact]
+    public void Command_palette_without_prefix_switches_to_another_open_window()
+    {
+        const ushort F1 = 0x70;
+        var original = _fixture.Window;
+        var originalHandle = original.Current.NativeWindowHandle;
+        AzunoteUiFixture.InvokeMenuItem(original, "File", "New");
+        var created = _fixture.WaitForWindows(windows => windows.Length >= 2)
+            .First(window => window.Current.NativeWindowHandle != originalHandle);
+        AzunoteUiFixture.WaitForElement(created, AutomationElement.NameProperty, "Document editor").SetFocus();
+
+        SendKeyChord(F1);
+        SetCommandPaletteText(WaitForCommandPalette(created, text => text == ">"), string.Empty);
+        AzunoteUiFixture.WaitFor(
+            () => created.FindFirst(
+                TreeScope.Descendants,
+                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.ListItem)),
+            "The command palette did not list the other window.");
+        SendEnterKey();
+
+        AzunoteUiFixture.WaitFor(
+            () => GetForegroundWindow() == originalHandle ? original : null,
+            "Choosing the other window did not activate it.");
+    }
+
+    private static AutomationElement? FindCommandPalette(AutomationElement window) =>
+        window.FindFirst(
+            TreeScope.Descendants,
+            new PropertyCondition(AutomationElement.NameProperty, "Command palette"));
+
+    private static AutomationElement WaitForCommandPalette(
+        AutomationElement window,
+        Func<string, bool> predicate) =>
+        AzunoteUiFixture.WaitFor(
+            () => FindCommandPalette(window) is { } palette
+                && palette.TryGetCurrentPattern(ValuePattern.Pattern, out var value)
+                && predicate(((ValuePattern)value).Current.Value)
+                    ? palette
+                    : null,
+            "The command palette did not show the expected text.");
+
+    private static void SetCommandPaletteText(AutomationElement palette, string text) =>
+        ((ValuePattern)palette.GetCurrentPattern(ValuePattern.Pattern)).SetValue(text);
+
+    [DllImport("user32.dll")]
+    private static extern int GetForegroundWindow();
+
     private static void SetElementValue(AutomationElement window, string name, string value) =>
         ((ValuePattern)AzunoteUiFixture.WaitForElement(window, AutomationElement.NameProperty, name)
             .GetCurrentPattern(ValuePattern.Pattern)).SetValue(value);

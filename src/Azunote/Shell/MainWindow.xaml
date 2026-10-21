@@ -472,7 +472,7 @@
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        <MenuBar Grid.Row="0">
+        <MenuBar x:Name="MainMenuBar" Grid.Row="0">
             <MenuBarItem Title="File">
                 <MenuFlyoutItem
                     Text="New"
@@ -881,6 +881,11 @@
             </MenuBarItem>
             <MenuBarItem x:Name="ToolsMenuItem" Title="Tools">
                 <MenuFlyoutItem
+                    Text="Command Palette..."
+                    KeyboardAcceleratorTextOverride="Ctrl+Shift+P"
+                    Command="{x:Bind ViewModel.ShowCommandPaletteCommand}"
+                />
+                <MenuFlyoutItem
                     Text="Run External Tool..."
                     Command="{x:Bind ViewModel.RunExternalToolCommand}"
                     IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
@@ -1250,6 +1255,66 @@
                 />
             </Grid>
         </Border>
-
+        <!--
+            Text starting with ">" searches the menu commands; any other text
+            searches the open and recent documents.
+        -->
+        <Border
+            x:Name="CommandPalettePanel"
+            Grid.Row="1"
+            Grid.RowSpan="2"
+            Width="560"
+            Margin="16,8,16,0"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Top"
+            Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource SurfaceStrokeColorFlyoutBrush}"
+            BorderThickness="1"
+            CornerRadius="{StaticResource OverlayCornerRadius}"
+            Translation="0,0,32"
+            Visibility="Collapsed"
+        >
+            <Border.Shadow>
+                <ThemeShadow />
+            </Border.Shadow>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <local:CompletionTextBox
+                    x:Name="CommandPaletteTextBox"
+                    Margin="8"
+                    PlaceholderText="Search open and recent files, or type &gt; for commands"
+                    AutomationProperties.Name="Command palette"
+                    BeforeKeyDown="CommandPaletteTextBox_BeforeKeyDown"
+                    TextChanged="CommandPaletteTextBox_TextChanged"
+                    LostFocus="CommandPaletteTextBox_LostFocus"
+                />
+                <ListView
+                    x:Name="CommandPaletteList"
+                    Grid.Row="1"
+                    MaxHeight="360"
+                    Margin="0,0,0,4"
+                    IsTabStop="False"
+                    AllowFocusOnInteraction="False"
+                    SelectionMode="Single"
+                    IsItemClickEnabled="True"
+                    ItemClick="CommandPaletteList_ItemClick"
+                    AutomationProperties.Name="Command palette results"
+                >
+                    <!-- The ListView defaults, played by the rows the palette
+                         opens with. Rows rebuilt while typing appear at once. -->
+                    <ListView.ItemContainerTransitions>
+                        <TransitionCollection x:Name="CommandPaletteRowTransitions">
+                            <AddDeleteThemeTransition />
+                            <ContentThemeTransition />
+                            <ReorderThemeTransition />
+                            <EntranceThemeTransition IsStaggeringEnabled="False" />
+                        </TransitionCollection>
+                    </ListView.ItemContainerTransitions>
+                </ListView>
+            </Grid>
+        </Border>
     </Grid>
 </Window>

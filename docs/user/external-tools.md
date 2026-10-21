@@ -36,7 +36,8 @@ attribute.
 
 Each Tools-menu external-tool item is a split item. Its main area runs the
 tool; the `...` area provides `Edit...` and `Show in Explorer` for the
-definition file.
+definition file. The command palette searches the Tools-menu entries along
+with the other menu commands.
 
 The `menus` field controls where a tool is shown. Tools menu entries retain the
 discovered folder hierarchy. Context-menu entries are added after the built-in
@@ -91,7 +92,7 @@ NODE_ENV = "development"
 | Field | Values | Description |
 | --- | --- | --- |
 | `name` | String | Name shown in the selected menu. If omitted, the definition file or bundle name is used. |
-| `shortcut` | Shortcut string | Optional keyboard shortcut, such as `Alt+Shift+F`. It is shown beside the item in both menus. |
+| `shortcut` | Shortcut string | Optional keyboard shortcut, such as `Alt+Shift+F`. It is shown beside the item in both menus. While the tool is available, the shortcut runs it instead of a built-in command on the same keys. |
 | `priority` | Integer | Shortcut tie-break when several tools share a key. The highest value among enabled tools runs. Defaults to `0`. Equal values keep discovery order. Menu order is unchanged. |
 | `menus` | Array of `tools`, `context` | Menu surfaces where the tool is shown. Use both values to show it in both menus. Defaults to `["tools"]`. |
 | `visibility` | `always`, `whenAvailable` | Whether the item remains visible when its conditions or command are unavailable. |

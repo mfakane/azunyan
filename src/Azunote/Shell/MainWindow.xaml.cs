@@ -128,6 +128,17 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         goToMatchingBracket.Invoked += GoToMatchingBracketAccelerator_Invoked;
         RootGrid.KeyboardAccelerators.Add(goToMatchingBracket);
 
+        foreach (var (key, modifiers) in new[]
+                 {
+                     (VirtualKey.P, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift),
+                     (VirtualKey.F1, VirtualKeyModifiers.None)
+                 })
+        {
+            var showCommandPalette = new KeyboardAccelerator { Key = key, Modifiers = modifiers };
+            showCommandPalette.Invoked += ShowCommandPaletteAccelerator_Invoked;
+            RootGrid.KeyboardAccelerators.Add(showCommandPalette);
+        }
+
         // The native text input handles arrow keys before window accelerators,
         // so shortcuts that the editor would otherwise consume are resolved
         // through the editor's own key pipeline.
@@ -197,6 +208,22 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
             : null;
     }
 
+    private void ShowCommandPaletteAccelerator_Invoked(
+        KeyboardAccelerator sender,
+        KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = true;
+        // An enabled external tool keeps its shortcut, as in the editor.
+        if (_externalToolShortcuts.TryGetValue(new(sender.Key, sender.Modifiers), out var resolveTool)
+            && resolveTool() is { } runTool)
+        {
+            runTool();
+            return;
+        }
+
+        ShowCommandPalette(CommandPalettePrefix);
+    }
+
     private void FindNextAccelerator_Invoked(
         KeyboardAccelerator sender,
         KeyboardAcceleratorInvokedEventArgs args)
@@ -219,7 +246,12 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         KeyboardAccelerator sender,
         KeyboardAcceleratorInvokedEventArgs args)
     {
-        if (_runtime.IsFindPanelVisible)
+        if (IsCommandPaletteOpen)
+        {
+            args.Handled = true;
+            CloseCommandPalette(focusEditor: true);
+        }
+        else if (_runtime.IsFindPanelVisible)
         {
             args.Handled = true;
             _runtime.CloseFindPanel();
@@ -487,6 +519,12 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         if (ReplaceTextBox.FocusState != FocusState.Unfocused)
         {
             textBoxCommand(ReplaceTextBox);
+            return;
+        }
+
+        if (CommandPaletteTextBox.FocusState != FocusState.Unfocused)
+        {
+            textBoxCommand(CommandPaletteTextBox);
             return;
         }
 

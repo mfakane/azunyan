@@ -466,6 +466,10 @@ internal sealed class ApplicationCoordinator : IDisposable
             && ReferenceEquals(registration.Window.Runtime.Session, source.Runtime.Session));
     }
 
+    /// <summary>Every window, in the order the Window menu lists them.</summary>
+    internal IReadOnlyList<MainWindow> Windows =>
+        _windows.Windows.Select(registration => registration.Window).ToArray();
+
     internal void CycleWindow(MainWindow source, int direction)
     {
         ArgumentNullException.ThrowIfNull(source);

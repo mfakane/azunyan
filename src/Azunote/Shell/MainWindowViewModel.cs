@@ -104,6 +104,7 @@ internal sealed class MainWindowViewModel :
         ShowFileInExplorerCommand = Async(() => Actions.ShowFileInExplorerAsync());
         OpenFolderInTerminalCommand = Async(() => Actions.OpenFolderInTerminalAsync());
         RunExternalToolCommand = Async(() => Actions.RunExternalToolAsync());
+        ShowCommandPaletteCommand = Command(() => Actions.ShowCommandPalette());
         OpenPreferencesCommand = Async(() => Actions.OpenPreferencesAsync());
         ToggleAlwaysOnTopCommand = Command(() => Actions.ToggleAlwaysOnTop());
         DuplicateWindowCommand = Command(() => Actions.DuplicateWindow());
@@ -249,6 +250,7 @@ internal sealed class MainWindowViewModel :
     public ICommand ShowFileInExplorerCommand { get; }
     public ICommand OpenFolderInTerminalCommand { get; }
     public ICommand RunExternalToolCommand { get; }
+    public ICommand ShowCommandPaletteCommand { get; }
     public ICommand OpenPreferencesCommand { get; }
     public ICommand ToggleAlwaysOnTopCommand { get; }
     public ICommand DuplicateWindowCommand { get; }
@@ -595,6 +597,7 @@ internal interface IMainWindowActions
     Task ShowFileInExplorerAsync();
     Task OpenFolderInTerminalAsync();
     Task RunExternalToolAsync();
+    void ShowCommandPalette();
     Task OpenPreferencesAsync();
     void ToggleAlwaysOnTop();
     void DuplicateWindow();

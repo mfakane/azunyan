@@ -157,6 +157,17 @@ the payload, and the status byte is the exit code `azu.exe` reports.
 See the [Command-line reference](../../docs/user/command-line.md) for options,
 pipeline input and output, and shell completion.
 
+## Command palette
+
+Tools > Command Palette... (Ctrl+Shift+P or F1) opens a search box over the
+editor with `>` already typed. Text that starts with `>` searches the menu
+commands, including external tools and the choices in submenus such as
+View > Line Ending; any other text searches the documents of the other
+windows and the recent files. Characters match in order, not necessarily
+next to each other, so `mlu` finds Move Line Up. Choosing Open Recent lists
+the recent files in the palette itself. Before anything is typed after `>`,
+the commands run recently in any window are listed first.
+
 ## Configuration and external tools
 
 See the user-facing documentation for the application configuration:
