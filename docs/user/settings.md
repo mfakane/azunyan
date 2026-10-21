@@ -8,6 +8,7 @@ created on first launch and contains:
 | --- | --- |
 | `settings.toml` | User-editable application settings. |
 | `state.toml` | Application-managed window, view, and recent-file state. |
+| `default-tools.toml` | Application-managed record of the [default tools](external-tools.md#default-tools) offered so far. |
 | `tools/` | [External tool definitions](external-tools.md). |
 | `modes/` | Custom language-mode definitions. |
 | `backups/` | [Unsaved documents](#unsaved-documents) kept for the next launch. |

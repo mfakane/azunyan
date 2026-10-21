@@ -3,7 +3,7 @@ menus = ["tools", "context"]
 visibility = "whenAvailable"
 
 [launch]
-pwsh = 'Sort-Object -Unique'
+pwsh = 'Sort-Object'
 input = "selection"
 stdin = "${input}"
 stdout = ["replaceSelection", "ignore"]

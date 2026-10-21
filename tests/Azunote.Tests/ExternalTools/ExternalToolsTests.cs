@@ -1968,6 +1968,7 @@ public sealed class ExternalToolsTests
         try
         {
             await SettingsFileService.EnsureExistsAsync(root);
+            await SettingsFileService.InstallDefaultToolsAsync(root);
 
             Assert.True(File.Exists(SettingsFileService.GetSettingsFilePath(root)));
             Assert.True(Directory.Exists(SettingsFileService.GetToolsDirectoryPath(root)));

@@ -166,6 +166,7 @@ public sealed class AzunoteDebugSettings
 [TomlSerializable(typeof(AzunoteDebugSettings))]
 [TomlSerializable(typeof(AzunoteToolsSettings))]
 [TomlSerializable(typeof(AzunoteState))]
+[TomlSerializable(typeof(DefaultToolsRecord))]
 [TomlSerializable(typeof(WindowLayoutState))]
 [TomlSerializable(typeof(ShellCommandSettings))]
 [TomlSerializable(typeof(ExternalToolSettings))]
@@ -912,15 +913,9 @@ public static class SettingsFileService
         CancellationToken cancellationToken = default)
     {
         var directory = GetFullDirectoryPath(settingsDirectory);
-        var toolsDirectory = Path.Combine(directory, ToolsDirectoryName);
-        var toolsDirectoryExisted = Directory.Exists(toolsDirectory);
         Directory.CreateDirectory(directory);
-        Directory.CreateDirectory(toolsDirectory);
+        Directory.CreateDirectory(Path.Combine(directory, ToolsDirectoryName));
         await EnsureDefaultModesAsync(directory, cancellationToken);
-        if (!toolsDirectoryExisted)
-        {
-            await EnsureDefaultToolsAsync(directory, cancellationToken);
-        }
 
         var settingsPath = Path.Combine(directory, SettingsFileName);
         if (!File.Exists(settingsPath))
@@ -928,6 +923,18 @@ public static class SettingsFileService
             await EnsureDefaultSettingsAsync(settingsPath, cancellationToken);
         }
     }
+
+    /// <summary>
+    /// Brings the default tools in line with this build. The bundle changes
+    /// only with Azunote itself, so this runs once as Azunote starts.
+    /// </summary>
+    public static Task InstallDefaultToolsAsync(
+        string settingsDirectory,
+        CancellationToken cancellationToken = default) =>
+        DefaultToolInstaller.InstallAsync(
+            GetFullDirectoryPath(settingsDirectory),
+            ToolsDirectoryName,
+            cancellationToken);
 
     public static async Task<AzunoteSettings> LoadAsync(
         string settingsDirectory,
@@ -1073,37 +1080,5 @@ public static class SettingsFileService
 
         await using var destination = File.Create(settingsPath);
         await source.CopyToAsync(destination, cancellationToken);
-    }
-
-    private static async Task EnsureDefaultToolsAsync(
-        string settingsDirectory,
-        CancellationToken cancellationToken)
-    {
-        var toolsDirectory = GetToolsDirectoryPath(settingsDirectory);
-        foreach (var relativePath in BundledDefaultAppData.GetFiles(ToolsDirectoryName))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var destinationPath = Path.Combine(toolsDirectory, relativePath);
-            var destinationDirectory = Path.GetDirectoryName(destinationPath);
-            if (!string.IsNullOrWhiteSpace(destinationDirectory))
-            {
-                Directory.CreateDirectory(destinationDirectory);
-            }
-
-            if (File.Exists(destinationPath))
-            {
-                continue;
-            }
-
-            await using var source = BundledDefaultAppData.OpenRead(
-                Path.Combine(ToolsDirectoryName, relativePath));
-            if (source is null)
-            {
-                continue;
-            }
-
-            await using var destination = File.Create(destinationPath);
-            await source.CopyToAsync(destination, cancellationToken);
-        }
     }
 }

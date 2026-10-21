@@ -50,6 +50,15 @@ removed. It ignores the entries the scan skips, so work below a hidden
 directory, such as a `git pull` writing to `.git`, does not reload anything.
 Invalid definitions are reported and do not replace the last valid tool menu.
 
+## Default tools
+
+Azunote ships tools for common edits, formatting, and Git under `Edit`,
+`Format`, and `Git`, and brings them up to date in the tools folder each time
+it starts. A new default tool is copied in, and an update replaces a default
+tool's file while the file is as Azunote wrote it. A file that has been edited is left as it is, and a
+default tool whose file was deleted is not copied back. `default-tools.toml`
+in the settings directory records what was offered.
+
 ## Condition evaluation
 
 To keep typing and selection changes responsive, `[when]` conditions are not
