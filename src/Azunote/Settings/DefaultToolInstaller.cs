@@ -33,6 +33,10 @@ internal static class DefaultToolInstaller
         [
             "45a8502921ac781661681ae28def8d0e52cfd83b00c89df8943378a363e601c2"
         ],
+        ["Git/ShowFileDiff.tool.toml"] =
+        [
+            "688b8c5ec6ea4346e7caa34e895ad27eeced7f697cbe655b07f9cda362d29c20"
+        ],
         ["Format/Whitespace.tool.toml"] =
         [
             "ba62145555e0b7995ef7ad60219c4b02e92290057834096a72ea4eeb4ee821e8"

@@ -12,4 +12,10 @@ public static class SyntaxClassifications
     /// Ctrl+Click navigation through its link-invoked event.
     /// </summary>
     public const string Link = "link";
+
+    /// <summary>A line or text added in a change, such as a diff's <c>+</c> line.</summary>
+    public const string Inserted = "inserted";
+
+    /// <summary>A line or text removed in a change, such as a diff's <c>-</c> line.</summary>
+    public const string Deleted = "deleted";
 }

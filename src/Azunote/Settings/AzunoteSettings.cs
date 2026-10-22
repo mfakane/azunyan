@@ -222,9 +222,39 @@ public sealed class ExternalToolOutputActionsTomlConverter
         ExternalToolOutputActions value)
     {
         writer.WriteStartArray();
-        writer.WriteStringValue(ExternalToolEnumValues.ToTomlValue(value.OnSuccess));
-        writer.WriteStringValue(ExternalToolEnumValues.ToTomlValue(value.OnFailure));
+        writer.WriteStringValue(Format(value.OnSuccess, value.OnSuccessLanguage));
+        writer.WriteStringValue(Format(value.OnFailure, value.OnFailureLanguage));
         writer.WriteEndArray();
+    }
+
+    private static string Format(ExternalToolOutputMode mode, string? language) =>
+        language is null
+            ? ExternalToolEnumValues.ToTomlValue(mode)
+            : $"{ExternalToolEnumValues.ToTomlValue(mode)}:{language}";
+
+    /// <summary>
+    /// Reads an action, which only <c>newDocument</c> may follow with a
+    /// language mode, as <c>newDocument:diff</c>.
+    /// </summary>
+    private static (ExternalToolOutputMode Mode, string? Language) ParseAction(string value)
+    {
+        var separator = value.IndexOf(':');
+        var mode = ExternalToolEnumValues.Parse<ExternalToolOutputMode>(
+            separator < 0 ? value : value[..separator],
+            "external-tool output action");
+        if (separator < 0)
+        {
+            return (mode, null);
+        }
+
+        var language = value[(separator + 1)..].Trim();
+        if (mode != ExternalToolOutputMode.NewDocument || language.Length == 0)
+        {
+            throw new SettingsFileException(
+                $"Invalid external-tool output action '{value}'. Only newDocument takes a language mode, as newDocument:<language>.");
+        }
+
+        return (mode, language);
     }
 
     private static ExternalToolOutputActions Parse(
@@ -239,15 +269,9 @@ public sealed class ExternalToolOutputActionsTomlConverter
 
         try
         {
-            var success = ExternalToolEnumValues.Parse<ExternalToolOutputMode>(
-                values[0],
-                "external-tool output action");
-            var failure = values.Count == 1
-                ? success
-                : ExternalToolEnumValues.Parse<ExternalToolOutputMode>(
-                    values[1],
-                    "external-tool output action");
-            return new ExternalToolOutputActions(success, failure);
+            var success = ParseAction(values[0]);
+            var failure = values.Count == 1 ? success : ParseAction(values[1]);
+            return new ExternalToolOutputActions(success.Mode, failure.Mode, success.Language, failure.Language);
         }
         catch (SettingsFileException exception)
         {

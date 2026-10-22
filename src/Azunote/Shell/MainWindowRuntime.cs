@@ -41,7 +41,7 @@ internal sealed class MainWindowRuntime : IDisposable
         MainWindowViewModel viewModel,
         Func<Task> createNewWindow,
         Func<string, Task> openFileInNewWindow,
-        Func<string, Task> openTextInNewWindow,
+        Func<string, string?, Task> openTextInNewWindow,
         Action refreshWindowMenus,
         IFilePathActions filePathActions,
         Action<string> recordRecentFile,
@@ -51,7 +51,7 @@ internal sealed class MainWindowRuntime : IDisposable
         DocumentSession? session = null,
         Document? document = null,
         Func<string, Task>? openFileRequest = null,
-        Func<Task<IExternalToolDocument>>? openStreamedTextInNewWindow = null)
+        Func<string?, Task<IExternalToolDocument>>? openStreamedTextInNewWindow = null)
     {
         _window = window ?? throw new ArgumentNullException(nameof(window));
         _view = new MainWindow.ViewBoundary(window);
@@ -591,6 +591,9 @@ internal sealed class MainWindowRuntime : IDisposable
             _status.Refresh();
         }
     }
+
+    /// <summary>Shows the document in a language mode, if one has this id.</summary>
+    internal void SelectLanguageMode(string id) => _languageModes.SelectManually(id);
 
     public void RefreshStatus()
     {

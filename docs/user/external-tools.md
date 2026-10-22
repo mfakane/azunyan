@@ -76,6 +76,7 @@ of a tool's Tools-menu item opens its file:
 | ConvertFrom-Json \| ConvertTo-Json | `priority`, sharing Alt+Shift+F with Prettier |
 | Run Batch File, Run Python Script | `cmd` and `command`, streaming `output` into a new window, with `[when].patterns` and `document = "clean"` |
 | Blame File, File History | `newDocument`, with `[when].exists = ".git"` |
+| Show File Diff | `newDocument:diff`, opening the output in the Diff mode |
 
 A new default tool is copied in, and an update replaces a default tool's file
 while the file is as Azunote wrote it. A file that has been edited is left as
@@ -367,6 +368,10 @@ An array is ordered `[zero-exit-action, non-zero-exit-action]`; a single action
 is used for both exit statuses. All three fields support `ignore`,
 `replaceDocument`, `replaceSelection`, `newDocument`, `reloadFile`,
 `showCompletion`, `showPromptResponse`, and `diagnostics`.
+
+`newDocument` opens the output in a new window, in Plain Text unless a
+language mode follows it: `newDocument:diff` opens it in the Diff mode. An id
+that names no mode leaves it in Plain Text.
 
 `replaceSelection` replaces the selection and leaves the output selected. With
 no selection it inserts the output at the caret and leaves the caret after it,

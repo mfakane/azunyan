@@ -5,7 +5,7 @@ visibility = "whenAvailable"
 command = "git"
 args = ["diff", "--no-ext-diff", "--no-color", "--", "${documentFile}"]
 workingDirectory = "${documentDirname}"
-stdout = ["newDocument", "ignore"]
+stdout = ["newDocument:diff", "ignore"]
 stderr = ["ignore", "newDocument"]
 
 [when]

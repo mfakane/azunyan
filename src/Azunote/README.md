@@ -203,8 +203,9 @@ there and reconciles it with the native caret rectangle for IME candidate
 placement. Completion results and provider tooltips use the same caret geometry.
 
 Built-in language definitions are available for C#, JavaScript, TypeScript,
-Python, JSON (including JSONC and JSON5), XML, YAML, TOML, Markdown, and
-PowerShell. Azunote exposes them from
+Python, JSON (including JSONC and JSON5), XML, YAML, TOML, Markdown,
+PowerShell, and unified diffs (`.diff`, `.patch`), whose added and removed
+lines are colored and whose files and hunks fold. Azunote exposes them from
 View > Language Mode, alongside Plain Text and its Azunote note mode. Custom
 language modes are described in [Settings](../../docs/user/settings.md).
 

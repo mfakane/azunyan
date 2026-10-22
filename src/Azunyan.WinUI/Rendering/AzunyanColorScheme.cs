@@ -81,6 +81,12 @@ public sealed record AzunyanColorScheme
     /// </summary>
     public Color LinkForeground { get; init; }
 
+    /// <summary>Foreground of added text, such as a diff's <c>+</c> lines.</summary>
+    public Color InsertedForeground { get; init; } = Color.FromArgb(0xff, 0x22, 0x86, 0x3a);
+
+    /// <summary>Foreground of removed text, such as a diff's <c>-</c> lines.</summary>
+    public Color DeletedForeground { get; init; } = Color.FromArgb(0xff, 0xcb, 0x24, 0x31);
+
     /// <summary>
     /// Optionally resolves a foreground for any syntax classification. Returning
     /// null retains Azunyan's built-in classification mapping and fallback.
@@ -136,6 +142,8 @@ public sealed record AzunyanColorScheme
             "task-marker" => TaskForeground,
             "variable" => VariableForeground,
             SyntaxClassifications.Link => LinkForeground,
+            SyntaxClassifications.Inserted => InsertedForeground,
+            SyntaxClassifications.Deleted => DeletedForeground,
             _ => EditorForeground
         };
     }

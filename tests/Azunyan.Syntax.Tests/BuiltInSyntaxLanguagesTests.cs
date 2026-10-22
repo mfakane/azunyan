@@ -116,6 +116,16 @@ public sealed class BuiltInSyntaxLanguagesTests
             "function Get-X { $value = \"a`\"b\" # note\n}",
             new[] { "function:keyword", "$value:variable", "\"a`\"b\":string", "# note:comment" }
         };
+        yield return new object[]
+        {
+            BuiltInSyntaxLanguages.Diff,
+            "diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1,2 +1,2 @@\n kept\n-old\n+new\n\\ No newline at end of file",
+            new[]
+            {
+                "diff --git a/x b/x:heading", "--- a/x:heading", "+++ b/x:heading", "@@ -1,2 +1,2 @@:keyword",
+                "-old:deleted", "+new:inserted", "\\ No newline at end of file:comment"
+            }
+        };
     }
 
     [Theory]
@@ -183,8 +193,10 @@ public sealed class BuiltInSyntaxLanguagesTests
         Assert.IsType<XmlFoldingProvider>(BuiltInSyntaxLanguages.Xml.FoldingProvider);
         Assert.Contains("*.toml", BuiltInSyntaxLanguages.Toml.Patterns);
         Assert.IsType<TomlFoldingProvider>(BuiltInSyntaxLanguages.Toml.FoldingProvider);
+        Assert.Equal([".diff", ".patch"], BuiltInSyntaxLanguages.Diff.FileExtensions);
+        Assert.IsType<DiffFoldingProvider>(BuiltInSyntaxLanguages.Diff.FoldingProvider);
         Assert.Equal([".", "(", "{", "[", "->"], BuiltInSyntaxLanguages.CSharp.CompletionTriggerCharacters);
-        Assert.Equal(10, BuiltInSyntaxLanguages.All.Count);
+        Assert.Equal(11, BuiltInSyntaxLanguages.All.Count);
     }
 
     [Fact]

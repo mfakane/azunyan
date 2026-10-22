@@ -13,12 +13,12 @@ public sealed partial class ExternalToolController
     private readonly DocumentController _documents;
     private readonly ITextFileStore _files;
     private readonly IUserPrompt _prompt;
-    private readonly Func<string, Task> _openTextInNewWindow;
+    private readonly Func<string, string?, Task> _openTextInNewWindow;
     private readonly Func<string> _languageModeId;
     private readonly Func<IReadOnlyList<string>> _languageExtensions;
     private readonly PowerShellWarmPool? _warmPool;
     private readonly IUiDispatcher? _dispatcher;
-    private readonly Func<Task<IExternalToolDocument>>? _openStreamedDocument;
+    private readonly Func<string?, Task<IExternalToolDocument>>? _openStreamedDocument;
     private readonly DocumentDiagnostics? _diagnostics;
 
     public ExternalToolController(
@@ -26,7 +26,7 @@ public sealed partial class ExternalToolController
         DocumentController documents,
         ITextFileStore files,
         IUserPrompt prompt,
-        Func<string, Task> openTextInNewWindow,
+        Func<string, string?, Task> openTextInNewWindow,
         Func<string>? languageModeId = null,
         Func<IReadOnlyList<string>>? languageExtensions = null)
     {
@@ -45,12 +45,12 @@ public sealed partial class ExternalToolController
         DocumentController documents,
         ITextFileStore files,
         IUserPrompt prompt,
-        Func<string, Task> openTextInNewWindow,
+        Func<string, string?, Task> openTextInNewWindow,
         Func<string>? languageModeId,
         PowerShellWarmPool? warmPool,
         Func<IReadOnlyList<string>>? languageExtensions = null,
         IUiDispatcher? dispatcher = null,
-        Func<Task<IExternalToolDocument>>? openStreamedDocument = null,
+        Func<string?, Task<IExternalToolDocument>>? openStreamedDocument = null,
         DocumentDiagnostics? diagnostics = null)
         : this(editor, documents, files, prompt, openTextInNewWindow, languageModeId, languageExtensions)
     {
@@ -276,7 +276,7 @@ public sealed partial class ExternalToolController
 
                 return;
             case ExternalToolOutputMode.NewDocument:
-                await _openTextInNewWindow(action.Text);
+                await _openTextInNewWindow(action.Text, action.Language);
                 return;
             case ExternalToolOutputMode.ReloadFile:
                 await ReloadOutputAsync(temporaryFilePath, filePath, cancellationToken);

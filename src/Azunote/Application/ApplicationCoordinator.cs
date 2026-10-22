@@ -321,11 +321,16 @@ internal sealed class ApplicationCoordinator : IDisposable
         ActivateWindow(registration);
     }
 
-    internal async Task OpenTextInNewWindowAsync(string text)
+    internal async Task OpenTextInNewWindowAsync(string text, string? languageId = null)
     {
         ArgumentNullException.ThrowIfNull(text);
         var registration = CreateWindowRegistration();
         await registration.Window.Runtime.OpenStartupTextAsync(text);
+        if (languageId is not null)
+        {
+            registration.Window.Runtime.SelectLanguageMode(languageId);
+        }
+
         ActivateWindow(registration);
     }
 
@@ -333,10 +338,15 @@ internal sealed class ApplicationCoordinator : IDisposable
     /// Opens an empty window and returns the document a streamed external-tool
     /// channel appends to, so its output appears as the tool produces it.
     /// </summary>
-    internal async Task<IExternalToolDocument> OpenStreamedTextInNewWindowAsync()
+    internal async Task<IExternalToolDocument> OpenStreamedTextInNewWindowAsync(string? languageId = null)
     {
         var registration = CreateWindowRegistration();
         await registration.Window.Runtime.OpenStartupTextAsync(string.Empty);
+        if (languageId is not null)
+        {
+            registration.Window.Runtime.SelectLanguageMode(languageId);
+        }
+
         ActivateWindow(registration);
         return registration.Window.Runtime.CreateStreamedDocument();
     }

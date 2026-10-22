@@ -389,7 +389,7 @@ public sealed class DocumentWorkflowTests
             var workflow = new DocumentWorkflow(
                 editor,
                 documents,
-                new ExternalToolController(editor, documents, files, prompt, _ => Task.CompletedTask),
+                new ExternalToolController(editor, documents, files, prompt, (_, _) => Task.CompletedTask),
                 new FakeFileDialogService { OpenPath = path },
                 new DefaultFileChangeMonitorFactory(),
                 new FakeUiDispatcher(),
@@ -567,7 +567,7 @@ public sealed class DocumentWorkflowTests
             documents,
             files,
             prompt,
-            _ => Task.CompletedTask);
+            (_, _) => Task.CompletedTask);
         var modes = LanguageModeCatalog.Create();
         return new DocumentWorkflow(
             editor,

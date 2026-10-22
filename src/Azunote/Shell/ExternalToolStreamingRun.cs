@@ -44,7 +44,7 @@ public sealed partial class ExternalToolController
                 {
                     ExternalToolOutputMode.ReplaceDocument => new EditorStreamTarget(this, selection, wholeDocument: true),
                     ExternalToolOutputMode.ReplaceSelection => new EditorStreamTarget(this, selection, wholeDocument: false),
-                    ExternalToolOutputMode.NewDocument => new NewDocumentStreamTarget(this),
+                    ExternalToolOutputMode.NewDocument => new NewDocumentStreamTarget(this, actions.OnSuccessLanguage),
                     ExternalToolOutputMode.ShowPromptResponse => new PromptResponseStreamTarget(
                         this,
                         conversationKey),
@@ -394,10 +394,15 @@ public sealed partial class ExternalToolController
         private sealed class NewDocumentStreamTarget : StreamTarget
         {
             private readonly ExternalToolStreamingRun _run;
+            private readonly string? _language;
             private readonly System.Text.StringBuilder _collected = new();
             private IExternalToolDocument? _document;
 
-            public NewDocumentStreamTarget(ExternalToolStreamingRun run) => _run = run;
+            public NewDocumentStreamTarget(ExternalToolStreamingRun run, string? language)
+            {
+                _run = run;
+                _language = language;
+            }
 
             public override async Task AppendAsync(string text)
             {
@@ -407,7 +412,7 @@ public sealed partial class ExternalToolController
                     return;
                 }
 
-                _document ??= await _run._owner._openStreamedDocument();
+                _document ??= await _run._owner._openStreamedDocument(_language);
                 _document.Append(text);
             }
 
@@ -421,7 +426,7 @@ public sealed partial class ExternalToolController
 
                 if (_collected.Length > 0)
                 {
-                    await _run._owner._openTextInNewWindow(_collected.ToString());
+                    await _run._owner._openTextInNewWindow(_collected.ToString(), _language);
                 }
             }
         }

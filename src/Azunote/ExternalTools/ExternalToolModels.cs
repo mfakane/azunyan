@@ -140,12 +140,21 @@ public sealed record ExternalToolInputPart(
     string Value,
     IReadOnlyDictionary<string, string>? Captures = null);
 
+/// <summary>
+/// The actions for a zero and a non-zero exit. A <c>newDocument</c> action can
+/// name the language mode its window opens in, as <c>newDocument:diff</c>.
+/// </summary>
 public sealed record ExternalToolOutputActions(
     ExternalToolOutputMode OnSuccess,
-    ExternalToolOutputMode OnFailure)
+    ExternalToolOutputMode OnFailure,
+    string? OnSuccessLanguage = null,
+    string? OnFailureLanguage = null)
 {
     public ExternalToolOutputMode Select(bool succeeded) =>
         succeeded ? OnSuccess : OnFailure;
+
+    public string? SelectLanguage(bool succeeded) =>
+        succeeded ? OnSuccessLanguage : OnFailureLanguage;
 
     public static ExternalToolOutputActions Ignore { get; } =
         new(ExternalToolOutputMode.Ignore, ExternalToolOutputMode.Ignore);
@@ -358,6 +367,8 @@ public sealed record ExternalToolDefinition
             {
                 writer.Write((int)actions.OnSuccess);
                 writer.Write((int)actions.OnFailure);
+                WriteString(actions.OnSuccessLanguage);
+                WriteString(actions.OnFailureLanguage);
             }
 
             WriteString(FileName);

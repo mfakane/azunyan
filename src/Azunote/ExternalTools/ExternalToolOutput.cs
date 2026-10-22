@@ -13,7 +13,8 @@ public enum ExternalToolOutputChannel
 public sealed record ExternalToolOutputAction(
     ExternalToolOutputChannel Stream,
     ExternalToolOutputMode Mode,
-    string Text);
+    string Text,
+    string? Language = null);
 
 public sealed record ExternalToolOutput(
     IReadOnlyList<ExternalToolOutputAction> Actions)
@@ -59,7 +60,8 @@ public static partial class ExternalToolOutputInterpreter
                 ExternalToolStreaming.Streams(definition.Stream, channel)
                     ? ExternalToolOutputMode.Ignore
                     : actions.Select(result.Succeeded),
-                text);
+                text,
+                actions.SelectLanguage(result.Succeeded));
 
         var actions = new[]
         {

@@ -35,7 +35,7 @@ public sealed class ExternalToolControllerTests
                 documents,
                 files,
                 prompt,
-                _ => Task.CompletedTask);
+                (_, _) => Task.CompletedTask);
 
             var result = await controller.RunAsync(
                 new ExternalToolDefinition(
@@ -86,7 +86,7 @@ public sealed class ExternalToolControllerTests
                 documents,
                 files,
                 prompt,
-                _ => Task.CompletedTask);
+                (_, _) => Task.CompletedTask);
             var definition = new ExternalToolDefinition(
                 scriptPath,
                 stdout: new ExternalToolOutputActions(
@@ -160,7 +160,7 @@ public sealed class ExternalToolControllerTests
                 documents,
                 files,
                 prompt,
-                _ => Task.CompletedTask,
+                (_, _) => Task.CompletedTask,
                 languageModeId: null,
                 warmPool: null,
                 diagnostics: diagnostics);
@@ -214,15 +214,17 @@ public sealed class ExternalToolControllerTests
             var files = new FakeTextFileStore();
             var prompt = new FakeUserPrompt();
             var openedText = string.Empty;
+            string? openedLanguage = null;
             var documents = new DocumentController(editor, session, files, prompt);
             var controller = new ExternalToolController(
                 editor,
                 documents,
                 files,
                 prompt,
-                text =>
+                (text, language) =>
                 {
                     openedText = text;
+                    openedLanguage = language;
                     return Task.CompletedTask;
                 });
 
@@ -231,11 +233,13 @@ public sealed class ExternalToolControllerTests
                     scriptPath,
                     stderr: new ExternalToolOutputActions(
                         ExternalToolOutputMode.Ignore,
-                        ExternalToolOutputMode.NewDocument)));
+                        ExternalToolOutputMode.NewDocument,
+                        OnFailureLanguage: "diff")));
 
             Assert.Equal(3, result.ExitCode);
             Assert.Equal("before", editor.Text);
             Assert.Equal("external failure", openedText.Trim());
+            Assert.Equal("diff", openedLanguage);
             Assert.Empty(prompt.Errors);
         }
         finally
@@ -276,7 +280,7 @@ public sealed class ExternalToolControllerTests
                 documents,
                 files,
                 prompt,
-                _ => Task.CompletedTask);
+                (_, _) => Task.CompletedTask);
 
             var result = await controller.RunAsync(
                 new ExternalToolDefinition(
@@ -330,7 +334,7 @@ public sealed class ExternalToolControllerTests
                 documents,
                 files,
                 prompt,
-                _ => Task.CompletedTask);
+                (_, _) => Task.CompletedTask);
             var definition = new ExternalToolDefinition(
                 scriptPath,
                 stdout: new ExternalToolOutputActions(
@@ -385,12 +389,12 @@ public sealed class ExternalToolControllerTests
                 documents,
                 files,
                 prompt,
-                _ => throw new InvalidOperationException("The streamed window should have been used."),
+                (_, _) => throw new InvalidOperationException("The streamed window should have been used."),
                 languageModeId: null,
                 warmPool: null,
                 languageExtensions: null,
                 dispatcher: null,
-                openStreamedDocument: () => Task.FromResult<IExternalToolDocument>(streamed));
+                openStreamedDocument: _ => Task.FromResult<IExternalToolDocument>(streamed));
 
             var result = await controller.RunAsync(
                 new ExternalToolDefinition(
@@ -442,7 +446,7 @@ public sealed class ExternalToolControllerTests
                 documents,
                 files,
                 prompt,
-                _ => Task.CompletedTask);
+                (_, _) => Task.CompletedTask);
 
             editor.SetSelection(new TextSelection(4, 7));
             var result = await controller.RunAsync(
@@ -488,7 +492,7 @@ public sealed class ExternalToolControllerTests
             documents,
             files,
             prompt,
-            _ => Task.CompletedTask,
+            (_, _) => Task.CompletedTask,
             languageModeId: null,
             warmPool: null,
             languageExtensions: null,

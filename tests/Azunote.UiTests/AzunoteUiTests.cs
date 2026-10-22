@@ -726,6 +726,26 @@ public sealed class AzunoteUiTests : IDisposable
         }
     }
 
+    [AzunoteUiFact]
+    public void A_patch_file_opens_in_the_diff_mode()
+    {
+        var root = Directory.CreateTempSubdirectory("azunote-diff-");
+        var document = Path.Combine(root.FullName, "change.patch");
+        File.WriteAllText(document, "--- a/x\n+++ b/x\n@@ -1 +1 @@\n-old\n+new\n");
+        using var fixture = new AzunoteUiFixture(document);
+        try
+        {
+            var window = fixture.Window;
+            AzunoteUiFixture.WaitFor(
+                () => FindByAutomationId(window, "LanguageModeStatus") is { Current.Name: "Diff" } status ? status : null,
+                "The patch did not open in the Diff mode.");
+        }
+        finally
+        {
+            root.Delete(recursive: true);
+        }
+    }
+
     private static AutomationElement? FindByAutomationId(AutomationElement window, string id) =>
         window.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.AutomationIdProperty, id));
 

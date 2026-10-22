@@ -31,6 +31,8 @@ public static class BuiltInSyntaxLanguages
 
     public static SyntaxLanguageDefinition PowerShell => CreatePowerShell();
 
+    public static SyntaxLanguageDefinition Diff => CreateDiff();
+
     public static IReadOnlyList<SyntaxLanguageDefinition> All =>
     [
         CSharp,
@@ -42,7 +44,8 @@ public static class BuiltInSyntaxLanguages
         Yaml,
         Toml,
         Markdown,
-        PowerShell
+        PowerShell,
+        Diff
     ];
 
     private static SyntaxLanguageDefinition CreateCSharp()
@@ -211,6 +214,26 @@ public static class BuiltInSyntaxLanguages
             new LineRemainderSyntaxRule("# ", "heading", requireLineStart: true)
         ],
         CommonCompletionTriggers);
+
+    /// <summary>
+    /// A unified diff, as <c>git diff</c> and <c>diff -u</c> print it. Lines
+    /// are classified by their first character, the file headers first so
+    /// that <c>---</c> and <c>+++</c> are not taken for removed and added
+    /// lines.
+    /// </summary>
+    private static SyntaxLanguageDefinition CreateDiff() =>
+        new("diff", "Diff", [".diff", ".patch"],
+        [
+            new RegexSyntaxRule(
+                @"(?m)^(?:diff |index |--- |\+\+\+ |new file mode |deleted file mode |old mode |new mode |similarity index |rename from |rename to |Binary files ).*$",
+                "heading"),
+            new RegexSyntaxRule(@"(?m)^@@.*$", "keyword"),
+            new RegexSyntaxRule(@"(?m)^\+.*$", SyntaxClassifications.Inserted),
+            new RegexSyntaxRule(@"(?m)^-.*$", SyntaxClassifications.Deleted),
+            new RegexSyntaxRule(@"(?m)^\\.*$", "comment")
+        ],
+        [],
+        foldingProvider: new DiffFoldingProvider());
 
     private static SyntaxLanguageDefinition CreatePowerShell()
     {
