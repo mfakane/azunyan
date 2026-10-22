@@ -1,5 +1,4 @@
 name = "Check JSON"
-menus = ["tools", "context"]
 visibility = "whenAvailable"
 
 [launch]

@@ -1,5 +1,4 @@
 name = "Check PowerShell Syntax"
-menus = ["tools", "context"]
 visibility = "whenAvailable"
 
 [launch]

@@ -1,5 +1,4 @@
 name = "Insert GUID"
-menus = ["tools", "context"]
 visibility = "whenAvailable"
 
 [launch]

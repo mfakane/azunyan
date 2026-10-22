@@ -1,6 +1,5 @@
 name = "Insert Date/Time"
 shortcut = "F5"
-menus = ["tools", "context"]
 visibility = "whenAvailable"
 
 [launch]

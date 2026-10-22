@@ -1,5 +1,4 @@
 name = "Check XML"
-menus = ["tools", "context"]
 visibility = "whenAvailable"
 
 [launch]

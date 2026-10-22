@@ -1,6 +1,5 @@
 name = "Trim Trailing Whitespace"
 shortcut = "Ctrl+Alt+W"
-menus = ["tools", "context"]
 visibility = "whenAvailable"
 
 [launch]

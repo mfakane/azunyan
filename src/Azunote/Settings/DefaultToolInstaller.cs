@@ -23,14 +23,19 @@ internal static class DefaultToolInstaller
 {
     public const string RecordFileName = "default-tools.toml";
 
-    // Earlier bundled versions, by path, for files installed before the record
-    // existed: such a file still holding one of these was never changed, so it
-    // is updated. Later versions are tracked by the record and need no entry.
+    // The versions released before Azunote kept the record, by path, for the
+    // files they installed: such a file still holding one of these was never
+    // changed, so it is updated. Versions released with the record are tracked
+    // by it and need no entry here.
     private static readonly Dictionary<string, string[]> EarlierVersionHashes = new(StringComparer.Ordinal)
     {
         ["Edit/SortSelectedLines.tool.toml"] =
         [
             "45a8502921ac781661681ae28def8d0e52cfd83b00c89df8943378a363e601c2"
+        ],
+        ["Format/Whitespace.tool.toml"] =
+        [
+            "ba62145555e0b7995ef7ad60219c4b02e92290057834096a72ea4eeb4ee821e8"
         ],
         ["Format/Prettier.tool.toml"] =
         [
