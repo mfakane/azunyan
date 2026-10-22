@@ -5,6 +5,20 @@ namespace Azunote.Tests;
 
 public sealed class DocumentSessionTests
 {
+    [Fact]
+    public void Untitled_text_marked_read_only_has_nothing_to_save()
+    {
+        var session = new DocumentSession();
+        session.SetUntitled("diff text", TextEncodingKind.Utf8, LineEndingKind.Lf);
+        Assert.True(session.State.IsDirty);
+
+        session.MarkReadOnly("diff text");
+
+        Assert.True(session.State.IsReadOnly);
+        Assert.False(session.State.IsDirty);
+        Assert.Null(session.State.FilePath);
+    }
+
     [Theory]
     [InlineData("a\r\nb\rc\n", "a\nb\nc\n", true)]
     [InlineData("a\nb\nc\n", "a\r\nb\rc\n", true)]

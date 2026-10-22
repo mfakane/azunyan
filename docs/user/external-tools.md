@@ -73,6 +73,7 @@ of a tool's Tools-menu item opens its file:
 | Check JSON, Check XML | `diagnostics`; Check JSON also `[when].executable` |
 | Format Markdown Table | A `.tool` folder whose `manifest.toml` runs a script beside it through `${toolFolder}` |
 | Prettier, dotnet format | `command` and `args` with `reloadFile` |
+| Prettier (Preview) | `proposeDocument`, formatting from standard input as a change to apply or discard |
 | ConvertFrom-Json \| ConvertTo-Json | `priority`, sharing Alt+Shift+F with Prettier |
 | Run Batch File, Run Python Script | `cmd` and `command`, streaming `output` into a new window, with `[when].patterns` and `document = "clean"` |
 | Blame File, File History | `newDocument`, with `[when].exists = ".git"` |
@@ -367,7 +368,8 @@ after the tool finishes.
 An array is ordered `[zero-exit-action, non-zero-exit-action]`; a single action
 is used for both exit statuses. All three fields support `ignore`,
 `replaceDocument`, `replaceSelection`, `newDocument`, `reloadFile`,
-`showCompletion`, `showPromptResponse`, and `diagnostics`.
+`showCompletion`, `showPromptResponse`, `diagnostics`, `proposeDocument`, and
+`proposeSelection`.
 
 `newDocument` opens the output in a new window, in Plain Text unless a
 language mode follows it: `newDocument:diff` opens it in the Diff mode. An id
@@ -378,6 +380,10 @@ no selection it inserts the output at the caret and leaves the caret after it,
 as typing would.
 
 `diagnostics` reads the output as [problems](#problems) in the document.
+
+`proposeDocument` and `proposeSelection` offer the output as a
+[proposed change](#proposed-changes) to the document or the selection instead
+of applying it.
 
 `showCompletion` treats each non-empty output line as one completion candidate
 and opens the completion window. Empty and whitespace-only lines are ignored.
@@ -444,6 +450,22 @@ none clears them; problems from other tools stay. Editing moves the problems
 after the edit along and drops the ones whose text it changes, and opening
 another file clears them all. A run is dropped when the document was edited
 while the tool ran.
+
+## Proposed changes
+
+`proposeDocument` and `proposeSelection` compare the output with the text the
+tool read, the whole document or the selection, and open the difference as a
+unified diff in a new read-only window in the Diff mode. The bar above it names
+the tool and the document: Apply replaces that text with the output and closes
+the window, while Discard, or closing the window, leaves the document as it is.
+When the output is the same as the text, a message says there is no change
+instead.
+
+The document can be edited while the tool runs and while the diff is open.
+Edits before the selection move the change along and edits after it do not
+matter, but once the text the tool read has been edited, which for
+`proposeDocument` is any edit, Apply reports that and changes nothing. Closing
+the document's window closes the windows of its proposed changes.
 
 ## Streaming output
 

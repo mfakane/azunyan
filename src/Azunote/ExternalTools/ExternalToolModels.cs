@@ -38,7 +38,9 @@ public enum ExternalToolOutputMode
     ReloadFile,
     ShowCompletion,
     ShowPromptResponse,
-    Diagnostics
+    Diagnostics,
+    ProposeDocument,
+    ProposeSelection
 }
 
 public sealed record ExternalToolPer(

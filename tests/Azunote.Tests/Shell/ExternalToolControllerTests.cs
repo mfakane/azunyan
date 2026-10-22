@@ -191,6 +191,75 @@ public sealed class ExternalToolControllerTests
     }
 
     [Fact]
+    public async Task A_proposed_selection_is_applied_where_the_selection_moved_unless_it_was_edited()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var root = Path.Combine(Path.GetTempPath(), $"azunote external controller proposal {Guid.NewGuid():N}");
+        var scriptPath = Path.Combine(root, "upper.cmd");
+        try
+        {
+            Directory.CreateDirectory(root);
+            await File.WriteAllTextAsync(scriptPath, "@echo off\r\n<nul set /p =TWO\r\nexit /b 0\r\n");
+
+            var editor = new FakeEditorView("one two three");
+            var session = new DocumentSession();
+            var files = new FakeTextFileStore();
+            var prompt = new FakeUserPrompt();
+            var documents = new DocumentController(editor, session, files, prompt);
+            var proposals = new List<ExternalToolProposal>();
+            var controller = new ExternalToolController(
+                editor,
+                documents,
+                files,
+                prompt,
+                (_, _) => Task.CompletedTask,
+                languageModeId: null,
+                warmPool: null,
+                openProposal: proposal =>
+                {
+                    proposals.Add(proposal);
+                    return Task.CompletedTask;
+                });
+            var definition = new ExternalToolDefinition(
+                scriptPath,
+                stdout: new ExternalToolOutputActions(
+                    ExternalToolOutputMode.ProposeSelection,
+                    ExternalToolOutputMode.Ignore));
+
+            editor.SetSelection(new TextSelection(4, 7));
+            await controller.RunAsync(definition, "Upper");
+
+            var proposal = Assert.Single(proposals);
+            Assert.Equal("one two three", editor.Text);
+            Assert.Equal("--- a/Untitled\n+++ b/Untitled\n@@ -1 +1 @@\n-two\n+TWO\n", proposal.Diff);
+            // Typing before the selection moves it; the change follows.
+            editor.Replace(new TextRange(0, 0), ">");
+            Assert.Null(proposal.Apply());
+            Assert.Equal(">one TWO three", editor.Text);
+
+            // Editing inside the selection keeps the change from applying.
+            editor.SetSelection(new TextSelection(9, 14));
+            await controller.RunAsync(definition, "Upper");
+            editor.Replace(new TextRange(10, 1), "x");
+
+            Assert.NotNull(proposals[1].Apply());
+            Assert.Equal(">one TWO txree", editor.Text);
+            Assert.Empty(prompt.Errors);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task Stderr_failure_action_can_open_a_new_document_without_an_error_prompt()
     {
         if (!OperatingSystem.IsWindows())

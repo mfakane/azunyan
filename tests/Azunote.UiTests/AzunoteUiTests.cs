@@ -529,6 +529,55 @@ public sealed class AzunoteUiTests : IDisposable
     }
 
     [AzunoteUiFact]
+    public void A_proposed_change_opens_as_a_diff_and_apply_changes_the_document()
+    {
+        var tools = Path.Combine(Path.GetDirectoryName(AzunoteUiFixture.ResolveExecutablePath())!, "appdata", "tools");
+        Directory.CreateDirectory(tools);
+        var name = "Proposal test " + Guid.NewGuid().ToString("N");
+        var definition = Path.Combine(tools, name + ".tool.toml");
+        File.WriteAllText(definition, $"""
+            name = "{name}"
+            [launch]
+            cmd = "<nul set /p =TWO"
+            input = "selection"
+            stdout = "proposeSelection"
+            """);
+        try
+        {
+            var window = _fixture.Window;
+            var originalHandle = window.Current.NativeWindowHandle;
+            AzunoteUiFixture.OpenMenu(window, "Tools");
+            AzunoteUiFixture.WaitForElement(window, AutomationElement.NameProperty, name);
+            AzunoteUiFixture.CloseMenu(window, "Tools");
+
+            var editor = _fixture.Editor;
+            AzunoteUiFixture.WaitForValuePattern(editor).SetValue("one two");
+            var textPattern = AzunoteUiFixture.WaitForTextPattern(editor);
+            AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "one two");
+            textPattern.DocumentRange.FindText("two", false, false)!.Select();
+            AzunoteUiFixture.InvokeMenuItem(window, "Tools", name);
+
+            var proposal = _fixture.WaitForWindows(windows => windows.Length >= 2)
+                .First(candidate => candidate.Current.NativeWindowHandle != originalHandle);
+            AzunoteUiFixture.WaitForDocumentText(
+                AzunoteUiFixture.WaitForTextPattern(
+                    AzunoteUiFixture.WaitForElement(proposal, AutomationElement.NameProperty, "Document editor")),
+                text => text.Contains("-two\n+TWO", StringComparison.Ordinal));
+            Assert.Contains("[READONLY]", proposal.Current.Name, StringComparison.Ordinal);
+            ((InvokePattern)AzunoteUiFixture.WaitForElement(proposal, AutomationElement.NameProperty, "Apply")
+                .GetCurrentPattern(InvokePattern.Pattern)).Invoke();
+
+            AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "one TWO");
+            _fixture.WaitForWindows(windows => windows.Length == 1);
+        }
+        finally
+        {
+            _fixture.Dispose();
+            File.Delete(definition);
+        }
+    }
+
+    [AzunoteUiFact]
     public void Replace_all_in_selection_is_undone_in_one_step()
     {
         var window = _fixture.Window;
@@ -644,6 +693,11 @@ public sealed class AzunoteUiTests : IDisposable
 
         try
         {
+            // The default tools load after the window opens.
+            AzunoteUiFixture.OpenMenu(_fixture.Window, "Tools");
+            AzunoteUiFixture.WaitForElement(_fixture.Window, AutomationElement.NameProperty, "Insert");
+            AzunoteUiFixture.CloseMenu(_fixture.Window, "Tools");
+
             editorValue.SetValue("at ");
             var textPattern = AzunoteUiFixture.WaitForTextPattern(editor);
             AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "at ");

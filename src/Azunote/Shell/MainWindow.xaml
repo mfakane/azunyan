@@ -469,6 +469,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -978,9 +979,32 @@
             IsHitTestVisible="False"
             Visibility="Collapsed"
         />
+        <!--
+            Shown in a window opened for a change a tool proposes: Apply puts
+            the change into the document the tool ran on.
+        -->
+        <InfoBar
+            x:Name="ProposalBar"
+            Grid.Row="1"
+            IsOpen="False"
+            IsClosable="False"
+            Severity="Informational"
+            Title="Proposed change"
+        >
+            <InfoBar.Content>
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
+                    <Button
+                        Content="Apply"
+                        Style="{StaticResource AccentButtonStyle}"
+                        Click="ApplyProposalButton_Click"
+                    />
+                    <Button Content="Discard" Click="DiscardProposalButton_Click" />
+                </StackPanel>
+            </InfoBar.Content>
+        </InfoBar>
         <Border
             x:Name="FindReplacePanel"
-            Grid.Row="1"
+            Grid.Row="2"
             HorizontalAlignment="Center"
             Margin="0,8,0,0"
             BorderThickness="0,0,0,1"
@@ -1187,7 +1211,7 @@
             </Grid>
         </Border>
         <Border
-            Grid.Row="2"
+            Grid.Row="3"
             BorderThickness="0,1"
             BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
         >
@@ -1208,7 +1232,7 @@
         </Border>
         <Border
             x:Name="StatusBarPanel"
-            Grid.Row="3"
+            Grid.Row="4"
             Padding="12,6"
             Visibility="{x:Bind ViewModel.StatusBarVisibility, Mode=OneWay}"
         >
@@ -1312,7 +1336,7 @@
         -->
         <Border
             x:Name="CommandPalettePanel"
-            Grid.Row="1"
+            Grid.Row="2"
             Grid.RowSpan="2"
             Width="560"
             Margin="16,8,16,0"

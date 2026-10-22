@@ -51,7 +51,8 @@ internal sealed class MainWindowRuntime : IDisposable
         DocumentSession? session = null,
         Document? document = null,
         Func<string, Task>? openFileRequest = null,
-        Func<string?, Task<IExternalToolDocument>>? openStreamedTextInNewWindow = null)
+        Func<string?, Task<IExternalToolDocument>>? openStreamedTextInNewWindow = null,
+        Func<ExternalToolProposal, Task>? openProposal = null)
     {
         _window = window ?? throw new ArgumentNullException(nameof(window));
         _view = new MainWindow.ViewBoundary(window);
@@ -97,7 +98,8 @@ internal sealed class MainWindowRuntime : IDisposable
             () => _languageModes.CurrentModeFileExtensions,
             _dispatcher,
             openStreamedTextInNewWindow,
-            _diagnostics);
+            _diagnostics,
+            openProposal);
 
         _documents = new DocumentWorkflow(
             _view,
@@ -591,6 +593,9 @@ internal sealed class MainWindowRuntime : IDisposable
             _status.Refresh();
         }
     }
+
+    /// <summary>Makes the document read-only text with nothing to save.</summary>
+    internal void MarkReadOnly() => _session.MarkReadOnly(_view.Text);
 
     /// <summary>Shows the document in a language mode, if one has this id.</summary>
     internal void SelectLanguageMode(string id) => _languageModes.SelectManually(id);

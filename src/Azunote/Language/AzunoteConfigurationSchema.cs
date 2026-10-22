@@ -238,7 +238,7 @@ public static class AzunoteSchemaCatalog
         new(
             name,
             AzunoteSchemaValueKind.Enum,
-            AllowedValues: ["ignore", "replaceDocument", "replaceSelection", "newDocument", "reloadFile", "showCompletion", "showPromptResponse", "diagnostics"],
+            AllowedValues: ["ignore", "replaceDocument", "replaceSelection", "newDocument", "reloadFile", "showCompletion", "showPromptResponse", "diagnostics", "proposeDocument", "proposeSelection"],
             Documentation: "An action or [zero-action, non-zero-action]. newDocument:<language> opens the window in that language mode, such as newDocument:diff.");
 
     private static AzunoteSchemaField EnumField(

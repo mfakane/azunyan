@@ -20,6 +20,7 @@ public sealed partial class ExternalToolController
     private readonly IUiDispatcher? _dispatcher;
     private readonly Func<string?, Task<IExternalToolDocument>>? _openStreamedDocument;
     private readonly DocumentDiagnostics? _diagnostics;
+    private readonly Func<ExternalToolProposal, Task>? _openProposal;
 
     public ExternalToolController(
         IEditorBuffer editor,
@@ -51,13 +52,15 @@ public sealed partial class ExternalToolController
         Func<IReadOnlyList<string>>? languageExtensions = null,
         IUiDispatcher? dispatcher = null,
         Func<string?, Task<IExternalToolDocument>>? openStreamedDocument = null,
-        DocumentDiagnostics? diagnostics = null)
+        DocumentDiagnostics? diagnostics = null,
+        Func<ExternalToolProposal, Task>? openProposal = null)
         : this(editor, documents, files, prompt, openTextInNewWindow, languageModeId, languageExtensions)
     {
         _warmPool = warmPool;
         _dispatcher = dispatcher;
         _openStreamedDocument = openStreamedDocument;
         _diagnostics = diagnostics;
+        _openProposal = openProposal;
     }
 
     public async Task<ExternalToolResult> RunAsync(
@@ -73,6 +76,15 @@ public sealed partial class ExternalToolController
         var selection = editorSnapshot.Selection;
         var filePath = _documents.Session.State.FilePath;
         string? temporaryFilePath = null;
+        // The text a proposal would replace is followed from the start, so
+        // edits made while the tool runs are accounted for.
+        var proposedDocument = Proposes(definition, ExternalToolOutputMode.ProposeDocument)
+            ? new TrackedTextRange(_editor, new TextRange(0, editorSnapshot.Text.Length), wholeDocument: true)
+            : null;
+        var proposedSelection = Proposes(definition, ExternalToolOutputMode.ProposeSelection)
+            ? new TrackedTextRange(_editor, selection.Range, wholeDocument: false)
+            : null;
+        var proposed = false;
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -176,6 +188,18 @@ public sealed partial class ExternalToolController
 
                 foreach (var action in output.Actions)
                 {
+                    if (action.Mode is ExternalToolOutputMode.ProposeDocument or ExternalToolOutputMode.ProposeSelection)
+                    {
+                        var wholeDocument = action.Mode == ExternalToolOutputMode.ProposeDocument;
+                        proposed |= await ProposeAsync(
+                            action.Text,
+                            wholeDocument ? editorSnapshot.Text : editorSnapshot.SelectedText,
+                            wholeDocument ? 1 : editorSnapshot.SelectionStart.Line + 1,
+                            (wholeDocument ? proposedDocument : proposedSelection)!,
+                            inlineTitle);
+                        continue;
+                    }
+
                     await ApplyOutputActionAsync(
                         action,
                         selection,
@@ -221,7 +245,60 @@ public sealed partial class ExternalToolController
             }
 
             DeleteTemporaryFile(temporaryFilePath);
+            if (!proposed)
+            {
+                proposedDocument?.Dispose();
+                proposedSelection?.Dispose();
+            }
         }
+    }
+
+    private static bool Proposes(ExternalToolDefinition definition, ExternalToolOutputMode mode) =>
+        new[] { definition.Output, definition.Stdout, definition.Stderr }
+            .Any(actions => actions.OnSuccess == mode || actions.OnFailure == mode);
+
+    /// <summary>
+    /// Opens the diff from the text the tool read to what it printed, to be
+    /// applied or discarded there. Returns whether one was opened; the range
+    /// it would replace is then followed until the proposal is done with.
+    /// </summary>
+    private async Task<bool> ProposeAsync(
+        string proposedText,
+        string originalText,
+        int firstLine,
+        TrackedTextRange range,
+        string source)
+    {
+        var name = _documents.Session.State.FilePath is { } path ? Path.GetFileName(path) : "Untitled";
+        var diff = UnifiedDiff.Create(originalText, proposedText, "a/" + name, "b/" + name, firstLine);
+        if (diff.Length == 0)
+        {
+            await _prompt.ShowErrorAsync("No changes", $"{source} proposed no change to {name}.");
+            return false;
+        }
+
+        if (_openProposal is null)
+        {
+            return false;
+        }
+
+        await _openProposal(new ExternalToolProposal(
+            $"{source} proposes a change to {name}.",
+            diff,
+            () =>
+            {
+                if (range.IsChanged)
+                {
+                    return "The text it would replace was edited after the tool ran.";
+                }
+
+                _editor.Replace(range.Range, proposedText);
+                _documents.Session.ObserveText(_editor.Text);
+                range.Dispose();
+                return null;
+            },
+            range.Dispose));
+        return true;
     }
 
     private static string ResolvePromptTitle(
@@ -255,6 +332,8 @@ public sealed partial class ExternalToolController
         {
             case ExternalToolOutputMode.Ignore:
             case ExternalToolOutputMode.Diagnostics:
+            case ExternalToolOutputMode.ProposeDocument:
+            case ExternalToolOutputMode.ProposeSelection:
                 return;
             case ExternalToolOutputMode.ReplaceDocument:
                 _editor.Replace(new TextRange(0, _editor.Text.Length), action.Text);

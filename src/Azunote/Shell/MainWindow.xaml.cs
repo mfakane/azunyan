@@ -22,6 +22,7 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     private readonly MainWindowRuntime _runtime;
     private AppWindow? _appWindow;
     private bool _allowClose;
+    private ExternalToolProposal? _proposal;
     private static readonly Dictionary<ExternalToolShortcut, Action<MainWindowRuntime>> EditorCommandShortcuts = new()
     {
         [new(VirtualKey.Up, VirtualKeyModifiers.Menu)] = runtime => runtime.MoveLines(down: false),
@@ -70,7 +71,8 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
             session,
             document,
             path => application.OpenFileAsync(this, path),
-            application.OpenStreamedTextInNewWindowAsync);
+            application.OpenStreamedTextInNewWindowAsync,
+            proposal => application.OpenProposalAsync(this, proposal));
         ViewModel.Attach(this);
         // MenuBarItem does not expose its internal flyout's Opening event.
         // Refresh synchronously on entry so the flyout's first paint is final.
@@ -355,8 +357,40 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         }
     }
 
+    /// <summary>Shows this window's diff as a change to apply or discard.</summary>
+    internal void ShowProposal(ExternalToolProposal proposal)
+    {
+        _proposal = proposal;
+        ProposalBar.Message = proposal.Title;
+        ProposalBar.IsOpen = true;
+    }
+
+    private void ApplyProposalButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_proposal?.Apply() is { } problem)
+        {
+            ProposalBar.Severity = InfoBarSeverity.Error;
+            ProposalBar.Message = problem;
+            return;
+        }
+
+        _proposal = null;
+        CloseWithoutAsking();
+    }
+
+    private void DiscardProposalButton_Click(object sender, RoutedEventArgs e) => CloseWithoutAsking();
+
+    /// <summary>Closes the window, leaving whatever it holds unsaved.</summary>
+    internal void CloseWithoutAsking()
+    {
+        _allowClose = true;
+        _runtime.DiscardBackup();
+        Close();
+    }
+
     private void MainWindow_Closed(object sender, WindowEventArgs args)
     {
+        _proposal?.Discard();
         _application.WindowClosed(this);
         Dispose();
     }

@@ -130,6 +130,18 @@ public sealed class DocumentSession
             IsDirty: !string.IsNullOrEmpty(currentText)));
     }
 
+    /// <summary>
+    /// Makes the document text to read rather than to save: read-only, and
+    /// with no unsaved changes, so closing it neither asks nor keeps a backup.
+    /// </summary>
+    public void MarkReadOnly(string currentText)
+    {
+        ArgumentNullException.ThrowIfNull(currentText);
+        _savedText = NormalizeLineEndings(currentText);
+        _formatChanged = false;
+        Update(_state with { IsDirty = false, IsReadOnly = true });
+    }
+
     public void Load(string fullPath, TextFileData data, bool isReadOnly = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fullPath);

@@ -1,0 +1,20 @@
+name = "Prettier (Preview)"
+visibility = "whenAvailable"
+
+[launch]
+# Prettier prints the formatted document instead of writing the file, and the
+# change opens as a diff to apply or discard.
+command = "prettier"
+path = "${workspaceFolder:package.json}/node_modules/.bin"
+args = ["--stdin-filepath", "${file}"]
+workingDirectory = "${documentDirname}"
+input = "document"
+stdin = "${input}"
+stdout = ["proposeDocument", "ignore"]
+stderr = ["ignore", "newDocument"]
+
+[when]
+extensions = [".js", ".jsx", ".ts", ".tsx", ".json", ".jsonc", ".json5", ".yaml", ".yml", ".md", ".css", ".less", ".scss", ".html", ".htm"]
+
+[env]
+NODE_ENV = "development"

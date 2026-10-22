@@ -8,6 +8,8 @@ internal sealed class ApplicationCoordinator : IDisposable
     private static readonly IEqualityComparer<DocumentSession> DocumentSessionComparer =
         ReferenceEqualityComparer.Instance;
     private readonly WindowRegistry<WindowRegistration> _windows = new();
+    // Each window showing a proposed change, with the window it would change.
+    private readonly Dictionary<MainWindow, MainWindow> _proposalSources = [];
     private readonly Dictionary<DocumentSession, int> _windowGroupAccentIndices =
         new(DocumentSessionComparer);
     private readonly ApplicationStateController _state =
@@ -335,6 +337,24 @@ internal sealed class ApplicationCoordinator : IDisposable
     }
 
     /// <summary>
+    /// Opens a window with the diff of a change a tool proposes for
+    /// <paramref name="source"/>, from which it is applied or discarded. The
+    /// window closes with its source.
+    /// </summary>
+    internal async Task OpenProposalAsync(MainWindow source, ExternalToolProposal proposal)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(proposal);
+        var registration = CreateWindowRegistration();
+        await registration.Window.Runtime.OpenStartupTextAsync(proposal.Diff);
+        registration.Window.Runtime.MarkReadOnly();
+        registration.Window.Runtime.SelectLanguageMode("diff");
+        registration.Window.ShowProposal(proposal);
+        _proposalSources[registration.Window] = source;
+        ActivateWindow(registration);
+    }
+
+    /// <summary>
     /// Opens an empty window and returns the document a streamed external-tool
     /// channel appends to, so its output appears as the tool produces it.
     /// </summary>
@@ -560,6 +580,12 @@ internal sealed class ApplicationCoordinator : IDisposable
 
         var session = window.Runtime.Session;
         _windows.Unregister(registration);
+        _proposalSources.Remove(window);
+        foreach (var proposal in _proposalSources.Where(pair => ReferenceEquals(pair.Value, window)).Select(pair => pair.Key).ToArray())
+        {
+            proposal.CloseWithoutAsking();
+        }
+
         registration.MarkClosed(window.Runtime.CaptureCommandLineOutput());
         var remainingViews = _windows.Windows.Where(candidate =>
             ReferenceEquals(candidate.Window.Runtime.Session, session)).ToArray();
