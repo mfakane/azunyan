@@ -1,0 +1,17 @@
+name = "Format Markdown Table"
+menus = ["tools", "context"]
+visibility = "whenAvailable"
+
+[launch]
+# The script is read as text rather than run as a file, so the execution
+# policy of Windows PowerShell does not stop it. Naming $input hands it every
+# line at once.
+pwsh = '$input | & ([scriptblock]::Create([IO.File]::ReadAllText("${toolFolder}\FormatTable.ps1")))'
+input = "selection"
+stdin = "${input}"
+stdout = ["replaceSelection", "ignore"]
+stderr = ["ignore", "newDocument"]
+
+[when]
+languages = ["markdown"]
+selection = "nonEmpty"

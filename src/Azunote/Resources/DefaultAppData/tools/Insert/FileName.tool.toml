@@ -1,0 +1,12 @@
+name = "Complete File Name"
+visibility = "whenAvailable"
+
+[launch]
+# Lists the document's folder as completion candidates, folders ending in /.
+pwsh = 'Get-ChildItem -Force | ForEach-Object { if ($_.PSIsContainer) { $_.Name + "/" } else { $_.Name } }'
+workingDirectory = "${documentDirname}"
+stdout = "showCompletion"
+stderr = ["ignore", "newDocument"]
+
+[when]
+file = "backed"

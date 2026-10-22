@@ -52,12 +52,30 @@ Invalid definitions are reported and do not replace the last valid tool menu.
 
 ## Default tools
 
-Azunote ships tools for common edits, insertions, checks, formatting, and Git
-under `Edit`, `Insert`, `Check`, `Format`, and `Git`, and brings them up to
-date in the tools folder each time it starts. Insert Date/Time (F5) inserts the
-current date and time as `2026-10-22 14:30`. The `Check` tools report the
-[problems](#problems) in PowerShell, JSON, and XML documents; Check JSON needs
-PowerShell 7 (`pwsh.exe`) and is hidden without it.
+Azunote ships tools for common edits, insertions, checks, formatting, running
+scripts, and Git under `Edit`, `Insert`, `Check`, `Format`, `Run`, and `Git`,
+and brings them up to date in the tools folder each time it starts. Insert
+Date/Time (F5) inserts the current date and time as `2026-10-22 14:30`. The
+`Check` tools report the [problems](#problems) in PowerShell, JSON, and XML
+documents. Check JSON and Run PowerShell Script need PowerShell 7 (`pwsh.exe`)
+and are hidden without it.
+
+The default tools double as examples of the definition format; the `...` area
+of a tool's Tools-menu item opens its file:
+
+| Tool | Shows |
+| --- | --- |
+| Sort Selected Lines, Join Lines | `pwsh` with `input = "selection"` and `replaceSelection` |
+| Trim Trailing Whitespace | `replaceDocument` and a `shortcut` |
+| Insert Date/Time, Insert GUID | A tool without input that inserts at the caret |
+| Calculate | `input = "prompt:..."` with `showPromptResponse`, a chat that answers each message |
+| Complete File Name | `showCompletion`, with `workingDirectory` |
+| Check JSON, Check XML | `diagnostics`; Check JSON also `[when].executable` |
+| Format Markdown Table | A `.tool` folder whose `manifest.toml` runs a script beside it through `${toolFolder}` |
+| Prettier, dotnet format | `command` and `args` with `reloadFile` |
+| ConvertFrom-Json \| ConvertTo-Json | `priority`, sharing Alt+Shift+F with Prettier |
+| Run Batch File, Run Python Script | `cmd` and `command`, streaming `output` into a new window, with `[when].patterns` and `document = "clean"` |
+| Blame File, File History | `newDocument`, with `[when].exists = ".git"` |
 
 A new default tool is copied in, and an update replaces a default tool's file
 while the file is as Azunote wrote it. A file that has been edited is left as

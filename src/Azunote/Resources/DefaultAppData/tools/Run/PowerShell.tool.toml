@@ -1,0 +1,15 @@
+name = "Run PowerShell Script"
+visibility = "whenAvailable"
+
+[launch]
+# The script is the user's own and is run on request, so the execution policy
+# is bypassed for it.
+command = "pwsh.exe"
+args = ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${file}"]
+output = "newDocument"
+stream = "output"
+
+[when]
+extensions = [".ps1"]
+file = "backed"
+document = "clean"

@@ -1,0 +1,12 @@
+name = "Run Batch File"
+visibility = "whenAvailable"
+
+[launch]
+cmd = '"${file}"'
+output = "newDocument"
+stream = "output"
+
+[when]
+patterns = ["*.bat", "*.cmd"]
+file = "backed"
+document = "clean"

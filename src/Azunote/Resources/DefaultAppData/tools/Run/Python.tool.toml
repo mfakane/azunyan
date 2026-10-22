@@ -1,0 +1,13 @@
+name = "Run Python Script"
+visibility = "whenAvailable"
+
+[launch]
+command = "python"
+args = ["-u", "${file}"]
+output = "newDocument"
+stream = "output"
+
+[when]
+extensions = [".py"]
+file = "backed"
+document = "clean"

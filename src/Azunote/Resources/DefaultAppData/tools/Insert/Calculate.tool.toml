@@ -1,0 +1,10 @@
+name = "Calculate"
+
+[launch]
+# Each message is evaluated as PowerShell, so it takes arithmetic such as
+# 2 * (3 + 4) as well as calls such as [math]::Sqrt(2). Insert in the chat
+# puts an answer into the document.
+pwsh = '&{ Invoke-Expression ($input -join "`n") }'
+input = "prompt:Expression, such as 2 * (3 + 4) or [math]::Sqrt(2)"
+stdin = "${input}"
+output = "showPromptResponse"
