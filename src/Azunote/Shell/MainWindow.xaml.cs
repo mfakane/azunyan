@@ -646,6 +646,11 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
 
     void IMainWindowActions.GoToMatchingBracket() => _runtime.MoveToMatchingBracket();
 
+    void IMainWindowActions.GoToProblem(bool next) => _runtime.GoToProblem(next);
+
+    private void ProblemsStatus_Tapped(object sender, TappedRoutedEventArgs e) =>
+        _runtime.GoToProblem(next: true);
+
     void IMainWindowActions.MoveLines(bool down) => _runtime.MoveLines(down);
 
     void IMainWindowActions.DuplicateLines(bool down) => _runtime.DuplicateLines(down);

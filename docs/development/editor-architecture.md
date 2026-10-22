@@ -230,7 +230,9 @@ such as `./other.md` becomes navigable.
 
 Decorations such as underline, squiggle, background highlight, and diagnostic
 markers are separate drawing primitives. They reuse the glyph hit-test map and
-do not create duplicate text.
+do not create duplicate text. The projected renderer draws a wavy underline
+under decorations of kind `error`, `warning`, and `information`, in the
+`AzunyanColorScheme` underline color for each; other kinds are not drawn.
 
 ### Folding
 

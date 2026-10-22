@@ -1,0 +1,19 @@
+name = "Check PowerShell Syntax"
+menus = ["tools", "context"]
+visibility = "whenAvailable"
+
+[launch]
+pwsh = '''&{
+  $errors = $null
+  [void][System.Management.Automation.Language.Parser]::ParseInput(($input -join "`n"), [ref]$null, [ref]$errors)
+  foreach ($e in $errors) {
+    '-({0},{1},{2},{3}): error: {4}' -f $e.Extent.StartLineNumber, $e.Extent.StartColumnNumber, $e.Extent.EndLineNumber, $e.Extent.EndColumnNumber, $e.Message
+  }
+}'''
+input = "document"
+stdin = "${input}"
+stdout = "diagnostics"
+stderr = ["ignore", "newDocument"]
+
+[when]
+languages = ["powershell"]

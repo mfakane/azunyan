@@ -105,6 +105,11 @@ internal sealed class ExternalToolAvailabilityCache : IDisposable
             () => ExternalToolLaunchResolver.Resolve(command, mode, directory, searchPath));
     }
 
+    public bool Executable(string pattern, string? directory, IReadOnlyList<string>? searchPath) =>
+        Get(("executable", pattern, directory, searchPath is null ? null : string.Join('\0', searchPath),
+                Environment.GetEnvironmentVariable("PATH"), Environment.GetEnvironmentVariable("PATHEXT")),
+            () => ExternalToolLaunchResolver.ExecutableExists(pattern, directory, searchPath));
+
     public void Dispose()
     {
         _cache.Dispose();

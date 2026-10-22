@@ -63,6 +63,8 @@ internal sealed class MainWindowViewModel :
         PasteCommand = Command(() => Actions.Paste());
         SelectAllCommand = Command(() => Actions.SelectAll());
         GoToMatchingBracketCommand = Command(() => Actions.GoToMatchingBracket());
+        GoToNextProblemCommand = Command(() => Actions.GoToProblem(next: true));
+        GoToPreviousProblemCommand = Command(() => Actions.GoToProblem(next: false));
         MoveLineUpCommand = Command(() => Actions.MoveLines(down: false));
         MoveLineDownCommand = Command(() => Actions.MoveLines(down: true));
         CopyLineUpCommand = Command(() => Actions.DuplicateLines(down: false));
@@ -227,6 +229,8 @@ internal sealed class MainWindowViewModel :
     public ICommand PasteCommand { get; }
     public ICommand SelectAllCommand { get; }
     public ICommand GoToMatchingBracketCommand { get; }
+    public ICommand GoToNextProblemCommand { get; }
+    public ICommand GoToPreviousProblemCommand { get; }
     public ICommand MoveLineUpCommand { get; }
     public ICommand MoveLineDownCommand { get; }
     public ICommand CopyLineUpCommand { get; }
@@ -266,6 +270,28 @@ internal sealed class MainWindowViewModel :
     }
 
     public bool CanEdit => !IsReadOnly;
+    public string ErrorCountText { get; private set; } = "0";
+    public string WarningCountText { get; private set; } = "0";
+    public string InformationCountText { get; private set; } = "0";
+    public Visibility ProblemsVisibility { get; private set; } = Visibility.Collapsed;
+
+    /// <summary>The message of the problem at the caret, shown beside the counts.</summary>
+    public string ProblemAtCaret { get; private set; } = string.Empty;
+
+    public void SetProblems(int errors, int warnings, int informations, string? messageAtCaret)
+    {
+        ErrorCountText = errors.ToString(CultureInfo.CurrentCulture);
+        WarningCountText = warnings.ToString(CultureInfo.CurrentCulture);
+        InformationCountText = informations.ToString(CultureInfo.CurrentCulture);
+        ProblemsVisibility = errors + warnings + informations > 0 ? Visibility.Visible : Visibility.Collapsed;
+        ProblemAtCaret = messageAtCaret ?? string.Empty;
+        OnPropertyChanged(nameof(ErrorCountText));
+        OnPropertyChanged(nameof(WarningCountText));
+        OnPropertyChanged(nameof(InformationCountText));
+        OnPropertyChanged(nameof(ProblemsVisibility));
+        OnPropertyChanged(nameof(ProblemAtCaret));
+    }
+
     public int RunningExternalToolCount
     {
         get => _runningExternalToolCount;
@@ -576,6 +602,7 @@ internal interface IMainWindowActions
     void Paste();
     void SelectAll();
     void GoToMatchingBracket();
+    void GoToProblem(bool next);
     void MoveLines(bool down);
     void DuplicateLines(bool down);
     void DeleteLines();

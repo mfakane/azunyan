@@ -1,0 +1,22 @@
+name = "Check XML"
+menus = ["tools", "context"]
+visibility = "whenAvailable"
+
+[launch]
+pwsh = '''&{
+  try {
+    [System.Xml.XmlDocument]::new().LoadXml(($input -join "`n"))
+  } catch {
+    $e = $_.Exception
+    while ($e -and $e -isnot [System.Xml.XmlException]) { $e = $e.InnerException }
+    if (-not $e) { throw }
+    '-:{0}:{1}: error: {2}' -f $e.LineNumber, $e.LinePosition, ($e.Message -replace ' Line \d+, position \d+\.$', '')
+  }
+}'''
+input = "document"
+stdin = "${input}"
+stdout = "diagnostics"
+stderr = ["ignore", "newDocument"]
+
+[when]
+languages = ["xml"]

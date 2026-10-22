@@ -15,7 +15,8 @@ internal sealed class PreparedExternalTool
             new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(
                 new Dictionary<string, string>(definition.Environment, StringComparer.OrdinalIgnoreCase)),
             definition.DefinitionDirectory, definition.CommandMode, definition.Stream,
-            definition.SearchPath, definition.InputPrompt, definition.PreserveChatHistory);
+            definition.SearchPath, definition.InputPrompt, definition.PreserveChatHistory,
+            definition.DiagnosticsPattern);
         Definition.DefinitionPath = definition.DefinitionPath;
         var when = settings.When;
         _conditions = new ExternalToolSettings
@@ -26,7 +27,8 @@ internal sealed class PreparedExternalTool
                 Extensions = [.. when.Extensions], Patterns = [.. when.Patterns],
                 Languages = [.. when.Languages], Os = [.. when.Os],
                 File = when.File, Selection = when.Selection, Document = when.Document,
-                Exists = when.Exists
+                Exists = when.Exists,
+                Executable = when.Executable
             }
         };
     }

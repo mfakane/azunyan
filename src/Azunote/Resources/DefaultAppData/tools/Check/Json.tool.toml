@@ -1,0 +1,25 @@
+name = "Check JSON"
+menus = ["tools", "context"]
+visibility = "whenAvailable"
+
+[launch]
+pwsh = '''&{
+  try {
+    [void][System.Text.Json.JsonDocument]::Parse(($input -join "`n"))
+  } catch {
+    $e = $_.Exception
+    while ($e -and $e -isnot [System.Text.Json.JsonException]) { $e = $e.InnerException }
+    if (-not $e) { throw }
+    '-:{0}:{1}: error: {2}' -f ($e.LineNumber + 1), ($e.BytePositionInLine + 1), ($e.Message -replace ' (Path|LineNumber): .*$', '')
+  }
+}'''
+input = "document"
+stdin = "${input}"
+stdout = "diagnostics"
+stderr = ["ignore", "newDocument"]
+
+[when]
+extensions = [".json"]
+# System.Text.Json needs PowerShell 7; without it, [launch].pwsh falls back to
+# Windows PowerShell.
+executable = "pwsh"

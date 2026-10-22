@@ -52,6 +52,19 @@ public static class ExternalToolAvailability
             definition.DefinitionDirectory,
             invocationContext,
             environment.Values);
+        if (settings.When?.Executable is { Values.Count: > 0 } executable
+            && ExternalToolExists.FirstFailure(
+                executable.Values,
+                name => cache?.Executable(name, definition.DefinitionDirectory, searchPath)
+                    ?? ExternalToolLaunchResolver.ExecutableExists(name, definition.DefinitionDirectory, searchPath))
+                is { } executableFailure)
+        {
+            var reason = $"Executable condition '{executableFailure}' was not met.";
+            return visibility == ExternalToolVisibility.Always
+                ? new ExternalToolMenuState(true, false, reason)
+                : new ExternalToolMenuState(false, false, reason);
+        }
+
         var launchPlan = cache is null ? ExternalToolLaunchResolver.Resolve(
             command,
             definition.CommandMode,

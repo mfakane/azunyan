@@ -231,14 +231,24 @@ public sealed partial class MainWindow
 
     private void ShowCompletion(CompletionResult completions) => _editor.ShowCompletion(completions);
 
+    private DocumentDiagnosticsProvider? _diagnosticsProvider;
+
+    /// <summary>Shows these problems in the editor, whatever language mode it is in.</summary>
+    internal void SetDiagnosticsProvider(DocumentDiagnosticsProvider provider)
+    {
+        _diagnosticsProvider = provider;
+        _editor.Providers.Tooltip = provider;
+        _editor.Providers.Decorations = provider;
+    }
+
     private void ApplyLanguage(EditorLanguageConfiguration configuration)
     {
         _editor.CompletionTriggerCharacters = configuration.CompletionTriggers;
         _editor.Providers.Syntax = configuration.Syntax;
         _editor.Providers.Completion = configuration.Completion;
         _editor.Providers.Folding = configuration.Folding;
-        _editor.Providers.Tooltip = null;
-        _editor.Providers.Decorations = null;
+        _editor.Providers.Tooltip = _diagnosticsProvider;
+        _editor.Providers.Decorations = _diagnosticsProvider;
         _editor.Providers.Gutter = null;
         _editor.Providers.Inlay = null;
         _editor.Providers.BlockAdornment = null;

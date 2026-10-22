@@ -99,6 +99,24 @@ public sealed record AzunyanColorScheme
 
     public Color TooltipBorder { get; init; }
 
+    /// <summary>
+    /// Wavy underline of a decoration whose kind is <c>error</c>,
+    /// <c>warning</c>, or <c>information</c>. Other kinds are not drawn.
+    /// </summary>
+    public Color ErrorUnderline { get; init; } = Color.FromArgb(0xff, 0xe5, 0x14, 0x00);
+
+    public Color WarningUnderline { get; init; } = Color.FromArgb(0xff, 0xbf, 0x88, 0x03);
+
+    public Color InformationUnderline { get; init; } = Color.FromArgb(0xff, 0x1a, 0x85, 0xff);
+
+    internal Color? GetDecorationUnderline(string kind) => kind switch
+    {
+        "error" => ErrorUnderline,
+        "warning" => WarningUnderline,
+        "information" => InformationUnderline,
+        _ => null
+    };
+
     public Color ResolveSyntaxForeground(string? classification)
     {
         if (!string.IsNullOrEmpty(classification)

@@ -97,7 +97,19 @@ internal static class AzunoteSystemColorScheme
             PopupBorder = border,
             TooltipBackground = popupBackground,
             TooltipForeground = foreground,
-            TooltipBorder = border
+            TooltipBorder = border,
+            ErrorUnderline = ThemeColor(
+                isDark,
+                Color.FromArgb(0xff, 0xe5, 0x14, 0x00),
+                Color.FromArgb(0xff, 0xf1, 0x4c, 0x4c)),
+            WarningUnderline = ThemeColor(
+                isDark,
+                Color.FromArgb(0xff, 0xbf, 0x88, 0x03),
+                Color.FromArgb(0xff, 0xcc, 0xa7, 0x00)),
+            InformationUnderline = ThemeColor(
+                isDark,
+                Color.FromArgb(0xff, 0x1a, 0x85, 0xff),
+                Color.FromArgb(0xff, 0x37, 0x94, 0xff))
         };
     }
 

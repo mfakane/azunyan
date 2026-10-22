@@ -132,7 +132,13 @@ public static class AzunoteSchemaCatalog
                         Documentation: "any, empty, nonEmpty, or regex:<pattern>. Compiled when loaded. A selection over 16 KiB, or a match that times out, does not match."),
                     EnumField("document", "any", "clean", "dirty"),
                     Field("os", AzunoteSchemaValueKind.Array, "property"),
-                    Field("exists", AzunoteSchemaValueKind.StringOrArray, documentation: "Path or glob that must exist. Entries are AND; | is OR; ! negates; ./ is the document directory only.")
+                    Field("exists", AzunoteSchemaValueKind.StringOrArray, documentation: "Path or glob that must exist. Entries are AND; | is OR; ! negates; ./ is the document directory only."),
+                    Field("executable", AzunoteSchemaValueKind.StringOrArray, documentation: "Executable that must be found on the tool's path or PATH, such as pwsh. Entries are AND; | is OR; ! negates; * and ? match names.")
+                ]),
+            new AzunoteSchemaTable(
+                "diagnostics",
+                [
+                    Field("pattern", AzunoteSchemaValueKind.String, documentation: "Regex read by the diagnostics action, with (?<line>) and (?<message>) groups and optional file, column, endLine, endColumn, and severity groups. Defaults to the MSBuild and GNU formats.")
                 ]),
             new AzunoteSchemaTable(
                 "env",
@@ -232,7 +238,7 @@ public static class AzunoteSchemaCatalog
         new(
             name,
             AzunoteSchemaValueKind.Enum,
-            AllowedValues: ["ignore", "replaceDocument", "replaceSelection", "newDocument", "reloadFile", "showCompletion", "showPromptResponse"],
+            AllowedValues: ["ignore", "replaceDocument", "replaceSelection", "newDocument", "reloadFile", "showCompletion", "showPromptResponse", "diagnostics"],
             Documentation: "An action or [zero-action, non-zero-action].");
 
     private static AzunoteSchemaField EnumField(

@@ -37,7 +37,8 @@ public enum ExternalToolOutputMode
     NewDocument,
     ReloadFile,
     ShowCompletion,
-    ShowPromptResponse
+    ShowPromptResponse,
+    Diagnostics
 }
 
 public sealed record ExternalToolPer(
@@ -240,7 +241,8 @@ public sealed record ExternalToolDefinition
         ExternalToolStreamChannels stream = ExternalToolStreamChannels.None,
         IReadOnlyList<string>? searchPath = null,
         string? inputPrompt = null,
-        bool preserveChatHistory = false)
+        bool preserveChatHistory = false,
+        string? diagnosticsPattern = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
         if (commandMode is not ExternalToolCommandMode.Executable
@@ -259,6 +261,7 @@ public sealed record ExternalToolDefinition
             ? "Type something"
             : inputPrompt;
         PreserveChatHistory = preserveChatHistory;
+        DiagnosticsPattern = string.IsNullOrWhiteSpace(diagnosticsPattern) ? null : diagnosticsPattern;
         Per = ExternalToolPer.Parse(per);
         Stdin = stdin ?? string.Empty;
         Output = output ?? ExternalToolOutputActions.Ignore;
@@ -294,6 +297,12 @@ public sealed record ExternalToolDefinition
 
     /// <summary>Whether this prompt tool retains its chat history after the inline chat closes.</summary>
     public bool PreserveChatHistory { get; }
+
+    /// <summary>
+    /// How the <see cref="ExternalToolOutputMode.Diagnostics"/> action reads
+    /// problems from the output, or null for the formats it knows.
+    /// </summary>
+    public string? DiagnosticsPattern { get; }
 
     public ExternalToolPer Per { get; }
 

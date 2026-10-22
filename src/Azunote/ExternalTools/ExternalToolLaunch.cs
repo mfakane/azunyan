@@ -1,3 +1,4 @@
+using System.IO.Enumeration;
 using System.Diagnostics;
 using System.Text;
 
@@ -210,6 +211,48 @@ internal static class ExternalToolLaunchResolver
         }
 
         return expanded;
+    }
+
+    /// <summary>
+    /// Whether an executable named by <paramref name="pattern"/> is found where
+    /// a command would be: a path relative to the definition, the tool's
+    /// search path, or PATH. A name may leave out its extension, and may use
+    /// <c>*</c> and <c>?</c>, which match a file name with or without its
+    /// executable extension.
+    /// </summary>
+    internal static bool ExecutableExists(
+        string pattern,
+        string? definitionDirectory,
+        IReadOnlyList<string>? searchPath)
+    {
+        pattern = pattern.Trim();
+        if (pattern.IndexOfAny(['*', '?']) < 0)
+        {
+            return ResolveExecutable(pattern, definitionDirectory, searchPath) is not null;
+        }
+
+        var extensions = GetWindowsExecutableExtensions().ToArray();
+        var pathVariable = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+        var directories = (searchPath ?? [])
+            .Concat(pathVariable.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+            .Select(directory => directory.Trim().Trim('"'))
+            .Where(directory => directory.Length > 0 && Directory.Exists(directory));
+        foreach (var directory in directories)
+        {
+            foreach (var file in Directory.EnumerateFiles(directory))
+            {
+                var name = Path.GetFileName(file);
+                if ((extensions.Length == 0
+                        || extensions.Contains(Path.GetExtension(name), StringComparer.OrdinalIgnoreCase))
+                    && (FileSystemName.MatchesSimpleExpression(pattern, name)
+                        || FileSystemName.MatchesSimpleExpression(pattern, Path.GetFileNameWithoutExtension(name))))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private static string? ResolveExecutable(

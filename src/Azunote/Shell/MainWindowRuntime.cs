@@ -31,6 +31,7 @@ internal sealed class MainWindowRuntime : IDisposable
     private readonly Action<bool> _recordWordWrap;
     private readonly Action<bool> _recordStatusBarVisible;
     private readonly DocumentBackupTracker _backups;
+    private readonly DocumentDiagnostics _diagnostics = new();
     private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer _backupTimer;
     private int _runningExternalToolCount;
     private bool _disposed;
@@ -54,6 +55,7 @@ internal sealed class MainWindowRuntime : IDisposable
     {
         _window = window ?? throw new ArgumentNullException(nameof(window));
         _view = new MainWindow.ViewBoundary(window);
+        _window.SetDiagnosticsProvider(new DocumentDiagnosticsProvider(_diagnostics));
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _refreshWindowMenus = refreshWindowMenus ?? throw new ArgumentNullException(nameof(refreshWindowMenus));
         _filePathActions = filePathActions ?? throw new ArgumentNullException(nameof(filePathActions));
@@ -94,7 +96,8 @@ internal sealed class MainWindowRuntime : IDisposable
             _powerShellWarmPool,
             () => _languageModes.CurrentModeFileExtensions,
             _dispatcher,
-            openStreamedTextInNewWindow);
+            openStreamedTextInNewWindow,
+            _diagnostics);
 
         _documents = new DocumentWorkflow(
             _view,
@@ -158,6 +161,8 @@ internal sealed class MainWindowRuntime : IDisposable
         _backupTimer.Tick += (_, _) => _backups.Flush();
 
         _documents.Changed += Documents_Changed;
+        _view.Edited += (_, change) => _diagnostics.Apply(change);
+        _diagnostics.Changed += Diagnostics_Changed;
         _languageModes.Changed += LanguageModes_Changed;
         _session.StateChanged += Session_StateChanged;
         RefreshDocumentView();
@@ -587,7 +592,34 @@ internal sealed class MainWindowRuntime : IDisposable
         }
     }
 
-    public void RefreshStatus() => _status.Refresh();
+    public void RefreshStatus()
+    {
+        _status.Refresh();
+        RefreshProblems();
+    }
+
+    /// <summary>Selects the next or previous problem, wrapping around the document.</summary>
+    public void GoToProblem(bool next)
+    {
+        var position = _view.Selection.Start;
+        if ((next ? _diagnostics.Next(position) : _diagnostics.Previous(position)) is { } problem)
+        {
+            _view.Select(problem.Range);
+        }
+    }
+
+    private void Diagnostics_Changed(object? sender, EventArgs args)
+    {
+        _view.RefreshProviders();
+        RefreshProblems();
+    }
+
+    private void RefreshProblems() =>
+        _viewModel.SetProblems(
+            _diagnostics.Count(DiagnosticSeverity.Error),
+            _diagnostics.Count(DiagnosticSeverity.Warning),
+            _diagnostics.Count(DiagnosticSeverity.Information),
+            _diagnostics.At(_view.CaretPosition).FirstOrDefault()?.Message);
 
     public void RefreshExternalToolsMenu()
     {
@@ -746,6 +778,11 @@ internal sealed class MainWindowRuntime : IDisposable
         object? sender,
         DocumentWorkflowChangedEventArgs args)
     {
+        if (args.Opened)
+        {
+            _diagnostics.Clear();
+        }
+
         if (args.Opened && _documents.CurrentFilePath is { } path)
         {
             _recordRecentFile(path);

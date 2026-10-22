@@ -6,8 +6,21 @@ internal static class ExternalToolExists
         IReadOnlyList<string> rules,
         ExternalToolContext context)
     {
-        ArgumentNullException.ThrowIfNull(rules);
         ArgumentNullException.ThrowIfNull(context);
+        return FirstFailure(rules, body => Probe(body, context));
+    }
+
+    /// <summary>
+    /// Returns the first rule none of whose <c>|</c> alternatives holds, where
+    /// <paramref name="probe"/> answers an alternative and a leading <c>!</c>
+    /// negates it. The rules are shared by <c>exists</c> and <c>executable</c>.
+    /// </summary>
+    public static string? FirstFailure(
+        IReadOnlyList<string> rules,
+        Func<string, bool> probe)
+    {
+        ArgumentNullException.ThrowIfNull(rules);
+        ArgumentNullException.ThrowIfNull(probe);
 
         foreach (var rule in rules)
         {
@@ -16,7 +29,7 @@ internal static class ExternalToolExists
                 continue;
             }
 
-            if (!RuleMatches(rule, context))
+            if (!RuleMatches(rule, probe))
             {
                 return rule;
             }
@@ -25,7 +38,7 @@ internal static class ExternalToolExists
         return null;
     }
 
-    private static bool RuleMatches(string rule, ExternalToolContext context)
+    private static bool RuleMatches(string rule, Func<string, bool> probe)
     {
         var matched = false;
         foreach (var alternative in SplitAlternatives(rule))
@@ -42,7 +55,7 @@ internal static class ExternalToolExists
                 continue;
             }
 
-            var found = Probe(body, context);
+            var found = probe(body);
             if (negated)
             {
                 found = !found;

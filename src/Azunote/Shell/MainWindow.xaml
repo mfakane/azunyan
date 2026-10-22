@@ -667,6 +667,22 @@
                     KeyboardAcceleratorTextOverride="Ctrl+["
                     Command="{x:Bind ViewModel.GoToMatchingBracketCommand}"
                 />
+                <MenuFlyoutItem
+                    Text="Go to Next Problem"
+                    Command="{x:Bind ViewModel.GoToNextProblemCommand}"
+                >
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="F8" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem
+                    Text="Go to Previous Problem"
+                    Command="{x:Bind ViewModel.GoToPreviousProblemCommand}"
+                >
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="F8" Modifiers="Shift" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
                 <MenuFlyoutSeparator />
                 <MenuFlyoutSubItem Text="Line">
                     <MenuFlyoutItem
@@ -1204,6 +1220,7 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <TextBlock
@@ -1236,8 +1253,41 @@
                     Text="{x:Bind ViewModel.LanguageModeStatus, Mode=OneWay}"
                 />
                 <StackPanel
-                    x:Name="ExternalToolStatus"
+                    x:Name="ProblemsStatus"
                     Grid.Column="5"
+                    Orientation="Horizontal"
+                    Spacing="4"
+                    ToolTipService.ToolTip="Go to Next Problem (F8)"
+                    Visibility="{x:Bind ViewModel.ProblemsVisibility, Mode=OneWay}"
+                    Tapped="ProblemsStatus_Tapped"
+                >
+                    <FontIcon Glyph="&#xEA39;" FontSize="14" />
+                    <TextBlock
+                        x:Name="ErrorCountStatus"
+                        Text="{x:Bind ViewModel.ErrorCountText, Mode=OneWay}"
+                        AutomationProperties.HelpText="Errors"
+                    />
+                    <FontIcon Glyph="&#xE7BA;" FontSize="14" Margin="6,0,0,0" />
+                    <TextBlock
+                        Text="{x:Bind ViewModel.WarningCountText, Mode=OneWay}"
+                        AutomationProperties.HelpText="Warnings"
+                    />
+                    <FontIcon Glyph="&#xE946;" FontSize="14" Margin="6,0,0,0" />
+                    <TextBlock
+                        Text="{x:Bind ViewModel.InformationCountText, Mode=OneWay}"
+                        AutomationProperties.HelpText="Information"
+                    />
+                    <TextBlock
+                        x:Name="ProblemAtCaretStatus"
+                        MaxWidth="480"
+                        Margin="8,0,0,0"
+                        Text="{x:Bind ViewModel.ProblemAtCaret, Mode=OneWay}"
+                        TextTrimming="CharacterEllipsis"
+                    />
+                </StackPanel>
+                <StackPanel
+                    x:Name="ExternalToolStatus"
+                    Grid.Column="6"
                     Orientation="Horizontal"
                     Spacing="4"
                     ToolTipService.ToolTip="Running external tools"
@@ -1248,7 +1298,7 @@
                 </StackPanel>
                 <TextBlock
                     x:Name="FilePathStatus"
-                    Grid.Column="6"
+                    Grid.Column="7"
                     HorizontalAlignment="Right"
                     Text="{x:Bind ViewModel.FilePathStatus, Mode=OneWay}"
                     TextTrimming="CharacterEllipsis"

@@ -52,10 +52,12 @@ Invalid definitions are reported and do not replace the last valid tool menu.
 
 ## Default tools
 
-Azunote ships tools for common edits, insertions, formatting, and Git under
-`Edit`, `Insert`, `Format`, and `Git`, and brings them up to date in the tools
-folder each time it starts. Insert Date/Time (F5) inserts the current date and
-time as `2026-10-22 14:30`.
+Azunote ships tools for common edits, insertions, checks, formatting, and Git
+under `Edit`, `Insert`, `Check`, `Format`, and `Git`, and brings them up to
+date in the tools folder each time it starts. Insert Date/Time (F5) inserts the
+current date and time as `2026-10-22 14:30`. The `Check` tools report the
+[problems](#problems) in PowerShell, JSON, and XML documents; Check JSON needs
+PowerShell 7 (`pwsh.exe`) and is hidden without it.
 
 A new default tool is copied in, and an update replaces a default tool's file
 while the file is as Azunote wrote it. A file that has been edited is left as
@@ -273,7 +275,8 @@ specified conditions must match.
 | `selection` | `any`, `empty`, `nonEmpty`, or `regex:<pattern>`. The pattern is compiled when the tool is loaded and tested with `IsMatch`. A selection longer than 16 KiB, or a match that exceeds the time limit, does not match. |
 | `document` | `any`, `clean`, or `dirty`. |
 | `os` | Operating-system identifiers, such as `windows`. |
-| `exists` | A path or glob, or an array of them. Array entries are all required. `|` separates alternatives inside one entry, and `!` negates that alternative. A bare name walks from the document directory toward the root. `./` checks only the document directory. `${workspaceFolder}` and `${workspaceFolder:pattern}` name a specific root. A match may be a file or a directory. |
+| `exists` | A path or glob, or an array of them. Array entries are all required. `\|` separates alternatives inside one entry, and `!` negates that alternative. A bare name walks from the document directory toward the root. `./` checks only the document directory. `${workspaceFolder}` and `${workspaceFolder:pattern}` name a specific root. A match may be a file or a directory. |
+| `executable` | An executable name, or an array of them, that must be found where a command would be: the tool's `[launch].path`, then `PATH`. The extension can be left out, so `pwsh` finds `pwsh.exe`, and `*` and `?` match names. `\|` and `!` work as in `exists`, so `!prettier` holds when Prettier is missing. Use it for an executable that a `cmd` or `pwsh` line calls, which the command check cannot see. |
 
 An untitled document is matched by `extensions` through its language mode:
 choosing the JSON mode in an untitled document makes the tools for `.json`,
@@ -284,6 +287,12 @@ matched by its own extension, whichever mode was chosen for it.
 With `visibility = "whenAvailable"`, a tool is hidden when its conditions do
 not match or its command cannot be resolved. With `visibility = "always"`, it
 remains visible but is disabled in those cases.
+
+### `[diagnostics]`
+
+| Field | Description |
+| --- | --- |
+| `pattern` | Regular expression the `diagnostics` action reads each output line with. See [Problems](#problems). Defaults to the MSBuild and GNU forms. |
 
 ## Input and output
 
@@ -339,11 +348,13 @@ after the tool finishes.
 An array is ordered `[zero-exit-action, non-zero-exit-action]`; a single action
 is used for both exit statuses. All three fields support `ignore`,
 `replaceDocument`, `replaceSelection`, `newDocument`, `reloadFile`,
-`showCompletion`, and `showPromptResponse`.
+`showCompletion`, `showPromptResponse`, and `diagnostics`.
 
 `replaceSelection` replaces the selection and leaves the output selected. With
 no selection it inserts the output at the caret and leaves the caret after it,
 as typing would.
+
+`diagnostics` reads the output as [problems](#problems) in the document.
 
 `showCompletion` treats each non-empty output line as one completion candidate
 and opens the completion window. Empty and whitespace-only lines are ignored.
@@ -361,6 +372,55 @@ applied in the order `output`, `stdout`, `stderr`.
 
 For `per` runs, each stream is concatenated without adding a separator. The
 default for all three output fields is `ignore`.
+
+## Problems
+
+The `diagnostics` action reads each output line that names a position as a
+problem in the document the tool ran on, and underlines it in red for an
+error, yellow for a warning, or blue for information. Resting the pointer on
+one shows its message and the tool that reported it. The status bar counts
+the problems and shows the message of the one at the caret; clicking the
+counts, or Edit > Go to Next Problem (F8) and Go to Previous Problem
+(Shift+F8), selects the next or previous one.
+
+Without a pattern of its own, a line is read in either of the forms most
+compilers and linters print:
+
+```text
+src\Program.cs(10,5): warning CS0168: The variable 'x' is declared but never used
+src/app.py:3:8: error: F401 `os` imported but unused
+```
+
+The column, the end position (`(line,col,endLine,endCol)`), and the severity
+are optional. A line without a severity is an error, and `note`, `hint`, and
+`info` are information. Without an end, the problem covers the word at its
+column, or the whole line when it names no column. Lines in neither form are
+skipped.
+
+A problem is kept only when it names the document: its path, the temporary
+copy given to the tool for an unsaved document (`${file}`), a path ending in
+the document's relative path, or no file at all. `-` and `<stdin>` also stand
+for the document, for a tool that reads it from standard input.
+
+`[diagnostics].pattern` reads another format. It is a regular expression
+matched against each line, with the named groups `line` and `message` and,
+optionally, `file`, `column`, `endLine`, `endColumn`, and `severity`:
+
+```toml
+[launch]
+command = "mylint"
+args = ["${file}"]
+stdout = "diagnostics"
+
+[diagnostics]
+pattern = '^line (?<line>\d+), col (?<column>\d+), (?<severity>\w+) - (?<message>.+)$'
+```
+
+Running a tool replaces the problems it reported before, so a run that prints
+none clears them; problems from other tools stay. Editing moves the problems
+after the edit along and drops the ones whose text it changes, and opening
+another file clears them all. A run is dropped when the document was edited
+while the tool ran.
 
 ## Streaming output
 

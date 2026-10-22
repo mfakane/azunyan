@@ -666,6 +666,69 @@ public sealed class AzunoteUiTests : IDisposable
         }
     }
 
+    [AzunoteUiFact]
+    public void Check_xml_reports_a_problem_that_f8_selects()
+    {
+        const ushort Control = 0x11, Shift = 0x10, P = 0x50, F8 = 0x77, Escape = 0x1B;
+        var root = Directory.CreateTempSubdirectory("azunote-check-");
+        var document = Path.Combine(root.FullName, "broken.xml");
+        File.WriteAllText(document, "<root>\n  <a></b>\n</root>");
+        using var fixture = new AzunoteUiFixture(document);
+        try
+        {
+            var window = fixture.Window;
+            var editor = fixture.Editor;
+            var textPattern = AzunoteUiFixture.WaitForTextPattern(editor);
+            AzunoteUiFixture.WaitForDocumentText(textPattern, text => text.Contains("</b>", StringComparison.Ordinal));
+            editor.SetFocus();
+
+            // The tools load after the window opens, and the palette lists
+            // what was there when it opened, so it is reopened until it has
+            // the tool. The menu names it after its folder when it is the
+            // only tool there for XML, as "Check: Check XML".
+            AzunoteUiFixture.WaitFor(
+                () =>
+                {
+                    SendKeyChord(Control, Shift, P);
+                    SetCommandPaletteText(WaitForCommandPalette(window, text => text == ">"), ">check xml");
+                    Thread.Sleep(500);
+                    if (window.FindAll(
+                                TreeScope.Descendants,
+                                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.ListItem))
+                            .Cast<AutomationElement>()
+                            .FirstOrDefault(row => row.Current.Name.EndsWith("Check XML", StringComparison.Ordinal)) is { } item)
+                    {
+                        return item;
+                    }
+
+                    SendKeyChord(Escape);
+                    return null;
+                },
+                "The command palette never offered Check XML.");
+            SendEnterKey();
+            AzunoteUiFixture.WaitFor(
+                () => FindByAutomationId(window, "ErrorCountStatus") is { Current.Name: "1" } count ? count : null,
+                "The status bar did not count the problem.");
+
+            // The parser's message and column depend on the PowerShell that
+            // ran it, so only the line and the message's presence are checked.
+            SendKeyChord(F8);
+            AzunoteUiFixture.WaitForSelectionText(
+                textPattern,
+                selected => selected.Length > 0 && "  <a></b>".Contains(selected, StringComparison.Ordinal));
+            AzunoteUiFixture.WaitFor(
+                () => FindByAutomationId(window, "ProblemAtCaretStatus") is { Current.Name.Length: > 0 } message ? message : null,
+                "The status bar did not show the problem at the caret.");
+        }
+        finally
+        {
+            root.Delete(recursive: true);
+        }
+    }
+
+    private static AutomationElement? FindByAutomationId(AutomationElement window, string id) =>
+        window.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.AutomationIdProperty, id));
+
     private static AutomationElement? FindCommandPalette(AutomationElement window) =>
         window.FindFirst(
             TreeScope.Descendants,

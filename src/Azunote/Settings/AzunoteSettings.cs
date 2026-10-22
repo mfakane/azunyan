@@ -172,6 +172,7 @@ public sealed class AzunoteDebugSettings
 [TomlSerializable(typeof(ExternalToolSettings))]
 [TomlSerializable(typeof(ExternalToolLaunchSettings))]
 [TomlSerializable(typeof(ExternalToolWhenSettings))]
+[TomlSerializable(typeof(ExternalToolDiagnosticsSettings))]
 [TomlSerializable(typeof(CustomSyntaxModeSettings))]
 [TomlSerializable(typeof(CustomSyntaxRuleSettings))]
 internal sealed partial class AzunoteTomlSerializerContext : TomlSerializerContext
@@ -627,6 +628,11 @@ public sealed class ExternalToolLaunchSettings
     public ExternalToolStreamChannels Stream { get; set; } = ExternalToolStreamChannels.None;
 }
 
+public sealed class ExternalToolDiagnosticsSettings
+{
+    public string? Pattern { get; set; }
+}
+
 public sealed class ExternalToolWhenSettings
 {
     public string[] Extensions { get; set; } = [];
@@ -645,6 +651,9 @@ public sealed class ExternalToolWhenSettings
 
     [TomlConverter(typeof(ExternalToolSearchPathTomlConverter))]
     public ExternalToolSearchPath? Exists { get; set; }
+
+    [TomlConverter(typeof(ExternalToolSearchPathTomlConverter))]
+    public ExternalToolSearchPath? Executable { get; set; }
 }
 
 public sealed class ExternalToolSettings
@@ -663,6 +672,8 @@ public sealed class ExternalToolSettings
     public ExternalToolLaunchSettings Launch { get; set; } = new();
 
     public ExternalToolWhenSettings When { get; set; } = new();
+
+    public ExternalToolDiagnosticsSettings Diagnostics { get; set; } = new();
 
     [TomlPropertyName("env")]
     public Dictionary<string, string> Environment { get; set; } = new(StringComparer.OrdinalIgnoreCase);
@@ -714,7 +725,8 @@ public sealed class ExternalToolSettings
             Launch.Stream,
             Launch.Path?.Values ?? [],
             input.Prompt,
-            Launch.PreserveChatHistory);
+            Launch.PreserveChatHistory,
+            Diagnostics.Pattern);
         definition.DefinitionPath = DefinitionPath;
         return definition;
     }
@@ -736,6 +748,8 @@ public sealed class ExternalToolSettings
         When.Languages ??= [];
         When.Os ??= [];
         When.Exists ??= new ExternalToolSearchPath([]);
+        When.Executable ??= new ExternalToolSearchPath([]);
+        Diagnostics ??= new();
 
         if (string.IsNullOrWhiteSpace(Name))
         {
@@ -795,6 +809,20 @@ public sealed class ExternalToolSettings
         _ = ExternalToolEnumValues.Parse<ExternalToolVisibility>(Visibility, nameof(Visibility));
         _ = ExternalToolEnumValues.Parse<ExternalToolFileCondition>(When.File, "when.file");
         ExternalToolSelectionPattern.Validate(When.Selection);
+        if (!string.IsNullOrWhiteSpace(Diagnostics.Pattern))
+        {
+            try
+            {
+                _ = ExternalToolDiagnostics.CreatePattern(Diagnostics.Pattern);
+            }
+            catch (ArgumentException exception)
+            {
+                throw new SettingsFileException(
+                    $"External tool '{Name}': invalid diagnostics.pattern. {exception.Message}",
+                    exception);
+            }
+        }
+
         _ = ExternalToolEnumValues.Parse<ExternalToolDocumentCondition>(When.Document, "when.document");
 
         Shortcut = string.IsNullOrWhiteSpace(Shortcut) ? null : Shortcut.Trim();

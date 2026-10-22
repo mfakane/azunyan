@@ -19,6 +19,7 @@ public sealed partial class ExternalToolController
     private readonly PowerShellWarmPool? _warmPool;
     private readonly IUiDispatcher? _dispatcher;
     private readonly Func<Task<IExternalToolDocument>>? _openStreamedDocument;
+    private readonly DocumentDiagnostics? _diagnostics;
 
     public ExternalToolController(
         IEditorBuffer editor,
@@ -49,12 +50,14 @@ public sealed partial class ExternalToolController
         PowerShellWarmPool? warmPool,
         Func<IReadOnlyList<string>>? languageExtensions = null,
         IUiDispatcher? dispatcher = null,
-        Func<Task<IExternalToolDocument>>? openStreamedDocument = null)
+        Func<Task<IExternalToolDocument>>? openStreamedDocument = null,
+        DocumentDiagnostics? diagnostics = null)
         : this(editor, documents, files, prompt, openTextInNewWindow, languageModeId, languageExtensions)
     {
         _warmPool = warmPool;
         _dispatcher = dispatcher;
         _openStreamedDocument = openStreamedDocument;
+        _diagnostics = diagnostics;
     }
 
     public async Task<ExternalToolResult> RunAsync(
@@ -155,6 +158,22 @@ public sealed partial class ExternalToolController
                 }
 
                 var output = ExternalToolOutputInterpreter.Interpret(definition, result);
+                var diagnosticsOutput = output.Actions
+                    .Where(action => action.Mode == ExternalToolOutputMode.Diagnostics)
+                    .Select(action => action.Text)
+                    .ToArray();
+                if (diagnosticsOutput.Length > 0)
+                {
+                    ApplyDiagnostics(
+                        definition,
+                        string.Join('\n', diagnosticsOutput),
+                        editorSnapshot.Text,
+                        conversationKey,
+                        inlineTitle,
+                        filePath,
+                        temporaryFilePath);
+                }
+
                 foreach (var action in output.Actions)
                 {
                     await ApplyOutputActionAsync(
@@ -235,6 +254,7 @@ public sealed partial class ExternalToolController
         switch (action.Mode)
         {
             case ExternalToolOutputMode.Ignore:
+            case ExternalToolOutputMode.Diagnostics:
                 return;
             case ExternalToolOutputMode.ReplaceDocument:
                 _editor.Replace(new TextRange(0, _editor.Text.Length), action.Text);
@@ -291,6 +311,38 @@ public sealed partial class ExternalToolController
     /// Keeps the replaced text selected, preserving the direction the original
     /// selection was made in.
     /// </summary>
+    /// <summary>
+    /// Replaces the problems this tool reported before with the ones it
+    /// printed now, placed in the text it read. The run is dropped when the
+    /// document was edited meanwhile, since the positions no longer fit it.
+    /// </summary>
+    private void ApplyDiagnostics(
+        ExternalToolDefinition definition,
+        string output,
+        string text,
+        string sourceKey,
+        string source,
+        string? filePath,
+        string? temporaryFilePath)
+    {
+        if (_diagnostics is null || !string.Equals(_editor.Text, text, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _diagnostics.Replace(
+            sourceKey,
+            ExternalToolDiagnostics.Parse(output, definition.DiagnosticsPattern)
+                .Where(diagnostic => ExternalToolDiagnostics.IsForDocument(diagnostic.File, filePath, temporaryFilePath))
+                .Select(diagnostic => new DocumentDiagnostic(
+                    sourceKey,
+                    source,
+                    ExternalToolDiagnostics.GetRange(text, diagnostic),
+                    diagnostic.Severity,
+                    diagnostic.Message))
+                .ToArray());
+    }
+
     /// <summary>
     /// Output inserted at a caret leaves the caret after it, as typing does;
     /// output that replaced a selection stays selected.

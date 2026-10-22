@@ -56,6 +56,42 @@ public sealed class DefaultToolDefinitionTests : IDisposable
         Assert.Matches(new Regex(pattern), result.StandardOutput);
     }
 
+    [Theory]
+    [InlineData("Check JSON", "{\n  \"a\": 1,\n  \"b\" 2\n}", 3)]
+    [InlineData("Check XML", "<root>\n  <a></b>\n</root>", 2)]
+    [InlineData("Check PowerShell Syntax", "$a = 1\nif ($a {\n}", 2)]
+    public async Task A_check_tool_reports_where_the_text_is_invalid(string name, string text, int line)
+    {
+        if (!PwshAvailable)
+        {
+            return;
+        }
+
+        var result = await RunAsync(name, text);
+
+        Assert.True(result.Succeeded, result.StandardError);
+        var diagnostic = ExternalToolDiagnostics.Parse(result.StandardOutput).First();
+        Assert.Equal(line, diagnostic.Line);
+        Assert.True(ExternalToolDiagnostics.IsForDocument(diagnostic.File));
+    }
+
+    [Theory]
+    [InlineData("Check JSON", "{ \"a\": [1, 2] }")]
+    [InlineData("Check XML", "<root><a /></root>")]
+    [InlineData("Check PowerShell Syntax", "$a = 1\nif ($a) { $a }")]
+    public async Task A_check_tool_reports_nothing_for_valid_text(string name, string text)
+    {
+        if (!PwshAvailable)
+        {
+            return;
+        }
+
+        var result = await RunAsync(name, text);
+
+        Assert.True(result.Succeeded, result.StandardError);
+        Assert.Empty(ExternalToolDiagnostics.Parse(result.StandardOutput));
+    }
+
     private async Task<ExternalToolResult> RunAsync(string name, string selection)
     {
         await SettingsFileService.EnsureExistsAsync(_root);

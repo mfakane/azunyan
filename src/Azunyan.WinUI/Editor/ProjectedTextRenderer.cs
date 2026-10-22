@@ -3,6 +3,7 @@ using Azunyan.Layout;
 using Azunyan.WinUI;
 using System.Globalization;
 using Microsoft.Graphics.Canvas;
+using Microsoft.Graphics.Canvas.Geometry;
 using Microsoft.Graphics.Canvas.UI;
 using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI;
@@ -2040,8 +2041,83 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             (float)(context.ContentLeft - context.HorizontalOffset),
             (float)top,
             context.ColorScheme.EditorForeground);
+        DrawDecorations(drawingSession, context, line, currentEntry.Layout, top);
         DrawComposition(drawingSession, context, line, currentEntry.Layout, top);
         DrawCaret(drawingSession, context, line, currentEntry.Layout, top);
+    }
+
+    /// <summary>
+    /// Draws a wavy underline below the part of each decoration on this row
+    /// whose kind has an underline color.
+    /// </summary>
+    private static void DrawDecorations(
+        CanvasDrawingSession drawingSession,
+        AzunyanEditorRenderContext context,
+        UnwrappedLineLayout layout,
+        DirectWriteTextLayout textLayout,
+        double top)
+    {
+        if (context.DocumentResults?.Decorations is not { Count: > 0 } decorations)
+        {
+            return;
+        }
+
+        var range = layout.SourceLine.SourceRange;
+        var left = context.ContentLeft - context.HorizontalOffset;
+        foreach (var decoration in decorations)
+        {
+            var start = Math.Max(range.Start, decoration.Range.Start);
+            var end = Math.Min(range.End, decoration.Range.End);
+            if (end <= start
+                || context.ColorScheme.GetDecorationUnderline(decoration.Kind) is not { } color)
+            {
+                continue;
+            }
+
+            var globalStart = layout.SourceLine.GetVisualColumn(DocumentAnchor.Before(start));
+            var globalEnd = layout.SourceLine.GetVisualColumn(DocumentAnchor.After(end));
+            var visibleStart = Math.Max(globalStart, layout.VisualStart);
+            var visibleEnd = Math.Min(globalEnd, layout.VisualEnd);
+            if (visibleEnd <= visibleStart)
+            {
+                continue;
+            }
+
+            foreach (var bounds in textLayout.GetCharacterBounds(
+                visibleStart - layout.VisualStart,
+                visibleEnd - visibleStart))
+            {
+                DrawWavyLine(
+                    drawingSession,
+                    (float)(left + bounds.X),
+                    (float)(left + bounds.X + Math.Max(4, bounds.Width)),
+                    (float)(top + context.LineHeight - 2.5),
+                    color);
+            }
+        }
+    }
+
+    private static void DrawWavyLine(
+        CanvasDrawingSession drawingSession,
+        float left,
+        float right,
+        float centerY,
+        Color color)
+    {
+        const float HalfWave = 2f;
+        const float Amplitude = 1.25f;
+        using var builder = new CanvasPathBuilder(drawingSession);
+        builder.BeginFigure(left, centerY + Amplitude);
+        var up = true;
+        for (var x = left + HalfWave; x < right + HalfWave; x += HalfWave)
+        {
+            builder.AddLine(Math.Min(x, right), centerY + (up ? -Amplitude : Amplitude));
+            up = !up;
+        }
+
+        builder.EndFigure(CanvasFigureLoop.Open);
+        using var geometry = CanvasGeometry.CreatePath(builder);
+        drawingSession.DrawGeometry(geometry, color, 1f);
     }
 
     private static void DrawComposition(

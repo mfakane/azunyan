@@ -127,6 +127,70 @@ public sealed class ExternalToolControllerTests
     }
 
     [Fact]
+    public async Task Diagnostics_action_places_the_problems_and_a_clean_run_clears_them()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            $"azunote external controller diagnostics {Guid.NewGuid():N}");
+        var scriptPath = Path.Combine(root, "lint.cmd");
+        try
+        {
+            Directory.CreateDirectory(root);
+            await File.WriteAllTextAsync(
+                scriptPath,
+                "@echo off\r\n"
+                + "if exist \"%~dp0clean\" exit /b 0\r\n"
+                + "echo -:2:5: warning: unused\r\n"
+                + "echo other.txt:1:1: error: elsewhere\r\n"
+                + "exit /b 1\r\n");
+
+            var editor = new FakeEditorView("one\r\ntwo three");
+            var session = new DocumentSession();
+            var files = new FakeTextFileStore();
+            var prompt = new FakeUserPrompt();
+            var documents = new DocumentController(editor, session, files, prompt);
+            var diagnostics = new DocumentDiagnostics();
+            var controller = new ExternalToolController(
+                editor,
+                documents,
+                files,
+                prompt,
+                _ => Task.CompletedTask,
+                languageModeId: null,
+                warmPool: null,
+                diagnostics: diagnostics);
+            var diagnosticsOutput = new ExternalToolOutputActions(
+                ExternalToolOutputMode.Diagnostics,
+                ExternalToolOutputMode.Diagnostics);
+
+            var definition = new ExternalToolDefinition(scriptPath, stdout: diagnosticsOutput);
+            await controller.RunAsync(definition, "Lint");
+
+            var problem = Assert.Single(diagnostics.Items);
+            Assert.Equal(TextRange.FromBounds(9, 14), problem.Range);
+            Assert.Equal((DiagnosticSeverity.Warning, "unused", "Lint"), (problem.Severity, problem.Message, problem.Source));
+
+            await File.WriteAllTextAsync(Path.Combine(root, "clean"), string.Empty);
+            await controller.RunAsync(definition, "Lint");
+
+            Assert.Empty(diagnostics.Items);
+            Assert.Empty(prompt.Errors);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task Stderr_failure_action_can_open_a_new_document_without_an_error_prompt()
     {
         if (!OperatingSystem.IsWindows())
