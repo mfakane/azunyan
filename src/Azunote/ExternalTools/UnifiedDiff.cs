@@ -89,7 +89,7 @@ public static class UnifiedDiff
         return count == 1 ? $"{start + firstLine}" : $"{start + firstLine},{count}";
     }
 
-    private static string[] SplitLines(string text)
+    internal static string[] SplitLines(string text)
     {
         if (text.Length == 0)
         {
@@ -100,7 +100,8 @@ public static class UnifiedDiff
         return text.EndsWith('\n') ? lines[..^1] : lines;
     }
 
-    private readonly record struct Edit(char Kind, string Text, int OldLine, int NewLine);
+    /// <summary>One line of an edit script: <c>' '</c> kept, <c>'-'</c> removed, <c>'+'</c> added.</summary>
+    internal readonly record struct Edit(char Kind, string Text, int OldLine, int NewLine);
 
     /// <summary>
     /// The shortest edit script by Myers' algorithm, as one entry per line:
@@ -109,7 +110,7 @@ public static class UnifiedDiff
     /// differ in more than <see cref="MaxDifferences"/> lines are compared as
     /// one removal and one addition.
     /// </summary>
-    private static List<Edit> Compare(string[] oldLines, string[] newLines)
+    internal static List<Edit> Compare(string[] oldLines, string[] newLines)
     {
         var prefix = 0;
         while (prefix < oldLines.Length && prefix < newLines.Length && oldLines[prefix] == newLines[prefix])

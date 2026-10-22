@@ -23,6 +23,7 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     private AppWindow? _appWindow;
     private bool _allowClose;
     private ExternalToolProposal? _proposal;
+    private bool _proposalUpdatePending;
     private static readonly Dictionary<ExternalToolShortcut, Action<MainWindowRuntime>> EditorCommandShortcuts = new()
     {
         [new(VirtualKey.Up, VirtualKeyModifiers.Menu)] = runtime => runtime.MoveLines(down: false),
@@ -361,19 +362,58 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     internal void ShowProposal(ExternalToolProposal proposal)
     {
         _proposal = proposal;
-        ProposalBar.Message = proposal.Title;
+        proposal.Changed += Proposal_Changed;
+        ShowProposalState(proposal);
         ProposalBar.IsOpen = true;
+    }
+
+    // Edits to the document change the diff; one update follows a burst of them.
+    private void Proposal_Changed(object? sender, EventArgs e)
+    {
+        if (_proposalUpdatePending)
+        {
+            return;
+        }
+
+        _proposalUpdatePending = true;
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            _proposalUpdatePending = false;
+            if (_proposal is { } proposal)
+            {
+                _runtime.ReplaceReadOnlyText(proposal.Diff);
+                ShowProposalState(proposal);
+            }
+        });
+    }
+
+    private void ShowProposalState(ExternalToolProposal proposal)
+    {
+        var conflicts = proposal.ConflictCount;
+        ProposalBar.Severity = conflicts > 0 ? InfoBarSeverity.Warning : InfoBarSeverity.Informational;
+        ProposalBar.Message = proposal.IsEmpty
+            ? "Every proposed change overlaps an edit, so none is left to apply."
+            : conflicts > 0
+                ? $"{proposal.Title} {conflicts} change{(conflicts == 1 ? " that overlaps an edit is" : "s that overlap edits are")} left out."
+                : proposal.Title;
+        ApplyProposalButton.IsEnabled = !proposal.IsEmpty;
     }
 
     private void ApplyProposalButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_proposal?.Apply() is { } problem)
+        if (_proposal is not { } proposal)
+        {
+            return;
+        }
+
+        if (proposal.Apply() is { } problem)
         {
             ProposalBar.Severity = InfoBarSeverity.Error;
             ProposalBar.Message = problem;
             return;
         }
 
+        proposal.Changed -= Proposal_Changed;
         _proposal = null;
         CloseWithoutAsking();
     }
@@ -390,7 +430,12 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
 
     private void MainWindow_Closed(object sender, WindowEventArgs args)
     {
-        _proposal?.Discard();
+        if (_proposal is { } proposal)
+        {
+            proposal.Changed -= Proposal_Changed;
+            proposal.Discard();
+        }
+
         _application.WindowClosed(this);
         Dispose();
     }

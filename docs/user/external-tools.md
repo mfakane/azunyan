@@ -456,16 +456,21 @@ while the tool ran.
 `proposeDocument` and `proposeSelection` compare the output with the text the
 tool read, the whole document or the selection, and open the difference as a
 unified diff in a new read-only window in the Diff mode. The bar above it names
-the tool and the document: Apply replaces that text with the output and closes
-the window, while Discard, or closing the window, leaves the document as it is.
+the tool and the document: Apply makes the change shown and closes the window,
+while Discard, or closing the window, leaves the document as it is.
 When the output is the same as the text, a message says there is no change
 instead.
 
-The document can be edited while the tool runs and while the diff is open.
-Edits before the selection move the change along and edits after it do not
-matter, but once the text the tool read has been edited, which for
-`proposeDocument` is any edit, Apply reports that and changes nothing. Closing
-the document's window closes the windows of its proposed changes.
+The document stays editable while the tool runs and while the diff is open.
+Each edit carries the proposed changes over to the edited text, and the diff is
+made again from it, so it always shows what Apply would do to the document as
+it is now. The text followed is the selection, which grows and shrinks with the
+edits made inside it, or the whole document. A proposed change to a line that
+was edited is left out: the bar says how many are, and the edited lines are
+underlined as warnings in the document until the proposal is applied or
+discarded. Changes on neighbouring lines both stand. The change keeps the line
+endings of the document, whichever ones the tool printed. Closing the
+document's window closes the windows of its proposed changes.
 
 ## Streaming output
 

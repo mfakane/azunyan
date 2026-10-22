@@ -191,7 +191,7 @@ public sealed class ExternalToolControllerTests
     }
 
     [Fact]
-    public async Task A_proposed_selection_is_applied_where_the_selection_moved_unless_it_was_edited()
+    public async Task A_proposed_selection_follows_edits_and_leaves_out_a_change_to_an_edited_line()
     {
         if (!OperatingSystem.IsWindows())
         {
@@ -211,6 +211,7 @@ public sealed class ExternalToolControllerTests
             var prompt = new FakeUserPrompt();
             var documents = new DocumentController(editor, session, files, prompt);
             var proposals = new List<ExternalToolProposal>();
+            var diagnostics = new DocumentDiagnostics();
             var controller = new ExternalToolController(
                 editor,
                 documents,
@@ -219,6 +220,7 @@ public sealed class ExternalToolControllerTests
                 (_, _) => Task.CompletedTask,
                 languageModeId: null,
                 warmPool: null,
+                diagnostics: diagnostics,
                 openProposal: proposal =>
                 {
                     proposals.Add(proposal);
@@ -241,14 +243,80 @@ public sealed class ExternalToolControllerTests
             Assert.Null(proposal.Apply());
             Assert.Equal(">one TWO three", editor.Text);
 
-            // Editing inside the selection keeps the change from applying.
+            // Editing the line the change is for leaves the change out, marks
+            // it in the document, and leaves nothing to apply.
             editor.SetSelection(new TextSelection(9, 14));
             await controller.RunAsync(definition, "Upper");
+            var changed = 0;
+            proposals[1].Changed += (_, _) => changed++;
             editor.Replace(new TextRange(10, 1), "x");
 
+            Assert.Equal(1, changed);
+            Assert.True(proposals[1].IsEmpty);
+            Assert.Equal(1, proposals[1].ConflictCount);
+            var conflict = Assert.Single(diagnostics.Items);
+            Assert.Equal((TextRange.FromBounds(9, 14), DiagnosticSeverity.Warning), (conflict.Range, conflict.Severity));
             Assert.NotNull(proposals[1].Apply());
             Assert.Equal(">one TWO txree", editor.Text);
+            proposals[1].Discard();
+            Assert.Empty(diagnostics.Items);
             Assert.Empty(prompt.Errors);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task A_proposed_document_keeps_edits_to_other_lines_and_the_document_line_endings()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var root = Path.Combine(Path.GetTempPath(), $"azunote external controller document proposal {Guid.NewGuid():N}");
+        var scriptPath = Path.Combine(root, "format.cmd");
+        try
+        {
+            Directory.CreateDirectory(root);
+            await File.WriteAllTextAsync(scriptPath, "@echo off\r\necho A\r\necho b\r\necho c\r\n");
+
+            var editor = new FakeEditorView("a\nb\nc\n");
+            var session = new DocumentSession();
+            var files = new FakeTextFileStore();
+            var prompt = new FakeUserPrompt();
+            var documents = new DocumentController(editor, session, files, prompt);
+            ExternalToolProposal? proposal = null;
+            var controller = new ExternalToolController(
+                editor,
+                documents,
+                files,
+                prompt,
+                (_, _) => Task.CompletedTask,
+                languageModeId: null,
+                warmPool: null,
+                openProposal: opened =>
+                {
+                    proposal = opened;
+                    return Task.CompletedTask;
+                });
+
+            await controller.RunAsync(new ExternalToolDefinition(
+                scriptPath,
+                stdout: new ExternalToolOutputActions(
+                    ExternalToolOutputMode.ProposeDocument,
+                    ExternalToolOutputMode.Ignore)));
+            editor.Replace(new TextRange(4, 1), "C");
+
+            Assert.NotNull(proposal);
+            Assert.Equal("--- a/Untitled\n+++ b/Untitled\n@@ -1,3 +1,3 @@\n-a\n+A\n b\n C\n", proposal.Diff);
+            Assert.Null(proposal.Apply());
+            Assert.Equal("A\nb\nC\n", editor.Text);
         }
         finally
         {

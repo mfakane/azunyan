@@ -597,6 +597,17 @@ internal sealed class MainWindowRuntime : IDisposable
     /// <summary>Makes the document read-only text with nothing to save.</summary>
     internal void MarkReadOnly() => _session.MarkReadOnly(_view.Text);
 
+    /// <summary>Replaces the text of a read-only document, keeping the selection where it can.</summary>
+    internal void ReplaceReadOnlyText(string text)
+    {
+        var selection = _view.Selection;
+        _view.SetText(text);
+        _session.MarkReadOnly(text);
+        _view.SetSelection(new TextSelection(
+            Math.Min(selection.Anchor, text.Length),
+            Math.Min(selection.Active, text.Length)));
+    }
+
     /// <summary>Shows the document in a language mode, if one has this id.</summary>
     internal void SelectLanguageMode(string id) => _languageModes.SelectManually(id);
 

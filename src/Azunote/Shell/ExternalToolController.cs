@@ -194,7 +194,6 @@ public sealed partial class ExternalToolController
                         proposed |= await ProposeAsync(
                             action.Text,
                             wholeDocument ? editorSnapshot.Text : editorSnapshot.SelectedText,
-                            wholeDocument ? 1 : editorSnapshot.SelectionStart.Line + 1,
                             (wholeDocument ? proposedDocument : proposedSelection)!,
                             inlineTitle);
                         continue;
@@ -265,39 +264,31 @@ public sealed partial class ExternalToolController
     private async Task<bool> ProposeAsync(
         string proposedText,
         string originalText,
-        int firstLine,
         TrackedTextRange range,
         string source)
     {
         var name = _documents.Session.State.FilePath is { } path ? Path.GetFileName(path) : "Untitled";
-        var diff = UnifiedDiff.Create(originalText, proposedText, "a/" + name, "b/" + name, firstLine);
-        if (diff.Length == 0)
+        var proposal = new ExternalToolProposal(
+            _editor,
+            range,
+            originalText,
+            proposedText,
+            source,
+            name,
+            _diagnostics,
+            () => _documents.Session.ObserveText(_editor.Text));
+        if (proposal.IsEmpty || _openProposal is null)
         {
-            await _prompt.ShowErrorAsync("No changes", $"{source} proposed no change to {name}.");
-            return false;
-        }
-
-        if (_openProposal is null)
-        {
-            return false;
-        }
-
-        await _openProposal(new ExternalToolProposal(
-            $"{source} proposes a change to {name}.",
-            diff,
-            () =>
+            proposal.Discard();
+            if (proposal.IsEmpty)
             {
-                if (range.IsChanged)
-                {
-                    return "The text it would replace was edited after the tool ran.";
-                }
+                await _prompt.ShowErrorAsync("No changes", $"{source} proposed no change to {name}.");
+            }
 
-                _editor.Replace(range.Range, proposedText);
-                _documents.Session.ObserveText(_editor.Text);
-                range.Dispose();
-                return null;
-            },
-            range.Dispose));
+            return false;
+        }
+
+        await _openProposal(proposal);
         return true;
     }
 
