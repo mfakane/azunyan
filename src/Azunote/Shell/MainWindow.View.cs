@@ -72,7 +72,27 @@ public sealed partial class MainWindow
         }
     }
 
-    internal void SetDocument(Document document) => _editor.SetDocument(document);
+    internal void SetDocument(Document document)
+    {
+        _editor.SetDocument(document);
+        WatchDocumentSelection();
+    }
+
+    private Document? _watchedDocument;
+
+    // The editor's own SelectionChanged follows its input box, which a
+    // selection made through automation or code may not move, so the document's
+    // selection is watched instead.
+    private void WatchDocumentSelection()
+    {
+        if (_watchedDocument is not null)
+        {
+            _watchedDocument.SelectionChanged -= Document_SelectionChanged;
+        }
+
+        _watchedDocument = _editor.Document;
+        _watchedDocument.SelectionChanged += Document_SelectionChanged;
+    }
 
     private void InitializeView()
     {

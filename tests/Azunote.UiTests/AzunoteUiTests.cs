@@ -564,10 +564,33 @@ public sealed class AzunoteUiTests : IDisposable
                     AzunoteUiFixture.WaitForElement(proposal, AutomationElement.NameProperty, "Document editor")),
                 text => text.Contains("-two\n+TWO", StringComparison.Ordinal));
             Assert.Contains("[READONLY]", proposal.Current.Name, StringComparison.Ordinal);
+
+            // Selecting a removed line in the diff selects its text in the
+            // document. The diff opened with "two" selected, as the document
+            // had it, so the whole line is selected to change the selection.
+            var diffEditor = AzunoteUiFixture.WaitForElement(proposal, AutomationElement.NameProperty, "Document editor");
+            var diffText = AzunoteUiFixture.WaitForTextPattern(diffEditor);
+            textPattern.DocumentRange.FindText("one", false, false)!.Select();
+            AzunoteUiFixture.WaitForSelectionText(textPattern, selected => selected == "one");
+            diffEditor.SetFocus();
+            diffText.DocumentRange.FindText("-two", false, false)!.Select();
+            AzunoteUiFixture.WaitForSelectionText(textPattern, selected => selected == "two");
+
+            // Typing into the document while the diff is open lands where
+            // the caret is, and the change still applies after it.
+            const ushort A = 0x41, B = 0x42, C = 0x43;
+            var end = textPattern.DocumentRange.Clone();
+            end.MoveEndpointByRange(TextPatternRangeEndpoint.Start, end, TextPatternRangeEndpoint.End);
+            end.Select();
+            editor.SetFocus();
+            SendKeyChord(A);
+            SendKeyChord(B);
+            SendKeyChord(C);
+            AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "one twoabc");
             ((InvokePattern)AzunoteUiFixture.WaitForElement(proposal, AutomationElement.NameProperty, "Apply")
                 .GetCurrentPattern(InvokePattern.Pattern)).Invoke();
 
-            AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "one TWO");
+            AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "one TWOabc");
             _fixture.WaitForWindows(windows => windows.Length == 1);
         }
         finally

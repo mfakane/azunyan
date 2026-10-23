@@ -83,6 +83,7 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         ToolsMenuItem.KeyDown += (_, _) => _runtime.RefreshExternalToolsMenuNow();
         Editor.ContextMenuOpening += (_, _) => _runtime.RefreshExternalToolsMenuNow();
         RegisterKeyboardAccelerators();
+        WatchDocumentSelection();
 
         if (_appWindow is not null)
         {
@@ -365,6 +366,7 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         proposal.Changed += Proposal_Changed;
         ShowProposalState(proposal);
         ProposalBar.IsOpen = true;
+        FollowProposalDocument();
     }
 
     // Edits to the document change the diff; one update follows a burst of them.
@@ -381,8 +383,18 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
             _proposalUpdatePending = false;
             if (_proposal is { } proposal)
             {
-                _runtime.ReplaceReadOnlyText(proposal.Diff);
+                _updatingProposalDiff = true;
+                try
+                {
+                    _runtime.ReplaceReadOnlyText(proposal.Diff);
+                }
+                finally
+                {
+                    _updatingProposalDiff = false;
+                }
+
                 ShowProposalState(proposal);
+                FollowProposalDocument();
             }
         });
     }
@@ -430,6 +442,12 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
 
     private void MainWindow_Closed(object sender, WindowEventArgs args)
     {
+        // The document can outlive this window when another one shows it.
+        if (_watchedDocument is not null)
+        {
+            _watchedDocument.SelectionChanged -= Document_SelectionChanged;
+        }
+
         if (_proposal is { } proposal)
         {
             proposal.Changed -= Proposal_Changed;
@@ -447,6 +465,68 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     {
         using var measurement = ShellPerformance.Measure("selection.changed");
         _runtime.RefreshStatus();
+    }
+
+    private void Document_SelectionChanged(object? sender, EventArgs e)
+    {
+        // A proposal's diff and its document select the same text. Only the
+        // window being worked in passes its selection on, so the selection
+        // one window receives is not passed back.
+        if (!_isWindowActive || _updatingProposalDiff)
+        {
+            return;
+        }
+
+        if (_proposal is { } proposal)
+        {
+            proposal.SelectInDocument(proposal.ToDocument(Document.Selection));
+        }
+        else
+        {
+            _application.SelectionChanged(this);
+        }
+    }
+
+    private bool _followPending;
+
+    // Set while this window changes its diff's text or selection itself, so
+    // those changes are not passed to the document as if the user made them.
+    private bool _updatingProposalDiff;
+
+    /// <summary>
+    /// Selects in this proposal's diff what is selected in its document, once
+    /// the document's editor is done with what moved its selection.
+    /// </summary>
+    internal void QueueFollowProposalDocument()
+    {
+        if (_followPending)
+        {
+            return;
+        }
+
+        _followPending = true;
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            _followPending = false;
+            FollowProposalDocument();
+        });
+    }
+
+    private void FollowProposalDocument()
+    {
+        if (_proposal?.ToDiff(_proposal.DocumentSelection) is { } selection)
+        {
+            _updatingProposalDiff = true;
+            try
+            {
+                Editor.SetDocumentSelection(selection);
+                Editor.ScrollSelectionIntoView();
+            }
+            finally
+            {
+                _updatingProposalDiff = false;
+            }
+        }
     }
 
     private void Editor_KeyDown(object sender, KeyRoutedEventArgs e)

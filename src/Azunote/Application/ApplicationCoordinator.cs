@@ -354,6 +354,18 @@ internal sealed class ApplicationCoordinator : IDisposable
         ActivateWindow(registration);
     }
 
+    /// <summary>Has the proposals for a window select what it selected.</summary>
+    internal void SelectionChanged(MainWindow source)
+    {
+        foreach (var (proposal, proposalSource) in _proposalSources)
+        {
+            if (ReferenceEquals(proposalSource, source))
+            {
+                proposal.QueueFollowProposalDocument();
+            }
+        }
+    }
+
     /// <summary>
     /// Opens an empty window and returns the document a streamed external-tool
     /// channel appends to, so its output appears as the tool produces it.

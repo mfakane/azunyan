@@ -17,7 +17,25 @@ public static class UnifiedDiff
     /// headers give the first line, so a diff of part of a document numbers its
     /// lines as the document does.
     /// </summary>
-    public static string Create(string oldText, string newText, string oldName, string newName, int firstLine = 1)
+    public static string Create(string oldText, string newText, string oldName, string newName, int firstLine = 1) =>
+        Create(oldText, newText, oldName, newName, firstLine, lines: null);
+
+    /// <summary>
+    /// One line of a written diff: its kind, <c>'f'</c> for a file header,
+    /// <c>'@'</c> for a hunk header, or the line's own prefix, and the
+    /// zero-based old line it stands for. An added line stands for the old
+    /// line it goes before, and a hunk header for the hunk's first old line.
+    /// </summary>
+    internal readonly record struct DiffLine(char Kind, int OldLine);
+
+    /// <summary>Writes the diff and adds a <see cref="DiffLine"/> for each of its lines.</summary>
+    internal static string Create(
+        string oldText,
+        string newText,
+        string oldName,
+        string newName,
+        int firstLine,
+        List<DiffLine>? lines)
     {
         ArgumentNullException.ThrowIfNull(oldText);
         ArgumentNullException.ThrowIfNull(newText);
@@ -32,6 +50,7 @@ public static class UnifiedDiff
         var builder = new StringBuilder();
         builder.Append("--- ").Append(oldName).Append('\n');
         builder.Append("+++ ").Append(newName).Append('\n');
+        lines?.AddRange([new DiffLine('f', 0), new DiffLine('f', 0)]);
         var index = 0;
         while (index < edits.Count)
         {
@@ -66,9 +85,11 @@ public static class UnifiedDiff
             builder.Append("@@ -").Append(Range(oldStart, oldCount, edits, start, '+', firstLine))
                 .Append(" +").Append(Range(newStart, newCount, edits, start, '-', firstLine))
                 .Append(" @@\n");
+            lines?.Add(new DiffLine('@', hunk[0].OldLine));
             foreach (var edit in hunk)
             {
                 builder.Append(edit.Kind).Append(edit.Text).Append('\n');
+                lines?.Add(new DiffLine(edit.Kind, edit.OldLine));
             }
 
             index = end + 1;

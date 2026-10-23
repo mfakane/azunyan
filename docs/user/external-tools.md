@@ -472,6 +472,12 @@ discarded. Changes on neighbouring lines both stand. The change keeps the line
 endings of the document, whichever ones the tool printed. Closing the
 document's window closes the windows of its proposed changes.
 
+The diff and the document select the same text. Selecting in the window being
+worked in selects the matching text in the other one and scrolls to it: a kept
+or removed line of the diff is that line of the document, and an added line or
+a header is where its change goes. A selection in the document takes the part
+of it the diff shows, and a caret on a line the diff leaves out moves nothing.
+
 ## Streaming output
 
 By default a channel's output is applied once the tool has exited. `stream`

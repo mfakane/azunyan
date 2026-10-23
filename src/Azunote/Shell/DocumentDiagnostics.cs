@@ -32,12 +32,18 @@ public sealed class DocumentDiagnostics
     public void Replace(string sourceKey, IEnumerable<DocumentDiagnostic> diagnostics)
     {
         ArgumentNullException.ThrowIfNull(diagnostics);
-        _items = _items
+        var items = _items
             .Where(item => item.SourceKey != sourceKey)
             .Concat(diagnostics)
             .OrderBy(item => item.Range.Start)
             .ThenBy(item => item.Severity)
             .ToList();
+        if (items.SequenceEqual(_items))
+        {
+            return;
+        }
+
+        _items = items;
         Changed?.Invoke(this, EventArgs.Empty);
     }
 

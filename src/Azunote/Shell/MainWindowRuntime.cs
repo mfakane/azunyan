@@ -624,6 +624,7 @@ internal sealed class MainWindowRuntime : IDisposable
         if ((next ? _diagnostics.Next(position) : _diagnostics.Previous(position)) is { } problem)
         {
             _view.Select(problem.Range);
+            _view.ScrollSelectionIntoView();
         }
     }
 
