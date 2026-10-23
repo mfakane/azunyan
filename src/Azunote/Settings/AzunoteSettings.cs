@@ -18,6 +18,12 @@ public sealed class AzunoteSettings
 
     public bool WindowSnapping { get; set; } = true;
 
+    /// <summary>
+    /// Encodings the menus offer besides the Unicode ones and the system's,
+    /// named as <see cref="TextEncoding.TryParse"/> reads them.
+    /// </summary>
+    public string[] Encodings { get; set; } = [];
+
     public AzunoteDebugSettings Debug { get; set; } = new();
 
     public AzunoteToolsSettings Tools { get; set; } = new();
@@ -1006,6 +1012,12 @@ public static class SettingsFileService
         settings.FontSize = double.IsFinite(settings.FontSize) && settings.FontSize > 0
             ? settings.FontSize
             : AzunoteSettings.DefaultFontSize;
+        settings.Encodings ??= [];
+        if (settings.Encodings.FirstOrDefault(name => !TextEncoding.TryParse(name, out _)) is { } unknown)
+        {
+            throw new SettingsFileException($"Unknown encoding '{unknown}' in encodings.");
+        }
+
         settings.Debug ??= new();
         settings.Debug.Validate();
         settings.Tools ??= new();

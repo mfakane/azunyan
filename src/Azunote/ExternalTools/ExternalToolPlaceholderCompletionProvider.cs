@@ -48,7 +48,7 @@ internal static class AzunotePlaceholderCatalog
         new("toolFolder", "Placeholder", "Directory containing the external-tool definition.", "${toolFolder} -> C:\\work\\tools"),
         new("document", "Placeholder", "The complete document text.", "${document} -> # Heading"),
         new("languageId", "Placeholder", "Identifier of the active language mode.", "${languageId} -> azunote.lang"),
-        new("encoding", "Placeholder", "Encoding of the current document.", "${encoding} -> Utf8"),
+        new("encoding", "Placeholder", "Encoding of the current document.", "${encoding} -> utf-8"),
         new("lineEnding", "Placeholder", "Line-ending style of the current document.", "${lineEnding} -> Lf"),
         new("platform", "Placeholder", "Operating-system identifier, such as windows or linux.", "${platform} -> windows"),
         new("architecture", "Placeholder", "Process architecture, such as x64 or arm64.", "${architecture} -> x64"),

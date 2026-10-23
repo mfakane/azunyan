@@ -16,7 +16,7 @@ public sealed class DocumentControllerTests
         var session = new DocumentSession();
         var files = new FakeTextFileStore();
         var controller = new DocumentController(editor, session, files, new FakeUserPrompt());
-        files.Files[path] = new TextFileData("original license", TextEncodingKind.Utf8, LineEndingKind.Lf);
+        files.Files[path] = new TextFileData("original license", TextEncoding.Utf8, LineEndingKind.Lf);
 
         await controller.OpenAsync(path);
         Assert.True(session.State.IsReadOnly);
@@ -24,7 +24,7 @@ public sealed class DocumentControllerTests
         editor.SetText("host update");
         Assert.False(await controller.SaveAsync());
         await Assert.ThrowsAsync<InvalidOperationException>(() => controller.SaveAsAsync(
-            new SaveFileDialogResult("copy.txt", TextEncodingKind.Utf8)));
+            new SaveFileDialogResult("copy.txt", TextEncoding.Utf8)));
         Assert.Equal("original license", files.Files[path].Text);
         Assert.Single(files.Files);
 
@@ -45,7 +45,7 @@ public sealed class DocumentControllerTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => controller.SaveAsAsync(
             new SaveFileDialogResult(Path.Combine(AppContext.BaseDirectory, "LICENSE"),
-                TextEncodingKind.Utf8)));
+                TextEncoding.Utf8)));
 
         Assert.Empty(files.Files);
         Assert.True(controller.Session.State.IsDirty);
@@ -73,7 +73,7 @@ public sealed class DocumentControllerTests
         var prompt = new FakeUserPrompt();
         var controller = new DocumentController(editor, session, files, prompt);
         files.Files[Path.GetFullPath("notes.txt")] =
-            new TextFileData("hello", TextEncodingKind.Utf8, LineEndingKind.Lf);
+            new TextFileData("hello", TextEncoding.Utf8, LineEndingKind.Lf);
 
         await controller.OpenAsync("notes.txt");
         Assert.Equal("hello", editor.Text);
@@ -118,17 +118,17 @@ public sealed class DocumentControllerTests
         var controller = new DocumentController(editor, session, files, prompt);
         session.Load(
             "notes.txt",
-            new TextFileData("saved", TextEncodingKind.Utf8, LineEndingKind.Lf));
+            new TextFileData("saved", TextEncoding.Utf8, LineEndingKind.Lf));
         editor.SetText("local");
         session.ObserveText(editor.Text);
 
         Assert.False(await controller.ApplyExternalChangeAsync(
-            new TextFileData("external", TextEncodingKind.Utf8, LineEndingKind.Lf)));
+            new TextFileData("external", TextEncoding.Utf8, LineEndingKind.Lf)));
         Assert.Equal("local", editor.Text);
 
         prompt.ExternalDecision = ExternalChangeDecision.Reload;
         Assert.True(await controller.ApplyExternalChangeAsync(
-            new TextFileData("external", TextEncodingKind.Utf8, LineEndingKind.Lf)));
+            new TextFileData("external", TextEncoding.Utf8, LineEndingKind.Lf)));
         Assert.Equal("external", editor.Text);
         Assert.False(session.State.IsDirty);
     }
@@ -143,7 +143,7 @@ public sealed class DocumentControllerTests
         var controller = new DocumentController(editor, session, files, prompt);
         session.Load(
             "notes.txt",
-            new TextFileData("first  \nsecond", TextEncodingKind.Utf8, LineEndingKind.Lf));
+            new TextFileData("first  \nsecond", TextEncoding.Utf8, LineEndingKind.Lf));
         editor.SetText("first  \nsecond");
         session.ObserveText(editor.Text);
         var settings = new EditorConfigSettings(
@@ -169,7 +169,7 @@ public sealed class DocumentControllerTests
         var controller = new DocumentController(editor, session, files, prompt);
         editor.SetText("first  \nsecond");
         var settings = new EditorConfigSettings(
-            Encoding: TextEncodingKind.Utf16BigEndian,
+            Encoding: TextEncoding.Utf16BigEndian,
             LineEnding: LineEndingKind.CrLf,
             InsertFinalNewline: true,
             TrimTrailingWhitespace: true);
@@ -177,14 +177,14 @@ public sealed class DocumentControllerTests
         await controller.SaveAsAsync(
             new SaveFileDialogResult(
                 "saved.txt",
-                TextEncodingKind.Utf8),
+                TextEncoding.Utf8),
             editorConfig: settings);
 
         var saved = files.Files[Path.GetFullPath("saved.txt")];
-        Assert.Equal(TextEncodingKind.Utf8, saved.Encoding);
+        Assert.Equal(TextEncoding.Utf8, saved.Encoding);
         Assert.Equal(LineEndingKind.CrLf, saved.LineEnding);
         Assert.Equal("first\nsecond\r\n", saved.Text);
-        Assert.Equal(TextEncodingKind.Utf8, session.State.Encoding);
+        Assert.Equal(TextEncoding.Utf8, session.State.Encoding);
         Assert.Equal(LineEndingKind.CrLf, session.State.LineEnding);
     }
 
@@ -197,13 +197,13 @@ public sealed class DocumentControllerTests
         var controller = new DocumentController(editor, session, files, new FakeUserPrompt());
         session.Load(
             "notes.txt",
-            new TextFileData("saved", TextEncodingKind.Utf8, LineEndingKind.Lf));
+            new TextFileData("saved", TextEncoding.Utf8, LineEndingKind.Lf));
         editor.SetText("saved");
         session.ObserveText(editor.Text);
         Assert.False(session.State.IsDirty);
 
         Assert.True(await controller.ApplyExternalChangeAsync(
-            new TextFileData("external", TextEncodingKind.Utf8, LineEndingKind.Lf)));
+            new TextFileData("external", TextEncoding.Utf8, LineEndingKind.Lf)));
         Assert.Equal("external", editor.Text);
         Assert.False(session.State.IsDirty);
 
@@ -222,17 +222,17 @@ public sealed class DocumentControllerTests
         var controller = new DocumentController(editor, session, files, new FakeUserPrompt());
         files.Files[Path.GetFullPath("notes.txt")] = new TextFileData(
             "saved",
-            TextEncodingKind.Utf8,
+            TextEncoding.Utf8,
             LineEndingKind.Lf);
         files.Files[Path.GetFullPath("tool-output.txt")] = new TextFileData(
             "tooled",
-            TextEncodingKind.Utf8,
+            TextEncoding.Utf8,
             LineEndingKind.Lf);
         await controller.OpenAsync("notes.txt");
 
         files.Files[Path.GetFullPath("notes.txt")] = new TextFileData(
             "changed",
-            TextEncodingKind.Utf8,
+            TextEncoding.Utf8,
             LineEndingKind.Lf);
         Assert.True(await controller.ReloadFromDiskAsync());
         Assert.Equal("changed", editor.Text);
@@ -286,20 +286,20 @@ public sealed class DocumentControllerTests
 
         public Task<TextFileData> ReadAsync(
             string path,
-            TextEncodingKind? encodingHint,
+            TextEncoding? encodingHint,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(Files[Path.GetFullPath(path)]);
 
         public Task<TextFileData> ReadWithEncodingAsync(
             string path,
-            TextEncodingKind encoding,
+            TextEncoding encoding,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(Files[Path.GetFullPath(path)] with { Encoding = encoding });
 
         public Task WriteAsync(
             string path,
             string text,
-            TextEncodingKind encoding,
+            TextEncoding encoding,
             LineEndingKind lineEnding,
             CancellationToken cancellationToken = default)
         {

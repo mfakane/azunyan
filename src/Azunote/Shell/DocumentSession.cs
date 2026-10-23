@@ -20,7 +20,7 @@ public sealed class DocumentSession
     private bool _formatChanged;
     private DocumentSessionState _state = new(
         FilePath: null,
-        Encoding: TextEncodingKind.Utf8,
+        Encoding: TextEncoding.Utf8,
         LineEnding: GetDefaultLineEnding(),
         IsDirty: false);
 
@@ -66,7 +66,7 @@ public sealed class DocumentSession
     /// Changes how the document is written on its next save. The document is
     /// dirty until then, so the choice is not lost on close.
     /// </summary>
-    public void ChangeFormat(TextEncodingKind? encoding, LineEndingKind? lineEnding)
+    public void ChangeFormat(TextEncoding? encoding, LineEndingKind? lineEnding)
     {
         var state = _state with
         {
@@ -117,7 +117,7 @@ public sealed class DocumentSession
 
     public void SetUntitled(
         string currentText,
-        TextEncodingKind encoding,
+        TextEncoding encoding,
         LineEndingKind lineEnding)
     {
         ArgumentNullException.ThrowIfNull(currentText);
@@ -152,7 +152,7 @@ public sealed class DocumentSession
     public void MarkSaved(
         string fullPath,
         string currentText,
-        TextEncodingKind encoding,
+        TextEncoding encoding,
         LineEndingKind lineEnding)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fullPath);
@@ -263,7 +263,7 @@ public sealed class DocumentSession
 
 public sealed record DocumentSessionState(
     string? FilePath,
-    TextEncodingKind Encoding,
+    TextEncoding Encoding,
     LineEndingKind LineEnding,
     bool IsDirty,
     bool IsReadOnly = false,

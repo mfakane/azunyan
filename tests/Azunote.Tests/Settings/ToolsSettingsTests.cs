@@ -104,4 +104,13 @@ public sealed class ToolsSettingsTests
             exception.Message,
             StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task Encodings_load_by_name_and_an_unknown_one_is_an_error()
+    {
+        var settings = await LoadAsync("encodings = [\"euc-jp\"]");
+
+        Assert.Equal(["euc-jp"], settings.Encodings);
+        await Assert.ThrowsAsync<SettingsFileException>(() => LoadAsync("encodings = [\"no-such-encoding\"]"));
+    }
 }

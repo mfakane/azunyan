@@ -9,7 +9,7 @@ public sealed class DocumentSessionTests
     public void Untitled_text_marked_read_only_has_nothing_to_save()
     {
         var session = new DocumentSession();
-        session.SetUntitled("diff text", TextEncodingKind.Utf8, LineEndingKind.Lf);
+        session.SetUntitled("diff text", TextEncoding.Utf8, LineEndingKind.Lf);
         Assert.True(session.State.IsDirty);
 
         session.MarkReadOnly("diff text");
@@ -30,7 +30,7 @@ public sealed class DocumentSessionTests
     public void Saved_comparison_preserves_mixed_newlines_and_trailing_newlines(string saved, string current, bool same)
     {
         var session = new DocumentSession();
-        session.MarkSaved("test.txt", saved, TextEncodingKind.Utf8, LineEndingKind.CrLf);
+        session.MarkSaved("test.txt", saved, TextEncoding.Utf8, LineEndingKind.CrLf);
         Assert.Equal(same, session.IsSameAsSaved(current));
         session.ObserveText(current);
         Assert.Equal(!same, session.State.IsDirty);
@@ -43,7 +43,7 @@ public sealed class DocumentSessionTests
     {
         var saved = string.Concat(Enumerable.Repeat("line\r\n", 100_000));
         var session = new DocumentSession();
-        session.MarkSaved("large.txt", saved, TextEncodingKind.Utf8, LineEndingKind.CrLf);
+        session.MarkSaved("large.txt", saved, TextEncoding.Utf8, LineEndingKind.CrLf);
         session.IsSameAsSaved(saved); // warm up diagnostics
         var before = GC.GetAllocatedBytesForCurrentThread();
         var same = session.IsSameAsSaved(saved);
@@ -57,10 +57,10 @@ public sealed class DocumentSessionTests
     {
         var session = new DocumentSession();
 
-        session.SetUntitled("", TextEncodingKind.Utf8, LineEndingKind.Lf);
+        session.SetUntitled("", TextEncoding.Utf8, LineEndingKind.Lf);
         Assert.False(session.State.IsDirty);
 
-        session.SetUntitled("from stdin", TextEncodingKind.Utf8, LineEndingKind.Lf);
+        session.SetUntitled("from stdin", TextEncoding.Utf8, LineEndingKind.Lf);
         Assert.True(session.State.IsDirty);
         Assert.Null(session.State.FilePath);
     }
@@ -71,7 +71,7 @@ public sealed class DocumentSessionTests
         var session = new DocumentSession();
         session.Load(
             "notes.txt",
-            new TextFileData("before", TextEncodingKind.Utf8, LineEndingKind.Lf));
+            new TextFileData("before", TextEncoding.Utf8, LineEndingKind.Lf));
 
         session.ObserveText("after");
         Assert.True(session.State.IsDirty);
@@ -88,7 +88,7 @@ public sealed class DocumentSessionTests
         var session = new DocumentSession();
         session.Load(
             "notes.txt",
-            new TextFileData("before\r\nafter", TextEncodingKind.Utf8, LineEndingKind.CrLf));
+            new TextFileData("before\r\nafter", TextEncoding.Utf8, LineEndingKind.CrLf));
 
         session.ObserveText("before\nafter");
 
@@ -102,14 +102,14 @@ public sealed class DocumentSessionTests
         var session = new DocumentSession();
         session.Load(
             "notes.txt",
-            new TextFileData("saved", TextEncodingKind.Utf8, LineEndingKind.Lf));
+            new TextFileData("saved", TextEncoding.Utf8, LineEndingKind.Lf));
 
         session.ApplyTemporaryReload(
-            new TextFileData("formatted", TextEncodingKind.Utf8Bom, LineEndingKind.CrLf),
+            new TextFileData("formatted", TextEncoding.Utf8Bom, LineEndingKind.CrLf),
             "formatted");
 
         Assert.Equal(Path.GetFullPath("notes.txt"), session.State.FilePath);
-        Assert.Equal(TextEncodingKind.Utf8Bom, session.State.Encoding);
+        Assert.Equal(TextEncoding.Utf8Bom, session.State.Encoding);
         Assert.Equal(LineEndingKind.CrLf, session.State.LineEnding);
         Assert.True(session.State.IsDirty);
         Assert.True(session.IsSameAsSaved("saved"));
@@ -119,16 +119,16 @@ public sealed class DocumentSessionTests
     public void Mark_saved_updates_path_and_clears_dirty_state()
     {
         var session = new DocumentSession();
-        session.SetUntitled("draft", TextEncodingKind.Utf8, LineEndingKind.Lf);
+        session.SetUntitled("draft", TextEncoding.Utf8, LineEndingKind.Lf);
 
         session.MarkSaved(
             "saved.md",
             "draft",
-            TextEncodingKind.Utf8Bom,
+            TextEncoding.Utf8Bom,
             LineEndingKind.CrLf);
 
         Assert.Equal(Path.GetFullPath("saved.md"), session.State.FilePath);
-        Assert.Equal(TextEncodingKind.Utf8Bom, session.State.Encoding);
+        Assert.Equal(TextEncoding.Utf8Bom, session.State.Encoding);
         Assert.Equal(LineEndingKind.CrLf, session.State.LineEnding);
         Assert.False(session.State.IsDirty);
     }
@@ -137,16 +137,16 @@ public sealed class DocumentSessionTests
     public void Format_from_editorconfig_is_not_an_unsaved_change_but_a_chosen_one_is()
     {
         var session = new DocumentSession();
-        session.MarkSaved("test.txt", "text", TextEncodingKind.Utf8, LineEndingKind.CrLf);
+        session.MarkSaved("test.txt", "text", TextEncoding.Utf8, LineEndingKind.CrLf);
 
         session.ApplyEditorConfig(EditorConfigSettings.Empty with { LineEnding = LineEndingKind.Lf });
         Assert.False(session.State.IsDirty);
 
-        session.ChangeFormat(TextEncodingKind.Utf8Bom, lineEnding: null);
+        session.ChangeFormat(TextEncoding.Utf8Bom, lineEnding: null);
         session.ObserveText("text");
         Assert.True(session.State.IsDirty);
 
-        session.MarkSaved("test.txt", "text", TextEncodingKind.Utf8Bom, LineEndingKind.Lf);
+        session.MarkSaved("test.txt", "text", TextEncoding.Utf8Bom, LineEndingKind.Lf);
         Assert.False(session.State.IsDirty);
     }
 }

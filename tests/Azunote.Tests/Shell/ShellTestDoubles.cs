@@ -351,7 +351,7 @@ internal sealed class FakeFileDialogService : IFileDialogService
 
     public SaveFileDialogResult? ShowSave(
         string suggestedFileName,
-        TextEncodingKind defaultEncoding,
+        TextEncoding defaultEncoding,
         IReadOnlyList<FileDialogFilter> filters,
         string defaultFilterId) => SaveResult;
 }
@@ -475,20 +475,20 @@ internal sealed class FakeTextFileStore : ITextFileStore
 
     public Task<TextFileData> ReadAsync(
         string path,
-        TextEncodingKind? encodingHint,
+        TextEncoding? encodingHint,
         CancellationToken cancellationToken = default) =>
         Task.FromResult(Files[Path.GetFullPath(path)]);
 
     public Task<TextFileData> ReadWithEncodingAsync(
         string path,
-        TextEncodingKind encoding,
+        TextEncoding encoding,
         CancellationToken cancellationToken = default) =>
         Task.FromResult(Files[Path.GetFullPath(path)] with { Encoding = encoding });
 
     public Task WriteAsync(
         string path,
         string text,
-        TextEncodingKind encoding,
+        TextEncoding encoding,
         LineEndingKind lineEnding,
         CancellationToken cancellationToken = default)
     {

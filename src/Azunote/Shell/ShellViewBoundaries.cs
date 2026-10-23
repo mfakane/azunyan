@@ -234,7 +234,7 @@ internal interface IFileDialogService
 
     SaveFileDialogResult? ShowSave(
         string suggestedFileName,
-        TextEncodingKind defaultEncoding,
+        TextEncoding defaultEncoding,
         IReadOnlyList<FileDialogFilter> filters,
         string defaultFilterId);
 }

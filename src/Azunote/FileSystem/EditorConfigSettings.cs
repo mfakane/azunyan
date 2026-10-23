@@ -11,7 +11,7 @@ public sealed record EditorConfigSettings(
     int? IndentSize = null,
     int? TabWidth = null,
     LineEndingKind? LineEnding = null,
-    TextEncodingKind? Encoding = null,
+    TextEncoding? Encoding = null,
     bool? InsertFinalNewline = null,
     bool? TrimTrailingWhitespace = null)
 {
@@ -21,7 +21,7 @@ public sealed record EditorConfigSettings(
         TabWidth ?? IndentSize ?? 4;
 
     public EditorConfigSettings WithExplicitFileFormat(
-        TextEncodingKind encoding,
+        TextEncoding encoding,
         LineEndingKind lineEnding) =>
         this with
         {

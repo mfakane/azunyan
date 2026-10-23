@@ -83,7 +83,7 @@ an empty string.
 | `${document}` | The complete document text. |
 | `${chatHistory}` | For prompt input, the current tool's conversation as a JSON array of role/content messages, including the latest user message. |
 | `${languageId}` | The active language-mode identifier. |
-| `${encoding}` | The current document encoding, such as `Utf8`. |
+| `${encoding}` | The current document encoding, such as `utf-8` or `shift_jis`. |
 | `${lineEnding}` | The current document line-ending style, such as `Lf`. |
 | `${platform}` | The operating-system identifier, such as `windows`, `linux`, or `macos`. |
 | `${architecture}` | The process architecture, such as `x64` or `arm64`. |

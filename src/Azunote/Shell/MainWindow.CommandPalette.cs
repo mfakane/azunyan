@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
@@ -23,6 +24,10 @@ public sealed partial class MainWindow
     private CommandPaletteItem[] _paletteCommands = [];
     private List<CommandPaletteItem> _paletteDocuments = [];
     private CommandPaletteItem? _openRecentPaletteItem;
+    // The choices offered in place of the commands and documents, such as
+    // the encodings of Other..., until the palette closes.
+    private CommandPaletteItem[]? _palettePicks;
+    private string? _palettePlaceholder;
     private CommandPaletteMatch[] _paletteMatches = [];
     private string? _paletteFilteredText;
     private bool _paletteRowsShown;
@@ -31,17 +36,53 @@ public sealed partial class MainWindow
 
     void IMainWindowActions.ShowCommandPalette() => ShowCommandPalette(CommandPalettePrefix);
 
-    private void ShowCommandPalette(string text)
+    internal void ShowEncodingPicker(TextEncoding current, string placeholder, Action<TextEncoding> select) =>
+        ShowCommandPalette(
+            string.Empty,
+            placeholder,
+            [
+                .. TextEncoding.GetAll().Select(encoding => new CommandPaletteItem(
+                    encoding.DisplayName,
+                    encoding.Name,
+                    Shortcut: null,
+                    IsEnabled: true,
+                    IsChecked: encoding == current,
+                    () => select(encoding)))
+            ]);
+
+    private void ShowCommandPalette(
+        string text,
+        string? placeholder = null,
+        CommandPaletteItem[]? picks = null)
     {
+        // A menu gives the focus back to where it was as it closes, which
+        // would close a palette opened from it at once, so the palette waits
+        // until the menus have closed.
+        if (XamlRoot is { } root
+            && VisualTreeHelper.GetOpenPopupsForXamlRoot(root).Any(popup => popup.Child is MenuFlyoutPresenter))
+        {
+            DispatcherQueue.TryEnqueue(
+                Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
+                () => ShowCommandPalette(text, placeholder, picks));
+            return;
+        }
+
         if (!IsCommandPaletteOpen)
         {
             CommandPaletteList.ItemContainerTransitions = CommandPaletteRowTransitions;
             _paletteRowsShown = false;
         }
 
-        _runtime.RefreshExternalToolsMenuNow();
-        _paletteCommands = OrderByRecentUse(CollectMenuCommands());
-        _paletteDocuments = CollectPaletteDocuments();
+        _palettePlaceholder ??= CommandPaletteTextBox.PlaceholderText;
+        CommandPaletteTextBox.PlaceholderText = placeholder ?? _palettePlaceholder;
+        _palettePicks = picks;
+        if (picks is null)
+        {
+            _runtime.RefreshExternalToolsMenuNow();
+            _paletteCommands = OrderByRecentUse(CollectMenuCommands());
+            _paletteDocuments = CollectPaletteDocuments();
+        }
+
         _paletteFilteredText = null;
         CommandPalettePanel.Visibility = Visibility.Visible;
         CommandPaletteTextBox.Text = text;
@@ -69,6 +110,7 @@ public sealed partial class MainWindow
         _paletteMatches = [];
         _paletteCommands = [];
         _paletteDocuments = [];
+        _palettePicks = null;
     }
 
     /// <summary>
@@ -85,8 +127,11 @@ public sealed partial class MainWindow
         }
 
         _paletteFilteredText = text;
-        var isCommandMode = text.StartsWith(CommandPalettePrefix, StringComparison.Ordinal);
-        IReadOnlyList<CommandPaletteItem> items = isCommandMode ? _paletteCommands : _paletteDocuments;
+        var isCommandMode = _palettePicks is null
+            && text.StartsWith(CommandPalettePrefix, StringComparison.Ordinal);
+        IReadOnlyList<CommandPaletteItem> items = _palettePicks is { } picks
+            ? picks
+            : isCommandMode ? _paletteCommands : _paletteDocuments;
         var query = (isCommandMode ? text[CommandPalettePrefix.Length..] : text).Trim();
         var matches = CommandPaletteSearch.Filter(query, items)
             .Take(MaxCommandPaletteResults)
@@ -140,7 +185,8 @@ public sealed partial class MainWindow
             return;
         }
 
-        if (CommandPaletteTextBox.Text.StartsWith(CommandPalettePrefix, StringComparison.Ordinal))
+        if (_palettePicks is null
+            && CommandPaletteTextBox.Text.StartsWith(CommandPalettePrefix, StringComparison.Ordinal))
         {
             var key = GetPaletteCommandKey(item);
             RecentPaletteCommands.Remove(key);

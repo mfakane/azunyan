@@ -9,7 +9,7 @@ namespace Azunote;
 
 public sealed record SaveFileDialogResult(
     string Path,
-    TextEncodingKind Encoding);
+    TextEncoding Encoding);
 
 /// <summary>
 /// Shows the Windows common Save dialog and adds the format controls used by
@@ -21,19 +21,13 @@ public static class NativeSaveFileDialog
     private const uint EncodingGroupId = 1000;
     private const uint EncodingControlId = 1001;
 
-    private const uint Utf8ItemId = 1;
-    private const uint Utf8BomItemId = 2;
-    private const uint Utf16LittleEndianItemId = 3;
-    private const uint Utf16BigEndianItemId = 4;
-    private const uint SystemDefaultItemId = 5;
-    private const uint Latin1ItemId = 6;
-
     private const int HResultCancelled = unchecked((int)0x800704C7);
 
     public static SaveFileDialogResult? Show(
         IntPtr ownerWindowHandle,
         string suggestedFileName,
-        TextEncodingKind defaultEncoding,
+        TextEncoding defaultEncoding,
+        IReadOnlyList<TextEncoding> encodings,
         IReadOnlyList<FileDialogFilter> filters,
         string defaultFilterId)
     {
@@ -66,14 +60,15 @@ public static class NativeSaveFileDialog
             fileSaveDialog.SetOptions(options | FILEOPENDIALOGOPTIONS.FOS_FORCEFILESYSTEM | FILEOPENDIALOGOPTIONS.FOS_OVERWRITEPROMPT);
 
             customize = (IFileDialogCustomize)fileSaveDialog;
-            AddEncodingControl(customize, defaultEncoding);
+            encodings = encodings.Contains(defaultEncoding) ? encodings : [.. encodings, defaultEncoding];
+            AddEncodingControl(customize, defaultEncoding, encodings);
 
             fileSaveDialog.Show(new HWND(ownerWindowHandle));
             fileSaveDialog.GetResult(out resultItem);
             var path = GetFileSystemPath(resultItem);
             customize.GetSelectedControlItem(EncodingControlId, out var encodingItemId);
 
-            return new SaveFileDialogResult(path, GetEncoding(encodingItemId));
+            return new SaveFileDialogResult(path, encodings[(int)encodingItemId]);
         }
         catch (COMException exception) when (exception.HResult == HResultCancelled)
         {
@@ -152,17 +147,17 @@ public static class NativeSaveFileDialog
     /// </summary>
     private static void AddEncodingControl(
         IFileDialogCustomize customize,
-        TextEncodingKind defaultEncoding)
+        TextEncoding defaultEncoding,
+        IReadOnlyList<TextEncoding> encodings)
     {
         customize.StartVisualGroup(EncodingGroupId, "Encoding:");
         customize.AddComboBox(EncodingControlId);
-        customize.AddControlItem(EncodingControlId, Utf8ItemId, "UTF-8");
-        customize.AddControlItem(EncodingControlId, Utf8BomItemId, "UTF-8 BOM");
-        customize.AddControlItem(EncodingControlId, Utf16LittleEndianItemId, "UTF-16 LE");
-        customize.AddControlItem(EncodingControlId, Utf16BigEndianItemId, "UTF-16 BE");
-        customize.AddControlItem(EncodingControlId, Latin1ItemId, "Latin-1");
-        customize.AddControlItem(EncodingControlId, SystemDefaultItemId, "System default");
-        customize.SetSelectedControlItem(EncodingControlId, GetEncodingItemId(defaultEncoding));
+        for (var index = 0; index < encodings.Count; index++)
+        {
+            customize.AddControlItem(EncodingControlId, (uint)index, encodings[index].DisplayName);
+        }
+
+        customize.SetSelectedControlItem(EncodingControlId, (uint)encodings.TakeWhile(encoding => encoding != defaultEncoding).Count());
         customize.EndVisualGroup();
         customize.MakeProminent(EncodingGroupId);
     }
@@ -180,28 +175,6 @@ public static class NativeSaveFileDialog
             Marshal.FreeCoTaskMem((IntPtr)path.Value);
         }
     }
-
-    private static uint GetEncodingItemId(TextEncodingKind encoding) => encoding switch
-    {
-        TextEncodingKind.Utf8 => Utf8ItemId,
-        TextEncodingKind.Utf8Bom => Utf8BomItemId,
-        TextEncodingKind.Utf16LittleEndian => Utf16LittleEndianItemId,
-        TextEncodingKind.Utf16BigEndian => Utf16BigEndianItemId,
-        TextEncodingKind.Latin1 => Latin1ItemId,
-        TextEncodingKind.SystemDefault => SystemDefaultItemId,
-        _ => Utf8ItemId
-    };
-
-    private static TextEncodingKind GetEncoding(uint itemId) => itemId switch
-    {
-        Utf8ItemId => TextEncodingKind.Utf8,
-        Utf8BomItemId => TextEncodingKind.Utf8Bom,
-        Utf16LittleEndianItemId => TextEncodingKind.Utf16LittleEndian,
-        Utf16BigEndianItemId => TextEncodingKind.Utf16BigEndian,
-        Latin1ItemId => TextEncodingKind.Latin1,
-        SystemDefaultItemId => TextEncodingKind.SystemDefault,
-        _ => throw new InvalidOperationException("The Save dialog returned an unknown encoding.")
-    };
 
     private static void ReleaseComObject(object? value)
     {

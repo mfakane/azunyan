@@ -18,11 +18,11 @@ public sealed class DocumentWorkflowTests
             OpenPath = "notes.txt",
             SaveResult = new SaveFileDialogResult(
                 "renamed.txt",
-                TextEncodingKind.Utf8Bom)
+                TextEncoding.Utf8Bom)
         };
         files.Files[Path.GetFullPath("notes.txt")] = new TextFileData(
             "hello",
-            TextEncodingKind.Utf8,
+            TextEncoding.Utf8,
             LineEndingKind.Lf);
         var workflow = CreateWorkflow(editor, session, files, prompt, dialogs);
 
@@ -41,7 +41,7 @@ public sealed class DocumentWorkflowTests
         workflow.ObserveTextChanged();
         Assert.True(await workflow.SaveAsAsync());
         Assert.Equal(Path.GetFullPath("renamed.txt"), workflow.CurrentFilePath);
-        Assert.Equal(TextEncodingKind.Utf8Bom, workflow.CurrentEncoding);
+        Assert.Equal(TextEncoding.Utf8Bom, workflow.CurrentEncoding);
         Assert.False(workflow.IsDirty);
     }
 
@@ -83,7 +83,7 @@ public sealed class DocumentWorkflowTests
         var dialogs = new FakeFileDialogService { OpenPath = "notes.txt" };
         files.Files[Path.GetFullPath("notes.txt")] = new TextFileData(
             "hello",
-            TextEncodingKind.Utf8,
+            TextEncoding.Utf8,
             LineEndingKind.Lf);
         var newWindowCount = 0;
         var workflow = CreateWorkflow(
@@ -115,7 +115,7 @@ public sealed class DocumentWorkflowTests
         var prompt = new FakeUserPrompt();
         files.Files[Path.GetFullPath("notes.txt")] = new TextFileData(
             "hello",
-            TextEncodingKind.Utf8,
+            TextEncoding.Utf8,
             LineEndingKind.Lf);
         var newWindowCount = 0;
         var workflow = CreateWorkflow(
@@ -208,7 +208,7 @@ public sealed class DocumentWorkflowTests
         var dialogs = new FakeFileDialogService { OpenPath = "other.txt" };
         files.Files[Path.GetFullPath("current.txt")] = new TextFileData(
             "current",
-            TextEncodingKind.Utf8,
+            TextEncoding.Utf8,
             LineEndingKind.Lf);
         var openedPath = string.Empty;
         var workflow = CreateWorkflow(
@@ -260,7 +260,7 @@ public sealed class DocumentWorkflowTests
             var dialogs = new FakeFileDialogService { OpenPath = path };
             files.Files[Path.GetFullPath(path)] = new TextFileData(
                 "first\nsecond",
-                TextEncodingKind.Utf8,
+                TextEncoding.Utf8,
                 LineEndingKind.Lf);
             var workflow = CreateWorkflow(editor, session, files, prompt, dialogs);
 
@@ -270,7 +270,7 @@ public sealed class DocumentWorkflowTests
             Assert.Equal(2, editor.IndentSize);
             Assert.Equal(IndentationInputMode.Spaces, editor.IndentationInputMode);
             Assert.Equal("\r\n", editor.PreferredLineEnding);
-            Assert.Equal(TextEncodingKind.Utf8Bom, workflow.CurrentEncoding);
+            Assert.Equal(TextEncoding.Utf8Bom, workflow.CurrentEncoding);
             Assert.Equal(LineEndingKind.CrLf, workflow.CurrentLineEnding);
         }
         finally
@@ -312,7 +312,7 @@ public sealed class DocumentWorkflowTests
             {
                 SaveResult = new SaveFileDialogResult(
                     path,
-                    TextEncodingKind.Utf8)
+                    TextEncoding.Utf8)
             };
             var workflow = CreateWorkflow(editor, session, files, prompt, dialogs);
             await workflow.OpenStartupTextAsync("first  \nsecond");
@@ -320,7 +320,7 @@ public sealed class DocumentWorkflowTests
             Assert.True(await workflow.SaveAsAsync());
 
             Assert.Equal("first\nsecond\n", files.Files[Path.GetFullPath(path)].Text);
-            Assert.Equal(TextEncodingKind.Utf8, workflow.CurrentEncoding);
+            Assert.Equal(TextEncoding.Utf8, workflow.CurrentEncoding);
             Assert.Equal(LineEndingKind.Lf, workflow.CurrentLineEnding);
             Assert.Equal(8, editor.TabDisplaySize);
             Assert.Equal(IndentationInputMode.Tab, editor.IndentationInputMode);
@@ -344,7 +344,7 @@ public sealed class DocumentWorkflowTests
             var editor = new FakeEditorView();
             var session = new DocumentSession();
             var files = new FakeTextFileStore();
-            files.Files[Path.GetFullPath(path)] = new TextFileData("text", TextEncodingKind.Utf8, LineEndingKind.Lf);
+            files.Files[Path.GetFullPath(path)] = new TextFileData("text", TextEncoding.Utf8, LineEndingKind.Lf);
             var factory = new FakeFileChangeMonitorFactory();
             var workflow = CreateWorkflow(
                 editor,
@@ -399,7 +399,7 @@ public sealed class DocumentWorkflowTests
                 () => Task.CompletedTask,
                 _ => Task.CompletedTask);
             await workflow.OpenFileAsync();
-            Assert.True(await workflow.SaveWithEncodingAsync(TextEncodingKind.Utf16LittleEndian));
+            Assert.True(await workflow.SaveWithEncodingAsync(TextEncoding.Utf16LittleEndian));
 
             for (var attempt = 0; attempt < 40 && !session.State.IsDeletedOnDisk; attempt++)
             {
@@ -421,7 +421,7 @@ public sealed class DocumentWorkflowTests
         var editor = new FakeEditorView();
         var session = new DocumentSession();
         var files = new FakeTextFileStore();
-        files.Files[path] = new TextFileData("a\r\nb", TextEncodingKind.Utf8, LineEndingKind.CrLf);
+        files.Files[path] = new TextFileData("a\r\nb", TextEncoding.Utf8, LineEndingKind.CrLf);
         var workflow = CreateWorkflow(
             editor,
             session,
@@ -436,13 +436,13 @@ public sealed class DocumentWorkflowTests
         workflow.ObserveTextChanged();
         Assert.True(workflow.IsDirty);
 
-        Assert.True(await workflow.SaveWithEncodingAsync(TextEncodingKind.Utf16LittleEndian));
-        Assert.Equal(TextEncodingKind.Utf16LittleEndian, files.Files[path].Encoding);
+        Assert.True(await workflow.SaveWithEncodingAsync(TextEncoding.Utf16LittleEndian));
+        Assert.Equal(TextEncoding.Utf16LittleEndian, files.Files[path].Encoding);
         Assert.Equal(LineEndingKind.Lf, files.Files[path].LineEnding);
         Assert.False(workflow.IsDirty);
 
-        await workflow.ReopenWithEncodingAsync(TextEncodingKind.Latin1);
-        Assert.Equal(TextEncodingKind.Latin1, session.State.Encoding);
+        await workflow.ReopenWithEncodingAsync(TextEncoding.Latin1);
+        Assert.Equal(TextEncoding.Latin1, session.State.Encoding);
         Assert.False(workflow.IsDirty);
     }
 
@@ -462,7 +462,7 @@ public sealed class DocumentWorkflowTests
             var dialogs = new FakeFileDialogService { OpenPath = path };
             files.Files[Path.GetFullPath(path)] = new TextFileData(
                 "before",
-                TextEncodingKind.Utf8,
+                TextEncoding.Utf8,
                 LineEndingKind.Lf);
             var factory = new FakeFileChangeMonitorFactory();
             var workflow = CreateWorkflow(
@@ -476,7 +476,7 @@ public sealed class DocumentWorkflowTests
             await workflow.OpenFileAsync();
             files.Files[Path.GetFullPath(path)] = new TextFileData(
                 "after",
-                TextEncodingKind.Utf8,
+                TextEncoding.Utf8,
                 LineEndingKind.Lf);
             factory.Monitors[^1].Trigger(path);
             await Task.Delay(30);
@@ -507,7 +507,7 @@ public sealed class DocumentWorkflowTests
             var fullPath = Path.GetFullPath(path);
             files.Files[fullPath] = new TextFileData(
                 "before",
-                TextEncodingKind.Utf8,
+                TextEncoding.Utf8,
                 LineEndingKind.Lf);
             var factory = new FakeFileChangeMonitorFactory();
             var workflow = CreateWorkflow(
@@ -521,7 +521,7 @@ public sealed class DocumentWorkflowTests
             await workflow.OpenFileAsync();
             files.Files[fullPath] = new TextFileData(
                 "after",
-                TextEncodingKind.Utf8,
+                TextEncoding.Utf8,
                 LineEndingKind.Lf);
             factory.Monitors[^1].Trigger(path);
             await Task.Delay(30);
@@ -536,7 +536,7 @@ public sealed class DocumentWorkflowTests
             Assert.True(workflow.IsDirty);
             files.Files[fullPath] = new TextFileData(
                 "third",
-                TextEncodingKind.Utf8,
+                TextEncoding.Utf8,
                 LineEndingKind.Lf);
             factory.Monitors[^1].Trigger(path);
             await Task.Delay(30);
@@ -593,20 +593,20 @@ public sealed class DocumentWorkflowTests
 
         public Task<TextFileData> ReadAsync(
             string path,
-            TextEncodingKind? encodingHint,
+            TextEncoding? encodingHint,
             CancellationToken cancellationToken = default) =>
             _files.ReadAsync(path, encodingHint, cancellationToken);
 
         public Task<TextFileData> ReadWithEncodingAsync(
             string path,
-            TextEncodingKind encoding,
+            TextEncoding encoding,
             CancellationToken cancellationToken = default) =>
             _files.ReadWithEncodingAsync(path, encoding, cancellationToken);
 
         public async Task WriteAsync(
             string path,
             string text,
-            TextEncodingKind encoding,
+            TextEncoding encoding,
             LineEndingKind lineEnding,
             CancellationToken cancellationToken = default)
         {

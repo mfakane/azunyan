@@ -40,7 +40,7 @@ public sealed class EditorConfigResolverTests
             Assert.Equal(2, settings.IndentSize);
             Assert.Equal(6, settings.TabWidth);
             Assert.Equal(LineEndingKind.Lf, settings.LineEnding);
-            Assert.Equal(TextEncodingKind.Utf8Bom, settings.Encoding);
+            Assert.Equal(TextEncoding.Utf8Bom, settings.Encoding);
             Assert.True(settings.InsertFinalNewline);
             Assert.True(settings.TrimTrailingWhitespace);
         }

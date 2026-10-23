@@ -820,11 +820,14 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
 
     void IMainWindowActions.ToggleComment() => _runtime.ToggleComment();
 
-    void IMainWindowActions.ReopenWithEncoding(TextEncodingKind encoding) =>
+    void IMainWindowActions.ReopenWithEncoding(TextEncoding encoding) =>
         _runtime.ReopenWithEncoding(encoding);
 
-    void IMainWindowActions.SaveWithEncoding(TextEncodingKind encoding) =>
+    void IMainWindowActions.SaveWithEncoding(TextEncoding encoding) =>
         _runtime.SaveWithEncoding(encoding);
+
+    void IMainWindowActions.ShowEncodingPicker(bool reopen) =>
+        _runtime.ShowEncodingPicker(reopen);
 
     void IMainWindowActions.ChangeLineEnding(LineEndingKind lineEnding) =>
         _runtime.ChangeLineEnding(lineEnding);

@@ -83,7 +83,7 @@ internal sealed class DocumentWorkflow : IDisposable
         ? Path.GetFileName(path)
         : "Untitled";
 
-    public TextEncodingKind CurrentEncoding => State.Encoding;
+    public TextEncoding CurrentEncoding => State.Encoding;
 
     public LineEndingKind CurrentLineEnding => State.LineEnding;
 
@@ -229,7 +229,7 @@ internal sealed class DocumentWorkflow : IDisposable
     /// Rereads the file with an encoding the user chose. Unsaved changes are
     /// confirmed first, because the reread text replaces them.
     /// </summary>
-    public async Task ReopenWithEncodingAsync(TextEncodingKind encoding)
+    public async Task ReopenWithEncodingAsync(TextEncoding encoding)
     {
         if (CurrentFilePath is null || (IsDirty && !await ConfirmPendingChangesAsync()))
         {
@@ -254,7 +254,7 @@ internal sealed class DocumentWorkflow : IDisposable
     }
 
     /// <summary>Saves the document in another encoding.</summary>
-    public async Task<bool> SaveWithEncodingAsync(TextEncodingKind encoding)
+    public async Task<bool> SaveWithEncodingAsync(TextEncoding encoding)
     {
         ChangeFileFormat(encoding, lineEnding: null);
         return await SaveAsync();
@@ -270,7 +270,7 @@ internal sealed class DocumentWorkflow : IDisposable
         NotifyChanged(CurrentLineEnding, opened: false);
     }
 
-    private void ChangeFileFormat(TextEncodingKind? encoding, LineEndingKind? lineEnding)
+    private void ChangeFileFormat(TextEncoding? encoding, LineEndingKind? lineEnding)
     {
         if (_documents.Session.State.IsReadOnly)
         {

@@ -10,7 +10,7 @@ public sealed class DocumentStatusPresenterTests
     public void Read_only_document_title_contains_the_readonly_marker()
     {
         var session = new DocumentSession();
-        session.Load("LICENSE", new TextFileData("license", TextEncodingKind.Utf8, LineEndingKind.Lf),
+        session.Load("LICENSE", new TextFileData("license", TextEncoding.Utf8, LineEndingKind.Lf),
             isReadOnly: true);
         var chrome = new FakeWindowChromeView();
         var presenter = new DocumentStatusPresenter(
@@ -31,7 +31,7 @@ public sealed class DocumentStatusPresenterTests
             "notes.txt",
             new TextFileData(
                 "first\nsecond",
-                TextEncodingKind.Utf8Bom,
+                TextEncoding.Utf8Bom,
                 LineEndingKind.Lf));
         var status = new FakeStatusBarView();
         var chrome = new FakeWindowChromeView();
@@ -58,7 +58,7 @@ public sealed class DocumentStatusPresenterTests
         var session = new DocumentSession();
         session.Load(
             "notes.txt",
-            new TextFileData("\tvalue", TextEncodingKind.Utf8, LineEndingKind.Lf));
+            new TextFileData("\tvalue", TextEncoding.Utf8, LineEndingKind.Lf));
         var status = new FakeStatusBarView();
         var chrome = new FakeWindowChromeView();
         var presenter = new DocumentStatusPresenter(editor, session, status, chrome);
@@ -77,7 +77,7 @@ public sealed class DocumentStatusPresenterTests
         var session = new DocumentSession();
         session.Load(
             "notes.txt",
-            new TextFileData("value\n  child", TextEncodingKind.Utf8, LineEndingKind.Lf));
+            new TextFileData("value\n  child", TextEncoding.Utf8, LineEndingKind.Lf));
         var status = new FakeStatusBarView();
         var chrome = new FakeWindowChromeView();
         var presenter = new DocumentStatusPresenter(editor, session, status, chrome);

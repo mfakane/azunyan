@@ -38,7 +38,7 @@ public sealed partial record ExternalToolContext
         int columnNumber = 1,
         string? languageId = null,
         string? toolDirectory = null,
-        TextEncodingKind encoding = TextEncodingKind.Utf8,
+        TextEncoding? encoding = null,
         LineEndingKind lineEnding = LineEndingKind.Lf,
         bool isDirty = false,
         LineColumn? selectionStart = null,
@@ -68,7 +68,7 @@ public sealed partial record ExternalToolContext
         ColumnNumber = columnNumber;
         LanguageId = languageId ?? string.Empty;
         LanguageExtensions = languageExtensions ?? [];
-        Encoding = encoding;
+        Encoding = encoding ?? TextEncoding.Utf8;
         LineEnding = lineEnding;
         IsDirty = isDirty;
         SelectionStart = selectionStart ?? new LineColumn(lineNumber - 1, columnNumber - 1);
@@ -173,7 +173,7 @@ public sealed partial record ExternalToolContext
     /// </summary>
     public IReadOnlyList<string> LanguageExtensions { get; }
 
-    public TextEncodingKind Encoding { get; }
+    public TextEncoding Encoding { get; }
 
     public LineEndingKind LineEnding { get; }
 

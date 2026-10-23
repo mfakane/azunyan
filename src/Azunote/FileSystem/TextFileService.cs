@@ -2,16 +2,6 @@ using System.Text;
 
 namespace Azunote;
 
-public enum TextEncodingKind
-{
-    Utf8,
-    Utf8Bom,
-    Utf16LittleEndian,
-    Utf16BigEndian,
-    Latin1,
-    SystemDefault
-}
-
 public enum LineEndingKind
 {
     Lf,
@@ -23,22 +13,11 @@ public enum LineEndingKind
 
 public sealed record TextFileData(
     string Text,
-    TextEncodingKind Encoding,
+    TextEncoding Encoding,
     LineEndingKind LineEnding);
 
 public static class TextFileService
 {
-    static TextFileService()
-    {
-        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-    }
-
-    private static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
-    private static readonly UTF8Encoding Utf8Bom = new(encoderShouldEmitUTF8Identifier: true, throwOnInvalidBytes: true);
-    private static readonly UnicodeEncoding Utf16LittleEndian = new(bigEndian: false, byteOrderMark: true);
-    private static readonly UnicodeEncoding Utf16BigEndian = new(bigEndian: true, byteOrderMark: true);
-    private static readonly Encoding Latin1 = Encoding.Latin1;
-
     public static Task<TextFileData> ReadAsync(
         string path,
         CancellationToken cancellationToken = default) =>
@@ -46,20 +25,12 @@ public static class TextFileService
 
     public static async Task<TextFileData> ReadAsync(
         string path,
-        TextEncodingKind? encodingHint,
+        TextEncoding? encodingHint,
         CancellationToken cancellationToken = default)
     {
         var bytes = await File.ReadAllBytesAsync(path, cancellationToken);
         var (encoding, body) = DetectEncoding(bytes, encodingHint);
-        var text = encoding switch
-        {
-            TextEncodingKind.Utf8 => Utf8.GetString(body),
-            TextEncodingKind.Utf8Bom => Utf8Bom.GetString(body),
-            TextEncodingKind.Utf16LittleEndian => Utf16LittleEndian.GetString(body),
-            TextEncodingKind.Utf16BigEndian => Utf16BigEndian.GetString(body),
-            TextEncodingKind.Latin1 => Latin1.GetString(body),
-            _ => GetSystemDefaultEncoding().GetString(body)
-        };
+        var text = encoding.GetEncoding().GetString(body);
 
         return new TextFileData(text, encoding, DetectLineEnding(text));
     }
@@ -71,13 +42,13 @@ public static class TextFileService
     /// </summary>
     public static async Task<TextFileData> ReadWithEncodingAsync(
         string path,
-        TextEncodingKind encoding,
+        TextEncoding encoding,
         CancellationToken cancellationToken = default)
     {
         var bytes = await File.ReadAllBytesAsync(path, cancellationToken);
-        var decoder = GetEncoding(encoding);
-        var byteOrderMark = encoding is TextEncodingKind.Utf8 or TextEncodingKind.Utf8Bom
-            ? Utf8Bom.GetPreamble()
+        var decoder = encoding.GetEncoding();
+        var byteOrderMark = encoding.CodePage == TextEncoding.Utf8.CodePage
+            ? TextEncoding.Utf8Bom.GetEncoding().GetPreamble()
             : decoder.GetPreamble();
         var body = bytes.AsSpan().StartsWith(byteOrderMark)
             ? bytes.AsSpan(byteOrderMark.Length)
@@ -89,7 +60,7 @@ public static class TextFileService
     public static async Task WriteAsync(
         string path,
         string text,
-        TextEncodingKind encodingKind,
+        TextEncoding encodingKind,
         CancellationToken cancellationToken = default)
     {
         await WriteAsync(path, text, encodingKind, lineEnding: null, cancellationToken);
@@ -98,7 +69,7 @@ public static class TextFileService
     public static async Task WriteAsync(
         string path,
         string text,
-        TextEncodingKind encodingKind,
+        TextEncoding encodingKind,
         LineEndingKind lineEnding,
         CancellationToken cancellationToken = default)
     {
@@ -108,11 +79,11 @@ public static class TextFileService
     private static async Task WriteAsync(
         string path,
         string text,
-        TextEncodingKind encodingKind,
+        TextEncoding encodingKind,
         LineEndingKind? lineEnding,
         CancellationToken cancellationToken)
     {
-        var encoding = GetEncoding(encodingKind);
+        var encoding = encodingKind.GetEncoding();
         var preamble = encoding.GetPreamble();
         var body = encoding.GetBytes(NormalizeLineEndings(text, lineEnding));
         var bytes = new byte[preamble.Length + body.Length];
@@ -224,16 +195,6 @@ public static class TextFileService
         };
     }
 
-    public static string GetEncodingDisplayName(TextEncodingKind encoding) => encoding switch
-    {
-        TextEncodingKind.Utf8 => "UTF-8",
-        TextEncodingKind.Utf8Bom => "UTF-8 BOM",
-        TextEncodingKind.Utf16LittleEndian => "UTF-16 LE",
-        TextEncodingKind.Utf16BigEndian => "UTF-16 BE",
-        TextEncodingKind.Latin1 => "Latin-1",
-        _ => "System default"
-    };
-
     public static string GetLineEndingDisplayName(LineEndingKind lineEnding) => lineEnding switch
     {
         LineEndingKind.CrLf => "CRLF",
@@ -243,31 +204,30 @@ public static class TextFileService
         _ => "None"
     };
 
-    private static (TextEncodingKind Encoding, byte[] Body) DetectEncoding(
+    private static (TextEncoding Encoding, byte[] Body) DetectEncoding(
         byte[] bytes,
-        TextEncodingKind? encodingHint)
+        TextEncoding? encodingHint)
     {
         if (bytes.AsSpan().StartsWith(new byte[] { 0xEF, 0xBB, 0xBF }))
         {
-            return (TextEncodingKind.Utf8Bom, bytes[3..]);
+            return (TextEncoding.Utf8Bom, bytes[3..]);
         }
 
         if (bytes.AsSpan().StartsWith(new byte[] { 0xFF, 0xFE }))
         {
-            return (TextEncodingKind.Utf16LittleEndian, bytes[2..]);
+            return (TextEncoding.Utf16LittleEndian, bytes[2..]);
         }
 
         if (bytes.AsSpan().StartsWith(new byte[] { 0xFE, 0xFF }))
         {
-            return (TextEncodingKind.Utf16BigEndian, bytes[2..]);
+            return (TextEncoding.Utf16BigEndian, bytes[2..]);
         }
 
-        if (encodingHint is { } hintedEncoding
-            && hintedEncoding != TextEncodingKind.SystemDefault)
+        if (encodingHint is { } hintedEncoding)
         {
             try
             {
-                _ = GetEncoding(hintedEncoding).GetString(bytes);
+                _ = hintedEncoding.GetEncoding().GetString(bytes);
                 return (hintedEncoding, bytes);
             }
             catch (DecoderFallbackException)
@@ -279,24 +239,12 @@ public static class TextFileService
 
         try
         {
-            Utf8.GetString(bytes);
-            return (TextEncodingKind.Utf8, bytes);
+            TextEncoding.Utf8.GetEncoding().GetString(bytes);
+            return (TextEncoding.Utf8, bytes);
         }
         catch (DecoderFallbackException)
         {
-            return (TextEncodingKind.SystemDefault, bytes);
+            return (TextEncoding.SystemDefault, bytes);
         }
     }
-
-    private static Encoding GetEncoding(TextEncodingKind encoding) => encoding switch
-    {
-        TextEncodingKind.Utf8 => Utf8,
-        TextEncodingKind.Utf8Bom => Utf8Bom,
-        TextEncodingKind.Utf16LittleEndian => Utf16LittleEndian,
-        TextEncodingKind.Utf16BigEndian => Utf16BigEndian,
-        TextEncodingKind.Latin1 => Latin1,
-        _ => GetSystemDefaultEncoding()
-    };
-
-    private static Encoding GetSystemDefaultEncoding() => Encoding.GetEncoding(0);
 }

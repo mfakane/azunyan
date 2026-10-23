@@ -13,6 +13,7 @@ internal sealed class MainWindowRuntime : IDisposable
     private readonly LanguageModeController _languageModes;
     private readonly DocumentWorkflow _documents;
     private readonly SettingsWorkflow _settings;
+    private IReadOnlyList<TextEncoding> _encodings = TextEncoding.GetOffered([]);
     private readonly LatestUiWork<ExternalToolEvaluationInput, Dictionary<ExternalToolSettings, ExternalToolMenuState>> _toolUpdates;
     private readonly ExternalToolAvailabilityCache _toolCache;
     private readonly PowerShellWarmPool _powerShellWarmPool = new();
@@ -57,6 +58,7 @@ internal sealed class MainWindowRuntime : IDisposable
         _window = window ?? throw new ArgumentNullException(nameof(window));
         _view = new MainWindow.ViewBoundary(window);
         _window.SetDiagnosticsProvider(new DocumentDiagnosticsProvider(_diagnostics));
+        _window.SetEncodingMenus(_encodings);
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _refreshWindowMenus = refreshWindowMenus ?? throw new ArgumentNullException(nameof(refreshWindowMenus));
         _filePathActions = filePathActions ?? throw new ArgumentNullException(nameof(filePathActions));
@@ -105,7 +107,7 @@ internal sealed class MainWindowRuntime : IDisposable
             _view,
             documents,
             externalTools,
-            new NativeFileDialogService(_view.WindowHandle),
+            new NativeFileDialogService(_view.WindowHandle, () => _encodings),
             new DefaultFileChangeMonitorFactory(),
             _dispatcher,
             _prompt,
@@ -262,6 +264,14 @@ internal sealed class MainWindowRuntime : IDisposable
         _view.SetFontFamily(settings.FontFamily);
         _view.SetFontSize(settings.FontSize);
         _window.SetWindowSnappingEnabled(settings.WindowSnapping);
+        // The menus are rebuilt only when the list changes, so an open menu
+        // keeps its items when the settings are read again.
+        var encodings = TextEncoding.GetOffered(settings.Encodings);
+        if (!encodings.SequenceEqual(_encodings))
+        {
+            _encodings = encodings;
+            _window.SetEncodingMenus(encodings);
+        }
     }
 
     public Task OpenStartupDocumentAsync(
@@ -417,6 +427,7 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public void ShowEncodingMenu() =>
         _window.ShowEncodingMenu(
+            _encodings,
             _session.State.Encoding,
             canReopen: _session.State.FilePath is not null,
             canSave: !_session.State.IsReadOnly,
@@ -425,11 +436,17 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public void ShowLineEndingMenu() => _window.ShowLineEndingMenu();
 
-    public void ReopenWithEncoding(TextEncodingKind encoding) =>
+    public void ReopenWithEncoding(TextEncoding encoding) =>
         _ = _documents.ReopenWithEncodingAsync(encoding);
 
-    public void SaveWithEncoding(TextEncodingKind encoding) =>
+    public void SaveWithEncoding(TextEncoding encoding) =>
         _ = _documents.SaveWithEncodingAsync(encoding);
+
+    public void ShowEncodingPicker(bool reopen) =>
+        _window.ShowEncodingPicker(
+            _session.State.Encoding,
+            reopen ? "Reopen with encoding" : "Save with encoding",
+            reopen ? ReopenWithEncoding : SaveWithEncoding);
 
     public void ChangeLineEnding(LineEndingKind lineEnding) =>
         _documents.ChangeLineEnding(lineEnding);

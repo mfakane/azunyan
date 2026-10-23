@@ -310,13 +310,13 @@ internal sealed class EditorConfigResolver : IEditorConfigResolver
             _ => null
         };
 
-        private static TextEncodingKind? ParseEncoding(string? value) => value switch
+        private static TextEncoding? ParseEncoding(string? value) => value switch
         {
-            "utf-8" => TextEncodingKind.Utf8,
-            "utf-8-bom" => TextEncodingKind.Utf8Bom,
-            "utf-16le" => TextEncodingKind.Utf16LittleEndian,
-            "utf-16be" => TextEncodingKind.Utf16BigEndian,
-            "latin1" => TextEncodingKind.Latin1,
+            "utf-8" => TextEncoding.Utf8,
+            "utf-8-bom" => TextEncoding.Utf8Bom,
+            "utf-16le" => TextEncoding.Utf16LittleEndian,
+            "utf-16be" => TextEncoding.Utf16BigEndian,
+            "latin1" => TextEncoding.Latin1,
             _ => null
         };
     }

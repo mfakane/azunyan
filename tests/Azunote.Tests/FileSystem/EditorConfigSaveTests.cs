@@ -50,10 +50,10 @@ public sealed class EditorConfigSaveTests
 
             var result = await TextFileService.ReadAsync(
                 path,
-                encodingHint: TextEncodingKind.Utf16LittleEndian);
+                encodingHint: TextEncoding.Utf16LittleEndian);
 
             Assert.Equal("日本語", result.Text);
-            Assert.Equal(TextEncodingKind.Utf16LittleEndian, result.Encoding);
+            Assert.Equal(TextEncoding.Utf16LittleEndian, result.Encoding);
         }
         finally
         {
@@ -77,14 +77,14 @@ public sealed class EditorConfigSaveTests
             await TextFileService.WriteAsync(
                 path,
                 "café",
-                TextEncodingKind.Latin1);
+                TextEncoding.Latin1);
 
             var result = await TextFileService.ReadAsync(
                 path,
-                encodingHint: TextEncodingKind.Latin1);
+                encodingHint: TextEncoding.Latin1);
 
             Assert.Equal("café", result.Text);
-            Assert.Equal(TextEncodingKind.Latin1, result.Encoding);
+            Assert.Equal(TextEncoding.Latin1, result.Encoding);
         }
         finally
         {
@@ -108,14 +108,14 @@ public sealed class EditorConfigSaveTests
             await TextFileService.WriteAsync(
                 path,
                 "日本語",
-                TextEncodingKind.Utf8Bom);
+                TextEncoding.Utf8Bom);
 
             var result = await TextFileService.ReadAsync(
                 path,
-                encodingHint: TextEncodingKind.Utf16LittleEndian);
+                encodingHint: TextEncoding.Utf16LittleEndian);
 
             Assert.Equal("日本語", result.Text);
-            Assert.Equal(TextEncodingKind.Utf8Bom, result.Encoding);
+            Assert.Equal(TextEncoding.Utf8Bom, result.Encoding);
         }
         finally
         {

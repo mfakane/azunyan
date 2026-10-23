@@ -495,38 +495,10 @@
                     x:Name="OpenRecentMenuItem"
                     Text="Open Recent"
                 />
-                <MenuFlyoutSubItem Text="Reopen with Encoding">
-                    <MenuFlyoutItem
-                        Text="UTF-8"
-                        Command="{x:Bind ViewModel.ReopenWithEncodingCommand}"
-                        CommandParameter="Utf8"
-                    />
-                    <MenuFlyoutItem
-                        Text="UTF-8 BOM"
-                        Command="{x:Bind ViewModel.ReopenWithEncodingCommand}"
-                        CommandParameter="Utf8Bom"
-                    />
-                    <MenuFlyoutItem
-                        Text="UTF-16 LE"
-                        Command="{x:Bind ViewModel.ReopenWithEncodingCommand}"
-                        CommandParameter="Utf16LittleEndian"
-                    />
-                    <MenuFlyoutItem
-                        Text="UTF-16 BE"
-                        Command="{x:Bind ViewModel.ReopenWithEncodingCommand}"
-                        CommandParameter="Utf16BigEndian"
-                    />
-                    <MenuFlyoutItem
-                        Text="Latin-1"
-                        Command="{x:Bind ViewModel.ReopenWithEncodingCommand}"
-                        CommandParameter="Latin1"
-                    />
-                    <MenuFlyoutItem
-                        Text="System default"
-                        Command="{x:Bind ViewModel.ReopenWithEncodingCommand}"
-                        CommandParameter="SystemDefault"
-                    />
-                </MenuFlyoutSubItem>
+                <MenuFlyoutSubItem
+                    x:Name="ReopenWithEncodingMenuItem"
+                    Text="Reopen with Encoding"
+                />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem
                     Text="Save"
@@ -550,40 +522,10 @@
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
                 <MenuFlyoutSubItem
+                    x:Name="SaveWithEncodingMenuItem"
                     Text="Save with Encoding"
                     IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
-                >
-                    <MenuFlyoutItem
-                        Text="UTF-8"
-                        Command="{x:Bind ViewModel.SaveWithEncodingCommand}"
-                        CommandParameter="Utf8"
-                    />
-                    <MenuFlyoutItem
-                        Text="UTF-8 BOM"
-                        Command="{x:Bind ViewModel.SaveWithEncodingCommand}"
-                        CommandParameter="Utf8Bom"
-                    />
-                    <MenuFlyoutItem
-                        Text="UTF-16 LE"
-                        Command="{x:Bind ViewModel.SaveWithEncodingCommand}"
-                        CommandParameter="Utf16LittleEndian"
-                    />
-                    <MenuFlyoutItem
-                        Text="UTF-16 BE"
-                        Command="{x:Bind ViewModel.SaveWithEncodingCommand}"
-                        CommandParameter="Utf16BigEndian"
-                    />
-                    <MenuFlyoutItem
-                        Text="Latin-1"
-                        Command="{x:Bind ViewModel.SaveWithEncodingCommand}"
-                        CommandParameter="Latin1"
-                    />
-                    <MenuFlyoutItem
-                        Text="System default"
-                        Command="{x:Bind ViewModel.SaveWithEncodingCommand}"
-                        CommandParameter="SystemDefault"
-                    />
-                </MenuFlyoutSubItem>
+                />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem
                     Text="Exit"

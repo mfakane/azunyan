@@ -6,6 +6,10 @@ fontFamily = "Consolas"
 fontSize = 14
 windowSnapping = true
 
+# Encodings the encoding menus list besides the Unicode ones and the system's
+# code page. File > Reopen/Save with Encoding > Other... lists every encoding.
+encodings = []
+
 # Detailed operation logs are disabled by default. Available categories are
 # "all", "render", "clipboard", "key", and "input".
 [debug]

@@ -74,18 +74,20 @@ internal sealed class MainWindowViewModel :
         ToggleCommentCommand = Command(() => Actions.ToggleComment());
         ReopenWithEncodingCommand = Command(parameter =>
         {
-            if (Enum.TryParse<TextEncodingKind>(parameter?.ToString(), out var encoding))
+            if (parameter is TextEncoding encoding)
             {
                 Actions.ReopenWithEncoding(encoding);
             }
         });
+        ReopenWithOtherEncodingCommand = Command(() => Actions.ShowEncodingPicker(reopen: true));
         SaveWithEncodingCommand = Command(parameter =>
         {
-            if (Enum.TryParse<TextEncodingKind>(parameter?.ToString(), out var encoding))
+            if (parameter is TextEncoding encoding)
             {
                 Actions.SaveWithEncoding(encoding);
             }
         });
+        SaveWithOtherEncodingCommand = Command(() => Actions.ShowEncodingPicker(reopen: false));
         ChangeLineEndingCommand = Command(parameter =>
         {
             if (Enum.TryParse<LineEndingKind>(parameter?.ToString(), out var lineEnding))
@@ -240,6 +242,8 @@ internal sealed class MainWindowViewModel :
     public ICommand ToggleCommentCommand { get; }
     public ICommand ReopenWithEncodingCommand { get; }
     public ICommand SaveWithEncodingCommand { get; }
+    public ICommand ReopenWithOtherEncodingCommand { get; }
+    public ICommand SaveWithOtherEncodingCommand { get; }
     public ICommand ChangeLineEndingCommand { get; }
     public ICommand ShowFindCommand { get; }
     public ICommand ShowReplaceCommand { get; }
@@ -608,8 +612,9 @@ internal interface IMainWindowActions
     void DeleteLines();
     void AddNextOccurrence();
     void ToggleComment();
-    void ReopenWithEncoding(TextEncodingKind encoding);
-    void SaveWithEncoding(TextEncodingKind encoding);
+    void ReopenWithEncoding(TextEncoding encoding);
+    void SaveWithEncoding(TextEncoding encoding);
+    void ShowEncodingPicker(bool reopen);
     void ChangeLineEnding(LineEndingKind lineEnding);
     void ShowFind();
     void ShowReplace();

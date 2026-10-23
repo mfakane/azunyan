@@ -32,7 +32,7 @@ internal sealed class DocumentStatusPresenter
         var currentLineEnding = lineEnding ?? _session.State.LineEnding;
         var state = new StatusBarState(
             $"Ln {lineColumn.Line + 1}, Col {lineColumn.Column + 1}",
-            TextFileService.GetEncodingDisplayName(_session.State.Encoding),
+            _session.State.Encoding.DisplayName,
             TextFileService.GetLineEndingDisplayName(currentLineEnding),
             TextEditorCommands.GetDocumentIndentationSettings(
                 snapshot,

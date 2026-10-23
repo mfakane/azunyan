@@ -1,5 +1,6 @@
 using Azunyan.Core;
 using Azunyan.WinUI;
+using System.Windows.Input;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -432,27 +433,63 @@ public sealed partial class MainWindow
         menu.ShowAt(_indentationStatus);
     }
 
+    /// <summary>
+    /// Fills File &gt; Reopen with Encoding and Save with Encoding with the
+    /// offered encodings, followed by Other... for the rest.
+    /// </summary>
+    internal void SetEncodingMenus(IReadOnlyList<TextEncoding> encodings)
+    {
+        FillEncodingMenu(ReopenWithEncodingMenuItem, encodings, _viewModel.ReopenWithEncodingCommand, _viewModel.ReopenWithOtherEncodingCommand);
+        FillEncodingMenu(SaveWithEncodingMenuItem, encodings, _viewModel.SaveWithEncodingCommand, _viewModel.SaveWithOtherEncodingCommand);
+    }
+
+    private static void FillEncodingMenu(
+        MenuFlyoutSubItem menu,
+        IReadOnlyList<TextEncoding> encodings,
+        ICommand command,
+        ICommand otherCommand)
+    {
+        menu.Items.Clear();
+        foreach (var encoding in encodings)
+        {
+            menu.Items.Add(new MenuFlyoutItem
+            {
+                Text = encoding.DisplayName,
+                Command = command,
+                CommandParameter = encoding
+            });
+        }
+
+        menu.Items.Add(new MenuFlyoutSeparator());
+        menu.Items.Add(new MenuFlyoutItem { Text = "Other...", Command = otherCommand });
+    }
+
     internal void ShowEncodingMenu(
-        TextEncodingKind current,
+        IReadOnlyList<TextEncoding> encodings,
+        TextEncoding current,
         bool canReopen,
         bool canSave,
-        Action<TextEncodingKind> reopen,
-        Action<TextEncodingKind> save)
+        Action<TextEncoding> reopen,
+        Action<TextEncoding> save)
     {
         var reopenMenu = new MenuFlyoutSubItem { Text = "Reopen with Encoding", IsEnabled = canReopen };
         var saveMenu = new MenuFlyoutSubItem { Text = "Save with Encoding", IsEnabled = canSave };
-        foreach (var encoding in Enum.GetValues<TextEncodingKind>())
+        foreach (var encoding in encodings.Contains(current) ? encodings : [.. encodings, current])
         {
             reopenMenu.Items.Add(CreateFormatItem(
-                TextFileService.GetEncodingDisplayName(encoding),
+                encoding.DisplayName,
                 encoding == current,
                 () => reopen(encoding)));
             saveMenu.Items.Add(CreateFormatItem(
-                TextFileService.GetEncodingDisplayName(encoding),
+                encoding.DisplayName,
                 encoding == current,
                 () => save(encoding)));
         }
 
+        reopenMenu.Items.Add(new MenuFlyoutSeparator());
+        reopenMenu.Items.Add(new MenuFlyoutItem { Text = "Other...", Command = _viewModel.ReopenWithOtherEncodingCommand });
+        saveMenu.Items.Add(new MenuFlyoutSeparator());
+        saveMenu.Items.Add(new MenuFlyoutItem { Text = "Other...", Command = _viewModel.SaveWithOtherEncodingCommand });
         new MenuFlyout { Items = { reopenMenu, saveMenu } }.ShowAt(EncodingStatus);
     }
 

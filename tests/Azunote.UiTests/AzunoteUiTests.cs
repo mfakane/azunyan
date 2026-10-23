@@ -965,6 +965,24 @@ public sealed class AzunoteUiTests : IDisposable
                 () => File.ReadAllBytes(document) is [0xFF, 0xFE, ..] ? document : null,
                 "Save with Encoding did not write UTF-16 LE.");
             Assert.Equal("a\nb", File.ReadAllText(document));
+
+            // Other... lists every encoding in the command palette. The File
+            // menu is opened again once the last choice has closed it.
+            AzunoteUiFixture.WaitFor(
+                () => FindMenuItem(window, "Save with Encoding") is null ? window : null,
+                "The File menu did not close after Save with Encoding.");
+            // Enter chooses it as a user would, so the menu hands the focus
+            // back as it closes.
+            AzunoteUiFixture.OpenMenu(window, "File");
+            WaitForSubmenuItem(window, "Save with Encoding", "Other...").SetFocus();
+            SendEnterKey();
+            Thread.Sleep(500);
+            SetCommandPaletteText(WaitForCommandPalette(window, text => text.Length == 0), "shift_jis");
+            AzunoteUiFixture.WaitForElement(window, AutomationElement.NameProperty, "Japanese (Shift-JIS)");
+            SendEnterKey();
+            AzunoteUiFixture.WaitFor(
+                () => File.ReadAllBytes(document) is [(byte)'a', (byte)'\n', (byte)'b'] ? document : null,
+                "Save with Encoding > Other... did not write Shift_JIS.");
         }
         finally
         {
@@ -1016,8 +1034,8 @@ public sealed class AzunoteUiTests : IDisposable
 
             ((ExpandCollapsePattern)encoding.GetCurrentPattern(ExpandCollapsePattern.Pattern)).Expand();
             AzunoteUiFixture.WaitFor(
-                () => encoding.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, "Latin-1")),
-                "The encoding combo box does not offer Latin-1.");
+                () => encoding.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, "UTF-16 BE")),
+                "The encoding combo box does not offer UTF-16 BE.");
             ((ExpandCollapsePattern)encoding.GetCurrentPattern(ExpandCollapsePattern.Pattern)).Collapse();
         }
         finally
@@ -1434,21 +1452,42 @@ public sealed class AzunoteUiTests : IDisposable
     private static extern uint SendInput(uint count, NativeInput[] inputs, int size);
 
     /// <summary>Expands a submenu of an open flyout and invokes one of its items.</summary>
-    private static void InvokeSubmenuItem(AutomationElement window, string submenuName, string itemName)
-    {
-        var submenu = AzunoteUiFixture.WaitFor(
-            () => FindMenuItem(window, submenuName),
-            $"Could not find the {submenuName} submenu.");
-        ((ExpandCollapsePattern)submenu.GetCurrentPattern(ExpandCollapsePattern.Pattern)).Expand();
-        InvokeFlyoutItem(window, itemName);
-    }
+    private static void InvokeSubmenuItem(AutomationElement window, string submenuName, string itemName) =>
+        InvokeMenuItem(WaitForSubmenuItem(window, submenuName, itemName));
+
+    /// <summary>
+    /// Expands a submenu of an open flyout until one of its items shows. The
+    /// pointer passing over another item can close the submenu again, so it
+    /// is expanded again while the item does not show.
+    /// </summary>
+    private static AutomationElement WaitForSubmenuItem(AutomationElement window, string submenuName, string itemName) =>
+        AzunoteUiFixture.WaitFor(
+            () =>
+            {
+                if (FindMenuItem(window, itemName) is { } item)
+                {
+                    return item;
+                }
+
+                if (FindMenuItem(window, submenuName) is { } submenu
+                    && submenu.GetCurrentPattern(ExpandCollapsePattern.Pattern) is ExpandCollapsePattern pattern
+                    && pattern.Current.ExpandCollapseState == ExpandCollapseState.Collapsed)
+                {
+                    pattern.Expand();
+                }
+
+                return null;
+            },
+            $"Could not find the {itemName} item of the {submenuName} submenu.");
 
     /// <summary>Invokes an item of an open flyout.</summary>
-    private static void InvokeFlyoutItem(AutomationElement window, string itemName)
-    {
-        var item = AzunoteUiFixture.WaitFor(
+    private static void InvokeFlyoutItem(AutomationElement window, string itemName) =>
+        InvokeMenuItem(AzunoteUiFixture.WaitFor(
             () => FindMenuItem(window, itemName),
-            $"Could not find the {itemName} menu item.");
+            $"Could not find the {itemName} menu item."));
+
+    private static void InvokeMenuItem(AutomationElement item)
+    {
         if (item.TryGetCurrentPattern(InvokePattern.Pattern, out var invoke))
         {
             ((InvokePattern)invoke).Invoke();

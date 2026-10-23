@@ -57,11 +57,11 @@ public sealed class DocumentBackupStoreTests : IDisposable
         tracker.Flush();
         Assert.Empty(store.ReadAll());
 
-        session.SetUntitled(text, TextEncodingKind.Utf8, LineEndingKind.CrLf);
+        session.SetUntitled(text, TextEncoding.Utf8, LineEndingKind.CrLf);
         tracker.Flush();
         Assert.Equal(new DocumentBackup(session.BackupId, null, "draft"), Assert.Single(store.ReadAll()));
 
-        session.MarkSaved(Path.Combine(_directory.FullName, "draft.txt"), text, TextEncodingKind.Utf8, LineEndingKind.CrLf);
+        session.MarkSaved(Path.Combine(_directory.FullName, "draft.txt"), text, TextEncoding.Utf8, LineEndingKind.CrLf);
         Assert.Empty(store.ReadAll());
     }
 
@@ -70,7 +70,7 @@ public sealed class DocumentBackupStoreTests : IDisposable
     {
         var store = new DocumentBackupStore(_directory.FullName);
         var session = new DocumentSession();
-        session.SetUntitled("piped", TextEncodingKind.Utf8, LineEndingKind.CrLf);
+        session.SetUntitled("piped", TextEncoding.Utf8, LineEndingKind.CrLf);
         using var tracker = new DocumentBackupTracker(store, session, () => "piped");
         tracker.Flush();
 

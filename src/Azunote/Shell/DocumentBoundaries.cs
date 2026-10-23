@@ -10,18 +10,18 @@ public interface ITextFileStore
 
     Task<TextFileData> ReadAsync(
         string path,
-        TextEncodingKind? encodingHint,
+        TextEncoding? encodingHint,
         CancellationToken cancellationToken = default);
 
     Task<TextFileData> ReadWithEncodingAsync(
         string path,
-        TextEncodingKind encoding,
+        TextEncoding encoding,
         CancellationToken cancellationToken = default);
 
     Task WriteAsync(
         string path,
         string text,
-        TextEncodingKind encoding,
+        TextEncoding encoding,
         LineEndingKind lineEnding,
         CancellationToken cancellationToken = default);
 }
@@ -35,20 +35,20 @@ public sealed class TextFileStore : ITextFileStore
 
     public Task<TextFileData> ReadAsync(
         string path,
-        TextEncodingKind? encodingHint,
+        TextEncoding? encodingHint,
         CancellationToken cancellationToken = default) =>
         TextFileService.ReadAsync(path, encodingHint, cancellationToken);
 
     public Task<TextFileData> ReadWithEncodingAsync(
         string path,
-        TextEncodingKind encoding,
+        TextEncoding encoding,
         CancellationToken cancellationToken = default) =>
         TextFileService.ReadWithEncodingAsync(path, encoding, cancellationToken);
 
     public Task WriteAsync(
         string path,
         string text,
-        TextEncodingKind encoding,
+        TextEncoding encoding,
         LineEndingKind lineEnding,
         CancellationToken cancellationToken = default) =>
         TextFileService.WriteAsync(path, text, encoding, lineEnding, cancellationToken);

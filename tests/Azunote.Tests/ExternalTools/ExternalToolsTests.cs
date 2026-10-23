@@ -225,7 +225,7 @@ public sealed class ExternalToolsTests
             string.Empty,
             languageId: "markdown",
             toolDirectory: Path.Combine("tools", "Format"),
-            encoding: TextEncodingKind.Utf8Bom,
+            encoding: TextEncoding.Utf8Bom,
             lineEnding: LineEndingKind.CrLf,
             isDirty: true);
 
@@ -243,7 +243,7 @@ public sealed class ExternalToolsTests
             $"{context.FileBasenameNoExtension}|{context.FileExtname}|{context.FileDirnameBasename}",
             context.Expand("${fileBasenameNoExtension}|${fileExtname}|${fileDirnameBasename}"));
         Assert.Equal("notes.md", context.Expand("${documentName}"));
-        Assert.Equal("markdown|Utf8Bom|CrLf", context.Expand("${languageId}|${encoding}|${lineEnding}"));
+        Assert.Equal("markdown|utf-8-bom|CrLf", context.Expand("${languageId}|${encoding}|${lineEnding}"));
     }
 
     [Fact]
@@ -1262,7 +1262,7 @@ public sealed class ExternalToolsTests
             await TextFileService.WriteAsync(
                 path,
                 "first\rsecond\r\nthird",
-                TextEncodingKind.Utf8);
+                TextEncoding.Utf8);
 
             Assert.Equal(
                 $"first{Environment.NewLine}second\r\nthird",
@@ -1288,7 +1288,7 @@ public sealed class ExternalToolsTests
             await TextFileService.WriteAsync(
                 path,
                 "first\r\nsecond\nthird",
-                TextEncodingKind.Utf8Bom,
+                TextEncoding.Utf8Bom,
                 LineEndingKind.Lf);
 
             var bytes = await File.ReadAllBytesAsync(path);

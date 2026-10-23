@@ -30,6 +30,7 @@ The file uses TOML syntax. The top-level settings are:
 | `fontFamily` | Font used by the editor and renderer. The default is `Consolas`. |
 | `fontSize` | Font size used by the editor and renderer. The default is `14`. |
 | `windowSnapping` | Enables magnetic alignment between Azunote windows while moving or resizing. The default is `true`. |
+| `encodings` | Encodings listed in the encoding menus besides UTF-8, UTF-8 BOM, UTF-16 LE, UTF-16 BE, and the system's code page, such as `["euc-jp", "iso-2022-jp"]`. Names are those .NET knows, or code page numbers. The default is `[]`. |
 | `[debug].logging` | Detailed diagnostic categories: `all`, `render`, `clipboard`, `key`, and `input`. An empty array disables high-volume diagnostic logging. |
 | `[tools].powerShellWarmProcesses` | Most PowerShell processes kept waiting at once for `[launch].pwsh` tools, 1 to 16. The default is half the logical processor count, between 1 and 4. |
 | `[tools].powerShellWarmIdleProcesses` | PowerShell processes kept waiting while no tool is running, 0 to `powerShellWarmProcesses`. The default is `1`. |
@@ -93,6 +94,9 @@ Besides edits to the text, two things leave a document unsaved:
 File > Save with Encoding saves in the chosen encoding at once, and File >
 Reopen with Encoding reads the file again in the chosen encoding instead of
 the detected one. Both are also available from the encoding in the status bar.
+The menus list the Unicode encodings, the system's code page, and those named
+by `encodings` in settings.toml. Other... lists every encoding in the command
+palette, where typing narrows them by name.
 The Save As dialog chooses the encoding beside its Save button; the line
 ending follows `end_of_line` in the target folder's `.editorconfig`, or else
 stays the document's.

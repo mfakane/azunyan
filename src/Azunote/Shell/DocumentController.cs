@@ -34,7 +34,7 @@ public sealed class DocumentController
 
     public Task<TextFileData> ReadAsync(
         string path,
-        TextEncodingKind? encodingHint,
+        TextEncoding? encodingHint,
         CancellationToken cancellationToken = default) =>
         _files.ReadAsync(path, encodingHint, cancellationToken);
 
@@ -66,7 +66,7 @@ public sealed class DocumentController
 
     public async Task OpenAsync(
         string path,
-        TextEncodingKind? encodingHint,
+        TextEncoding? encodingHint,
         CancellationToken cancellationToken = default)
     {
         var data = await _files.ReadAsync(path, encodingHint, cancellationToken);
@@ -81,7 +81,7 @@ public sealed class DocumentController
         ReplaceEditorText(text);
         _session.SetUntitled(
             text,
-            TextEncodingKind.Utf8,
+            TextEncoding.Utf8,
             DocumentSession.GetLineEndingOrDefault(TextFileService.DetectLineEnding(text)));
     }
 
@@ -90,7 +90,7 @@ public sealed class DocumentController
         ReplaceEditorText(string.Empty);
         _session.SetUntitled(
             string.Empty,
-            TextEncodingKind.Utf8,
+            TextEncoding.Utf8,
             DocumentSession.GetDefaultLineEnding());
     }
 
@@ -170,7 +170,7 @@ public sealed class DocumentController
         ReloadFromDiskAsync(encodingHint: null, cancellationToken: cancellationToken);
 
     public async Task<bool> ReloadFromDiskAsync(
-        TextEncodingKind? encodingHint,
+        TextEncoding? encodingHint,
         CancellationToken cancellationToken = default)
     {
         var path = _session.State.FilePath;
@@ -190,7 +190,7 @@ public sealed class DocumentController
     /// replaced as an edit, so undo returns to the previous decoding.
     /// </summary>
     public async Task<bool> ReopenWithEncodingAsync(
-        TextEncodingKind encoding,
+        TextEncoding encoding,
         CancellationToken cancellationToken = default)
     {
         if (_session.State.FilePath is not { } path)
@@ -214,7 +214,7 @@ public sealed class DocumentController
 
     public async Task<bool> ReloadFromTemporaryFileAsync(
         string path,
-        TextEncodingKind? encodingHint,
+        TextEncoding? encodingHint,
         CancellationToken cancellationToken = default)
     {
         if (_session.State.IsReadOnly) return false;
