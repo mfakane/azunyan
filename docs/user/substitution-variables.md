@@ -1,118 +1,99 @@
-# Substitution Variables
+# Substitution variables
 
-Azunote expands substitution variables in command-related settings. A variable
-has the form `${name}`. Environment variables use the form `${env:NAME}`.
+Commands configured in Azunote can refer to the document and its surroundings
+with substitution variables. A variable has the form `${name}`, and an
+environment variable the form `${env:NAME}`.
 
-Unknown variables are left unchanged. If a known variable has no value in the
-current context, it expands to an empty string.
+Unknown variables are left unchanged. A known variable with no value in the
+current context, such as `${documentFile}` in an untitled document, expands to
+an empty string.
 
 ## Where variables are expanded
 
-Variables are expanded in the following fields:
+- `settings.toml`: `command`, `args`, and `workingDirectory` in
+  [`[terminal]` and `[explorer]`](settings.md#settingstoml).
+- [External tool definitions](tool-definitions.md): `command`, `args`, `cmd`,
+  `pwsh`, `workingDirectory`, and `stdin` in `[launch]`, and the values in
+  `[env]`.
 
-- `settings.toml`: `terminal.command`, `terminal.args`,
-  `terminal.workingDirectory`, and the corresponding `explorer` fields.
-- External tool definitions: `[launch].command`, `[launch].args`,
-  `[launch].cmd`, `[launch].pwsh`, `[launch].workingDirectory`,
-  `[launch].stdin`, and values in the `[env]`
-  table.
-
-Expansion is performed before each external process invocation. With
-`per` enabled, `${input}` is the current partition for that invocation; for
-`per = regex:...`, `${input:1}` and `${input:groupname}` refer to numbered and
-named capture groups. It is otherwise the empty string unless an invocation
-context sets it explicitly.
-The expanded arguments remain separate arguments; they are not passed through a
-shell.
+Variables are expanded each time the command runs. An argument stays one
+argument after expansion, even when the value contains spaces; it is not passed
+through a shell.
 
 ## VS Code-style variables
 
-These variables follow the names used by VS Code's predefined variables.
+These variables follow the names of VS Code's predefined variables.
 
 | Variable | Expands to |
 | --- | --- |
-| `${userHome}` | The current user's home directory. |
-| `${workspaceFolder}` | The workspace folder containing the document. Azunote discovers it from the nearest ancestor containing `.git` or an `.editorconfig` with `root = true`. |
-| `${workspaceFolder:pattern}` | The nearest ancestor containing a file matched by the glob `pattern`. Multiple patterns can be separated with `\|`, for example `${workspaceFolder:*.sln\|*.slnx}`. |
+| `${userHome}` | The current user's home folder. |
+| `${workspaceFolder}` | The workspace folder of the document: the nearest folder above it that contains `.git`, or an `.editorconfig` with `root = true`. |
+| `${workspaceFolder:pattern}` | The nearest folder above the document that contains a file matching the glob `pattern`. Separate several patterns with `\|`, for example `${workspaceFolder:*.sln\|*.slnx}`. |
 | `${workspaceFolderBasename}` | The name of `${workspaceFolder}`. |
-| `${workspaceFolderBasename:pattern}` | The name of the nearest ancestor containing a file matched by `pattern`. It supports the same `\|`-separated patterns as `${workspaceFolder:pattern}`. |
-| `${file}` | The path of the file supplied to the tool. For a dirty or untitled document this is the temporary execution file. |
-| `${fileWorkspaceFolder}` | The workspace folder containing the document. |
+| `${workspaceFolderBasename:pattern}` | The name of `${workspaceFolder:pattern}`. |
+| `${file}` | The path of the file given to the tool. For a document with unsaved changes, or an untitled one, this is a [temporary copy](tool-definitions.md#temporary-copies). |
+| `${fileWorkspaceFolder}` | The workspace folder of the document. |
 | `${relativeFile}` | The document path relative to `${workspaceFolder}`. |
-| `${relativeFileDirname}` | The document directory relative to `${workspaceFolder}`. |
-| `${fileBasename}` | The name of the execution file, including its extension. |
-| `${fileBasenameNoExtension}` | The execution file name without its extension. |
-| `${fileExtname}` | The extension of the execution file, including the leading dot. |
-| `${fileDirname}` | The directory containing the execution file. |
-| `${fileDirnameBasename}` | The name of the directory containing the execution file. |
-| `${cwd}` | The current working directory of the Azunote process. |
-| `${lineNumber}` | The one-based line number of the caret. |
-| `${columnNumber}` | The one-based column number of the caret. |
-| `${selectedText}` | The currently selected text. |
-| `${input}` | The selected external-tool input for the current `per` invocation. |
-| `${input:1}` | The first numbered capture group for the current regex `per` invocation. |
-| `${input:groupname}` | The named capture group `groupname` for the current regex `per` invocation. |
+| `${relativeFileDirname}` | The document's folder relative to `${workspaceFolder}`. |
+| `${fileBasename}` | The file name of `${file}`, including its extension. |
+| `${fileBasenameNoExtension}` | The file name of `${file}` without its extension. |
+| `${fileExtname}` | The extension of `${file}`, including the leading dot. |
+| `${fileDirname}` | The folder containing `${file}`. |
+| `${fileDirnameBasename}` | The name of the folder containing `${file}`. |
+| `${cwd}` | The current folder of the Azunote process. |
+| `${lineNumber}` | The caret's line number, counting from 1. |
+| `${columnNumber}` | The caret's column number, counting from 1. |
+| `${selectedText}` | The selected text. |
+| `${input}` | The tool's [input](tool-definitions.md#input), or the current part of it for a `per` run. |
+| `${input:1}` | The first numbered capture group of the current `per = "regex:..."` match. |
+| `${input:groupname}` | The named capture group `groupname` of the current `per = "regex:..."` match. |
 | `${execPath}` | The path of the running Azunote executable. |
 | `${pathSeparator}` | The operating system's path separator. |
-| `${/}` | A shorthand for `${pathSeparator}`. |
+| `${/}` | Short for `${pathSeparator}`. |
 
-`${file}` and the other `file*` variables describe the file used for the
- execution. `${file}` can therefore point to a temporary file when the current
- document has unsaved changes or has not been saved yet. Use the `document*`
- variables below when the original document path is required.
+The `${file*}` variables describe the file given to the tool, which can be a
+temporary copy. Use the `${document*}` variables below when the document's own
+path is needed.
 
-For `${workspaceFolder:pattern}`, matching starts in the current document's
-directory and walks toward the filesystem root. Patterns are evaluated relative
-to each candidate directory using the same glob syntax as
-`Microsoft.Extensions.FileSystemGlobbing`; use `**` when a match may be nested
-below the candidate directory. If no pattern matches, the variable expands to
-an empty string.
+`${workspaceFolder:pattern}` checks the document's folder first and then each
+folder above it. Patterns are relative to the folder being checked, so use `**`
+for a file that may be further down, such as `**/*.csproj`. If nothing matches,
+the variable expands to an empty string.
 
-## Azunote-specific variables
+## Azunote variables
 
 | Variable | Expands to |
 | --- | --- |
-| `${documentFile}` | The original document path on disk, or empty for an untitled document. |
-| `${documentDirname}` | The directory containing the original document, or empty for an untitled document. |
+| `${documentFile}` | The document's path, or empty for an untitled document. |
+| `${documentDirname}` | The document's folder, or empty for an untitled document. |
 | `${documentDirnameBasename}` | The name of `${documentDirname}`. |
-| `${documentName}` | The original document file name. |
-| `${documentBasenameNoExtension}` | The original document file name without its extension. |
-| `${documentExtension}` | The original document extension, including the leading dot. |
-| `${tempFile}` | The temporary execution-file path when the document is dirty or untitled; empty otherwise. |
-| `${toolFolder}` | The directory containing the external tool definition. |
+| `${documentName}` | The document's file name. |
+| `${documentBasenameNoExtension}` | The document's file name without its extension. |
+| `${documentExtension}` | The document's extension, including the leading dot. |
+| `${tempFile}` | The path of the temporary copy for a document with unsaved changes or an untitled one; empty otherwise. |
+| `${toolFolder}` | The folder containing the external tool definition. |
 | `${document}` | The complete document text. |
-| `${chatHistory}` | For prompt input, the current tool's conversation as a JSON array of role/content messages, including the latest user message. |
-| `${languageId}` | The active language-mode identifier. |
-| `${encoding}` | The current document encoding, such as `utf-8` or `shift_jis`. |
-| `${lineEnding}` | The current document line-ending style, such as `Lf`. |
-| `${platform}` | The operating-system identifier, such as `windows`, `linux`, or `macos`. |
-| `${architecture}` | The process architecture, such as `x64` or `arm64`. |
-| `${selectionStartLine}` | The one-based line number where the selection starts. |
-| `${selectionStartColumn}` | The one-based column where the selection starts. |
-| `${selectionEndLine}` | The one-based line number where the selection ends. |
-| `${selectionEndColumn}` | The one-based column where the selection ends. |
-
-For an untitled document, variables that require the original document path
-expand to an empty string. When an external tool is run, `${file}` and the
-other `file*` variables can still refer to the temporary execution file.
+| `${chatHistory}` | For a [prompt](prompt-tools.md), the conversation so far as a JSON array of role/content messages, including the latest user message. |
+| `${languageId}` | The identifier of the document's language mode. |
+| `${encoding}` | The document's encoding, such as `utf-8` or `shift_jis`. |
+| `${lineEnding}` | The document's line ending, such as `Lf`. |
+| `${platform}` | The operating system, such as `windows`. |
+| `${architecture}` | The processor architecture, such as `x64` or `arm64`. |
+| `${selectionStartLine}` | The line where the selection starts, counting from 1. |
+| `${selectionStartColumn}` | The column where the selection starts, counting from 1. |
+| `${selectionEndLine}` | The line where the selection ends, counting from 1. |
+| `${selectionEndColumn}` | The column where the selection ends, counting from 1. |
 
 ## Environment variables
 
-Use `${env:NAME}` to read an environment variable. Names are matched without
-regard to case.
+`${env:NAME}` reads an environment variable. Names are matched without regard
+to case.
 
-For `terminal.*` and `explorer.*`, the value comes from the Azunote process
-environment. External tools additionally load a `.env` file:
+`[terminal]` and `[explorer]` see Azunote's own environment. External tools
+also read the nearest `.env` file: the first one found in the document's folder
+or a folder above it. An untitled document has no folder, so it reads none.
 
-1. Start at the original document's directory.
-2. Walk toward the filesystem root.
-3. Use the first `.env` file found.
-
-An untitled document has no original document directory, so it does not load a
-`.env` file. The nearest `.env` also applies when the execution file is a
-temporary file; the search is based on the original document path.
-
-The supported `.env` syntax is intentionally small:
+The `.env` syntax is intentionally small:
 
 ```dotenv
 # Comments and blank lines are allowed.
@@ -124,20 +105,19 @@ SINGLE_QUOTED='literal value'
 DOUBLE_QUOTED="another literal"
 ```
 
-Malformed lines are ignored. Duplicate keys use the last value. Variable
-interpolation and multiline values are not supported; for example,
-`A=${B}` in `.env` remains the literal value `${B}`.
+Malformed lines are ignored, and a repeated key keeps its last value. Values
+cannot span lines or refer to other variables: `A=${B}` sets `A` to the literal
+text `${B}`.
 
-The precedence for external tools is:
+For an external tool, a later source overrides an earlier one:
 
 ```text
-inherited process environment < nearest .env < external tool [env]
+Azunote's environment < nearest .env < the tool's [env]
 ```
 
-The resulting values are used both for `${env:NAME}` expansion and for the
-environment of the child process. Values in an external tool's `[env]` table
-may reference other substitution variables, including inherited process or
-`.env` values:
+The result is both what `${env:NAME}` reads and the environment the tool runs
+with. Values in a tool's `[env]` table may use other substitution variables,
+including environment variables from Azunote or `.env`:
 
 ```toml
 name = "Run formatter"
@@ -151,6 +131,6 @@ FORMATTER_CONFIG = "${workspaceFolder}/formatter.json"
 FORMATTER_MODE = "check"
 ```
 
-Environment-variable completion is based on the current Azunote process
-environment. Variables that exist only in `.env` are still expanded when the
-external tool runs, but are not added to the completion list.
+While editing a definition, completion offers the variables in Azunote's
+environment. Variables that only `.env` defines are not offered, but they are
+still expanded when the tool runs.

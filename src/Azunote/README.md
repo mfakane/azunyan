@@ -176,8 +176,10 @@ commands run recently in any window are listed first.
 
 See the user-facing documentation for the application configuration:
 
-- [Settings](../../docs/user/settings.md), including `settings.toml`, state, and custom language modes
-- [External Tools](../../docs/user/external-tools.md), including tool discovery and launch definitions
+- [Settings](../../docs/user/settings.md), including `settings.toml` and the settings directory
+- [Language Modes](../../docs/user/language-modes.md), including custom language modes
+- [External Tools](../../docs/user/external-tools.md), with the
+  [definition format](../../docs/user/tool-definitions.md) and the pages linked from it
 - [Substitution Variables](../../docs/user/substitution-variables.md), including `.env` loading and expansion
 
 The settings directory is `%LOCALAPPDATA%\Azunote` by default. When an
@@ -211,7 +213,7 @@ Python, JSON (including JSONC and JSON5), XML, YAML, TOML, Markdown,
 PowerShell, and unified diffs (`.diff`, `.patch`), whose added and removed
 lines are colored and whose files and hunks fold. Azunote exposes them from
 View > Language Mode, alongside Plain Text and its Azunote note mode. Custom
-language modes are described in [Settings](../../docs/user/settings.md).
+language modes are described in [Language Modes](../../docs/user/language-modes.md).
 
 Folding is offered by the language definitions that supply a folding provider.
 TOML and the Azunote note mode fold a table section up to the next header, JSON

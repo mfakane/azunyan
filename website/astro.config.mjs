@@ -22,12 +22,23 @@ export default defineConfig({
 					],
 				},
 				{
-					label: 'Documentation',
+					label: 'Using Azunote',
+					items: ['docs/command-line', 'docs/documents'],
+				},
+				{
+					label: 'Configuration',
+					items: ['docs/settings', 'docs/language-modes', 'docs/substitution-variables'],
+				},
+				{
+					label: 'External tools',
 					items: [
-						{ label: 'Command line', slug: 'docs/command-line' },
-						{ label: 'Settings', slug: 'docs/settings' },
-						{ label: 'External tools', slug: 'docs/external-tools' },
-						{ label: 'Substitution variables', slug: 'docs/substitution-variables' },
+						{ label: 'Overview', slug: 'docs/external-tools' },
+						'docs/tool-definitions',
+						'docs/powershell-tools',
+						'docs/prompt-tools',
+						'docs/problems',
+						'docs/proposed-changes',
+						'docs/streaming-output',
 					],
 				},
 			],

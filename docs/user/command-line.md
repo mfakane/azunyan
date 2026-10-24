@@ -1,13 +1,11 @@
-# Command-line reference
+# Command line
 
-The published output includes `azu.exe` next to `Azunote.exe`. Add that
-directory to `PATH` to invoke Azunote as `azu`; the packaged build registers
-`azu` as an app execution alias. In the portable ZIP, both executable names
-are shims that forward arguments, standard input and output, and the exit code
-to the application.
+`azu` opens and edits Azunote documents from a command prompt or PowerShell.
+The installed app registers `azu` as a command. For the portable ZIP, add the
+extracted folder, which contains `azu.exe` next to `Azunote.exe`, to `PATH`.
 
-`Azunote.exe` is a Windows subsystem application, so its help is shown in the
-editor. `azu --help` writes the same command-line help to standard output.
+`azu --help` prints the command-line help. `Azunote.exe --help` shows the same
+help in an editor window.
 
 ## Usage
 
@@ -20,38 +18,36 @@ Get-Content -Wait input.log | azu --stream
 azu +12:4 path\to\file.txt
 ```
 
-Path commands return after the editor processes the request. `--wait` keeps the
-CLI blocked until the opened document window closes. Standard-input commands
-stay connected while input is being read; `--stream` updates the editor during
-that time. If Azunote is not running, `azu` starts it and forwards the command;
-an empty, unmodified, untitled window is reused when possible.
+`azu` returns as soon as Azunote has opened the document, unless `--wait` or
+`--output` asks it to wait for the window to close. If Azunote is not running,
+`azu` starts it. An empty, unmodified, untitled window is reused when possible.
 
 ## Options
 
 | Option | Description |
 | --- | --- |
-| `path ...` | Open one or more documents. A path already open activates its existing window. |
+| `path ...` | Open one or more documents. A path that is already open activates its window. |
 | `--wait`, `-w` | Wait until the document window closes. |
 | `--stdin` | Read a complete document from standard input after input ends. A bare `-` is the same as `--stdin`. |
-| `--stream` | Read standard input and append arriving text to the editor as it is received. This option implies `--stdin`. |
-| `--line N`, `-l N` | Open at one-based line N. |
-| `--column N`, `-c N` | Open at one-based column N. |
-| `--output values`, `-o values` | Write selected document values to standard output when the window closes. Requesting output also waits for the window. |
-| `--json` | Write requested output as one JSON object. |
+| `--stream` | Read standard input and append text to the editor as it arrives. This option implies `--stdin`. |
+| `--line N`, `-l N` | Open at line N, counting from 1. |
+| `--column N`, `-c N` | Open at column N, counting from 1. |
+| `--output values`, `-o values` | Write values from the document to standard output when the window closes. Requesting output also waits for the window. |
+| `--json` | Write the requested output as one JSON object. |
 | `--help`, `-h` | Show command-line help. |
-| `+N[:M]` | Open at one-based line N and optional column M. |
+| `+N[:M]` | Open at line N and, optionally, column M. |
 | `--` | Treat the remaining arguments as document paths. |
 
-Line and column values must be positive integers and are clamped to the opened
-document. Several paths open one window each. A command that names several
-paths cannot use options that apply to a single document, such as `--line`,
+Line and column values must be positive integers. A value past the end of the
+document goes to the last line or column. Several paths open one window each,
+and cannot be combined with options for a single document, such as `--line`,
 `--output`, or `--wait`.
 
 ## Standard input
 
 `--stdin` reads all input before opening it as a document. Use `--stream` when
 input is produced over time and should appear in the editor before the source
-process finishes:
+finishes:
 
 ```powershell
 Get-Content -Wait build.log | azu --stream
@@ -59,9 +55,9 @@ Get-Content -Wait build.log | azu --stream
 
 ## Editing in a pipeline
 
-`--output` accepts `filePath`, `document`, or `selection`. `none` requests no
-output. A single requested value is written as UTF-8 without a byte-order mark
-or added line ending:
+`--output` accepts `filePath`, `document`, or `selection`, and `none` requests
+no output. A single value is written as UTF-8 without a byte-order mark or an
+added line ending:
 
 ```powershell
 $text = git log --oneline | azu --output document -
@@ -69,46 +65,49 @@ $path = azu --output filePath notes.md
 git config core.editor "azu --wait"
 ```
 
-An untitled document has no file to save, so closing it returns its buffer
-without a save prompt. A file-backed document uses the ordinary save
-confirmation; discarding unsaved changes cancels the command output.
+Closing an untitled document returns its text without asking to save it. A
+document with a file asks to save as usual, and discarding the changes cancels
+the output.
 
-Several values must be comma-separated and used with `--json`:
+Several values are separated by commas and need `--json`:
 
 ```powershell
 $result = azu --output filePath,document --json notes.md | ConvertFrom-Json
 $result.document | Set-Content $result.filePath
 ```
 
-The JSON object is written as one line and preserves each value's line
-endings. An untitled document has an empty `filePath`. `--json` also works
-with one requested value. `none` cannot be combined with another value, a
-value cannot be repeated, and `--json` requires `--output`.
+The JSON object is written on one line and keeps each value's line endings. An
+untitled document has an empty `filePath`. `--json` also works with a single
+value. `none` cannot be combined with another value, a value cannot be
+repeated, and `--json` requires `--output`.
 
-In PowerShell, pass a list of output values as one argument. Join a variable
-list with commas before passing it:
+In PowerShell, pass the list as one argument. Join a list held in a variable
+with commas first:
 
 ```powershell
 azu --output ($values -join ',') --json notes.md
 ```
 
-The command returns exit code 0 on success, 1 when a file-backed document is
-closed with unsaved changes discarded, and 2 when the command is invalid or
-Azunote cannot be reached.
+## Exit codes
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Success. |
+| `1` | A document with a file was closed and its unsaved changes were discarded. |
+| `2` | The command is invalid, or Azunote cannot be reached. |
 
 ## Tab completion
 
-`azu` answers completion requests from the same command-line grammar used by
-the editor. In PowerShell 7, load the shipped script and add the line to
-`$PROFILE` to keep completion enabled:
+In PowerShell 7, load the bundled script to complete `azu` options and
+`--output` values. Add the line to `$PROFILE` to keep it enabled:
 
 ```powershell
 . 'C:\Program Files\Azunote\Register-AzunoteCompletion.ps1'
 ```
 
-Option names and `--output` values are completed; paths are left to the
-shell's file completion. A shell configured for
-[dotnet-suggest](https://github.com/dotnet/command-line-api) can use it too:
+Paths are left to the shell's own file completion. A shell set up for
+[dotnet-suggest](https://github.com/dotnet/command-line-api) can use that
+instead:
 
 ```powershell
 dotnet tool install -g dotnet-suggest

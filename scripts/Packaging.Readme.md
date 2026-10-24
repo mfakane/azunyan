@@ -8,8 +8,10 @@ PowerShell to open and edit documents from a shell.
 ## Documentation
 
 The bundled guides cover the [command line](docs/command-line.md),
-[settings](docs/settings.md), [external tools](docs/external-tools.md), and
-[substitution variables](docs/substitution-variables.md).
+[documents and files](docs/documents.md), [settings](docs/settings.md),
+[language modes](docs/language-modes.md),
+[substitution variables](docs/substitution-variables.md), and
+[external tools](docs/external-tools.md).
 
 ## Data and licensing
 
