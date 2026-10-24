@@ -41,8 +41,10 @@ for (const name of await readdir(docsSource)) {
 }
 
 const assets = path.join(site, 'src', 'assets', 'repo');
+const publicDir = path.join(site, 'public');
 await mkdir(assets, { recursive: true });
+await mkdir(publicDir, { recursive: true });
 await copyFile(path.join(repo, 'assets', 'icons', '01-paw-notebook.svg'), path.join(assets, 'icon.svg'));
 await copyFile(path.join(repo, 'assets', 'icons', '01-paw-notebook-small.svg'), path.join(assets, 'logo.svg'));
 await copyFile(path.join(repo, 'assets', 'screenshots', 'completion.png'), path.join(assets, 'completion.png'));
-await copyFile(path.join(repo, 'assets', 'icons', '01-paw-notebook-16.svg'), path.join(site, 'public', 'favicon.svg'));
+await copyFile(path.join(repo, 'assets', 'icons', '01-paw-notebook-16.svg'), path.join(publicDir, 'favicon.svg'));
