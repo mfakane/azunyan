@@ -23,6 +23,12 @@
     <DisplayName>Azunote</DisplayName>
     <PublisherDisplayName>MF Alie</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
+    <!--
+      Settings live in %LOCALAPPDATA%\Azunote for every installation, where
+      the user edits them and clones tool collections into them, so writes
+      there must not be redirected into the package's private copy.
+    -->
+    <desktop6:FileSystemWriteVirtualization>disabled</desktop6:FileSystemWriteVirtualization>
     <uap10:PackageIntegrity>
       <uap10:Content Enforcement="on"/>
     </uap10:PackageIntegrity>
@@ -94,5 +100,6 @@
 
   <Capabilities>
     <rescap:Capability Name="runFullTrust" />
+    <rescap:Capability Name="unvirtualizedResources" />
   </Capabilities>
 </Package>

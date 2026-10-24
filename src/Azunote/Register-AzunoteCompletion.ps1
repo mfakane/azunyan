@@ -9,7 +9,7 @@ being edited to the same grammar the editor parses, so the suggestions never
 drift from the accepted options. Dot-source this script from $PROFILE to keep
 the registration:
 
-    . 'C:\Program Files\Azunote\Register-AzunoteCompletion.ps1'
+    . 'C:\path\to\Azunote\Register-AzunoteCompletion.ps1'
 
 .PARAMETER CommandName
 The command names to complete. Defaults to the azu client under the names a

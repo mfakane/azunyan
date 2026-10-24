@@ -98,18 +98,25 @@ azu --output ($values -join ',') --json notes.md
 
 ## Tab completion
 
-In PowerShell 7, load the bundled script to complete `azu` options and
-`--output` values. Add the line to `$PROFILE` to keep it enabled:
+`azu` can complete its options and `--output` values in PowerShell. Paths are
+left to the shell's own file completion.
 
-```powershell
-. 'C:\Program Files\Azunote\Register-AzunoteCompletion.ps1'
-```
+### Microsoft Store and installer
 
-Paths are left to the shell's own file completion. A shell set up for
-[dotnet-suggest](https://github.com/dotnet/command-line-api) can use that
-instead:
+Use [dotnet-suggest](https://github.com/dotnet/command-line-api). Install it,
+add its PowerShell script to your profile, and register `azu`:
 
 ```powershell
 dotnet tool install -g dotnet-suggest
-dotnet-suggest register --command-path 'C:\Program Files\Azunote\azu.exe'
+dotnet-suggest script PowerShell >> $PROFILE
+dotnet-suggest register --command-path "$env:LOCALAPPDATA\Microsoft\WindowsApps\azu.exe"
+```
+
+### Portable ZIP
+
+In PowerShell 7, load `Register-AzunoteCompletion.ps1` from the extracted
+folder. Add the line to `$PROFILE` to keep it enabled:
+
+```powershell
+. 'C:\path\to\Azunote\Register-AzunoteCompletion.ps1'
 ```
