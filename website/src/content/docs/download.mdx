@@ -1,11 +1,14 @@
 ---
 title: Download
-description: Get Azunote from the Microsoft Store or GitHub releases.
+description: Get Azunote from the Microsoft Store, or as a portable ZIP.
 ---
+
+Azunote runs on Windows x64 and ARM64. Get it from the Microsoft Store, or
+download the portable version to run without installing.
 
 ## Microsoft Store
 
-Azunote is available from the Microsoft Store for Windows x64 and ARM64.
+The Microsoft Store installs Azunote and keeps it up to date.
 
 <div class="not-content">
 	<a href="https://get.microsoft.com/installer/download/9NGSZLG0TL96">
@@ -14,16 +17,17 @@ Azunote is available from the Microsoft Store for Windows x64 and ARM64.
 	</a>
 </div>
 
-## GitHub releases
+## Portable
 
-[GitHub releases](https://github.com/mfakane/azunyan/releases/latest) provide
-downloads for Windows x64 and ARM64:
+The portable version runs from any folder, such as a USB drive, and keeps its
+settings in the `appdata` folder inside it.
 
-- **Portable ZIP** — `Azunote-<version>-win-x64.zip` or
-  `Azunote-<version>-win-arm64.zip`. Extract the whole folder for your device
-  and run `Azunote.exe`; nothing is installed.
-- **Installer** — `Azunote-<version>.msixbundle` contains both architectures.
-  It is currently unsigned, so it must be signed with a certificate the machine
-  trusts before it can be installed.
+1. Download the ZIP for your device from the
+   [latest release](https://github.com/mfakane/azunyan/releases/latest):
+   `Azunote-<version>-win-x64.zip` for most PCs, or
+   `Azunote-<version>-win-arm64.zip` for Windows on Arm. Settings > System >
+   About shows which one you have under System type.
+2. Extract the whole folder and run `Azunote.exe`.
 
-Each file has a `.sha256` sidecar.
+To update, extract the new ZIP and copy the `appdata` folder from the old one
+into it. Each ZIP has a `.sha256` file for checking the download.
