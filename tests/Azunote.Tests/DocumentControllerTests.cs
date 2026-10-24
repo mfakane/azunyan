@@ -23,8 +23,7 @@ public sealed class DocumentControllerTests
         Assert.Equal("original license", editor.Text);
         editor.SetText("host update");
         Assert.False(await controller.SaveAsync());
-        await Assert.ThrowsAsync<InvalidOperationException>(() => controller.SaveAsAsync(
-            new SaveFileDialogResult("copy.txt", TextEncoding.Utf8)));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => controller.SaveAsAsync("copy.txt"));
         Assert.Equal("original license", files.Files[path].Text);
         Assert.Single(files.Files);
 
@@ -44,8 +43,7 @@ public sealed class DocumentControllerTests
         controller.LoadUntitledText("draft");
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => controller.SaveAsAsync(
-            new SaveFileDialogResult(Path.Combine(AppContext.BaseDirectory, "LICENSE"),
-                TextEncoding.Utf8)));
+            Path.Combine(AppContext.BaseDirectory, "LICENSE")));
 
         Assert.Empty(files.Files);
         Assert.True(controller.Session.State.IsDirty);
@@ -160,7 +158,7 @@ public sealed class DocumentControllerTests
     }
 
     [Fact]
-    public async Task SaveAs_uses_the_dialog_encoding_and_the_editorconfig_line_ending()
+    public async Task SaveAs_keeps_the_document_encoding_and_takes_the_editorconfig_line_ending()
     {
         var editor = new FakeEditorBuffer();
         var session = new DocumentSession();
@@ -174,11 +172,7 @@ public sealed class DocumentControllerTests
             InsertFinalNewline: true,
             TrimTrailingWhitespace: true);
 
-        await controller.SaveAsAsync(
-            new SaveFileDialogResult(
-                "saved.txt",
-                TextEncoding.Utf8),
-            editorConfig: settings);
+        await controller.SaveAsAsync("saved.txt", editorConfig: settings);
 
         var saved = files.Files[Path.GetFullPath("saved.txt")];
         Assert.Equal(TextEncoding.Utf8, saved.Encoding);

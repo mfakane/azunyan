@@ -16,9 +16,7 @@ public sealed class DocumentWorkflowTests
         var dialogs = new FakeFileDialogService
         {
             OpenPath = "notes.txt",
-            SaveResult = new SaveFileDialogResult(
-                "renamed.txt",
-                TextEncoding.Utf8Bom)
+            SavePath = "renamed.txt"
         };
         files.Files[Path.GetFullPath("notes.txt")] = new TextFileData(
             "hello",
@@ -41,7 +39,7 @@ public sealed class DocumentWorkflowTests
         workflow.ObserveTextChanged();
         Assert.True(await workflow.SaveAsAsync());
         Assert.Equal(Path.GetFullPath("renamed.txt"), workflow.CurrentFilePath);
-        Assert.Equal(TextEncoding.Utf8Bom, workflow.CurrentEncoding);
+        Assert.Equal(TextEncoding.Utf8, workflow.CurrentEncoding);
         Assert.False(workflow.IsDirty);
     }
 
@@ -310,9 +308,7 @@ public sealed class DocumentWorkflowTests
             var prompt = new FakeUserPrompt();
             var dialogs = new FakeFileDialogService
             {
-                SaveResult = new SaveFileDialogResult(
-                    path,
-                    TextEncoding.Utf8)
+                SavePath = path
             };
             var workflow = CreateWorkflow(editor, session, files, prompt, dialogs);
             await workflow.OpenStartupTextAsync("first  \nsecond");

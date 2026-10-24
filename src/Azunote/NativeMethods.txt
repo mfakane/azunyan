@@ -1,11 +1,10 @@
-// Native file dialogs and the save-dialog customization controls.
+// Native file dialogs.
 CoCreateInstance
 FileSaveDialog
 FileOpenDialog
 IFileOpenDialog
 IFileSaveDialog
 IFileDialog
-IFileDialogCustomize
 IShellItem
 COMDLG_FILTERSPEC
 FILEOPENDIALOGOPTIONS

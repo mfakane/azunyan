@@ -107,7 +107,7 @@ internal sealed class MainWindowRuntime : IDisposable
             _view,
             documents,
             externalTools,
-            new NativeFileDialogService(_view.WindowHandle, () => _encodings),
+            new NativeFileDialogService(_view.WindowHandle),
             new DefaultFileChangeMonitorFactory(),
             _dispatcher,
             _prompt,

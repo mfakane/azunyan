@@ -7,27 +7,17 @@ using Windows.Win32.UI.Shell.Common;
 
 namespace Azunote;
 
-public sealed record SaveFileDialogResult(
-    string Path,
-    TextEncoding Encoding);
-
 /// <summary>
-/// Shows the Windows common Save dialog and adds the format controls used by
-/// editors such as Notepad. The dialog remains a native system dialog rather
-/// than an app-owned replacement.
+/// Shows the Windows common Save dialog. The encoding is chosen from the
+/// File menu instead, so the dialog stays as the system shows it.
 /// </summary>
 public static class NativeSaveFileDialog
 {
-    private const uint EncodingGroupId = 1000;
-    private const uint EncodingControlId = 1001;
-
     private const int HResultCancelled = unchecked((int)0x800704C7);
 
-    public static SaveFileDialogResult? Show(
+    public static string? Show(
         IntPtr ownerWindowHandle,
         string suggestedFileName,
-        TextEncoding defaultEncoding,
-        IReadOnlyList<TextEncoding> encodings,
         IReadOnlyList<FileDialogFilter> filters,
         string defaultFilterId)
     {
@@ -39,7 +29,6 @@ public static class NativeSaveFileDialog
         }
 
         IFileSaveDialog? dialog = null;
-        IFileDialogCustomize? customize = null;
         IShellItem? resultItem = null;
         try
         {
@@ -59,16 +48,9 @@ public static class NativeSaveFileDialog
             fileSaveDialog.GetOptions(out var options);
             fileSaveDialog.SetOptions(options | FILEOPENDIALOGOPTIONS.FOS_FORCEFILESYSTEM | FILEOPENDIALOGOPTIONS.FOS_OVERWRITEPROMPT);
 
-            customize = (IFileDialogCustomize)fileSaveDialog;
-            encodings = encodings.Contains(defaultEncoding) ? encodings : [.. encodings, defaultEncoding];
-            AddEncodingControl(customize, defaultEncoding, encodings);
-
             fileSaveDialog.Show(new HWND(ownerWindowHandle));
             fileSaveDialog.GetResult(out resultItem);
-            var path = GetFileSystemPath(resultItem);
-            customize.GetSelectedControlItem(EncodingControlId, out var encodingItemId);
-
-            return new SaveFileDialogResult(path, encodings[(int)encodingItemId]);
+            return GetFileSystemPath(resultItem);
         }
         catch (COMException exception) when (exception.HResult == HResultCancelled)
         {
@@ -77,7 +59,6 @@ public static class NativeSaveFileDialog
         finally
         {
             ReleaseComObject(resultItem);
-            ReleaseComObject(customize);
             ReleaseComObject(dialog);
         }
     }
@@ -138,28 +119,6 @@ public static class NativeSaveFileDialog
         var extension = filter?.Extensions.FirstOrDefault(item =>
             !string.IsNullOrWhiteSpace(item) && item is not "*" and not "*.*");
         return extension?.TrimStart('.').TrimStart('*') ?? "txt";
-    }
-
-    /// <summary>
-    /// Places the encoding beside the Save button, as Notepad does. Only one
-    /// control, or a visual group holding one, can go there; the group shows
-    /// its label next to the combo box.
-    /// </summary>
-    private static void AddEncodingControl(
-        IFileDialogCustomize customize,
-        TextEncoding defaultEncoding,
-        IReadOnlyList<TextEncoding> encodings)
-    {
-        customize.StartVisualGroup(EncodingGroupId, "Encoding:");
-        customize.AddComboBox(EncodingControlId);
-        for (var index = 0; index < encodings.Count; index++)
-        {
-            customize.AddControlItem(EncodingControlId, (uint)index, encodings[index].DisplayName);
-        }
-
-        customize.SetSelectedControlItem(EncodingControlId, (uint)encodings.TakeWhile(encoding => encoding != defaultEncoding).Count());
-        customize.EndVisualGroup();
-        customize.MakeProminent(EncodingGroupId);
     }
 
     private static unsafe string GetFileSystemPath(IShellItem shellItem)

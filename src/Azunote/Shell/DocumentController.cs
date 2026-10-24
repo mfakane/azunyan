@@ -129,26 +129,27 @@ public sealed class DocumentController
     }
 
     public Task SaveAsAsync(
-        SaveFileDialogResult save,
+        string path,
         CancellationToken cancellationToken = default) =>
         SaveAsAsync(
-            save,
+            path,
             editorConfig: null,
             cancellationToken: cancellationToken);
 
     public async Task SaveAsAsync(
-        SaveFileDialogResult save,
+        string path,
         EditorConfigSettings? editorConfig,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(save);
-        var path = Path.GetFullPath(save.Path);
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        path = Path.GetFullPath(path);
         if (_session.State.IsReadOnly || BundledLegalDocuments.IsReadOnlyPath(path))
         {
             throw new InvalidOperationException("The document is read-only.");
         }
-        // The dialog chooses only the encoding. The line ending follows the
+        // The encoding stays the document's. The line ending follows the
         // target's .editorconfig, or else stays the document's.
+        var encoding = _session.State.Encoding;
         var lineEnding = editorConfig?.LineEnding is { } configured
             ? DocumentSession.GetLineEndingOrDefault(configured)
             : _session.State.LineEnding;
@@ -159,11 +160,11 @@ public sealed class DocumentController
         await _files.WriteAsync(
             path,
             textToSave,
-            save.Encoding,
+            encoding,
             lineEnding,
             cancellationToken);
         ApplySavedText(textToSave);
-        _session.MarkSaved(path, _editor.Text, save.Encoding, lineEnding);
+        _session.MarkSaved(path, _editor.Text, encoding, lineEnding);
     }
 
     public Task<bool> ReloadFromDiskAsync(CancellationToken cancellationToken = default) =>

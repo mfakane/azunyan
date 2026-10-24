@@ -97,9 +97,8 @@ the detected one. Both are also available from the encoding in the status bar.
 The menus list the Unicode encodings, the system's code page, and those named
 by `encodings` in settings.toml. Other... lists every encoding in the command
 palette, where typing narrows them by name.
-The Save As dialog chooses the encoding beside its Save button; the line
-ending follows `end_of_line` in the target folder's `.editorconfig`, or else
-stays the document's.
+Save As keeps the document's encoding; the line ending follows `end_of_line`
+in the target folder's `.editorconfig`, or else stays the document's.
 
 A window that a command line waits on (`--wait`) still asks before closing,
 because the command line reports what became of its document. Untitled text

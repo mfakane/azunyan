@@ -201,19 +201,18 @@ internal sealed class DocumentWorkflow : IDisposable
         if (_documents.Session.State.IsReadOnly) return false;
         try
         {
-            var save = _fileDialogs.ShowSave(
+            var path = _fileDialogs.ShowSave(
                 CurrentFilePath is null ? "Untitled.txt" : Path.GetFileName(CurrentFilePath),
-                CurrentEncoding,
                 _fileDialogFilters(),
                 _languageModeId());
-            if (save is null)
+            if (path is null)
             {
                 return false;
             }
 
-            var targetConfig = await _editorConfigResolver.ResolveAsync(save.Path);
-            await _documents.SaveAsAsync(save, editorConfig: targetConfig);
-            ApplyEditorConfig(targetConfig.WithExplicitFileFormat(save.Encoding, CurrentLineEnding));
+            var targetConfig = await _editorConfigResolver.ResolveAsync(path);
+            await _documents.SaveAsAsync(path, editorConfig: targetConfig);
+            ApplyEditorConfig(targetConfig.WithExplicitFileFormat(CurrentEncoding, CurrentLineEnding));
             NotifyChanged(lineEnding: null, opened: false);
             StartFileWatcher();
             return true;

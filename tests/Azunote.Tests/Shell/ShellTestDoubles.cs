@@ -345,15 +345,14 @@ internal sealed class FakeFileDialogService : IFileDialogService
 {
     public string? OpenPath { get; set; }
 
-    public SaveFileDialogResult? SaveResult { get; set; }
+    public string? SavePath { get; set; }
 
     public string? ShowOpen(IReadOnlyList<FileDialogFilter> filters) => OpenPath;
 
-    public SaveFileDialogResult? ShowSave(
+    public string? ShowSave(
         string suggestedFileName,
-        TextEncoding defaultEncoding,
         IReadOnlyList<FileDialogFilter> filters,
-        string defaultFilterId) => SaveResult;
+        string defaultFilterId) => SavePath;
 }
 
 internal sealed class FakeFileChangeMonitor : IFileChangeMonitor
