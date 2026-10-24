@@ -113,7 +113,12 @@ tests/
 benchmarks/
   Azunyan.EditorBenchmarks/ editor model, syntax, projection, and layout benchmarks
 docs/                  architecture and Azunote configuration documentation
+website/               Azunote website (Astro Starlight) built from docs/user and assets
 ```
+
+The website is published to GitHub Pages by `.github/workflows/website.yml`.
+Run `pnpm install` and then `pnpm dev` or `pnpm build` in `website/` to work
+on it locally; both copy `docs/user` and the artwork into the site first.
 
 ## Editor components
 

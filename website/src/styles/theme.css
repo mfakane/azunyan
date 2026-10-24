@@ -1,0 +1,12 @@
+/* Accent colors taken from the plum of the Azunote icon. */
+:root {
+	--sl-color-accent-low: #3d1129;
+	--sl-color-accent: #b4467f;
+	--sl-color-accent-high: #f3cfe2;
+}
+
+:root[data-theme='light'] {
+	--sl-color-accent-low: #f6dcea;
+	--sl-color-accent: #93305f;
+	--sl-color-accent-high: #4c1031;
+}

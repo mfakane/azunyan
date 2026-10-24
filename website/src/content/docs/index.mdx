@@ -1,0 +1,59 @@
+---
+title: Azunote
+description: A small document-per-window text editor for Windows.
+hero:
+  tagline: A small document-per-window text editor for Windows, built with WinUI 3. Each window owns one document.
+  image:
+    file: ../../assets/repo/icon.svg
+  actions:
+    - text: Download
+      link: /azunyan/download/
+      icon: right-arrow
+    - text: Documentation
+      link: /azunyan/docs/command-line/
+      icon: open-book
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+import screenshot from '../../assets/repo/completion.png';
+
+<Image src={screenshot} alt="Azunote editing a settings file with completion" />
+
+## Features
+
+<CardGrid>
+	<Card title="One window, one document" icon="document">
+		Every document opens in its own window, so Windows itself manages them.
+		No projects, no workspaces, no tabs to manage.
+	</Card>
+	<Card title="Part of your shell" icon="seti:powershell">
+		`azu` opens files from the command line, waits for a window to close, and
+		reads or edits text in a pipeline. See the
+		[command-line reference](/azunyan/docs/command-line/).
+	</Card>
+	<Card title="External tools" icon="setting">
+		Run any program on the document or selection, then insert, replace,
+		propose a change, or show problems from its output. See
+		[external tools](/azunyan/docs/external-tools/).
+	</Card>
+	<Card title="Command palette" icon="magnifier">
+		Ctrl+Shift+P searches every menu command, the other windows, and recent
+		files.
+	</Card>
+	<Card title="Language modes" icon="seti:json">
+		Highlighting for C#, JavaScript, TypeScript, Python, JSON, XML, YAML, TOML,
+		Markdown, PowerShell, and diffs, with folding and custom modes.
+	</Card>
+	<Card title="Plain-text settings" icon="pencil">
+		Settings, tools, and modes are TOML files, completed as you type and
+		reloaded when they change. See [settings](/azunyan/docs/settings/).
+	</Card>
+</CardGrid>
+
+## License
+
+Azunote is licensed under the [zlib license](https://github.com/mfakane/azunyan/blob/master/LICENSE).
+It is built from Azunyan, a set of reusable text-editor components developed in
+the [same repository](https://github.com/mfakane/azunyan).
