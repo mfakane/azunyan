@@ -65,6 +65,7 @@ internal sealed class MainWindowViewModel :
         GoToMatchingBracketCommand = Command(() => Actions.GoToMatchingBracket());
         GoToNextProblemCommand = Command(() => Actions.GoToProblem(next: true));
         GoToPreviousProblemCommand = Command(() => Actions.GoToProblem(next: false));
+        ShowProblemsCommand = Command(() => Actions.ShowProblems());
         MoveLineUpCommand = Command(() => Actions.MoveLines(down: false));
         MoveLineDownCommand = Command(() => Actions.MoveLines(down: true));
         CopyLineUpCommand = Command(() => Actions.DuplicateLines(down: false));
@@ -233,6 +234,7 @@ internal sealed class MainWindowViewModel :
     public ICommand GoToMatchingBracketCommand { get; }
     public ICommand GoToNextProblemCommand { get; }
     public ICommand GoToPreviousProblemCommand { get; }
+    public ICommand ShowProblemsCommand { get; }
     public ICommand MoveLineUpCommand { get; }
     public ICommand MoveLineDownCommand { get; }
     public ICommand CopyLineUpCommand { get; }
@@ -607,6 +609,7 @@ internal interface IMainWindowActions
     void SelectAll();
     void GoToMatchingBracket();
     void GoToProblem(bool next);
+    void ShowProblems();
     void MoveLines(bool down);
     void DuplicateLines(bool down);
     void DeleteLines();

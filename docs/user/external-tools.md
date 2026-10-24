@@ -408,9 +408,11 @@ The `diagnostics` action reads each output line that names a position as a
 problem in the document the tool ran on, and underlines it in red for an
 error, yellow for a warning, or blue for information. Resting the pointer on
 one shows its message and the tool that reported it. The status bar counts
-the problems and shows the message of the one at the caret; clicking the
-counts, or Edit > Go to Next Problem (F8) and Go to Previous Problem
-(Shift+F8), selects the next or previous one.
+the problems and shows the message of the one at the caret. Edit > Go to
+Next Problem (F8) and Go to Previous Problem (Shift+F8) select the next or
+previous one. Edit > Show Problems... (Ctrl+Shift+M), or clicking the counts,
+lists them in the command palette with their lines, and choosing one selects
+it.
 
 Without a pattern of its own, a line is read in either of the forms most
 compilers and linters print:

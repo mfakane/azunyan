@@ -164,9 +164,13 @@ editor with `>` already typed. Text that starts with `>` searches the menu
 commands, including external tools and the choices in submenus such as
 View > Line Ending; any other text searches the documents of the other
 windows and the recent files. Characters match in order, not necessarily
-next to each other, so `mlu` finds Move Line Up. Choosing Open Recent lists
-the recent files in the palette itself. Before anything is typed after `>`,
-the commands run recently in any window are listed first.
+next to each other, so `mlu` finds Move Line Up. Choosing Open Recent or
+Language Mode lists the recent files or the language modes in the palette
+itself; so do File > Reopen/Save with Encoding > Other..., which lists every
+encoding, and Edit > Show Problems... (Ctrl+Shift+M), which lists the
+problems to go to one. Clicking the language mode or the problem counts in
+the status bar does the same. Before anything is typed after `>`, the
+commands run recently in any window are listed first.
 
 ## Configuration and external tools
 

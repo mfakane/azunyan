@@ -807,8 +807,13 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
 
     void IMainWindowActions.GoToProblem(bool next) => _runtime.GoToProblem(next);
 
+    void IMainWindowActions.ShowProblems() => _runtime.ShowProblems();
+
     private void ProblemsStatus_Tapped(object sender, TappedRoutedEventArgs e) =>
-        _runtime.GoToProblem(next: true);
+        _runtime.ShowProblems();
+
+    private void LanguageModeStatus_Tapped(object sender, TappedRoutedEventArgs e) =>
+        ShowLanguageModePicker();
 
     void IMainWindowActions.MoveLines(bool down) => _runtime.MoveLines(down);
 

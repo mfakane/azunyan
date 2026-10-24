@@ -796,6 +796,24 @@ public sealed class AzunoteUiTests : IDisposable
             AzunoteUiFixture.WaitFor(
                 () => FindByAutomationId(window, "ProblemAtCaretStatus") is { Current.Name.Length: > 0 } message ? message : null,
                 "The status bar did not show the problem at the caret.");
+
+            // Show Problems lists it in the palette, and choosing it selects it.
+            const ushort Home = 0x24, M = 0x4D;
+            SendKeyChord(Control, Home);
+            AzunoteUiFixture.WaitForSelectionText(textPattern, selected => selected.Length == 0);
+            SendKeyChord(Control, Shift, M);
+            WaitForCommandPalette(window, text => text.Length == 0);
+            AzunoteUiFixture.WaitFor(
+                () => window.FindAll(
+                        TreeScope.Descendants,
+                        new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.ListItem))
+                    .Cast<AutomationElement>()
+                    .FirstOrDefault(row => row.Current.HelpText.Contains("Ln 2,", StringComparison.Ordinal)),
+                "The palette did not list the problem.");
+            SendEnterKey();
+            AzunoteUiFixture.WaitForSelectionText(
+                textPattern,
+                selected => selected.Length > 0 && "  <a></b>".Contains(selected, StringComparison.Ordinal));
         }
         finally
         {
@@ -816,6 +834,20 @@ public sealed class AzunoteUiTests : IDisposable
             AzunoteUiFixture.WaitFor(
                 () => FindByAutomationId(window, "LanguageModeStatus") is { Current.Name: "Diff" } status ? status : null,
                 "The patch did not open in the Diff mode.");
+
+            // Language Mode lists the modes in the palette itself.
+            const ushort Control = 0x11, Shift = 0x10, P = 0x50;
+            fixture.Editor.SetFocus();
+            SendKeyChord(Control, Shift, P);
+            SetCommandPaletteText(WaitForCommandPalette(window, text => text == ">"), ">language mode");
+            AzunoteUiFixture.WaitForElement(window, AutomationElement.NameProperty, "Language Mode");
+            SendEnterKey();
+            SetCommandPaletteText(WaitForCommandPalette(window, text => text.Length == 0), "markdown");
+            AzunoteUiFixture.WaitForElement(window, AutomationElement.NameProperty, "Markdown");
+            SendEnterKey();
+            AzunoteUiFixture.WaitFor(
+                () => FindByAutomationId(window, "LanguageModeStatus") is { Current.Name: "Markdown" } status ? status : null,
+                "Choosing Markdown in the palette did not change the mode.");
         }
         finally
         {

@@ -626,6 +626,14 @@
                         <KeyboardAccelerator Key="F8" Modifiers="Shift" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
+                <MenuFlyoutItem
+                    Text="Show Problems..."
+                    Command="{x:Bind ViewModel.ShowProblemsCommand}"
+                >
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="M" Modifiers="Control,Shift" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
                 <MenuFlyoutSeparator />
                 <MenuFlyoutSubItem Text="Line">
                     <MenuFlyoutItem
@@ -1218,13 +1226,14 @@
                     x:Name="LanguageModeStatus"
                     Grid.Column="4"
                     Text="{x:Bind ViewModel.LanguageModeStatus, Mode=OneWay}"
+                    Tapped="LanguageModeStatus_Tapped"
                 />
                 <StackPanel
                     x:Name="ProblemsStatus"
                     Grid.Column="5"
                     Orientation="Horizontal"
                     Spacing="4"
-                    ToolTipService.ToolTip="Go to Next Problem (F8)"
+                    ToolTipService.ToolTip="Show Problems (Ctrl+Shift+M)"
                     Visibility="{x:Bind ViewModel.ProblemsVisibility, Mode=OneWay}"
                     Tapped="ProblemsStatus_Tapped"
                 >

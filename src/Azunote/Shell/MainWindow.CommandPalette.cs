@@ -23,7 +23,6 @@ public sealed partial class MainWindow
     // The candidates are collected once when the palette opens.
     private CommandPaletteItem[] _paletteCommands = [];
     private List<CommandPaletteItem> _paletteDocuments = [];
-    private CommandPaletteItem? _openRecentPaletteItem;
     // The choices offered in place of the commands and documents, such as
     // the encodings of Other..., until the palette closes.
     private CommandPaletteItem[]? _palettePicks;
@@ -37,8 +36,7 @@ public sealed partial class MainWindow
     void IMainWindowActions.ShowCommandPalette() => ShowCommandPalette(CommandPalettePrefix);
 
     internal void ShowEncodingPicker(TextEncoding current, string placeholder, Action<TextEncoding> select) =>
-        ShowCommandPalette(
-            string.Empty,
+        ShowPalettePicker(
             placeholder,
             [
                 .. TextEncoding.GetAll().Select(encoding => new CommandPaletteItem(
@@ -49,6 +47,29 @@ public sealed partial class MainWindow
                     IsChecked: encoding == current,
                     () => select(encoding)))
             ]);
+
+    internal void ShowLanguageModePicker()
+    {
+        var current = _runtime.CurrentLanguageModeId;
+        ShowPalettePicker(
+            "Select a language mode",
+            [
+                .. _viewModel.LanguageModeItems.Select(mode => new CommandPaletteItem(
+                    mode.Entry.DisplayName,
+                    string.Join(' ', mode.Entry.FileExtensions),
+                    Shortcut: null,
+                    IsEnabled: true,
+                    IsChecked: string.Equals(mode.Entry.Id, current, StringComparison.OrdinalIgnoreCase),
+                    () => mode.SelectCommand.Execute(null)))
+            ]);
+    }
+
+    /// <summary>
+    /// Offers <paramref name="items"/> in the palette instead of the commands
+    /// and documents until it closes.
+    /// </summary>
+    internal void ShowPalettePicker(string placeholder, CommandPaletteItem[] items) =>
+        ShowCommandPalette(string.Empty, placeholder, items);
 
     private void ShowCommandPalette(
         string text,
@@ -197,7 +218,7 @@ public sealed partial class MainWindow
             }
         }
 
-        if (ReferenceEquals(item, _openRecentPaletteItem))
+        if (item.KeepsPaletteOpen)
         {
             item.Invoke();
             return;
@@ -223,9 +244,9 @@ public sealed partial class MainWindow
 
     /// <summary>
     /// Reads the commands from the menu bar, so every menu item is offered
-    /// without a second list to keep in step. Open Recent is offered as one
-    /// command that lists the recent files, and the open windows are left to
-    /// the document search.
+    /// without a second list to keep in step. Open Recent and Language Mode
+    /// are each offered as one command that lists their choices in the
+    /// palette, and the open windows are left to the document search.
     /// </summary>
     private List<CommandPaletteItem> CollectMenuCommands()
     {
@@ -249,14 +270,27 @@ public sealed partial class MainWindow
             if (ReferenceEquals(item, OpenRecentMenuItem))
             {
                 // Lists the recent files in the palette itself.
-                _openRecentPaletteItem = new CommandPaletteItem(
+                commands.Add(new CommandPaletteItem(
                     OpenRecentMenuItem.Text,
                     path,
                     Shortcut: null,
                     isEnabled,
                     IsChecked: false,
-                    () => CommandPaletteTextBox.Text = string.Empty);
-                commands.Add(_openRecentPaletteItem);
+                    () => CommandPaletteTextBox.Text = string.Empty,
+                    KeepsPaletteOpen: true));
+                continue;
+            }
+
+            if (ReferenceEquals(item, LanguageModeMenuItem))
+            {
+                commands.Add(new CommandPaletteItem(
+                    LanguageModeMenuItem.Text,
+                    path,
+                    Shortcut: null,
+                    isEnabled,
+                    IsChecked: false,
+                    ShowLanguageModePicker,
+                    KeepsPaletteOpen: true));
                 continue;
             }
 

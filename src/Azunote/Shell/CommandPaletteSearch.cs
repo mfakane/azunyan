@@ -11,7 +11,8 @@ internal sealed record CommandPaletteItem(
     string? Shortcut,
     bool IsEnabled,
     bool IsChecked,
-    Action Invoke);
+    Action Invoke,
+    bool KeepsPaletteOpen = false);
 
 internal sealed record CommandPaletteMatch(
     CommandPaletteItem Item,

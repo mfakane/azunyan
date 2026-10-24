@@ -628,6 +628,8 @@ internal sealed class MainWindowRuntime : IDisposable
     /// <summary>Shows the document in a language mode, if one has this id.</summary>
     internal void SelectLanguageMode(string id) => _languageModes.SelectManually(id);
 
+    internal string CurrentLanguageModeId => _languageModes.CurrentModeId;
+
     public void RefreshStatus()
     {
         _status.Refresh();
@@ -643,6 +645,31 @@ internal sealed class MainWindowRuntime : IDisposable
             _view.Select(problem.Range);
             _view.ScrollSelectionIntoView();
         }
+    }
+
+    /// <summary>Lists the problems in the command palette to go to one.</summary>
+    public void ShowProblems()
+    {
+        var lines = _view.Snapshot.Lines;
+        _window.ShowPalettePicker(
+            _diagnostics.Items.Count == 0 ? "No problems" : "Go to a problem",
+            [
+                .. _diagnostics.Items.Select(problem =>
+                {
+                    var position = lines.GetLineColumn(problem.Range.Start);
+                    return new CommandPaletteItem(
+                        problem.Message,
+                        $"{problem.Severity} · {problem.Source} · Ln {position.Line + 1}, Col {position.Column + 1}",
+                        Shortcut: null,
+                        IsEnabled: true,
+                        IsChecked: false,
+                        () =>
+                        {
+                            _view.Select(problem.Range);
+                            _view.ScrollSelectionIntoView();
+                        });
+                })
+            ]);
     }
 
     private void Diagnostics_Changed(object? sender, EventArgs args)
