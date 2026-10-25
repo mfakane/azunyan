@@ -7,10 +7,11 @@ opens the folder in Explorer. It is created on first launch and contains:
 | Path | Purpose |
 | --- | --- |
 | `settings.toml` | Application settings. |
-| `state.toml` | Window layout and recent files, managed by Azunote. |
+| `state.toml` | Window layout, recent files, and the [language servers](language-servers.md) turned on, managed by Azunote. |
 | `default-tools.toml` | Record of the [default tools](external-tools.md#default-tools) offered so far, managed by Azunote. |
+| `default-modes.toml` | Record of the [default mode definitions](language-modes.md#default-definitions) offered so far, managed by Azunote. |
 | `tools/` | [External tools](external-tools.md). |
-| `modes/` | [Custom language modes](language-modes.md). |
+| `modes/` | [Custom language modes](language-modes.md) and changes to built-in ones. |
 | `backups/` | Copies of [unsaved documents](documents.md#unsaved-changes) for the next launch. |
 | `logs/` | Error logs, one file per day. |
 

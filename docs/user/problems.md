@@ -1,7 +1,8 @@
 # Problems
 
 A tool whose output uses the `diagnostics` action shows the errors and warnings
-it prints in the document. Each problem is underlined in red for an error,
+it prints in the document, and a [language server](language-servers.md) shows
+the ones it finds. Each problem is underlined in red for an error,
 yellow for a warning, or blue for information, and resting the pointer on it
 shows the message and the tool that reported it.
 

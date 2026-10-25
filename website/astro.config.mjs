@@ -34,7 +34,7 @@ export default defineConfig({
 				},
 				{
 					label: 'Configuration',
-					items: ['docs/settings', 'docs/language-modes', 'docs/substitution-variables'],
+					items: ['docs/settings', 'docs/language-modes', 'docs/language-servers', 'docs/substitution-variables'],
 				},
 				{
 					label: 'External tools',

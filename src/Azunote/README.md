@@ -178,6 +178,7 @@ See the user-facing documentation for the application configuration:
 
 - [Settings](../../docs/user/settings.md), including `settings.toml` and the settings directory
 - [Language Modes](../../docs/user/language-modes.md), including custom language modes
+- [Language Servers](../../docs/user/language-servers.md), connected through language modes
 - [External Tools](../../docs/user/external-tools.md), with the
   [definition format](../../docs/user/tool-definitions.md) and the pages linked from it
 - [Substitution Variables](../../docs/user/substitution-variables.md), including `.env` loading and expansion
