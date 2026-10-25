@@ -12,11 +12,23 @@ internal static class WorkspaceFolderResolver
         encoderShouldEmitUTF8Identifier: false,
         throwOnInvalidBytes: true);
 
+    /// <summary>
+    /// Finds the folder for <c>${workspaceFolder}</c>: with a pattern, the
+    /// nearest folder holding a matching file; without one, the nearest folder
+    /// holding <c>.git</c>, a root <c>.editorconfig</c>, or a file matching
+    /// one of the language mode's <paramref name="workspacePatterns"/>.
+    /// </summary>
     public static string? FindForFile(
         string? filePath,
-        string? patternExpression = null) => FindForFile(filePath, patternExpression, null);
+        string? patternExpression = null,
+        IReadOnlyList<string>? workspacePatterns = null) =>
+        FindForFile(filePath, patternExpression, workspacePatterns, null);
 
-    internal static string? FindForFile(string? filePath, string? patternExpression, Action<string>? observeDirectory,
+    internal static string? FindForFile(
+        string? filePath,
+        string? patternExpression,
+        IReadOnlyList<string>? workspacePatterns,
+        Action<string>? observeDirectory,
         Action? readFailed = null)
     {
         using var measurement = ShellPerformance.Measure("workspace.search");
@@ -35,6 +47,9 @@ internal static class WorkspaceFolderResolver
             return null;
         }
 
+        var workspaceMatcher = patternExpression is null && workspacePatterns is { Count: > 0 }
+            ? CreateMatcher(string.Join('|', workspacePatterns))
+            : null;
         for (var current = directory;
              !string.IsNullOrWhiteSpace(current);
              current = GetParentDirectory(current))
@@ -42,7 +57,8 @@ internal static class WorkspaceFolderResolver
             observeDirectory?.Invoke(current);
             if (matcher is not null
                 ? HasMatchingFile(matcher, current)
-                : IsDefaultWorkspaceFolder(current, readFailed))
+                : IsDefaultWorkspaceFolder(current, readFailed)
+                    || (workspaceMatcher is not null && HasMatchingFile(workspaceMatcher, current)))
             {
                 return current;
             }

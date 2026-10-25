@@ -1,3 +1,4 @@
+using System.IO.Enumeration;
 using Microsoft.Extensions.Primitives;
 
 namespace Azunote;
@@ -208,7 +209,13 @@ internal sealed class SharedFileWatchRegistry : IDisposable
             Token = new CancellationChangeToken(_changed.Token);
         }
 
-        internal bool Matches(string? path) => path is not null && _names.Contains(Path.GetFileName(path));
+        // A name with * or ? is a file-name pattern, as a language mode's workspace patterns are.
+        internal bool Matches(string? path) =>
+            path is not null
+            && Path.GetFileName(path) is var name
+            && (_names.Contains(name)
+                || _names.Any(pattern => pattern.IndexOfAny(['*', '?']) >= 0
+                    && FileSystemName.MatchesSimpleExpression(pattern, name)));
 
         internal void Invalidate()
         {

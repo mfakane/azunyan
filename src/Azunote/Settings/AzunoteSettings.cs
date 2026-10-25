@@ -53,7 +53,7 @@ public sealed class AzunoteSettings
     /// modes folder. These values are derived from mode definition files.
     /// </summary>
     [JsonIgnore]
-    public IReadOnlyList<SyntaxLanguageDefinition> CustomSyntaxModes { get; internal set; } = [];
+    public IReadOnlyList<CustomLanguageMode> CustomSyntaxModes { get; internal set; } = [];
 
     /// <summary>
     /// The hierarchical menu nodes discovered below the tools folder.
@@ -172,7 +172,7 @@ public sealed class AzunoteDebugSettings
 [TomlSerializable(typeof(AzunoteDebugSettings))]
 [TomlSerializable(typeof(AzunoteToolsSettings))]
 [TomlSerializable(typeof(AzunoteState))]
-[TomlSerializable(typeof(DefaultToolsRecord))]
+[TomlSerializable(typeof(DefaultFilesRecord))]
 [TomlSerializable(typeof(WindowLayoutState))]
 [TomlSerializable(typeof(ShellCommandSettings))]
 [TomlSerializable(typeof(ExternalToolSettings))]
@@ -181,6 +181,7 @@ public sealed class AzunoteDebugSettings
 [TomlSerializable(typeof(ExternalToolDiagnosticsSettings))]
 [TomlSerializable(typeof(CustomSyntaxModeSettings))]
 [TomlSerializable(typeof(CustomSyntaxRuleSettings))]
+[TomlSerializable(typeof(LanguageServerSettings))]
 internal sealed partial class AzunoteTomlSerializerContext : TomlSerializerContext
 {
 }
@@ -973,7 +974,7 @@ public static class SettingsFileService
         var directory = GetFullDirectoryPath(settingsDirectory);
         Directory.CreateDirectory(directory);
         Directory.CreateDirectory(Path.Combine(directory, ToolsDirectoryName));
-        await EnsureDefaultModesAsync(directory, cancellationToken);
+        Directory.CreateDirectory(Path.Combine(directory, ModesDirectoryName));
 
         var settingsPath = Path.Combine(directory, SettingsFileName);
         if (!File.Exists(settingsPath))
@@ -983,16 +984,18 @@ public static class SettingsFileService
     }
 
     /// <summary>
-    /// Brings the default tools in line with this build. The bundle changes
-    /// only with Azunote itself, so this runs once as Azunote starts.
+    /// Brings the default tools and mode definitions in line with this build.
+    /// The bundle changes only with Azunote itself, so this runs once as
+    /// Azunote starts.
     /// </summary>
-    public static Task InstallDefaultToolsAsync(
+    public static async Task InstallDefaultFilesAsync(
         string settingsDirectory,
-        CancellationToken cancellationToken = default) =>
-        DefaultToolInstaller.InstallAsync(
-            GetFullDirectoryPath(settingsDirectory),
-            ToolsDirectoryName,
-            cancellationToken);
+        CancellationToken cancellationToken = default)
+    {
+        var directory = GetFullDirectoryPath(settingsDirectory);
+        await DefaultFileInstaller.InstallToolsAsync(directory, ToolsDirectoryName, cancellationToken);
+        await DefaultFileInstaller.InstallModesAsync(directory, ModesDirectoryName, cancellationToken);
+    }
 
     public static async Task<AzunoteSettings> LoadAsync(
         string settingsDirectory,
@@ -1091,40 +1094,6 @@ public static class SettingsFileService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         return Path.GetFullPath(path);
-    }
-
-    private static async Task EnsureDefaultModesAsync(
-        string settingsDirectory,
-        CancellationToken cancellationToken)
-    {
-        var modesDirectory = GetModesDirectoryPath(settingsDirectory);
-        if (Directory.Exists(modesDirectory))
-        {
-            return;
-        }
-
-        var defaultFiles = BundledDefaultAppData.GetFiles(ModesDirectoryName);
-        Directory.CreateDirectory(modesDirectory);
-        foreach (var relativePath in defaultFiles)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var destinationPath = Path.Combine(modesDirectory, relativePath);
-            var destinationDirectory = Path.GetDirectoryName(destinationPath);
-            if (!string.IsNullOrWhiteSpace(destinationDirectory))
-            {
-                Directory.CreateDirectory(destinationDirectory);
-            }
-
-            await using var source = BundledDefaultAppData.OpenRead(
-                Path.Combine(ModesDirectoryName, relativePath));
-            if (source is null)
-            {
-                continue;
-            }
-
-            await using var destination = File.Create(destinationPath);
-            await source.CopyToAsync(destination, cancellationToken);
-        }
     }
 
     private static async Task EnsureDefaultSettingsAsync(

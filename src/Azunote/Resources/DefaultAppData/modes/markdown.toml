@@ -1,0 +1,8 @@
+# Changes the built-in Markdown mode. Everything here is commented out, so the
+# mode is unchanged until a line is uncommented. See the Language Modes and
+# Language Servers pages of the Azunote documentation.
+
+# https://github.com/artempyanykh/marksman
+# [languageServer]
+# command = "marksman"
+# args = ["server"]

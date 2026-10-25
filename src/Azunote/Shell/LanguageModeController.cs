@@ -42,6 +42,18 @@ internal sealed class LanguageModeController
             ? currentMode.FileExtensions
             : [];
 
+    /// <summary>The current mode's patterns that mark a workspace folder besides the defaults.</summary>
+    public IReadOnlyList<string> CurrentModeWorkspacePatterns =>
+        _catalog.TryGet(_currentModeId, out var currentMode)
+            ? currentMode.WorkspacePatterns
+            : [];
+
+    /// <summary>The language server the current mode names, if any.</summary>
+    public LanguageServerDefinition? CurrentModeLanguageServer =>
+        _catalog.TryGet(_currentModeId, out var currentMode)
+            ? currentMode.LanguageServer
+            : null;
+
     public string CurrentModeDisplayName =>
         _catalog.TryGet(_currentModeId, out var mode)
             ? mode.DisplayName
@@ -67,7 +79,7 @@ internal sealed class LanguageModeController
     /// </summary>
     public bool IsEditableDocument(string path) => _catalog.IsKnownFile(path);
 
-    public void Initialize(IReadOnlyList<SyntaxLanguageDefinition>? customModes = null)
+    public void Initialize(IReadOnlyList<CustomLanguageMode>? customModes = null)
     {
         var selectedMode = _currentModeId;
         _catalog = LanguageModeCatalog.Create(customModes);
@@ -84,6 +96,9 @@ internal sealed class LanguageModeController
 
         Apply(selectedMode, refresh: customModes is not null);
     }
+
+    /// <summary>Applies the current mode again, after what the editor gets for it changed.</summary>
+    public void Reapply() => Apply(_currentModeId, refresh: true);
 
     public void SelectManually(string id)
     {

@@ -21,6 +21,7 @@ public sealed partial class ExternalToolController
     private readonly Func<string?, Task<IExternalToolDocument>>? _openStreamedDocument;
     private readonly DocumentDiagnostics? _diagnostics;
     private readonly Func<ExternalToolProposal, Task>? _openProposal;
+    private Func<IReadOnlyList<string>> _workspacePatterns = () => [];
 
     public ExternalToolController(
         IEditorBuffer editor,
@@ -53,7 +54,8 @@ public sealed partial class ExternalToolController
         IUiDispatcher? dispatcher = null,
         Func<string?, Task<IExternalToolDocument>>? openStreamedDocument = null,
         DocumentDiagnostics? diagnostics = null,
-        Func<ExternalToolProposal, Task>? openProposal = null)
+        Func<ExternalToolProposal, Task>? openProposal = null,
+        Func<IReadOnlyList<string>>? workspacePatterns = null)
         : this(editor, documents, files, prompt, openTextInNewWindow, languageModeId, languageExtensions)
     {
         _warmPool = warmPool;
@@ -61,6 +63,7 @@ public sealed partial class ExternalToolController
         _openStreamedDocument = openStreamedDocument;
         _diagnostics = diagnostics;
         _openProposal = openProposal;
+        _workspacePatterns = workspacePatterns ?? _workspacePatterns;
     }
 
     public async Task<ExternalToolResult> RunAsync(
@@ -132,7 +135,8 @@ public sealed partial class ExternalToolController
                 _documents.Session.State.IsDirty,
                 editorSnapshot.SelectionStart,
                 editorSnapshot.SelectionEnd,
-                languageExtensions: _languageExtensions());
+                languageExtensions: _languageExtensions(),
+                workspacePatterns: _workspacePatterns());
             while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();

@@ -50,12 +50,18 @@ internal sealed class ExternalToolAvailabilityCache : IDisposable
     public IReadOnlyDictionary<string, string> DotEnv(string? directory) =>
         GetWatched(("dotenv", directory), (observe, failed) => DotEnvFileLoader.Load(directory, observe, failed), [".env"]);
 
-    public string? Workspace(string? path, string? pattern) =>
+    public string? Workspace(string? path, string? pattern, IReadOnlyList<string>? workspacePatterns = null) =>
+        FindWorkspace(path, pattern, workspacePatterns ?? []);
+
+    private string? FindWorkspace(string? path, string? pattern, IReadOnlyList<string> workspacePatterns) =>
         pattern is not null
             ? Get(("workspace", path, pattern, Environment.CurrentDirectory),
                 () => WorkspaceFolderResolver.FindForFile(path, pattern))
-            : GetWatched(("workspace", path, pattern, Environment.CurrentDirectory),
-                (observe, failed) => WorkspaceFolderResolver.FindForFile(path, null, observe, failed), [".git", ".editorconfig"]);
+            : GetWatched(("workspace", path, string.Join('|', workspacePatterns), Environment.CurrentDirectory),
+                (observe, failed) => WorkspaceFolderResolver.FindForFile(path, null, workspacePatterns, observe, failed),
+                [".git", ".editorconfig", .. workspacePatterns
+                    .SelectMany(pattern => pattern.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    .Select(pattern => Path.GetFileName(pattern))]);
 
     private T GetWatched<T>(object key, Func<Action<string>?, Action?, T> factory, string[] names)
     {

@@ -117,7 +117,7 @@ internal sealed class SettingsService : IDisposable
         try
         {
             await EnsureExistsAsync();
-            await _settings.InstallDefaultToolsAsync();
+            await _settings.InstallDefaultFilesAsync();
         }
         catch (Exception exception)
         {

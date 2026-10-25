@@ -175,7 +175,7 @@ public sealed class DefaultToolDefinitionTests : IDisposable
     private async Task<ExternalToolResult> RunAsync(string name, ExternalToolContext context)
     {
         await SettingsFileService.EnsureExistsAsync(_root);
-        await SettingsFileService.InstallDefaultToolsAsync(_root);
+        await SettingsFileService.InstallDefaultFilesAsync(_root);
         var settings = await SettingsFileService.LoadAsync(_root);
         var tool = Assert.Single(settings.ExternalTools, tool => tool.Name == name);
         // The tool's folder is supplied as Azunote supplies it, for ${toolFolder}.

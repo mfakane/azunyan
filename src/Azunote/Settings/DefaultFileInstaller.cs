@@ -5,29 +5,31 @@ using Tomlyn;
 namespace Azunote;
 
 /// <summary>
-/// The default tool content Azunote last offered for each path below the
-/// tools directory, as a hash of the text.
+/// The default content Azunote last offered for each path below the tools or
+/// modes directory, as a hash of the text.
 /// </summary>
-public sealed class DefaultToolsRecord
+public sealed class DefaultFilesRecord
 {
     public Dictionary<string, string> Offered { get; set; } = new(StringComparer.Ordinal);
 }
 
 /// <summary>
-/// Installs the default tools and keeps them current without overwriting the
-/// user's work. A file that still holds the content last offered for its path
-/// is updated with the bundle; a changed file is left alone; a file that was
-/// offered and is gone was deleted by the user and stays deleted.
+/// Installs the default tools and mode definitions and keeps them current
+/// without overwriting the user's work. A file that still holds the content
+/// last offered for its path is updated with the bundle; a changed file is left
+/// alone; a file that was offered and is gone was deleted by the user and stays
+/// deleted.
 /// </summary>
-internal static class DefaultToolInstaller
+internal static class DefaultFileInstaller
 {
-    public const string RecordFileName = "default-tools.toml";
+    public const string ToolsRecordFileName = "default-tools.toml";
+    public const string ModesRecordFileName = "default-modes.toml";
 
     // The versions released before Azunote kept the record, by path, for the
     // files they installed: such a file still holding one of these was never
     // changed, so it is updated. Versions released with the record are tracked
     // by it and need no entry here.
-    private static readonly Dictionary<string, string[]> EarlierVersionHashes = new(StringComparer.Ordinal)
+    private static readonly Dictionary<string, string[]> EarlierToolHashes = new(StringComparer.Ordinal)
     {
         ["Edit/SortSelectedLines.tool.toml"] =
         [
@@ -52,25 +54,52 @@ internal static class DefaultToolInstaller
         ]
     };
 
-    public static async Task InstallAsync(
+    public static Task InstallToolsAsync(
         string settingsDirectory,
         string toolsDirectoryName,
+        CancellationToken cancellationToken) =>
+        InstallAsync(
+            settingsDirectory,
+            toolsDirectoryName,
+            ToolsRecordFileName,
+            "Default tools",
+            EarlierToolHashes,
+            cancellationToken);
+
+    public static Task InstallModesAsync(
+        string settingsDirectory,
+        string modesDirectoryName,
+        CancellationToken cancellationToken) =>
+        InstallAsync(
+            settingsDirectory,
+            modesDirectoryName,
+            ModesRecordFileName,
+            "Default language mode definitions",
+            new Dictionary<string, string[]>(),
+            cancellationToken);
+
+    private static async Task InstallAsync(
+        string settingsDirectory,
+        string directoryName,
+        string recordFileName,
+        string recordDescription,
+        IReadOnlyDictionary<string, string[]> earlierVersionHashes,
         CancellationToken cancellationToken)
     {
-        var toolsDirectory = Path.Combine(settingsDirectory, toolsDirectoryName);
-        var recordPath = Path.Combine(settingsDirectory, RecordFileName);
+        var directory = Path.Combine(settingsDirectory, directoryName);
+        var recordPath = Path.Combine(settingsDirectory, recordFileName);
         var previous = File.Exists(recordPath)
             ? (await SettingsFileService.DeserializeAsync(
                 recordPath,
-                AzunoteTomlSerializerContext.Default.DefaultToolsRecord,
+                AzunoteTomlSerializerContext.Default.DefaultFilesRecord,
                 cancellationToken))?.Offered ?? []
             : [];
         var offered = new Dictionary<string, string>(StringComparer.Ordinal);
 
-        foreach (var relativePath in BundledDefaultAppData.GetFiles(toolsDirectoryName))
+        foreach (var relativePath in BundledDefaultAppData.GetFiles(directoryName))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var bundled = await ReadBundledAsync(Path.Combine(toolsDirectoryName, relativePath), cancellationToken);
+            var bundled = await ReadBundledAsync(Path.Combine(directoryName, relativePath), cancellationToken);
             if (bundled is null)
             {
                 continue;
@@ -78,7 +107,7 @@ internal static class DefaultToolInstaller
 
             var key = relativePath.Replace('\\', '/');
             var bundledHash = Hash(bundled);
-            var destinationPath = Path.Combine(toolsDirectory, relativePath);
+            var destinationPath = Path.Combine(directory, relativePath);
             var currentHash = File.Exists(destinationPath)
                 ? Hash(await File.ReadAllBytesAsync(destinationPath, cancellationToken))
                 : null;
@@ -87,7 +116,7 @@ internal static class DefaultToolInstaller
                 : currentHash != bundledHash
                     && (previous.TryGetValue(key, out var offeredHash)
                         ? currentHash == offeredHash
-                        : EarlierVersionHashes.GetValueOrDefault(key)?.Contains(currentHash) == true);
+                        : earlierVersionHashes.GetValueOrDefault(key)?.Contains(currentHash) == true);
             if (install)
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
@@ -101,11 +130,11 @@ internal static class DefaultToolInstaller
             || offered.Any(entry => previous.GetValueOrDefault(entry.Key) != entry.Value))
         {
             var toml = TomlSerializer.Serialize(
-                new DefaultToolsRecord { Offered = offered },
-                AzunoteTomlSerializerContext.Default.DefaultToolsRecord);
+                new DefaultFilesRecord { Offered = offered },
+                AzunoteTomlSerializerContext.Default.DefaultFilesRecord);
             await File.WriteAllTextAsync(
                 recordPath,
-                "# Default tools Azunote has offered. This file is managed automatically.\n" + toml,
+                $"# {recordDescription} Azunote has offered. This file is managed automatically.\n" + toml,
                 new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
                 cancellationToken);
         }
@@ -125,7 +154,7 @@ internal static class DefaultToolInstaller
     }
 
     /// <summary>
-    /// Hashes the text with LF line endings and no BOM, so the same tool hashes
+    /// Hashes the text with LF line endings and no BOM, so the same file hashes
     /// alike whichever line endings the build or an editor gave the file.
     /// </summary>
     internal static string Hash(byte[] content)

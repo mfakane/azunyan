@@ -13,7 +13,13 @@ public sealed record LanguageModeEntry(
     string? DefinitionPath,
     IFoldingProvider? FoldingProvider = null,
     string? LineComment = null,
-    BlockCommentDelimiters? BlockComment = null);
+    BlockCommentDelimiters? BlockComment = null,
+    IReadOnlyList<string>? WorkspacePatterns = null,
+    LanguageServerDefinition? LanguageServer = null)
+{
+    /// <summary>Glob patterns that mark a workspace folder besides the defaults.</summary>
+    public IReadOnlyList<string> WorkspacePatterns { get; init; } = WorkspacePatterns ?? [];
+}
 
 /// <summary>
 /// Application-owned language mode definitions. It contains no menu or other
@@ -87,8 +93,20 @@ public sealed class LanguageModeCatalog
         ];
     }
 
+    /// <summary>The ids of the modes Azunote defines itself.</summary>
+    public static bool IsBuiltIn(string id) => BuiltInIds.Contains(id);
+
+    private static readonly HashSet<string> BuiltInIds = new(
+        ["plain-text", "azunote", .. BuiltInSyntaxLanguages.All.Select(language => language.Id)],
+        StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Builds the catalog from the built-in modes and the modes folder. A
+    /// definition with a built-in id changes that mode in place; any other
+    /// adds a mode after the built-in ones.
+    /// </summary>
     public static LanguageModeCatalog Create(
-        IReadOnlyList<SyntaxLanguageDefinition>? customModes = null)
+        IReadOnlyList<CustomLanguageMode>? customModes = null)
     {
         var entries = new List<LanguageModeEntry>
         {
@@ -114,19 +132,43 @@ public sealed class LanguageModeCatalog
 
         entries.AddRange(BuiltInSyntaxLanguages.All.Select(CreateEntry));
         var customModeStartIndex = entries.Count;
-        if (customModes is not null)
+        foreach (var mode in customModes ?? [])
         {
-            var knownIds = entries
-                .Select(entry => entry.Id)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            entries.AddRange(
-                customModes
-                    .Where(mode => knownIds.Add(mode.Id))
-                    .Select(CreateEntry));
+            var index = entries.FindIndex(entry =>
+                string.Equals(entry.Id, mode.Id, StringComparison.OrdinalIgnoreCase));
+            if (index < 0)
+            {
+                if (mode.Syntax is not null)
+                {
+                    entries.Add(CreateEntry(mode.Syntax) with
+                    {
+                        WorkspacePatterns = mode.WorkspacePatterns ?? [],
+                        LanguageServer = mode.LanguageServer
+                    });
+                }
+            }
+            else if (index < customModeStartIndex)
+            {
+                entries[index] = Change(entries[index], mode);
+            }
         }
 
         return new LanguageModeCatalog(entries, customModeStartIndex);
     }
+
+    private static LanguageModeEntry Change(LanguageModeEntry entry, CustomLanguageMode mode) =>
+        entry with
+        {
+            DisplayName = mode.DisplayName ?? entry.DisplayName,
+            Patterns = mode.Patterns ?? entry.Patterns,
+            FileExtensions = mode.Patterns is { } patterns
+                ? SyntaxLanguageDefinition.GetFileExtensions(patterns)
+                : entry.FileExtensions,
+            CompletionTriggers = mode.CompletionTriggerCharacters ?? entry.CompletionTriggers,
+            WorkspacePatterns = mode.WorkspacePatterns ?? entry.WorkspacePatterns,
+            LanguageServer = mode.LanguageServer ?? entry.LanguageServer,
+            DefinitionPath = mode.DefinitionPath
+        };
 
     private static LanguageModeEntry CreateEntry(SyntaxLanguageDefinition definition) =>
         new(

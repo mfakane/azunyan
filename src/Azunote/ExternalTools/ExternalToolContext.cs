@@ -5,7 +5,7 @@ namespace Azunote;
 
 public sealed partial record ExternalToolContext
 {
-    private readonly Func<string?, string?, string?> _findWorkspace;
+    private readonly Func<string?, string?, IReadOnlyList<string>, string?> _findWorkspace;
     private const string WorkspaceFolderPatternPrefix = "workspaceFolder:";
 
     [GeneratedRegex(@"\$\{(?<name>[^{}]+)\}", RegexOptions.Compiled | RegexOptions.CultureInvariant)]
@@ -43,8 +43,9 @@ public sealed partial record ExternalToolContext
         bool isDirty = false,
         LineColumn? selectionStart = null,
         LineColumn? selectionEnd = null,
-        Func<string?, string?, string?>? workspaceResolver = null,
-        IReadOnlyList<string>? languageExtensions = null)
+        Func<string?, string?, IReadOnlyList<string>, string?>? workspaceResolver = null,
+        IReadOnlyList<string>? languageExtensions = null,
+        IReadOnlyList<string>? workspacePatterns = null)
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(selection);
@@ -61,7 +62,8 @@ public sealed partial record ExternalToolContext
             ? null
             : Path.GetFullPath(toolDirectory);
         _findWorkspace = workspaceResolver ?? WorkspaceFolderResolver.FindForFile;
-        WorkspaceFolder = _findWorkspace(DocumentFilePath ?? ExecutionFilePath, null);
+        WorkspacePatterns = workspacePatterns ?? [];
+        WorkspaceFolder = _findWorkspace(DocumentFilePath ?? ExecutionFilePath, null, WorkspacePatterns);
         Document = document;
         Selection = selection;
         LineNumber = lineNumber;
@@ -173,6 +175,9 @@ public sealed partial record ExternalToolContext
     /// </summary>
     public IReadOnlyList<string> LanguageExtensions { get; }
 
+    /// <summary>The language mode's patterns that mark a workspace folder besides the defaults.</summary>
+    public IReadOnlyList<string> WorkspacePatterns { get; }
+
     public TextEncoding Encoding { get; }
 
     public LineEndingKind LineEnding { get; }
@@ -237,7 +242,8 @@ public sealed partial record ExternalToolContext
             {
                 return _findWorkspace(
                     DocumentFilePath ?? ExecutionFilePath,
-                    name[WorkspaceFolderPatternPrefix.Length..]) ?? string.Empty;
+                    name[WorkspaceFolderPatternPrefix.Length..],
+                    []) ?? string.Empty;
             }
 
             const string workspaceFolderBasenamePatternPrefix = "workspaceFolderBasename:";
@@ -246,7 +252,8 @@ public sealed partial record ExternalToolContext
                 return GetPathBasename(
                     _findWorkspace(
                         DocumentFilePath ?? ExecutionFilePath,
-                        name[workspaceFolderBasenamePatternPrefix.Length..])) ?? string.Empty;
+                        name[workspaceFolderBasenamePatternPrefix.Length..],
+                        [])) ?? string.Empty;
             }
 
             return name switch

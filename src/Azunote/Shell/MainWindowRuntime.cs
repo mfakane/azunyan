@@ -101,7 +101,8 @@ internal sealed class MainWindowRuntime : IDisposable
             _dispatcher,
             openStreamedTextInNewWindow,
             _diagnostics,
-            openProposal);
+            openProposal,
+            () => _languageModes.CurrentModeWorkspacePatterns);
 
         _documents = new DocumentWorkflow(
             _view,
@@ -714,7 +715,7 @@ internal sealed class MainWindowRuntime : IDisposable
     private ExternalToolEvaluationInput CaptureExternalToolInput() =>
         new(_view.Snapshot, _view.Selection, _session.State,
             _languageModes.CurrentModeId, _languageModes.CurrentModeFileExtensions,
-            _settings.PreparedTools);
+            _languageModes.CurrentModeWorkspacePatterns, _settings.PreparedTools);
 
     /// <summary>
     /// Keeps a PowerShell process waiting only while a `pwsh` tool is
@@ -911,7 +912,8 @@ internal sealed class MainWindowRuntime : IDisposable
             state.IsDirty,
             editorSnapshot.SelectionStart,
             editorSnapshot.SelectionEnd,
-            languageExtensions: _languageModes.CurrentModeFileExtensions);
+            languageExtensions: _languageModes.CurrentModeFileExtensions,
+            workspacePatterns: _languageModes.CurrentModeWorkspacePatterns);
     }
 
     private static ShellCommandInvocation ResolveShellCommand(

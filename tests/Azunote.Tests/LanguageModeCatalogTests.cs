@@ -13,24 +13,40 @@ public sealed class LanguageModeCatalogTests
             "Custom config",
             ["*.config"],
             [new LiteralSyntaxRule("true", "keyword")]);
-        var catalog = LanguageModeCatalog.Create([custom]);
+        var catalog = LanguageModeCatalog.Create([Mode(custom)]);
 
         Assert.Equal("custom-config", catalog.SelectForPath("settings.config"));
         Assert.Equal("plain-text", catalog.SelectForPath("readme.txt"));
     }
 
     [Fact]
-    public void Built_in_mode_wins_over_custom_duplicate_ids()
+    public void A_built_in_id_changes_only_the_settings_given()
     {
-        var duplicate = new SyntaxLanguageDefinition(
+        var server = new LanguageServerDefinition("json-server", ["--stdio"], [], null, null, null, null);
+        var change = new CustomLanguageMode(
             "json",
-            "Custom JSON",
-            ["*.custom-json"],
-            [new LiteralSyntaxRule("true", "keyword")]);
-        var catalog = LanguageModeCatalog.Create([duplicate]);
+            Path.GetFullPath("json.toml"),
+            null,
+            "My JSON",
+            SyntaxLanguageDefinition.NormalizePatterns(["*.custom-json"]),
+            null,
+            ["package.json"],
+            server);
+        var builtIn = LanguageModeCatalog.Create();
+        var catalog = LanguageModeCatalog.Create([change]);
 
-        Assert.DoesNotContain(catalog.Entries, entry => entry.DisplayName == "Custom JSON");
-        Assert.Equal("json", catalog.SelectForPath("data.json"));
+        Assert.True(builtIn.TryGet("json", out var original));
+        Assert.True(catalog.TryGet("json", out var json));
+        Assert.Equal(builtIn.Entries.Count, catalog.Entries.Count);
+        Assert.Equal("My JSON", json.DisplayName);
+        Assert.Equal("json", catalog.SelectForPath("data.custom-json"));
+        Assert.NotEqual("json", catalog.SelectForPath("data.json"));
+        Assert.Equal([".custom-json"], json.FileExtensions);
+        Assert.Equal(original.CompletionTriggers, json.CompletionTriggers);
+        Assert.Same(original.Provider?.GetType(), json.Provider?.GetType());
+        Assert.Equal(["package.json"], json.WorkspacePatterns);
+        Assert.Same(server, json.LanguageServer);
+        Assert.Equal(change.DefinitionPath, json.DefinitionPath);
         Assert.Equal("yaml", catalog.SelectForPath("config.yml"));
     }
 
@@ -89,6 +105,17 @@ public sealed class LanguageModeCatalogTests
             [new LiteralSyntaxRule("true", "keyword")]);
 
         Assert.False(LanguageModeCatalog.Create().IsKnownFile("notes.custom"));
-        Assert.True(LanguageModeCatalog.Create([custom]).IsKnownFile("notes.custom"));
+        Assert.True(LanguageModeCatalog.Create([Mode(custom)]).IsKnownFile("notes.custom"));
     }
+
+    private static CustomLanguageMode Mode(SyntaxLanguageDefinition syntax) =>
+        new(
+            syntax.Id,
+            Path.GetFullPath($"{syntax.Id}.toml"),
+            syntax,
+            syntax.DisplayName,
+            syntax.Patterns,
+            syntax.CompletionTriggerCharacters,
+            [],
+            null);
 }

@@ -28,16 +28,8 @@ public sealed class SyntaxLanguageDefinition : ISyntaxAnalysisProvider, IIncreme
         DefinitionPath = string.IsNullOrWhiteSpace(definitionPath)
             ? null
             : Path.GetFullPath(definitionPath);
-        Patterns = patterns
-            .Select(NormalizePattern)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        FileExtensions = Patterns
-            .Select(TryGetExtension)
-            .Where(extension => extension is not null)
-            .Select(extension => extension!)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        Patterns = NormalizePatterns(patterns);
+        FileExtensions = GetFileExtensions(Patterns);
         CompletionTriggerCharacters = (completionTriggerCharacters ?? Array.Empty<string>())
             .Select(NormalizeTrigger)
             .Distinct(StringComparer.Ordinal)
@@ -145,6 +137,31 @@ public sealed class SyntaxLanguageDefinition : ISyntaxAnalysisProvider, IIncreme
             change,
             previousAnalysis,
             cancellationToken);
+
+    /// <summary>
+    /// Normalizes file-name patterns the way <see cref="Patterns"/> holds them,
+    /// for an application that changes the patterns of a definition.
+    /// </summary>
+    public static IReadOnlyList<string> NormalizePatterns(IEnumerable<string> patterns)
+    {
+        ArgumentNullException.ThrowIfNull(patterns);
+        return patterns
+            .Select(NormalizePattern)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    /// <summary>The extensions <see cref="NormalizePatterns"/> output names, for file dialogs.</summary>
+    public static IReadOnlyList<string> GetFileExtensions(IEnumerable<string> normalizedPatterns)
+    {
+        ArgumentNullException.ThrowIfNull(normalizedPatterns);
+        return normalizedPatterns
+            .Select(TryGetExtension)
+            .Where(extension => extension is not null)
+            .Select(extension => extension!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
 
     private static string NormalizePattern(string pattern)
     {

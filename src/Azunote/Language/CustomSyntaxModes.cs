@@ -4,23 +4,47 @@ using Azunyan.Syntax;
 
 namespace Azunote;
 
-/// <summary>The TOML shape accepted for one custom language mode.</summary>
+/// <summary>
+/// The TOML shape accepted for one custom language mode, or for the changes to
+/// a built-in one. A setting left out is null, so a change to a built-in mode
+/// keeps the built-in value.
+/// </summary>
 public sealed class CustomSyntaxModeSettings
 {
-    public string Id { get; set; } = string.Empty;
+    public string? Id { get; set; }
 
-    public string DisplayName { get; set; } = string.Empty;
+    public string? DisplayName { get; set; }
 
-    public string[] Patterns { get; set; } = [];
+    public string[]? Patterns { get; set; }
 
     /// <summary>Compatibility alias for definitions written before patterns.</summary>
-    public string[] Extensions { get; set; } = [];
+    public string[]? Extensions { get; set; }
 
     /// <summary>Literal strings which trigger completion requests in this mode.</summary>
-    public string[] CompletionTriggerCharacters { get; set; } = [];
+    public string[]? CompletionTriggerCharacters { get; set; }
 
-    public CustomSyntaxRuleSettings[] Rules { get; set; } = [];
+    /// <summary>Glob patterns that mark a workspace folder besides the defaults.</summary>
+    public string[]? WorkspacePatterns { get; set; }
+
+    public CustomSyntaxRuleSettings[]? Rules { get; set; }
+
+    public LanguageServerSettings? LanguageServer { get; set; }
 }
+
+/// <summary>
+/// A language mode read from the modes folder. For a built-in id it holds only
+/// the settings the file changes; otherwise <see cref="Syntax"/> is the new
+/// mode and every other setting has a value.
+/// </summary>
+public sealed record CustomLanguageMode(
+    string Id,
+    string DefinitionPath,
+    SyntaxLanguageDefinition? Syntax,
+    string? DisplayName,
+    IReadOnlyList<string>? Patterns,
+    IReadOnlyList<string>? CompletionTriggerCharacters,
+    IReadOnlyList<string>? WorkspacePatterns,
+    LanguageServerDefinition? LanguageServer);
 
 /// <summary>The TOML shape accepted for one ordered syntax rule.</summary>
 public sealed class CustomSyntaxRuleSettings
@@ -52,7 +76,7 @@ public sealed class CustomSyntaxRuleSettings
 
 public static class CustomSyntaxModeDiscovery
 {
-    public static async Task<IReadOnlyList<SyntaxLanguageDefinition>> LoadAsync(
+    public static async Task<IReadOnlyList<CustomLanguageMode>> LoadAsync(
         string modesDirectory,
         CancellationToken cancellationToken = default)
     {
@@ -62,7 +86,7 @@ public static class CustomSyntaxModeDiscovery
             return [];
         }
 
-        var modes = new List<SyntaxLanguageDefinition>();
+        var modes = new List<CustomLanguageMode>();
         var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var path in Directory.EnumerateFiles(modesDirectory, "*.toml", SearchOption.AllDirectories)
                      .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
@@ -85,14 +109,14 @@ public static class CustomSyntaxModeDiscovery
 
             try
             {
-                var definition = CreateDefinition(settings, path);
-                if (!ids.Add(definition.Id))
+                var mode = CreateMode(settings, path);
+                if (!ids.Add(mode.Id))
                 {
                     throw new SettingsFileException(
-                        $"Duplicate syntax mode id '{definition.Id}' in '{path}'.");
+                        $"Duplicate syntax mode id '{mode.Id}' in '{path}'.");
                 }
 
-                modes.Add(definition);
+                modes.Add(mode);
             }
             catch (SettingsFileException exception)
             {
@@ -111,46 +135,70 @@ public static class CustomSyntaxModeDiscovery
         return modes;
     }
 
-    private static SyntaxLanguageDefinition CreateDefinition(
+    private static CustomLanguageMode CreateMode(
         CustomSyntaxModeSettings settings,
         string definitionPath)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        if (string.IsNullOrWhiteSpace(settings.Id))
+        var id = string.IsNullOrWhiteSpace(settings.Id)
+            ? Path.GetFileNameWithoutExtension(definitionPath)
+            : settings.Id.Trim();
+        if (string.IsNullOrWhiteSpace(id))
         {
             throw new SettingsFileException("A syntax mode needs a non-empty id.");
         }
 
-        if (string.IsNullOrWhiteSpace(settings.DisplayName))
+        var displayName = string.IsNullOrWhiteSpace(settings.DisplayName)
+            ? null
+            : settings.DisplayName;
+        var patterns = settings.Patterns
+            ?? (settings.Extensions is { Length: > 0 } ? settings.Extensions : null);
+        var languageServer = settings.LanguageServer is null
+            ? null
+            : LanguageServerDefinition.Create(
+                settings.LanguageServer,
+                Path.GetDirectoryName(Path.GetFullPath(definitionPath)));
+        if (LanguageModeCatalog.IsBuiltIn(id))
         {
-            throw new SettingsFileException(
-                $"Syntax mode '{settings.Id}' needs a non-empty displayName.");
-        }
+            if (settings.Rules is { Length: > 0 })
+            {
+                throw new SettingsFileException(
+                    $"The built-in mode '{id}' keeps its own highlighting and cannot have rules.");
+            }
 
-        if (settings.Patterns is null)
-        {
-            settings.Patterns = [];
-        }
-
-        if (settings.Patterns.Length == 0 && settings.Extensions is { Length: > 0 })
-        {
-            settings.Patterns = settings.Extensions;
+            return new CustomLanguageMode(
+                id,
+                Path.GetFullPath(definitionPath),
+                null,
+                displayName,
+                patterns is null ? null : SyntaxLanguageDefinition.NormalizePatterns(patterns),
+                settings.CompletionTriggerCharacters,
+                settings.WorkspacePatterns,
+                languageServer);
         }
 
         if (settings.Rules is null || settings.Rules.Length == 0)
         {
             throw new SettingsFileException(
-                $"Syntax mode '{settings.Id}' needs at least one rule.");
+                $"Syntax mode '{id}' needs at least one rule.");
         }
 
-        var sources = settings.Rules.Select(CreateRule).ToArray();
-        return new SyntaxLanguageDefinition(
-            settings.Id,
-            settings.DisplayName,
-            settings.Patterns,
-            sources,
+        var syntax = new SyntaxLanguageDefinition(
+            id,
+            displayName ?? id,
+            patterns ?? [],
+            settings.Rules.Select(CreateRule).ToArray(),
             settings.CompletionTriggerCharacters,
             definitionPath);
+        return new CustomLanguageMode(
+            id,
+            syntax.DefinitionPath!,
+            syntax,
+            syntax.DisplayName,
+            syntax.Patterns,
+            syntax.CompletionTriggerCharacters,
+            settings.WorkspacePatterns ?? [],
+            languageServer);
     }
 
     private static ISyntaxProvider CreateRule(CustomSyntaxRuleSettings settings)

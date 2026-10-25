@@ -5,7 +5,7 @@ namespace Azunote;
 // Capturing this object does not materialize text or perform filesystem discovery.
 internal sealed record ExternalToolEvaluationInput(
     TextSnapshot Snapshot, TextSelection Selection, DocumentSessionState State, string LanguageId,
-    IReadOnlyList<string> LanguageExtensions,
+    IReadOnlyList<string> LanguageExtensions, IReadOnlyList<string> WorkspacePatterns,
     IReadOnlyDictionary<ExternalToolSettings, PreparedExternalTool> Tools)
 {
     public ExternalToolContext CreateContext(string? toolDirectory, ExternalToolAvailabilityCache? cache = null)
@@ -18,7 +18,7 @@ internal sealed record ExternalToolEvaluationInput(
             Snapshot.GetText(selection.Range), caret.Line + 1, caret.Column + 1,
             LanguageId, toolDirectory, State.Encoding, State.LineEnding, State.IsDirty,
             lines.GetLineColumn(selection.Start), lines.GetLineColumn(selection.End),
-            cache is null ? null : cache.Workspace, LanguageExtensions);
+            cache is null ? null : cache.Workspace, LanguageExtensions, WorkspacePatterns);
     }
 
     public Dictionary<ExternalToolSettings, ExternalToolMenuState> Evaluate(Func<bool> isCurrent,

@@ -153,12 +153,31 @@ public static class AzunoteSchemaCatalog
             new AzunoteSchemaTable(
                 string.Empty,
                 [
-                    Field("id", AzunoteSchemaValueKind.String),
-                    Field("displayName", AzunoteSchemaValueKind.String),
+                    Field("id", AzunoteSchemaValueKind.String, documentation: "The mode id. Defaults to the file name; a built-in id changes that mode."),
+                    Field("displayName", AzunoteSchemaValueKind.String, documentation: "The name shown in menus. Defaults to the id."),
                     Field("patterns", AzunoteSchemaValueKind.Array),
                     Field("completionTriggerCharacters", AzunoteSchemaValueKind.Array),
+                    Field("workspacePatterns", AzunoteSchemaValueKind.Array, documentation: "Globs for files that mark a workspace folder, besides .git and a root .editorconfig."),
                     Field("rules", AzunoteSchemaValueKind.Array)
                 ]),
+            new AzunoteSchemaTable(
+                "languageServer",
+                [
+                    Field("command", AzunoteSchemaValueKind.String, "command", supportsPlaceholders: true, documentation: "The language server to run."),
+                    Field("args", AzunoteSchemaValueKind.Array, "property", supportsPlaceholders: true),
+                    Field("path", AzunoteSchemaValueKind.StringOrArray, "path", supportsPlaceholders: true, documentation: "Directories searched before PATH. A missing directory is skipped."),
+                    Field("languageId", AzunoteSchemaValueKind.String, documentation: "The language identifier sent to the server. Defaults to the mode id."),
+                    Field("initializationOptions", AzunoteSchemaValueKind.Map, documentation: "A table sent to the server when it starts."),
+                    Field("settings", AzunoteSchemaValueKind.Map, documentation: "Settings the server asks for, by section.")
+                ]),
+            new AzunoteSchemaTable(
+                "languageServer.initializationOptions",
+                [],
+                AllowsDynamicFields: true),
+            new AzunoteSchemaTable(
+                "languageServer.settings",
+                [],
+                AllowsDynamicFields: true),
             new AzunoteSchemaTable(
                 "rules",
                 [

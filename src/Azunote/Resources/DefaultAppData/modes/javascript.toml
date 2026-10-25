@@ -1,0 +1,12 @@
+# Changes the built-in JavaScript mode. Everything here is commented out, so
+# the mode is unchanged until a line is uncommented. See the Language Modes
+# and Language Servers pages of the Azunote documentation.
+
+# Folders holding these files are workspace folders too.
+# workspacePatterns = ["package.json", "jsconfig.json"]
+
+# npm install -g typescript-language-server typescript
+# [languageServer]
+# command = "typescript-language-server"
+# args = ["--stdio"]
+# path = ["${workspaceFolder}/node_modules/.bin"]

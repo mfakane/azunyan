@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Azunote.Tests.Settings;
 
-public sealed class DefaultToolInstallerTests : IDisposable
+public sealed class DefaultFileInstallerTests : IDisposable
 {
     private const string SortTool = "Edit/SortSelectedLines.tool.toml";
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"azunyan-default-tools-{Guid.NewGuid():N}");
@@ -24,7 +24,7 @@ public sealed class DefaultToolInstallerTests : IDisposable
         await StartAsync();
 
         Assert.Contains("Sort-Object", await ReadToolAsync(SortTool), StringComparison.Ordinal);
-        Assert.True(File.Exists(Path.Combine(_root, DefaultToolInstaller.RecordFileName)));
+        Assert.True(File.Exists(Path.Combine(_root, DefaultFileInstaller.ToolsRecordFileName)));
     }
 
     [Fact]
@@ -61,7 +61,7 @@ public sealed class DefaultToolInstallerTests : IDisposable
         Directory.CreateDirectory(Path.Combine(_root, SettingsFileService.ToolsDirectoryName));
         await StartAsync();
         var bundled = await ReadToolAsync(SortTool);
-        File.Delete(Path.Combine(_root, DefaultToolInstaller.RecordFileName));
+        File.Delete(Path.Combine(_root, DefaultFileInstaller.ToolsRecordFileName));
         File.Delete(ToolPath("Edit/UrlEncode.tool.toml"));
         // The sort tool as it shipped when it also removed duplicates, with
         // the CRLF line endings a build may have given it.
@@ -81,7 +81,7 @@ public sealed class DefaultToolInstallerTests : IDisposable
     private async Task StartAsync()
     {
         await SettingsFileService.EnsureExistsAsync(_root);
-        await SettingsFileService.InstallDefaultToolsAsync(_root);
+        await SettingsFileService.InstallDefaultFilesAsync(_root);
     }
 
     private string ToolPath(string relativePath) =>
@@ -93,14 +93,14 @@ public sealed class DefaultToolInstallerTests : IDisposable
 
     private async Task RecordOfferedAsync(string relativePath, string text)
     {
-        var recordPath = Path.Combine(_root, DefaultToolInstaller.RecordFileName);
+        var recordPath = Path.Combine(_root, DefaultFileInstaller.ToolsRecordFileName);
         var record = await SettingsFileService.DeserializeAsync(
             recordPath,
-            AzunoteTomlSerializerContext.Default.DefaultToolsRecord,
+            AzunoteTomlSerializerContext.Default.DefaultFilesRecord,
             CancellationToken.None);
-        record!.Offered[relativePath] = DefaultToolInstaller.Hash(Encoding.UTF8.GetBytes(text));
+        record!.Offered[relativePath] = DefaultFileInstaller.Hash(Encoding.UTF8.GetBytes(text));
         await File.WriteAllTextAsync(
             recordPath,
-            TomlSerializer.Serialize(record, AzunoteTomlSerializerContext.Default.DefaultToolsRecord));
+            TomlSerializer.Serialize(record, AzunoteTomlSerializerContext.Default.DefaultFilesRecord));
     }
 }

@@ -19,8 +19,8 @@ public sealed class SettingsController
     public Task EnsureExistsAsync(CancellationToken cancellationToken = default) =>
         SettingsFileService.EnsureExistsAsync(Directory, cancellationToken);
 
-    public Task InstallDefaultToolsAsync(CancellationToken cancellationToken = default) =>
-        SettingsFileService.InstallDefaultToolsAsync(Directory, cancellationToken);
+    public Task InstallDefaultFilesAsync(CancellationToken cancellationToken = default) =>
+        SettingsFileService.InstallDefaultFilesAsync(Directory, cancellationToken);
 
     public async Task<AzunoteSettings> LoadAsync(CancellationToken cancellationToken = default)
     {
