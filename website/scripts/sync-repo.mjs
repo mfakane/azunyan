@@ -29,7 +29,15 @@ function convert(markdown, name) {
 	const body = markdown
 		.slice(match[0].length)
 		.replace(/(\]\()([^)\s]+)(\))/g, (_, open, target, close) => open + rewriteLink(target) + close);
-	return `---\ntitle: ${JSON.stringify(match[1])}\n---\n${body}`;
+	// The opening paragraph, as plain text, describes the page in search
+	// results and link previews.
+	const description = body
+		.trim()
+		.split(/\r?\n\s*\r?\n/)[0]
+		.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+		.replace(/[`*]/g, '')
+		.replace(/\s+/g, ' ');
+	return `---\ntitle: ${JSON.stringify(match[1])}\ndescription: ${JSON.stringify(description)}\n---\n${body}`;
 }
 
 await rm(docsTarget, { recursive: true, force: true });
