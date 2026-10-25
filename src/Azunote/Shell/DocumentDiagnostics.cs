@@ -147,3 +147,29 @@ public sealed class DocumentDiagnosticsProvider : IDecorationProvider, ITooltipP
         return ValueTask.FromResult<TooltipData?>(new TooltipData(range, content));
     }
 }
+
+/// <summary>
+/// Shows the problems at the pointer followed by what a second provider, such
+/// as a language server, says about the same place.
+/// </summary>
+public sealed class CompositeTooltipProvider(ITooltipProvider first, ITooltipProvider second) : ITooltipProvider
+{
+    public async ValueTask<TooltipData?> GetTooltipAsync(
+        EditorProviderContext context,
+        CancellationToken cancellationToken = default)
+    {
+        var problems = await first.GetTooltipAsync(context, cancellationToken);
+        var description = await second.GetTooltipAsync(context, cancellationToken);
+        if (problems is null || description is null)
+        {
+            return problems ?? description;
+        }
+
+        return new TooltipData(
+            TextRange.FromBounds(
+                Math.Min(problems.Range.Start, description.Range.Start),
+                Math.Max(problems.Range.End, description.Range.End)),
+            problems.Content + Environment.NewLine + Environment.NewLine + description.Content,
+            problems.Title ?? description.Title);
+    }
+}

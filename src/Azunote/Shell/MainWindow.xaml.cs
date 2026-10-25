@@ -73,7 +73,8 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
             document,
             path => application.OpenFileAsync(this, path),
             application.OpenStreamedTextInNewWindowAsync,
-            proposal => application.OpenProposalAsync(this, proposal));
+            proposal => application.OpenProposalAsync(this, proposal),
+            application.LanguageServers);
         ViewModel.Attach(this);
         // MenuBarItem does not expose its internal flyout's Opening event.
         // Refresh synchronously on entry so the flyout's first paint is final.
@@ -814,6 +815,9 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
 
     private void LanguageModeStatus_Tapped(object sender, TappedRoutedEventArgs e) =>
         ShowLanguageModePicker();
+
+    private void LanguageServerStatus_Tapped(object sender, TappedRoutedEventArgs e) =>
+        _runtime.ToggleLanguageServer();
 
     void IMainWindowActions.MoveLines(bool down) => _runtime.MoveLines(down);
 

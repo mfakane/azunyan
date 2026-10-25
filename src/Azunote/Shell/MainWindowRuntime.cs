@@ -33,6 +33,9 @@ internal sealed class MainWindowRuntime : IDisposable
     private readonly Action<bool> _recordStatusBarVisible;
     private readonly DocumentBackupTracker _backups;
     private readonly DocumentDiagnostics _diagnostics = new();
+    private readonly LanguageServerController? _languageServer;
+    private IReadOnlyList<string> _languageServerTriggers = [];
+    private DocumentSessionState _previousState;
     private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer _backupTimer;
     private int _runningExternalToolCount;
     private bool _disposed;
@@ -53,7 +56,8 @@ internal sealed class MainWindowRuntime : IDisposable
         Document? document = null,
         Func<string, Task>? openFileRequest = null,
         Func<string?, Task<IExternalToolDocument>>? openStreamedTextInNewWindow = null,
-        Func<ExternalToolProposal, Task>? openProposal = null)
+        Func<ExternalToolProposal, Task>? openProposal = null,
+        LanguageServerRegistry? languageServers = null)
     {
         _window = window ?? throw new ArgumentNullException(nameof(window));
         _view = new MainWindow.ViewBoundary(window);
@@ -165,12 +169,29 @@ internal sealed class MainWindowRuntime : IDisposable
         _backupTimer.IsRepeating = false;
         _backupTimer.Tick += (_, _) => _backups.Flush();
 
+        if (languageServers is not null)
+        {
+            _languageServer = new LanguageServerController(
+                _view,
+                () => _session.State,
+                () => _languageModes.CurrentModeId,
+                () => _languageModes.CurrentModeLanguageServer,
+                () => _languageModes.CurrentModeWorkspacePatterns,
+                languageServers,
+                _diagnostics,
+                _dispatcher);
+            _window.SetLanguageServerProviders(_languageServer);
+            _languageServer.Changed += LanguageServer_Changed;
+        }
+
         _documents.Changed += Documents_Changed;
         _view.Edited += (_, change) => _diagnostics.Apply(change);
         _diagnostics.Changed += Diagnostics_Changed;
         _languageModes.Changed += LanguageModes_Changed;
         _session.StateChanged += Session_StateChanged;
+        _previousState = _session.State;
         RefreshDocumentView();
+        _languageServer?.Update();
     }
 
     public bool IsFindPanelVisible => _viewModel.IsFindPanelVisible;
@@ -556,6 +577,9 @@ internal sealed class MainWindowRuntime : IDisposable
         }
     }
 
+    /// <summary>Turns the document's language server on or off for its workspace folder.</summary>
+    public void ToggleLanguageServer() => _languageServer?.Toggle();
+
     public void ToggleStatusBar()
     {
         _recordStatusBarVisible(_editorCommands.ToggleStatusBar());
@@ -768,6 +792,12 @@ internal sealed class MainWindowRuntime : IDisposable
         }
 
         _disposed = true;
+        if (_languageServer is not null)
+        {
+            _languageServer.Changed -= LanguageServer_Changed;
+            _languageServer.Dispose();
+        }
+
         _backupTimer.Stop();
         _backups.Dispose();
         _powerShellWarmPool.Dispose();
@@ -854,6 +884,11 @@ internal sealed class MainWindowRuntime : IDisposable
             _languageModes.DocumentOpened(path);
         }
 
+        if (args.Opened)
+        {
+            _languageServer?.Reloaded();
+        }
+
         _viewModel.TabDisplaySize = _view.TabDisplaySize;
         _viewModel.IndentSize = _view.IndentSize;
         _viewModel.IndentationInputMode = _view.IndentationInputMode;
@@ -865,6 +900,7 @@ internal sealed class MainWindowRuntime : IDisposable
     private void LanguageModes_Changed(object? sender, EventArgs args)
     {
         _status.Refresh();
+        _languageServer?.Update();
     }
 
     private void Session_StateChanged(object? sender, EventArgs args)
@@ -876,6 +912,24 @@ internal sealed class MainWindowRuntime : IDisposable
         }
 
         RefreshDocumentView();
+        var previous = _previousState;
+        _previousState = _session.State;
+        _languageServer?.Update();
+        if (previous.IsDirty && !_session.State.IsDirty && previous.FilePath == _session.State.FilePath)
+        {
+            _languageServer?.Saved();
+        }
+    }
+
+    private void LanguageServer_Changed(object? sender, EventArgs args)
+    {
+        _viewModel.SetLanguageServer(_languageServer!.Indicator);
+        var triggers = _languageServer.CompletionTriggerCharacters;
+        if (!triggers.SequenceEqual(_languageServerTriggers))
+        {
+            _languageServerTriggers = triggers;
+            _languageModes.Reapply();
+        }
     }
 
     internal ExternalToolMenuState GetExternalToolMenuState(ExternalToolSettings tool)

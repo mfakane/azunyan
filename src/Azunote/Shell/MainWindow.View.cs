@@ -253,6 +253,7 @@ public sealed partial class MainWindow
     private void ShowCompletion(CompletionResult completions) => _editor.ShowCompletion(completions);
 
     private DocumentDiagnosticsProvider? _diagnosticsProvider;
+    private ILanguageServerProviders? _languageServerProviders;
 
     /// <summary>Shows these problems in the editor, whatever language mode it is in.</summary>
     internal void SetDiagnosticsProvider(DocumentDiagnosticsProvider provider)
@@ -262,13 +263,27 @@ public sealed partial class MainWindow
         _editor.Providers.Decorations = provider;
     }
 
+    /// <summary>
+    /// Lets the document's language server complete and describe in every
+    /// language mode; it steps aside while no server runs.
+    /// </summary>
+    internal void SetLanguageServerProviders(ILanguageServerProviders providers) =>
+        _languageServerProviders = providers;
+
     private void ApplyLanguage(EditorLanguageConfiguration configuration)
     {
-        _editor.CompletionTriggerCharacters = configuration.CompletionTriggers;
+        var languageServer = _languageServerProviders;
+        _editor.CompletionTriggerCharacters = languageServer is null
+            ? configuration.CompletionTriggers
+            : [.. configuration.CompletionTriggers.Union(languageServer.CompletionTriggerCharacters, StringComparer.Ordinal)];
         _editor.Providers.Syntax = configuration.Syntax;
-        _editor.Providers.Completion = configuration.Completion;
+        _editor.Providers.Completion = languageServer is null
+            ? configuration.Completion
+            : languageServer.GetCompletionProvider(configuration.Completion);
         _editor.Providers.Folding = configuration.Folding;
-        _editor.Providers.Tooltip = _diagnosticsProvider;
+        _editor.Providers.Tooltip = languageServer is null || _diagnosticsProvider is null
+            ? _diagnosticsProvider
+            : new CompositeTooltipProvider(_diagnosticsProvider, languageServer.TooltipProvider);
         _editor.Providers.Decorations = _diagnosticsProvider;
         _editor.Providers.Gutter = null;
         _editor.Providers.Inlay = null;

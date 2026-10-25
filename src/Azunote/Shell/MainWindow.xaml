@@ -1196,6 +1196,7 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <TextBlock
@@ -1229,8 +1230,31 @@
                     Tapped="LanguageModeStatus_Tapped"
                 />
                 <StackPanel
-                    x:Name="ProblemsStatus"
+                    x:Name="LanguageServerStatus"
                     Grid.Column="5"
+                    Margin="-12,0,0,0"
+                    Orientation="Horizontal"
+                    Spacing="2"
+                    Background="Transparent"
+                    ToolTipService.ToolTip="{x:Bind ViewModel.LanguageServerToolTip, Mode=OneWay}"
+                    AutomationProperties.Name="{x:Bind ViewModel.LanguageServerToolTip, Mode=OneWay}"
+                    Visibility="{x:Bind ViewModel.LanguageServerVisibility, Mode=OneWay}"
+                    Tapped="LanguageServerStatus_Tapped"
+                >
+                    <FontIcon
+                        Glyph="&#xE945;"
+                        FontSize="14"
+                        Opacity="{x:Bind ViewModel.LanguageServerOpacity, Mode=OneWay}"
+                    />
+                    <FontIcon
+                        Glyph="&#xE7BA;"
+                        FontSize="12"
+                        Visibility="{x:Bind ViewModel.LanguageServerFailureVisibility, Mode=OneWay}"
+                    />
+                </StackPanel>
+                <StackPanel
+                    x:Name="ProblemsStatus"
+                    Grid.Column="6"
                     Orientation="Horizontal"
                     Spacing="4"
                     ToolTipService.ToolTip="Show Problems (Ctrl+Shift+M)"
@@ -1263,7 +1287,7 @@
                 </StackPanel>
                 <StackPanel
                     x:Name="ExternalToolStatus"
-                    Grid.Column="6"
+                    Grid.Column="7"
                     Orientation="Horizontal"
                     Spacing="4"
                     ToolTipService.ToolTip="Running external tools"
@@ -1274,7 +1298,7 @@
                 </StackPanel>
                 <TextBlock
                     x:Name="FilePathStatus"
-                    Grid.Column="7"
+                    Grid.Column="8"
                     HorizontalAlignment="Right"
                     Text="{x:Bind ViewModel.FilePathStatus, Mode=OneWay}"
                     TextTrimming="CharacterEllipsis"

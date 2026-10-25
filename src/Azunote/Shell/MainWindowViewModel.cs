@@ -298,6 +298,45 @@ internal sealed class MainWindowViewModel :
         OnPropertyChanged(nameof(ProblemAtCaret));
     }
 
+    public Visibility LanguageServerVisibility { get; private set; } = Visibility.Collapsed;
+
+    /// <summary>Dimmed while the server is off, full while it runs.</summary>
+    public double LanguageServerOpacity { get; private set; } = 1;
+
+    public Visibility LanguageServerFailureVisibility { get; private set; } = Visibility.Collapsed;
+
+    public string LanguageServerToolTip { get; private set; } = string.Empty;
+
+    public void SetLanguageServer(LanguageServerIndicator indicator)
+    {
+        ArgumentNullException.ThrowIfNull(indicator);
+        LanguageServerVisibility = indicator.State == LanguageServerIndicatorState.Hidden
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        LanguageServerOpacity = indicator.State switch
+        {
+            LanguageServerIndicatorState.Off => 0.4,
+            LanguageServerIndicatorState.Starting => 0.7,
+            _ => 1
+        };
+        LanguageServerFailureVisibility = indicator.State == LanguageServerIndicatorState.Failed
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        LanguageServerToolTip = indicator.State switch
+        {
+            LanguageServerIndicatorState.Off => $"{indicator.Command} is off for this folder. Click to turn it on.",
+            LanguageServerIndicatorState.Starting => $"{indicator.Command} is starting. Click to turn it off.",
+            LanguageServerIndicatorState.Running => $"{indicator.Command} is running. Click to turn it off.",
+            LanguageServerIndicatorState.Failed =>
+                $"{indicator.Command} failed: {indicator.Message}{Environment.NewLine}Click to turn it off.",
+            _ => string.Empty
+        };
+        OnPropertyChanged(nameof(LanguageServerVisibility));
+        OnPropertyChanged(nameof(LanguageServerOpacity));
+        OnPropertyChanged(nameof(LanguageServerFailureVisibility));
+        OnPropertyChanged(nameof(LanguageServerToolTip));
+    }
+
     public int RunningExternalToolCount
     {
         get => _runningExternalToolCount;
