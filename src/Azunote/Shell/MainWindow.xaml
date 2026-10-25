@@ -710,6 +710,13 @@
                     x:Name="LanguageModeMenuItem"
                     Text="Language Mode"
                 />
+                <ToggleMenuFlyoutItem
+                    x:Name="LanguageServerMenuItem"
+                    Text="Language Server"
+                    IsChecked="{x:Bind ViewModel.IsLanguageServerOn, Mode=OneWay}"
+                    IsEnabled="{x:Bind ViewModel.IsLanguageServerAvailable, Mode=OneWay}"
+                    Command="{x:Bind ViewModel.ToggleLanguageServerCommand}"
+                />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutSubItem
                     x:Name="TabDisplaySizeMenuItem"
@@ -1196,7 +1203,6 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <TextBlock
@@ -1223,38 +1229,47 @@
                     Text="{x:Bind ViewModel.IndentationStatus, Mode=OneWay}"
                     Tapped="IndentationStatus_Tapped"
                 />
-                <TextBlock
-                    x:Name="LanguageModeStatus"
-                    Grid.Column="4"
-                    Text="{x:Bind ViewModel.LanguageModeStatus, Mode=OneWay}"
-                    Tapped="LanguageModeStatus_Tapped"
-                />
-                <StackPanel
-                    x:Name="LanguageServerStatus"
-                    Grid.Column="5"
-                    Margin="-12,0,0,0"
-                    Orientation="Horizontal"
-                    Spacing="2"
-                    Background="Transparent"
-                    ToolTipService.ToolTip="{x:Bind ViewModel.LanguageServerToolTip, Mode=OneWay}"
-                    AutomationProperties.Name="{x:Bind ViewModel.LanguageServerToolTip, Mode=OneWay}"
-                    Visibility="{x:Bind ViewModel.LanguageServerVisibility, Mode=OneWay}"
-                    Tapped="LanguageServerStatus_Tapped"
-                >
-                    <FontIcon
-                        Glyph="&#xE945;"
-                        FontSize="14"
-                        Opacity="{x:Bind ViewModel.LanguageServerOpacity, Mode=OneWay}"
-                    />
-                    <FontIcon
-                        Glyph="&#xE7BA;"
-                        FontSize="12"
-                        Visibility="{x:Bind ViewModel.LanguageServerFailureVisibility, Mode=OneWay}"
+                <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="6">
+                    <StackPanel
+                        x:Name="LanguageServerStatus"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal"
+                        Spacing="2"
+                        Background="Transparent"
+                        ToolTipService.ToolTip="{x:Bind ViewModel.LanguageServerToolTip, Mode=OneWay}"
+                        AutomationProperties.Name="{x:Bind ViewModel.LanguageServerToolTip, Mode=OneWay}"
+                        Visibility="{x:Bind ViewModel.LanguageServerVisibility, Mode=OneWay}"
+                        Tapped="LanguageServerStatus_Tapped"
+                    >
+                        <FontIcon
+                            Glyph="&#xE945;"
+                            FontSize="14"
+                            Opacity="{x:Bind ViewModel.LanguageServerOpacity, Mode=OneWay}"
+                            Visibility="{x:Bind ViewModel.LanguageServerIconVisibility, Mode=OneWay}"
+                        />
+                        <ProgressRing
+                            Width="14"
+                            Height="14"
+                            MinWidth="0"
+                            MinHeight="0"
+                            IsActive="{x:Bind ViewModel.IsLanguageServerBusy, Mode=OneWay}"
+                            Visibility="{x:Bind ViewModel.LanguageServerBusyVisibility, Mode=OneWay}"
+                        />
+                        <FontIcon
+                            Glyph="&#xE7BA;"
+                            FontSize="12"
+                            Visibility="{x:Bind ViewModel.LanguageServerFailureVisibility, Mode=OneWay}"
+                        />
+                    </StackPanel>
+                    <TextBlock
+                        x:Name="LanguageModeStatus"
+                        Text="{x:Bind ViewModel.LanguageModeStatus, Mode=OneWay}"
+                        Tapped="LanguageModeStatus_Tapped"
                     />
                 </StackPanel>
                 <StackPanel
                     x:Name="ProblemsStatus"
-                    Grid.Column="6"
+                    Grid.Column="5"
                     Orientation="Horizontal"
                     Spacing="4"
                     ToolTipService.ToolTip="Show Problems (Ctrl+Shift+M)"
@@ -1287,7 +1302,7 @@
                 </StackPanel>
                 <StackPanel
                     x:Name="ExternalToolStatus"
-                    Grid.Column="7"
+                    Grid.Column="6"
                     Orientation="Horizontal"
                     Spacing="4"
                     ToolTipService.ToolTip="Running external tools"
@@ -1298,7 +1313,7 @@
                 </StackPanel>
                 <TextBlock
                     x:Name="FilePathStatus"
-                    Grid.Column="8"
+                    Grid.Column="7"
                     HorizontalAlignment="Right"
                     Text="{x:Bind ViewModel.FilePathStatus, Mode=OneWay}"
                     TextTrimming="CharacterEllipsis"

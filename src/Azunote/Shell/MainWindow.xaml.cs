@@ -816,8 +816,10 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     private void LanguageModeStatus_Tapped(object sender, TappedRoutedEventArgs e) =>
         ShowLanguageModePicker();
 
+    void IMainWindowActions.ToggleLanguageServer() => _runtime.ToggleLanguageServer();
+
     private void LanguageServerStatus_Tapped(object sender, TappedRoutedEventArgs e) =>
-        _runtime.ToggleLanguageServer();
+        ViewModel.ToggleLanguageServerCommand.Execute(null);
 
     void IMainWindowActions.MoveLines(bool down) => _runtime.MoveLines(down);
 

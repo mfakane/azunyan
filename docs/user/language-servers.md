@@ -22,20 +22,22 @@ path = ["${workspaceFolder}/node_modules/.bin"]
 
 When the document's mode has a server, the document is saved in a
 [workspace folder](language-modes.md#workspace-folder), and the server's
-command is found, the status bar shows ⚡. Clicking it turns the server on for
-that workspace folder and starts it; clicking it again turns it off and stops
-it. Azunote remembers which servers are on for which folders, and starts them
-again when a document in the folder is opened. Other windows on the same
-folder follow along.
+command is found, **View > Language Server** becomes available and the status
+bar shows ⚡ before the mode's name as a shortcut to it. Choosing it turns the
+server on for that workspace folder and starts it; choosing it again turns it
+off and stops it. Azunote remembers which servers are on for which folders, and
+starts them again when a document in the folder is opened. Other windows on the
+same folder follow along.
 
 A server runs programs and reads settings from the workspace folder, so turn it
 on only for folders you trust. A server that is on for one folder stays off for
 others, and changing its `command` turns it off everywhere.
 
-The ⚡ is dimmed while the server is off and highlighted while it runs. If the
-server fails to start or stops by itself, the ⚡ shows a warning and resting
-the pointer on it tells why. Clicking it turns the server off; clicking it
-again starts it anew.
+The ⚡ is dimmed while the server is off, turns into a spinner while it starts,
+and is highlighted while it runs. If the server fails to start or stops by
+itself, the ⚡ shows a warning and resting the pointer on it tells why. The menu
+item stays checked, so choosing it turns the server off and choosing it again
+starts it anew.
 
 ## What a server provides
 

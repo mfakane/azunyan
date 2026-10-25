@@ -105,6 +105,7 @@ internal sealed class MainWindowViewModel :
         SetIndentSizeCommand = Command(SetIndentSize);
         SetIndentationInputModeCommand = Command(SetIndentationInputMode);
         ToggleStatusBarCommand = Command(() => Actions.ToggleStatusBar());
+        ToggleLanguageServerCommand = Command(() => Actions.ToggleLanguageServer());
         CopyFilePathCommand = Command(() => Actions.CopyFilePath());
         ShowFileInExplorerCommand = Async(() => Actions.ShowFileInExplorerAsync());
         OpenFolderInTerminalCommand = Async(() => Actions.OpenFolderInTerminalAsync());
@@ -256,6 +257,7 @@ internal sealed class MainWindowViewModel :
     public ICommand SetIndentSizeCommand { get; }
     public ICommand SetIndentationInputModeCommand { get; }
     public ICommand ToggleStatusBarCommand { get; }
+    public ICommand ToggleLanguageServerCommand { get; }
     public ICommand CopyFilePathCommand { get; }
     public ICommand ShowFileInExplorerCommand { get; }
     public ICommand OpenFolderInTerminalCommand { get; }
@@ -300,8 +302,21 @@ internal sealed class MainWindowViewModel :
 
     public Visibility LanguageServerVisibility { get; private set; } = Visibility.Collapsed;
 
+    /// <summary>The document's mode has a server it can start in its workspace folder.</summary>
+    public bool IsLanguageServerAvailable { get; private set; }
+
+    /// <summary>The server is turned on for the document's workspace folder.</summary>
+    public bool IsLanguageServerOn { get; private set; }
+
     /// <summary>Dimmed while the server is off, full while it runs.</summary>
     public double LanguageServerOpacity { get; private set; } = 1;
+
+    /// <summary>A spinner takes the place of the icon while the server starts.</summary>
+    public bool IsLanguageServerBusy { get; private set; }
+
+    public Visibility LanguageServerIconVisibility => IsLanguageServerBusy ? Visibility.Collapsed : Visibility.Visible;
+
+    public Visibility LanguageServerBusyVisibility => IsLanguageServerBusy ? Visibility.Visible : Visibility.Collapsed;
 
     public Visibility LanguageServerFailureVisibility { get; private set; } = Visibility.Collapsed;
 
@@ -310,29 +325,31 @@ internal sealed class MainWindowViewModel :
     public void SetLanguageServer(LanguageServerIndicator indicator)
     {
         ArgumentNullException.ThrowIfNull(indicator);
-        LanguageServerVisibility = indicator.State == LanguageServerIndicatorState.Hidden
-            ? Visibility.Collapsed
-            : Visibility.Visible;
-        LanguageServerOpacity = indicator.State switch
-        {
-            LanguageServerIndicatorState.Off => 0.4,
-            LanguageServerIndicatorState.Starting => 0.7,
-            _ => 1
-        };
+        IsLanguageServerAvailable = indicator.State != LanguageServerIndicatorState.Hidden;
+        IsLanguageServerOn = indicator.State is not (LanguageServerIndicatorState.Hidden or LanguageServerIndicatorState.Off);
+        LanguageServerVisibility = IsLanguageServerAvailable ? Visibility.Visible : Visibility.Collapsed;
+        LanguageServerOpacity = indicator.State == LanguageServerIndicatorState.Off ? 0.4 : 1;
+        IsLanguageServerBusy = indicator.State == LanguageServerIndicatorState.Starting;
         LanguageServerFailureVisibility = indicator.State == LanguageServerIndicatorState.Failed
             ? Visibility.Visible
             : Visibility.Collapsed;
+        var name = Path.GetFileName(indicator.Command);
         LanguageServerToolTip = indicator.State switch
         {
-            LanguageServerIndicatorState.Off => $"{indicator.Command} is off for this folder. Click to turn it on.",
-            LanguageServerIndicatorState.Starting => $"{indicator.Command} is starting. Click to turn it off.",
-            LanguageServerIndicatorState.Running => $"{indicator.Command} is running. Click to turn it off.",
+            LanguageServerIndicatorState.Off => $"{name} is off for this folder. Click to turn it on.",
+            LanguageServerIndicatorState.Starting => $"{name} is starting. Click to turn it off.",
+            LanguageServerIndicatorState.Running => $"{name} is running. Click to turn it off.",
             LanguageServerIndicatorState.Failed =>
-                $"{indicator.Command} failed: {indicator.Message}{Environment.NewLine}Click to turn it off.",
+                $"{name} failed: {indicator.Message}{Environment.NewLine}Click to turn it off.",
             _ => string.Empty
         };
         OnPropertyChanged(nameof(LanguageServerVisibility));
+        OnPropertyChanged(nameof(IsLanguageServerAvailable));
+        OnPropertyChanged(nameof(IsLanguageServerOn));
         OnPropertyChanged(nameof(LanguageServerOpacity));
+        OnPropertyChanged(nameof(IsLanguageServerBusy));
+        OnPropertyChanged(nameof(LanguageServerIconVisibility));
+        OnPropertyChanged(nameof(LanguageServerBusyVisibility));
         OnPropertyChanged(nameof(LanguageServerFailureVisibility));
         OnPropertyChanged(nameof(LanguageServerToolTip));
     }
@@ -667,6 +684,7 @@ internal interface IMainWindowActions
     void SetIndentSize(int? size);
     void SetIndentationInputMode(IndentationInputMode mode);
     void ToggleStatusBar();
+    void ToggleLanguageServer();
     void CopyFilePath();
     Task ShowFileInExplorerAsync();
     Task OpenFolderInTerminalAsync();
