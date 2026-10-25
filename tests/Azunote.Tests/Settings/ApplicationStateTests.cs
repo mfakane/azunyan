@@ -67,6 +67,35 @@ public sealed class ApplicationStateTests
     }
 
     [Fact]
+    public async Task Controller_remembers_language_servers_turned_on_per_folder()
+    {
+        var directory = CreateDirectory();
+        try
+        {
+            using (var controller = new ApplicationStateController(directory))
+            {
+                controller.SetLanguageServerEnabled(@"C:\src\app", "typescript-language-server", true);
+                await controller.InitializeAsync();
+                controller.SetLanguageServerEnabled(@"C:\src\lib", "typescript-language-server", true);
+                controller.SetLanguageServerEnabled(@"C:\src\lib", "typescript-language-server", false);
+                controller.SetLanguageServerEnabled(@"C:\src\tool", "pyright-langserver", true);
+                await controller.FlushAsync();
+            }
+
+            using var reloaded = new ApplicationStateController(directory);
+            await reloaded.InitializeAsync();
+            Assert.True(reloaded.IsLanguageServerEnabled(@"c:\SRC\app", "typescript-language-server"));
+            Assert.False(reloaded.IsLanguageServerEnabled(@"C:\src\lib", "typescript-language-server"));
+            Assert.False(reloaded.IsLanguageServerEnabled(@"C:\src\tool", "typescript-language-server"));
+            Assert.True(reloaded.IsLanguageServerEnabled(@"C:\src\tool", "pyright-langserver"));
+        }
+        finally
+        {
+            DeleteDirectory(directory);
+        }
+    }
+
+    [Fact]
     public async Task State_service_normalizes_invalid_window_dimensions()
     {
         var directory = CreateDirectory();

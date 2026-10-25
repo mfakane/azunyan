@@ -16,6 +16,7 @@ internal sealed class ApplicationStateController : IDisposable
     private WindowLayoutState? _pendingWindowSize;
     private bool? _pendingWordWrap;
     private bool? _pendingStatusBarVisible;
+    private readonly List<(string Workspace, string Command, bool Enabled)> _pendingLanguageServers = [];
     private bool _initialized;
     private bool _disposed;
 
@@ -233,6 +234,47 @@ internal sealed class ApplicationStateController : IDisposable
         }
     }
 
+    public bool IsLanguageServerEnabled(string workspace, string command)
+    {
+        lock (_gate)
+        {
+            return _current.LanguageServers.Any(entry => entry.Matches(workspace, command));
+        }
+    }
+
+    public void SetLanguageServerEnabled(string workspace, string command, bool enabled)
+    {
+        lock (_gate)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            ApplyLanguageServerEnabled(_current, workspace, command, enabled);
+            if (!_initialized)
+            {
+                _pendingLanguageServers.Add((workspace, command, enabled));
+            }
+            else
+            {
+                QueueSaveLocked();
+            }
+        }
+    }
+
+    private static void ApplyLanguageServerEnabled(
+        AzunoteState state,
+        string workspace,
+        string command,
+        bool enabled)
+    {
+        var others = state.LanguageServers.Where(entry => !entry.Matches(workspace, command));
+        state.LanguageServers = enabled
+            ? [.. others, new LanguageServerEnablement { Workspace = workspace, Command = command }]
+            : [.. others];
+    }
+
     public async Task FlushAsync()
     {
         Task initialization;
@@ -317,17 +359,25 @@ internal sealed class ApplicationStateController : IDisposable
                         loadedState.StatusBarVisible = pendingStatusBarVisible;
                     }
 
+                    loadedState.LanguageServers ??= [];
+                    foreach (var (workspace, command, enabled) in _pendingLanguageServers)
+                    {
+                        ApplyLanguageServerEnabled(loadedState, workspace, command, enabled);
+                    }
+
                     _current = AzunoteStateNormalization.Normalize(loadedState);
                 }
 
                 var hasPendingChanges = _pendingWindowSize is not null
                     || _pendingRecentFiles.Count > 0
                     || _pendingWordWrap is not null
-                    || _pendingStatusBarVisible is not null;
+                    || _pendingStatusBarVisible is not null
+                    || _pendingLanguageServers.Count > 0;
                 _pendingWindowSize = null;
                 _pendingRecentFiles.Clear();
                 _pendingWordWrap = null;
                 _pendingStatusBarVisible = null;
+                _pendingLanguageServers.Clear();
                 _initialized = true;
                 if (hasPendingChanges)
                 {

@@ -174,6 +174,7 @@ public sealed class AzunoteDebugSettings
 [TomlSerializable(typeof(AzunoteState))]
 [TomlSerializable(typeof(DefaultFilesRecord))]
 [TomlSerializable(typeof(WindowLayoutState))]
+[TomlSerializable(typeof(LanguageServerEnablement))]
 [TomlSerializable(typeof(ShellCommandSettings))]
 [TomlSerializable(typeof(ExternalToolSettings))]
 [TomlSerializable(typeof(ExternalToolLaunchSettings))]

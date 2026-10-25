@@ -18,6 +18,21 @@ public sealed class AzunoteState
     public bool WordWrap { get; set; }
 
     public bool StatusBarVisible { get; set; } = true;
+
+    /// <summary>The language servers turned on, each for one workspace folder.</summary>
+    public LanguageServerEnablement[] LanguageServers { get; set; } = [];
+}
+
+/// <summary>A language server command turned on for a workspace folder.</summary>
+public sealed class LanguageServerEnablement
+{
+    public string Workspace { get; set; } = string.Empty;
+
+    public string Command { get; set; } = string.Empty;
+
+    public bool Matches(string workspace, string command) =>
+        string.Equals(Workspace, workspace, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(Command, command, StringComparison.Ordinal);
 }
 
 public sealed class WindowLayoutState
@@ -56,6 +71,11 @@ internal static class AzunoteStateNormalization
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(MaximumRecentFiles)
             .ToArray() ?? [];
+        state.LanguageServers = state.LanguageServers?
+            .Where(entry => entry is not null
+                && !string.IsNullOrWhiteSpace(entry.Workspace)
+                && !string.IsNullOrWhiteSpace(entry.Command))
+            .ToArray() ?? [];
         return state;
     }
 
@@ -69,7 +89,15 @@ internal static class AzunoteStateNormalization
             },
             RecentFiles = [.. state.RecentFiles],
             WordWrap = state.WordWrap,
-            StatusBarVisible = state.StatusBarVisible
+            StatusBarVisible = state.StatusBarVisible,
+            LanguageServers =
+            [
+                .. state.LanguageServers.Select(entry => new LanguageServerEnablement
+                {
+                    Workspace = entry.Workspace,
+                    Command = entry.Command
+                })
+            ]
         };
 }
 

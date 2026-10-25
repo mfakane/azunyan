@@ -22,6 +22,16 @@ internal sealed class ApplicationCoordinator : IDisposable
     internal DocumentBackupStore Backups { get; } =
         new(Path.Combine(SettingsFileService.GetDefaultDirectory(), "backups"));
 
+    public ApplicationCoordinator()
+    {
+        LanguageServers = new LanguageServerRegistry(
+            _state.IsLanguageServerEnabled,
+            _state.SetLanguageServerEnabled);
+    }
+
+    /// <summary>The language servers every window shares.</summary>
+    internal LanguageServerRegistry LanguageServers { get; }
+
     public MainWindow? Window => _windows.Active?.Window;
 
     public void Launch(IReadOnlyList<string> arguments)
@@ -64,6 +74,8 @@ internal sealed class ApplicationCoordinator : IDisposable
         IReadOnlyList<string> arguments)
     {
         await _state.InitializeAsync().ConfigureAwait(true);
+        // The windows asked before the remembered choices were read.
+        LanguageServers.NotifyEnablementChanged();
         if (!registration.IsClosed)
         {
             var state = _state.Current;
@@ -730,6 +742,7 @@ internal sealed class ApplicationCoordinator : IDisposable
             _windows.Unregister(registration);
         }
 
+        LanguageServers.Dispose();
         _state.Dispose();
         SettingsService.Shared.Dispose();
     }
