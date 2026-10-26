@@ -38,7 +38,7 @@ jobs:
 
     steps:
       - name: Check out repository and pinned submodules
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: recursive
 
@@ -82,7 +82,7 @@ jobs:
           }
 
       - name: Set up .NET 10
-        uses: actions/setup-dotnet@v6
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           dotnet-version: 10.0.x
 
@@ -91,7 +91,7 @@ jobs:
         run: ./scripts/Build-Win2D.ps1
 
       - name: Upload Win2D package
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: win2d-package
           path: artifacts/packages/Microsoft.Graphics.Win2D.*.nupkg
@@ -119,10 +119,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up .NET 10
-        uses: actions/setup-dotnet@v6
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           dotnet-version: 10.0.x
 
@@ -135,7 +135,7 @@ jobs:
           if ($os -ne 'Arm64') { throw 'This job must run on an ARM64 runner.' }
 
       - name: Download Win2D package
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: win2d-package
           path: artifacts/packages
@@ -176,7 +176,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Ensure MSVC ARM64 build tools for Native AOT
         if: matrix.rid == 'win-arm64'
@@ -206,12 +206,12 @@ jobs:
           }
 
       - name: Set up .NET 10
-        uses: actions/setup-dotnet@v6
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           dotnet-version: 10.0.x
 
       - name: Set up WinApp CLI
-        uses: microsoft/setup-WinAppCli@v0.2
+        uses: microsoft/setup-WinAppCli@b93bbddc1f7abc061ca0d3a8119e3a0c7dd71495 # v0.2
         with:
           version: v0.7.1
 
@@ -220,7 +220,7 @@ jobs:
         run: winapp --version
 
       - name: Download Win2D package
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: win2d-package
           path: artifacts/packages
@@ -250,7 +250,7 @@ jobs:
               -OutputDirectory artifacts/distributions
 
       - name: Upload distributions
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: azunote-${{ matrix.rid }}
           path: |
@@ -267,15 +267,15 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up WinApp CLI
-        uses: microsoft/setup-WinAppCli@v0.2
+        uses: microsoft/setup-WinAppCli@b93bbddc1f7abc061ca0d3a8119e3a0c7dd71495 # v0.2
         with:
           version: v0.7.1
 
       - name: Download per-architecture distributions
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: azunote-win-*
           path: artifacts/per-rid
@@ -293,7 +293,7 @@ jobs:
         run: ./scripts/Test-AzunoteMsixBundle.ps1 -Path (Get-Item artifacts/distributions/*.msixbundle).FullName
 
       - name: Upload MSIX bundle
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: azunote-msixbundle
           path: |
@@ -309,10 +309,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Download ARM64 distributions
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: azunote-win-arm64
           path: artifacts/distributions
