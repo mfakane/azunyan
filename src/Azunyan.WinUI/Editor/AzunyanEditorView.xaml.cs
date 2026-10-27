@@ -3692,9 +3692,14 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         _hoverPosition = position;
         _hoverLinkRange = link;
         _hoverLinkText = linkText;
-        _completionRequested = false;
-        HideCompletionPopup();
         HideTooltipPopup();
+
+        // Moving the pointer leaves an open completion list alone. Asking
+        // about the pointer would replace the completions at the caret.
+        if (_completionRequested || IsCompletionPopupOpen)
+        {
+            return;
+        }
 
         // A link answers its own tooltip, so the position channel is not
         // asked for one and cannot replace it.
