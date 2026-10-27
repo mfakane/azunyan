@@ -33,6 +33,22 @@ public sealed class LanguageServerClientTests
     }
 
     [Fact]
+    public async Task Without_a_workspace_folder_initialize_sends_no_root()
+    {
+        await using var server = new FakeLanguageServer();
+        await using var client = server.CreateClient(string.Empty);
+
+        await client.InitializeAsync(null, CancellationToken.None);
+        var folders = await server.RequestAsync("workspace/workspaceFolders", null);
+
+        var initialize = Assert.Single(server.ReceivedOf("initialize"))!;
+        Assert.Null(initialize["rootUri"]);
+        Assert.Null(initialize["rootPath"]);
+        Assert.Null(initialize["workspaceFolders"]);
+        Assert.Null(folders);
+    }
+
+    [Fact]
     public async Task A_document_opened_twice_is_opened_and_closed_once()
     {
         await using var server = new FakeLanguageServer();

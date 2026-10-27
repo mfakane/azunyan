@@ -33,6 +33,11 @@ A server runs programs and reads settings from the workspace folder, so turn it
 on only for folders you trust. A server that is on for one folder stays off for
 others, and changing its `command` turns it off everywhere.
 
+A document outside every workspace folder gets the menu item and the ⚡ only
+when the server has `allowOutsideWorkspace = true`. Such a server is turned on
+once for all files outside a workspace folder, and runs without one, which suits
+servers that look at a single file, such as those for JSON and YAML.
+
 The ⚡ is dimmed while the server is off, turns into a spinner while it starts,
 and is highlighted while it runs. If the server fails to start or stops by
 itself, the ⚡ shows a warning and resting the pointer on it tells why. The menu
@@ -63,13 +68,14 @@ a minute after its last document is closed.
 | `languageId` | The language identifier sent to the server. Defaults to the mode's `id`. |
 | `initializationOptions` | A table sent to the server when it starts. |
 | `settings` | A table of settings the server asks for, such as `[languageServer.settings.python.analysis]`. |
+| `allowOutsideWorkspace` | `true` also offers the server for files outside every workspace folder. Defaults to `false`. |
 
 `command`, `args`, and `path` accept
 [substitution variables](substitution-variables.md) such as
 `${workspaceFolder}`. A relative `command` or `path` is relative to the folder
 of the definition file.
 
-The server runs in the workspace folder. A `.cmd` or `.bat` command, such as
+The server runs in the workspace folder, if it has one. A `.cmd` or `.bat` command, such as
 one installed by npm, runs through `cmd.exe`, and a `.ps1` command through
 PowerShell.
 
@@ -92,4 +98,5 @@ typeCheckingMode = "basic"
 [languageServer]
 command = "vscode-json-language-server"
 args = ["--stdio"]
+allowOutsideWorkspace = true
 ~~~

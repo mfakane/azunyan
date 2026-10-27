@@ -168,7 +168,8 @@ public static class AzunoteSchemaCatalog
                     Field("path", AzunoteSchemaValueKind.StringOrArray, "path", supportsPlaceholders: true, documentation: "Directories searched before PATH. A missing directory is skipped."),
                     Field("languageId", AzunoteSchemaValueKind.String, documentation: "The language identifier sent to the server. Defaults to the mode id."),
                     Field("initializationOptions", AzunoteSchemaValueKind.Map, documentation: "A table sent to the server when it starts."),
-                    Field("settings", AzunoteSchemaValueKind.Map, documentation: "Settings the server asks for, by section.")
+                    Field("settings", AzunoteSchemaValueKind.Map, documentation: "Settings the server asks for, by section."),
+                    Field("allowOutsideWorkspace", AzunoteSchemaValueKind.Boolean, documentation: "Also offers the server for files outside every workspace folder.")
                 ]),
             new AzunoteSchemaTable(
                 "languageServer.initializationOptions",

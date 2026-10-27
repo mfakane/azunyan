@@ -6,3 +6,4 @@
 # [languageServer]
 # command = "vscode-json-language-server"
 # args = ["--stdio"]
+# allowOutsideWorkspace = true

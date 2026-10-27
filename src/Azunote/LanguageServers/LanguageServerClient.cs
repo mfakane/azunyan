@@ -5,7 +5,11 @@ using Azunyan.Core;
 
 namespace Azunote;
 
-/// <summary>A language server resolved for one workspace folder, ready to start.</summary>
+/// <summary>
+/// A language server resolved for one workspace folder, ready to start. An
+/// empty <see cref="WorkspaceFolder"/> stands for the files outside every
+/// workspace folder.
+/// </summary>
 internal sealed record LanguageServerLaunch(
     LanguageServerDefinition Definition,
     ExternalToolLaunchPlan Plan,
@@ -108,18 +112,13 @@ internal sealed class LanguageServerClient : IAsyncDisposable
 
     public async Task InitializeAsync(JsonObject? initializationOptions, CancellationToken cancellationToken)
     {
-        var folderUri = ToUri(_workspaceFolder);
         var parameters = new JsonObject
         {
             ["processId"] = Environment.ProcessId,
             ["clientInfo"] = new JsonObject { ["name"] = "Azunote" },
-            ["rootPath"] = _workspaceFolder,
-            ["rootUri"] = folderUri,
-            ["workspaceFolders"] = new JsonArray(new JsonObject
-            {
-                ["uri"] = folderUri,
-                ["name"] = Path.GetFileName(Path.TrimEndingDirectorySeparator(_workspaceFolder))
-            }),
+            ["rootPath"] = _workspaceFolder.Length == 0 ? null : _workspaceFolder,
+            ["rootUri"] = _workspaceFolder.Length == 0 ? null : ToUri(_workspaceFolder),
+            ["workspaceFolders"] = GetWorkspaceFolders(),
             ["capabilities"] = new JsonObject
             {
                 ["general"] = new JsonObject { ["positionEncodings"] = new JsonArray("utf-16") },
@@ -421,11 +420,7 @@ internal sealed class LanguageServerClient : IAsyncDisposable
     private Task<JsonNode?> HandleRequestAsync(string method, JsonNode? parameters) => method switch
     {
         "workspace/configuration" => Task.FromResult<JsonNode?>(GetConfiguration(parameters?["items"] as JsonArray)),
-        "workspace/workspaceFolders" => Task.FromResult<JsonNode?>(new JsonArray(new JsonObject
-        {
-            ["uri"] = ToUri(_workspaceFolder),
-            ["name"] = Path.GetFileName(Path.TrimEndingDirectorySeparator(_workspaceFolder))
-        })),
+        "workspace/workspaceFolders" => Task.FromResult<JsonNode?>(GetWorkspaceFolders()),
         "workspace/applyEdit" => Task.FromResult<JsonNode?>(new JsonObject { ["applied"] = false }),
         "client/registerCapability"
             or "client/unregisterCapability"
@@ -435,6 +430,15 @@ internal sealed class LanguageServerClient : IAsyncDisposable
             JsonRpcException.MethodNotFound,
             $"Azunote does not handle {method}."))
     };
+
+    private JsonArray? GetWorkspaceFolders() =>
+        _workspaceFolder.Length == 0
+            ? null
+            : new JsonArray(new JsonObject
+            {
+                ["uri"] = ToUri(_workspaceFolder),
+                ["name"] = Path.GetFileName(Path.TrimEndingDirectorySeparator(_workspaceFolder))
+            });
 
     private JsonArray GetConfiguration(JsonArray? items)
     {

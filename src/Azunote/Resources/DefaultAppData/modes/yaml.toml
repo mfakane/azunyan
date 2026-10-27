@@ -6,3 +6,4 @@
 # [languageServer]
 # command = "yaml-language-server"
 # args = ["--stdio"]
+# allowOutsideWorkspace = true

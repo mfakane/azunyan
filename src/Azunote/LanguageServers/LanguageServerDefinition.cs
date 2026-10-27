@@ -21,12 +21,16 @@ public sealed class LanguageServerSettings
     public TomlTable? InitializationOptions { get; set; }
 
     public TomlTable? Settings { get; set; }
+
+    public bool? AllowOutsideWorkspace { get; set; }
 }
 
 /// <summary>
 /// How to start the language server of a mode. <see cref="Command"/>,
 /// <see cref="Arguments"/> and <see cref="SearchPath"/> are expanded for the
-/// document when the server starts.
+/// document when the server starts. With <see cref="AllowOutsideWorkspace"/>,
+/// documents outside every workspace folder share one server that has no
+/// workspace folder.
 /// </summary>
 public sealed record LanguageServerDefinition(
     string Command,
@@ -35,7 +39,8 @@ public sealed record LanguageServerDefinition(
     string? LanguageId,
     JsonObject? InitializationOptions,
     JsonObject? Settings,
-    string? DefinitionDirectory)
+    string? DefinitionDirectory,
+    bool AllowOutsideWorkspace = false)
 {
     internal static LanguageServerDefinition Create(
         LanguageServerSettings settings,
@@ -54,7 +59,8 @@ public sealed record LanguageServerDefinition(
             string.IsNullOrWhiteSpace(settings.LanguageId) ? null : settings.LanguageId.Trim(),
             settings.InitializationOptions is null ? null : ToJson(settings.InitializationOptions),
             settings.Settings is null ? null : ToJson(settings.Settings),
-            definitionDirectory);
+            definitionDirectory,
+            settings.AllowOutsideWorkspace == true);
     }
 
     /// <summary>The values of a TOML table as JSON, for the server.</summary>

@@ -85,6 +85,23 @@ public sealed class LanguageServerControllerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_server_allowed_outside_workspaces_is_turned_on_for_all_such_files()
+    {
+        _definition = _definition! with { AllowOutsideWorkspace = true };
+        _filePath = Path.Combine(Path.GetPathRoot(_root)!, $"no-workspace-{Guid.NewGuid():N}", "app.ts");
+        using var controller = CreateController();
+        controller.Update();
+        Assert.Equal(LanguageServerIndicatorState.Off, controller.Indicator.State);
+        Assert.True(controller.Indicator.OutsideWorkspace);
+
+        controller.Toggle();
+        await WaitForAsync(() => controller.Indicator.State == LanguageServerIndicatorState.Running);
+
+        Assert.Contains((string.Empty, "fake-server"), _enabled);
+        Assert.Equal(string.Empty, Assert.Single(Launches).WorkspaceFolder);
+    }
+
+    [Fact]
     public async Task Turning_the_server_on_starts_it_for_the_folder_and_opens_the_document()
     {
         using var controller = CreateController();

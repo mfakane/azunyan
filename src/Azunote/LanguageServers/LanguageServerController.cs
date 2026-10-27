@@ -16,7 +16,8 @@ internal enum LanguageServerIndicatorState
 internal sealed record LanguageServerIndicator(
     LanguageServerIndicatorState State,
     string? Command = null,
-    string? Message = null)
+    string? Message = null,
+    bool OutsideWorkspace = false)
 {
     public static LanguageServerIndicator Hidden { get; } = new(LanguageServerIndicatorState.Hidden);
 }
@@ -124,7 +125,10 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
         {
             Detach();
             _target = target;
-            SetIndicator(new LanguageServerIndicator(LanguageServerIndicatorState.Off, target.Launch.Definition.Command));
+            SetIndicator(new LanguageServerIndicator(
+                LanguageServerIndicatorState.Off,
+                target.Launch.Definition.Command,
+                OutsideWorkspace: target.Launch.WorkspaceFolder.Length == 0));
             return;
         }
 
@@ -225,7 +229,11 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
         LanguageServerDefinition definition,
         IReadOnlyList<string> workspacePatterns)
     {
-        if (WorkspaceFolderResolver.FindForFile(filePath, null, workspacePatterns) is not { } workspaceFolder)
+        // A file outside every workspace folder gets the server only when the
+        // definition allows it, as the empty folder all such files share.
+        var workspaceFolder = WorkspaceFolderResolver.FindForFile(filePath, null, workspacePatterns)
+            ?? (definition.AllowOutsideWorkspace ? string.Empty : null);
+        if (workspaceFolder is null)
         {
             return null;
         }

@@ -79,6 +79,7 @@ public sealed class ApplicationStateTests
                 controller.SetLanguageServerEnabled(@"C:\src\lib", "typescript-language-server", true);
                 controller.SetLanguageServerEnabled(@"C:\src\lib", "typescript-language-server", false);
                 controller.SetLanguageServerEnabled(@"C:\src\tool", "pyright-langserver", true);
+                controller.SetLanguageServerEnabled(string.Empty, "vscode-json-language-server", true);
                 await controller.FlushAsync();
             }
 
@@ -88,6 +89,7 @@ public sealed class ApplicationStateTests
             Assert.False(reloaded.IsLanguageServerEnabled(@"C:\src\lib", "typescript-language-server"));
             Assert.False(reloaded.IsLanguageServerEnabled(@"C:\src\tool", "typescript-language-server"));
             Assert.True(reloaded.IsLanguageServerEnabled(@"C:\src\tool", "pyright-langserver"));
+            Assert.True(reloaded.IsLanguageServerEnabled(string.Empty, "vscode-json-language-server"));
         }
         finally
         {

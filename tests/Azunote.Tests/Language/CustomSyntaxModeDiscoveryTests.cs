@@ -165,6 +165,7 @@ public sealed class CustomSyntaxModeDiscoveryTests
                 command = "pyright-langserver"
                 args = ["--stdio"]
                 path = "tools"
+                allowOutsideWorkspace = true
 
                 [languageServer.settings.python.analysis]
                 typeCheckingMode = "basic"
@@ -182,6 +183,7 @@ public sealed class CustomSyntaxModeDiscoveryTests
             Assert.Equal(["--stdio"], server.Arguments);
             Assert.Equal(["tools"], server.SearchPath);
             Assert.Equal(Path.GetFullPath(modesDirectory), server.DefinitionDirectory);
+            Assert.True(server.AllowOutsideWorkspace);
             Assert.Equal(
                 """{"python":{"analysis":{"typeCheckingMode":"basic","extraPaths":["src","lib"],"depth":2}}}""",
                 server.Settings!.ToJsonString());

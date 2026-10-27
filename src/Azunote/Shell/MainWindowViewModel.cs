@@ -336,6 +336,8 @@ internal sealed class MainWindowViewModel :
         var name = Path.GetFileName(indicator.Command);
         LanguageServerToolTip = indicator.State switch
         {
+            LanguageServerIndicatorState.Off when indicator.OutsideWorkspace =>
+                $"{name} is off for files outside a workspace folder. Click to turn it on.",
             LanguageServerIndicatorState.Off => $"{name} is off for this folder. Click to turn it on.",
             LanguageServerIndicatorState.Starting => $"{name} is starting. Click to turn it off.",
             LanguageServerIndicatorState.Running => $"{name} is running. Click to turn it off.",

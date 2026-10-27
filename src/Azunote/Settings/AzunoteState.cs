@@ -19,7 +19,10 @@ public sealed class AzunoteState
 
     public bool StatusBarVisible { get; set; } = true;
 
-    /// <summary>The language servers turned on, each for one workspace folder.</summary>
+    /// <summary>
+    /// The language servers turned on, each for one workspace folder, or for
+    /// the files outside every workspace folder when the folder is empty.
+    /// </summary>
     public LanguageServerEnablement[] LanguageServers { get; set; } = [];
 }
 
@@ -72,9 +75,12 @@ internal static class AzunoteStateNormalization
             .Take(MaximumRecentFiles)
             .ToArray() ?? [];
         state.LanguageServers = state.LanguageServers?
-            .Where(entry => entry is not null
-                && !string.IsNullOrWhiteSpace(entry.Workspace)
-                && !string.IsNullOrWhiteSpace(entry.Command))
+            .Where(entry => entry is not null && !string.IsNullOrWhiteSpace(entry.Command))
+            .Select(entry =>
+            {
+                entry.Workspace ??= string.Empty;
+                return entry;
+            })
             .ToArray() ?? [];
         return state;
     }
