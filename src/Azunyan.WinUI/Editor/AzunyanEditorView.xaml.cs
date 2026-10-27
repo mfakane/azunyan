@@ -1161,7 +1161,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             _foldStateProvider = _providers.Folding;
         }
 
-        RequestProviderResults(true, true, true);
+        // An open completion session asks again too; an answer without
+        // completions at the caret would end it.
+        RequestProviderResults(true, true, true, requestCompletion: _completionRequested);
     }
 
     /// <summary>Requests completion explicitly, independent of the current prefix.</summary>
@@ -1871,7 +1873,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         DispatcherQueue.TryEnqueue(FlushPendingAutomationDocumentChange);
         if (!IsComposing
             && !_applyingCompletion
-            && InputWindow.FocusState != FocusState.Unfocused)
+            && InputHost.FocusState != FocusState.Unfocused)
         {
             var completionWasRequested = _completionRequested || IsCompletionPopupOpen;
             var isEdit = args.Kind == DocumentChangeKind.Edit;
@@ -3075,8 +3077,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     {
         LogDiagnostic(
             AzunyanDiagnosticCategory.Input,
-            $"native-focus-changed state={InputWindow.FocusState}; {DescribeDiagnosticState()}");
-        if (InputWindow.FocusState == FocusState.Unfocused)
+            $"native-focus-changed state={InputHost.FocusState}; {DescribeDiagnosticState()}");
+        if (InputHost.FocusState == FocusState.Unfocused)
         {
             EndTypedInputUndoGroup();
             // A window deactivation can lose the physical KeyUp messages.

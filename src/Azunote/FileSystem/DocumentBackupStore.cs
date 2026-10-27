@@ -25,6 +25,10 @@ public sealed class DocumentBackupStore
 
     public string Directory { get; }
 
+    /// <summary>Where the backups are kept, inside the settings directory.</summary>
+    public static string GetDirectory(string settingsDirectory) =>
+        Path.Combine(settingsDirectory, "backups");
+
     public void Write(DocumentBackup backup)
     {
         ArgumentNullException.ThrowIfNull(backup);

@@ -25,7 +25,7 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
-    public async Task The_watch_is_told_to_ignore_the_application_state_file()
+    public async Task The_watch_is_told_to_ignore_the_application_state_file_and_backups()
     {
         using var directory = new TemporaryDirectory();
         var monitors = new FakeFileChangeMonitorFactory();
@@ -40,6 +40,7 @@ public sealed class SettingsServiceTests
         Assert.NotNull(monitor.Ignore);
         var ignore = monitor.Ignore!;
         Assert.True(ignore(StateFileService.GetStateFilePath(directory.Path)));
+        Assert.True(ignore(Path.Combine(DocumentBackupStore.GetDirectory(directory.Path), "0123.backup.tmp")));
         Assert.False(ignore(SettingsFileService.GetSettingsFilePath(directory.Path)));
         Assert.False(ignore(Path.Combine(
             directory.Path,

@@ -224,10 +224,21 @@ internal sealed class SettingsService : IDisposable
         }
     }
 
-    private bool IsApplicationStateChange(string? changedPath) =>
-        changedPath is not null
-        && string.Equals(
-            Path.GetFullPath(changedPath),
-            StateFileService.GetStateFilePath(_settings.Directory),
-            StringComparison.OrdinalIgnoreCase);
+    /// <summary>
+    /// Whether a change is to what Azunote writes on its own, the state file
+    /// and the backups of unsaved documents, rather than to the settings.
+    /// </summary>
+    private bool IsApplicationStateChange(string? changedPath)
+    {
+        if (changedPath is null)
+        {
+            return false;
+        }
+
+        var path = Path.GetFullPath(changedPath);
+        var backups = Path.GetFullPath(DocumentBackupStore.GetDirectory(_settings.Directory));
+        return string.Equals(path, StateFileService.GetStateFilePath(_settings.Directory), StringComparison.OrdinalIgnoreCase)
+            || string.Equals(path, backups, StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith(backups + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+    }
 }

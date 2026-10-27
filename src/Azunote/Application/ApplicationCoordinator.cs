@@ -20,7 +20,7 @@ internal sealed class ApplicationCoordinator : IDisposable
     private bool _disposed;
 
     internal DocumentBackupStore Backups { get; } =
-        new(Path.Combine(SettingsFileService.GetDefaultDirectory(), "backups"));
+        new(DocumentBackupStore.GetDirectory(SettingsFileService.GetDefaultDirectory()));
 
     public ApplicationCoordinator()
     {
