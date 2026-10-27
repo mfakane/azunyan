@@ -19,7 +19,7 @@ public sealed class LanguageServerRegistryTests
         using var registry = new LanguageServerRegistry(
             (_, _) => true,
             (_, _, _) => { },
-            _ =>
+            (_, _) =>
             {
                 starts++;
                 return server.CreateClient(Workspace);
@@ -51,7 +51,7 @@ public sealed class LanguageServerRegistryTests
         using var registry = new LanguageServerRegistry(
             (_, _) => true,
             (_, _, _) => { },
-            _ => server.CreateClient(Workspace),
+            (_, _) => server.CreateClient(Workspace),
             time);
         var first = registry.Acquire(Launch());
         await WaitForStatusAsync(first.Instance, LanguageServerStatus.Running);
@@ -74,7 +74,7 @@ public sealed class LanguageServerRegistryTests
         using var registry = new LanguageServerRegistry(
             (_, _) => true,
             (workspace, command, enabled) => recorded.Add((workspace, command, enabled)),
-            _ => server.CreateClient(Workspace));
+            (_, _) => server.CreateClient(Workspace));
         var changed = 0;
         registry.EnablementChanged += (_, _) => changed++;
         using var lease = registry.Acquire(Launch());
@@ -94,7 +94,7 @@ public sealed class LanguageServerRegistryTests
         using var registry = new LanguageServerRegistry(
             (_, _) => true,
             (_, _, _) => { },
-            _ =>
+            (_, _) =>
             {
                 attempts++;
                 throw new FileNotFoundException("No such server.");
@@ -103,6 +103,8 @@ public sealed class LanguageServerRegistryTests
         var lease = registry.Acquire(Launch());
         await WaitForStatusAsync(lease.Instance, LanguageServerStatus.Failed);
         Assert.Contains("No such server.", lease.Instance.FailureMessage, StringComparison.Ordinal);
+        lease.Instance.Log.Subscribe(_ => { }, out var log).Dispose();
+        Assert.Contains("No such server.", log, StringComparison.Ordinal);
         lease.Dispose();
 
         using var again = registry.Acquire(Launch());
@@ -119,7 +121,7 @@ public sealed class LanguageServerRegistryTests
         using var registry = new LanguageServerRegistry(
             (_, _) => true,
             (_, _, _) => { },
-            _ => server.CreateClient(Workspace));
+            (_, _) => server.CreateClient(Workspace));
         using var lease = registry.Acquire(Launch());
         await WaitForStatusAsync(lease.Instance, LanguageServerStatus.Running);
 

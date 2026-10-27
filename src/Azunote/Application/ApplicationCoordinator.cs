@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.UI.Dispatching;
 
 namespace Azunote;
@@ -393,6 +394,61 @@ internal sealed class ApplicationCoordinator : IDisposable
 
         ActivateWindow(registration);
         return registration.Window.Runtime.CreateStreamedDocument();
+    }
+
+    /// <summary>
+    /// Opens a read-only window with a language server's log, which keeps
+    /// adding what the server and Azunote say until the window is closed.
+    /// </summary>
+    internal async Task OpenLanguageServerLogAsync(LanguageServerLog log)
+    {
+        ArgumentNullException.ThrowIfNull(log);
+        var dispatcher = _dispatcherQueue
+            ?? throw new InvalidOperationException("The Azunote UI dispatcher is unavailable.");
+        var registration = CreateWindowRegistration();
+        await registration.Window.Runtime.OpenStartupTextAsync(string.Empty);
+        registration.Window.Runtime.MarkReadOnly();
+        ActivateWindow(registration);
+
+        // Lines arrive on the server's threads; they are added together on the
+        // UI thread, so a busy server costs one edit per turn.
+        var pending = new StringBuilder();
+        var scheduled = false;
+        void Flush()
+        {
+            string text;
+            lock (pending)
+            {
+                text = pending.ToString();
+                pending.Clear();
+                scheduled = false;
+            }
+
+            if (!registration.IsClosed)
+            {
+                registration.Window.Runtime.AppendReadOnlyText(text);
+            }
+        }
+
+        var subscription = log.Subscribe(
+            line =>
+            {
+                lock (pending)
+                {
+                    pending.Append(line);
+                    if (scheduled)
+                    {
+                        return;
+                    }
+
+                    scheduled = true;
+                }
+
+                dispatcher.TryEnqueue(Flush);
+            },
+            out var kept);
+        registration.Window.Runtime.AppendReadOnlyText(kept);
+        _ = registration.Closed.ContinueWith(_ => subscription.Dispose(), TaskScheduler.Default);
     }
 
     internal async Task OpenFileAsync(MainWindow source, string path)

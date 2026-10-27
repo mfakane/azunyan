@@ -98,6 +98,9 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
     public IReadOnlyList<string> CompletionTriggerCharacters =>
         _active?.Client.CompletionTriggerCharacters ?? [];
 
+    /// <summary>The log of the server the document holds, while it is turned on.</summary>
+    public LanguageServerLog? Log => _lease?.Instance.Log;
+
     public ICompletionProvider GetCompletionProvider(ICompletionProvider? fallback) =>
         new CompletionProvider(this, fallback);
 

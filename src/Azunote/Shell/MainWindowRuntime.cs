@@ -34,6 +34,7 @@ internal sealed class MainWindowRuntime : IDisposable
     private readonly DocumentBackupTracker _backups;
     private readonly DocumentDiagnostics _diagnostics = new();
     private readonly LanguageServerController? _languageServer;
+    private readonly Func<LanguageServerLog, Task>? _openLanguageServerLog;
     private IReadOnlyList<string> _languageServerTriggers = [];
     private DocumentSessionState _previousState;
     private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer _backupTimer;
@@ -57,7 +58,8 @@ internal sealed class MainWindowRuntime : IDisposable
         Func<string, Task>? openFileRequest = null,
         Func<string?, Task<IExternalToolDocument>>? openStreamedTextInNewWindow = null,
         Func<ExternalToolProposal, Task>? openProposal = null,
-        LanguageServerRegistry? languageServers = null)
+        LanguageServerRegistry? languageServers = null,
+        Func<LanguageServerLog, Task>? openLanguageServerLog = null)
     {
         _window = window ?? throw new ArgumentNullException(nameof(window));
         _view = new MainWindow.ViewBoundary(window);
@@ -71,6 +73,7 @@ internal sealed class MainWindowRuntime : IDisposable
         _recordWordWrap = recordWordWrap ?? throw new ArgumentNullException(nameof(recordWordWrap));
         _recordStatusBarVisible = recordStatusBarVisible ?? throw new ArgumentNullException(nameof(recordStatusBarVisible));
         _session = session ?? new DocumentSession();
+        _openLanguageServerLog = openLanguageServerLog;
         if (document is not null)
         {
             _view.SetDocument(document);
@@ -580,6 +583,11 @@ internal sealed class MainWindowRuntime : IDisposable
     /// <summary>Turns the document's language server on or off for its workspace folder.</summary>
     public void ToggleLanguageServer() => _languageServer?.Toggle();
 
+    public Task ShowLanguageServerLogAsync() =>
+        _languageServer?.Log is { } log && _openLanguageServerLog is not null
+            ? _openLanguageServerLog(log)
+            : Task.CompletedTask;
+
     public void ToggleStatusBar()
     {
         _recordStatusBarVisible(_editorCommands.ToggleStatusBar());
@@ -638,6 +646,26 @@ internal sealed class MainWindowRuntime : IDisposable
 
     /// <summary>Makes the document read-only text with nothing to save.</summary>
     internal void MarkReadOnly() => _session.MarkReadOnly(_view.Text);
+
+    /// <summary>
+    /// Adds text to the end of a read-only document. A caret at the end stays
+    /// there, so the document follows what is added.
+    /// </summary>
+    internal void AppendReadOnlyText(string text)
+    {
+        var end = _view.Text.Length;
+        var follows = _view.Selection.IsEmpty && _view.Selection.Active == end;
+        // The editor ignores edits while it is read-only.
+        _view.SetReadOnly(false);
+        _view.Replace(new TextRange(end, 0), text);
+        _view.SetReadOnly(true);
+        _session.MarkReadOnly(_view.Text);
+        if (follows)
+        {
+            _view.SetSelection(TextSelection.Caret(_view.Text.Length));
+            _view.ScrollSelectionIntoView();
+        }
+    }
 
     /// <summary>Replaces the text of a read-only document, keeping the selection where it can.</summary>
     internal void ReplaceReadOnlyText(string text)

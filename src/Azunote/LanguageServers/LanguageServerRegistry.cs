@@ -24,6 +24,9 @@ internal sealed class LanguageServerInstance
 
     public LanguageServerLaunch Launch { get; }
 
+    /// <summary>What happened to this server since it was first started, kept across failures.</summary>
+    public LanguageServerLog Log { get; } = new();
+
     /// <summary>Raised on any thread when <see cref="Status"/> changes.</summary>
     public event EventHandler? StatusChanged;
 
@@ -51,13 +54,17 @@ internal sealed class LanguageServerInstance
     internal bool IsStopped { get; private set; }
 
     internal async Task StartAsync(
-        Func<LanguageServerLaunch, LanguageServerClient> start,
+        Func<LanguageServerLaunch, LanguageServerLog, LanguageServerClient> start,
         TimeSpan initializeTimeout)
     {
         LanguageServerClient? client = null;
         try
         {
-            client = start(Launch);
+            Log.Write(string.Join(' ', ["Starting", Launch.Plan.ResolvedPath, .. Launch.Arguments]));
+            Log.Write(Launch.WorkspaceFolder.Length == 0
+                ? "Outside every workspace folder"
+                : $"Workspace folder: {Launch.WorkspaceFolder}");
+            client = start(Launch, Log);
             lock (_gate)
             {
                 if (IsStopped)
@@ -95,6 +102,7 @@ internal sealed class LanguageServerInstance
 
         StopTimer?.Dispose();
         StopTimer = null;
+        Log.Write("Stopping");
         return client?.DisposeAsync() ?? ValueTask.CompletedTask;
     }
 
@@ -124,6 +132,7 @@ internal sealed class LanguageServerInstance
             _client = null;
         }
 
+        Log.Write(message);
         var errorOutput = client?.ErrorOutput;
         SetStatus(
             LanguageServerStatus.Failed,
@@ -188,7 +197,7 @@ internal sealed class LanguageServerRegistry : IDisposable
     private readonly Dictionary<string, LanguageServerInstance> _instances = new(StringComparer.Ordinal);
     private readonly Func<string, string, bool> _isEnabled;
     private readonly Action<string, string, bool> _setEnabled;
-    private readonly Func<LanguageServerLaunch, LanguageServerClient> _start;
+    private readonly Func<LanguageServerLaunch, LanguageServerLog, LanguageServerClient> _start;
     private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _idleTimeout;
     private bool _disposed;
@@ -196,7 +205,7 @@ internal sealed class LanguageServerRegistry : IDisposable
     public LanguageServerRegistry(
         Func<string, string, bool> isEnabled,
         Action<string, string, bool> setEnabled,
-        Func<LanguageServerLaunch, LanguageServerClient>? start = null,
+        Func<LanguageServerLaunch, LanguageServerLog, LanguageServerClient>? start = null,
         TimeProvider? timeProvider = null,
         TimeSpan? idleTimeout = null)
     {

@@ -49,6 +49,28 @@ public sealed class LanguageServerClientTests
     }
 
     [Fact]
+    public async Task The_log_has_every_message_either_way()
+    {
+        await using var server = new FakeLanguageServer();
+        var log = new LanguageServerLog();
+        await using var client = server.CreateClient(Workspace, log: log);
+
+        await client.InitializeAsync(null, CancellationToken.None);
+        await server.NotifyAsync("window/logMessage", new JsonObject { ["type"] = 3, ["message"] = "ready" });
+        await client.OpenAsync(DocumentUri, "typescript", "let a = 1;");
+        await server.WaitForAsync("textDocument/didOpen");
+
+        var lines = new List<string>();
+        log.Subscribe(lines.Add, out var text).Dispose();
+        Assert.Contains("→ initialize #1 {", text, StringComparison.Ordinal);
+        Assert.Contains("← #1 {", text, StringComparison.Ordinal);
+        Assert.Contains("→ initialized {", text, StringComparison.Ordinal);
+        Assert.Contains("← window/logMessage {", text, StringComparison.Ordinal);
+        Assert.Contains("\"message\":\"ready\"", text, StringComparison.Ordinal);
+        Assert.Contains("→ textDocument/didOpen {", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_document_opened_twice_is_opened_and_closed_once()
     {
         await using var server = new FakeLanguageServer();

@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -20,16 +21,19 @@ internal sealed class JsonRpcException(int code, string message) : Exception(mes
 /// JSON-RPC 2.0 over a pair of streams with the <c>Content-Length</c> framing
 /// of the Language Server Protocol. Requests from the peer are answered by
 /// <c>handleRequest</c>; notifications go to <c>handleNotification</c>. Both
-/// run on the reading task, one message at a time.
+/// run on the reading task, one message at a time. Every message, either way,
+/// is written to the log when there is one.
 /// </summary>
 internal sealed class JsonRpcConnection : IAsyncDisposable
 {
     private static readonly byte[] HeaderEnd = "\r\n\r\n"u8.ToArray();
+    private static readonly JsonSerializerOptions LogOptions = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
     private readonly Stream _input;
     private readonly Stream _output;
     private readonly Func<string, JsonNode?, Task<JsonNode?>> _handleRequest;
     private readonly Action<string, JsonNode?> _handleNotification;
+    private readonly LanguageServerLog? _log;
     private readonly SemaphoreSlim _writeLock = new(1, 1);
     private readonly ConcurrentDictionary<long, TaskCompletionSource<JsonNode?>> _pending = new();
     private readonly CancellationTokenSource _closing = new();
@@ -41,12 +45,14 @@ internal sealed class JsonRpcConnection : IAsyncDisposable
         Stream input,
         Stream output,
         Func<string, JsonNode?, Task<JsonNode?>> handleRequest,
-        Action<string, JsonNode?> handleNotification)
+        Action<string, JsonNode?> handleNotification,
+        LanguageServerLog? log = null)
     {
         _input = input ?? throw new ArgumentNullException(nameof(input));
         _output = output ?? throw new ArgumentNullException(nameof(output));
         _handleRequest = handleRequest ?? throw new ArgumentNullException(nameof(handleRequest));
         _handleNotification = handleNotification ?? throw new ArgumentNullException(nameof(handleNotification));
+        _log = log;
     }
 
     /// <summary>Completes when the peer closes its output or sends something unreadable.</summary>
@@ -144,6 +150,7 @@ internal sealed class JsonRpcConnection : IAsyncDisposable
 
     private async Task WriteAsync(JsonObject message, CancellationToken cancellationToken)
     {
+        Log("→", message);
         var body = new ArrayBufferWriter<byte>();
         using (var writer = new Utf8JsonWriter(body))
         {
@@ -199,7 +206,9 @@ internal sealed class JsonRpcConnection : IAsyncDisposable
                 var body = buffer.GetRange(bodyStart, length).ToArray();
                 buffer.RemoveRange(0, bodyStart + length);
                 start = 0;
-                await DispatchAsync(JsonNode.Parse(body)).ConfigureAwait(false);
+                var message = JsonNode.Parse(body);
+                Log("←", message);
+                await DispatchAsync(message).ConfigureAwait(false);
             }
         }
         catch (Exception exception) when (exception is IOException or JsonException or FormatException or ObjectDisposedException)
@@ -310,6 +319,20 @@ internal sealed class JsonRpcConnection : IAsyncDisposable
         }
 
         await WriteAsync(response, _closing.Token).ConfigureAwait(false);
+    }
+
+    /// <summary>Writes a message as its method or the id it answers, then its JSON.</summary>
+    private void Log(string direction, JsonNode? message)
+    {
+        if (_log is null || message is not JsonObject body)
+        {
+            return;
+        }
+
+        var method = body["method"]?.GetValue<string>();
+        var id = body["id"]?.ToJsonString();
+        var title = method is null ? $"#{id}" : id is null ? method : $"{method} #{id}";
+        _log.Write($"{direction} {title} {body.ToJsonString(LogOptions)}");
     }
 
     private void FailPending(Exception exception)

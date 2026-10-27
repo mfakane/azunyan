@@ -47,7 +47,7 @@ public sealed class LanguageServerControllerTests : IAsyncLifetime
                     _enabled.Remove((workspace, command));
                 }
             },
-            launch =>
+            (launch, _) =>
             {
                 Launches.Add(launch);
                 return _server.CreateClient(launch.WorkspaceFolder);

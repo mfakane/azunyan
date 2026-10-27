@@ -40,6 +40,7 @@ internal sealed class LanguageServerClient : IAsyncDisposable
     private readonly SemaphoreSlim _documentsLock = new(1, 1);
     private readonly Dictionary<string, OpenDocument> _documents = new(StringComparer.Ordinal);
     private readonly Queue<string> _errorOutput = new();
+    private readonly LanguageServerLog? _log;
     private bool _sendsOpenClose = true;
     private bool _sendsChanges = true;
     private bool _sendsSave;
@@ -51,12 +52,14 @@ internal sealed class LanguageServerClient : IAsyncDisposable
         Stream toServer,
         string workspaceFolder,
         JsonObject? settings,
-        Process? process = null)
+        Process? process = null,
+        LanguageServerLog? log = null)
     {
         _workspaceFolder = workspaceFolder;
         _settings = settings;
         _process = process;
-        _connection = new JsonRpcConnection(fromServer, toServer, HandleRequestAsync, HandleNotification);
+        _log = log;
+        _connection = new JsonRpcConnection(fromServer, toServer, HandleRequestAsync, HandleNotification, log);
         _connection.Start();
     }
 
@@ -84,7 +87,7 @@ internal sealed class LanguageServerClient : IAsyncDisposable
         }
     }
 
-    public static LanguageServerClient Start(LanguageServerLaunch launch)
+    public static LanguageServerClient Start(LanguageServerLaunch launch, LanguageServerLog? log = null)
     {
         ArgumentNullException.ThrowIfNull(launch);
         var startInfo = new ProcessStartInfo
@@ -105,7 +108,8 @@ internal sealed class LanguageServerClient : IAsyncDisposable
             process.StandardInput.BaseStream,
             launch.WorkspaceFolder,
             launch.Definition.Settings,
-            process);
+            process,
+            log);
         _ = client.ReadErrorOutputAsync(process.StandardError);
         return client;
     }
@@ -503,6 +507,7 @@ internal sealed class LanguageServerClient : IAsyncDisposable
         {
             while (await errorOutput.ReadLineAsync().ConfigureAwait(false) is { } line)
             {
+                _log?.Write($"stderr: {line}");
                 lock (_errorOutput)
                 {
                     _errorOutput.Enqueue(line);

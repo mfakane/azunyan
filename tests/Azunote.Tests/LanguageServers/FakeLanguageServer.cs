@@ -46,8 +46,11 @@ internal sealed class FakeLanguageServer : IAsyncDisposable
 
     public ConcurrentQueue<(string Method, JsonNode? Parameters)> Received { get; } = new();
 
-    public LanguageServerClient CreateClient(string workspaceFolder, JsonObject? settings = null) =>
-        new(_client, _client, workspaceFolder, settings);
+    public LanguageServerClient CreateClient(
+        string workspaceFolder,
+        JsonObject? settings = null,
+        LanguageServerLog? log = null) =>
+        new(_client, _client, workspaceFolder, settings, log: log);
 
     public Task<JsonNode?> RequestAsync(string method, JsonNode? parameters) =>
         _connection.SendRequestAsync(method, parameters);

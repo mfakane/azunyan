@@ -717,6 +717,12 @@
                     IsEnabled="{x:Bind ViewModel.IsLanguageServerAvailable, Mode=OneWay}"
                     Command="{x:Bind ViewModel.ToggleLanguageServerCommand}"
                 />
+                <MenuFlyoutItem
+                    x:Name="LanguageServerLogMenuItem"
+                    Text="Language Server Log"
+                    IsEnabled="{x:Bind ViewModel.IsLanguageServerOn, Mode=OneWay}"
+                    Command="{x:Bind ViewModel.ShowLanguageServerLogCommand}"
+                />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutSubItem
                     x:Name="TabDisplaySizeMenuItem"

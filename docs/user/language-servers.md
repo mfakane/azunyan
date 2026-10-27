@@ -44,6 +44,12 @@ itself, the ⚡ shows a warning and resting the pointer on it tells why. The men
 item stays checked, so choosing it turns the server off and choosing it again
 starts it anew.
 
+**View > Language Server Log** opens a read-only window with what the server
+and Azunote have said to each other: how the server was started, every message
+either way, what the server wrote to standard error, and why it failed. It
+starts with the last 2,000 lines and keeps adding new ones until it is closed.
+Very long messages, such as those carrying a whole document, are cut short.
+
 ## What a server provides
 
 - **Problems**: what the server reports appears as [problems](problems.md),
