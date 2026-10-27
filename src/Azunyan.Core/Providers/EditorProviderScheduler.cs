@@ -285,6 +285,7 @@ public sealed class EditorProviderScheduler : IDisposable
         int position,
         TextSelection selection,
         bool includeCompletion = true,
+        bool includeTooltip = true,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
@@ -299,6 +300,7 @@ public sealed class EditorProviderScheduler : IDisposable
                     requestId,
                     providerContext,
                     includeCompletion,
+                    includeTooltip,
                     token),
             cancellationToken);
     }
@@ -325,6 +327,7 @@ public sealed class EditorProviderScheduler : IDisposable
                     requestId,
                     providerContext,
                     includeCompletion: false,
+                    includeTooltip: true,
                     token),
             cancellationToken);
     }
@@ -596,9 +599,10 @@ public sealed class EditorProviderScheduler : IDisposable
         long requestId,
         EditorProviderContext context,
         bool includeCompletion,
+        bool includeTooltip,
         CancellationToken cancellationToken)
     {
-        var tooltipTask = providers.Tooltip is null
+        var tooltipTask = !includeTooltip || providers.Tooltip is null
             ? Task.FromResult<TooltipData?>(null)
             : InvokeOptionalAsync(
                 () => providers.Tooltip.GetTooltipAsync(context, cancellationToken),

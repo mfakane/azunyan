@@ -60,6 +60,35 @@ public sealed partial class AzunyanEditorView
             inputOrigin.Y + caretRect.Y + caretRect.Height);
     }
 
+    /// <summary>
+    /// Asks what the pointer rests on once it has stayed at one position for
+    /// a moment, which is when a tooltip is wanted; passing over text asks
+    /// nothing. An answer for an earlier position is dropped.
+    /// </summary>
+    private void ScheduleHoverRequest()
+    {
+        NextProviderGeneration(ref _hoverProviderGeneration);
+        _hoverResult = null;
+        _hoverTimer ??= DispatcherQueue.CreateTimer();
+        _hoverTimer.Interval = HoverDelay;
+        _hoverTimer.IsRepeating = false;
+        _hoverTimer.Stop();
+        _hoverTimer.Tick -= OnHoverTimerTick;
+        _hoverTimer.Tick += OnHoverTimerTick;
+        _hoverTimer.Start();
+    }
+
+    private void OnHoverTimerTick(
+        Microsoft.UI.Dispatching.DispatcherQueueTimer sender,
+        object args)
+    {
+        sender.Stop();
+        if (_hoverPosition >= 0 && _hoverLinkRange is null)
+        {
+            RequestHoverProvider(_hoverPosition);
+        }
+    }
+
     private void RequestHoverProvider(int position)
     {
         if (!IsLoaded)

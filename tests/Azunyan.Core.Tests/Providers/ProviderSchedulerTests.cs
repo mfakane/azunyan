@@ -170,6 +170,31 @@ public sealed class ProviderSchedulerTests
     }
 
     [Fact]
+    public async Task A_position_request_without_the_tooltip_does_not_ask_for_one()
+    {
+        var asked = 0;
+        var providers = new EditorProviderSet
+        {
+            Tooltip = new DelegateTooltipProvider((context, _) =>
+            {
+                asked++;
+                return Task.FromResult<TooltipData?>(new TooltipData(TextRange.Empty(context.Position), "caret"));
+            })
+        };
+        using var scheduler = new EditorProviderScheduler(providers);
+
+        var results = await scheduler.RequestPositionAsync(
+                new TextSnapshot("text"),
+                1,
+                TextSelection.Caret(1),
+                includeTooltip: false)
+            .WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.Null(results!.Tooltip);
+        Assert.Equal(0, asked);
+    }
+
+    [Fact]
     public async Task A_pre_canceled_request_does_not_cancel_the_current_channel_request()
     {
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

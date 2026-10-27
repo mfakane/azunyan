@@ -101,7 +101,9 @@ public sealed partial class AzunyanEditorView
                     snapshot,
                     selection.CaretPosition,
                     selection,
-                    includeCompletion: requestCompletion),
+                    includeCompletion: requestCompletion,
+                    // The tooltip is asked where the pointer rests, not here.
+                    includeTooltip: false),
                 generation);
         }
     }

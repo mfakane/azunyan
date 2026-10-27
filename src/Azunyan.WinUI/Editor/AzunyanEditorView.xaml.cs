@@ -34,6 +34,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private const string LineCopyClipboardFormat = "application/vnd.azunyan.line-copy";
     private static readonly TimeSpan TypedInputUndoGroupInterval =
         TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan HoverDelay = TimeSpan.FromMilliseconds(300);
     private readonly AzunyanEditorRenderer _defaultRenderer;
     private Document _document = new();
     private readonly SlidingInputWindowCalculator _inputWindowCalculator = new();
@@ -63,6 +64,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private bool _typedInputUndoGroupActive;
     private long? _lastTypedInputTimestamp;
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _typedInputUndoGroupTimer;
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _hoverTimer;
     private long _pasteOperationSequence;
     private DateTimeOffset _clipboardUnavailableUntil;
     private AzunyanColorScheme _colorScheme;
@@ -189,6 +191,13 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         _typedInputUndoGroupTimer = null;
+        if (_hoverTimer is { } hoverTimer)
+        {
+            hoverTimer.Stop();
+            hoverTimer.Tick -= OnHoverTimerTick;
+        }
+
+        _hoverTimer = null;
         _documentProviderDelayCancellation?.Cancel();
         _documentProviderDelayCancellation?.Dispose();
         _documentProviderDelayCancellation = null;
@@ -3696,13 +3705,11 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         _hoverLinkText = linkText;
         HideTooltipPopup();
 
-        // A link answers its own tooltip, so the hover channel is not asked
-        // for one and cannot replace it.
-        if (link is null)
-        {
-            RequestHoverProvider(position);
-        }
-        else
+        ScheduleHoverRequest();
+
+        // A link answers its own tooltip at once, and the hover channel is
+        // not asked for one that could replace it.
+        if (link is not null)
         {
             UpdateTooltipPopup();
         }
@@ -3710,6 +3717,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     private void OnInputPointerExited(object sender, PointerRoutedEventArgs args)
     {
+        _hoverTimer?.Stop();
         _hoverPosition = -1;
         _hoverLinkRange = null;
         _lastPointerPosition = null;
