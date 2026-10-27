@@ -67,14 +67,51 @@ public sealed partial class AzunyanEditorView
             return;
         }
 
-        var generation = NextProviderGeneration(ref _positionProviderGeneration);
-        _ = ApplyPositionProviderResultAsync(
-            _providerScheduler.RequestPositionAsync(
-            Snapshot,
+        var generation = NextProviderGeneration(ref _hoverProviderGeneration);
+        _hoverResult = null;
+        _ = ApplyHoverProviderResultAsync(
+            _providerScheduler.RequestHoverAsync(
+                Snapshot,
                 position,
-            Document.Selection,
-                includeCompletion: false),
+                Document.Selection),
             generation);
+    }
+
+    /// <summary>
+    /// Keeps what the pointer rests on apart from the provider frame, whose
+    /// position results belong to the caret and its completions.
+    /// </summary>
+    private async Task ApplyHoverProviderResultAsync(
+        Task<PositionProviderResults?> request,
+        long generation)
+    {
+        PositionProviderResults? result;
+        try
+        {
+            result = await request.ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            return;
+        }
+
+        if (result is null)
+        {
+            return;
+        }
+
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (!IsLoaded
+                || generation != _hoverProviderGeneration
+                || !ReferenceEquals(result.Context.Snapshot, Snapshot))
+            {
+                return;
+            }
+
+            _hoverResult = result;
+            UpdateTooltipPopup();
+        });
     }
 
     private void UpdateTooltipPopup()
@@ -95,11 +132,12 @@ public sealed partial class AzunyanEditorView
             return;
         }
 
-        var frame = GetCurrentFrame();
-        var tooltip = frame?.Position?.Tooltip;
-        if (frame is null
+        var hover = _hoverResult;
+        var tooltip = hover?.Tooltip;
+        if (hover is null
             || tooltip is null
-            || frame.Position!.Context.Position != _hoverPosition
+            || hover.Context.Position != _hoverPosition
+            || !ReferenceEquals(hover.Context.Snapshot, Snapshot)
             || tooltip.Range.Start > Snapshot.Length
             || tooltip.Range.End > Snapshot.Length)
         {
@@ -141,7 +179,17 @@ public sealed partial class AzunyanEditorView
         TooltipPopup.HorizontalOffset = Math.Max(
             inputOrigin.X,
             inputOrigin.X + anchorRect.X);
-        TooltipPopup.VerticalOffset = inputOrigin.Y + anchorRect.Y + anchorRect.Height + 4;
+        // The completion list opens under the caret's line, so the tooltip
+        // goes above its own line while the list is open.
+        if (IsCompletionPopupOpen)
+        {
+            TooltipBorder.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            TooltipPopup.VerticalOffset = inputOrigin.Y + anchorRect.Y - TooltipBorder.DesiredSize.Height - 4;
+        }
+        else
+        {
+            TooltipPopup.VerticalOffset = inputOrigin.Y + anchorRect.Y + anchorRect.Height + 4;
+        }
         TooltipPopup.IsOpen = true;
     }
 

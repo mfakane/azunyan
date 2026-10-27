@@ -137,6 +137,39 @@ public sealed class ProviderSchedulerTests
     }
 
     [Fact]
+    public async Task A_hover_request_leaves_the_position_request_running()
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var providers = new EditorProviderSet
+        {
+            Completion = new DelegateCompletionProvider(async context =>
+            {
+                started.SetResult();
+                await release.Task;
+                return new CompletionResult(
+                    TextRange.Empty(context.Position),
+                    new[] { new CompletionItem("caret") });
+            }),
+            Tooltip = new DelegateTooltipProvider((context, _) =>
+                Task.FromResult<TooltipData?>(new TooltipData(TextRange.Empty(context.Position), "pointer")))
+        };
+        using var scheduler = new EditorProviderScheduler(providers);
+        var snapshot = new TextSnapshot("text");
+
+        var position = scheduler.RequestPositionAsync(snapshot, 4, TextSelection.Caret(4));
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        var hover = await scheduler.RequestHoverAsync(snapshot, 1, TextSelection.Caret(4))
+            .WaitAsync(TimeSpan.FromSeconds(1));
+        release.SetResult();
+        var caret = await position.WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.Equal("pointer", hover!.Tooltip!.Content);
+        Assert.Null(hover.Completions);
+        Assert.Equal("caret", Assert.Single(caret!.Completions!.Items).Label);
+    }
+
+    [Fact]
     public async Task A_pre_canceled_request_does_not_cancel_the_current_channel_request()
     {
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

@@ -327,6 +327,8 @@ public sealed partial class AzunyanEditorView
         NextProviderGeneration(ref _documentProviderGeneration);
         NextProviderGeneration(ref _viewportProviderGeneration);
         NextProviderGeneration(ref _positionProviderGeneration);
+        NextProviderGeneration(ref _hoverProviderGeneration);
+        _hoverResult = null;
     }
 
     private static long NextProviderGeneration(ref long generation) =>

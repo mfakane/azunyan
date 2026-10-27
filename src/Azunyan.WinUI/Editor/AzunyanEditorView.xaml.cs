@@ -102,6 +102,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private long _documentProviderGeneration;
     private long _viewportProviderGeneration;
     private long _positionProviderGeneration;
+    private long _hoverProviderGeneration;
+    private PositionProviderResults? _hoverResult;
     private DocumentChangedEventArgs? _pendingProviderDocumentChange;
     private DocumentChangedEventArgs? _pendingAutomationDocumentChange;
     private AzunyanEditorViewAutomationPeer? _automationPeer;
@@ -3694,15 +3696,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         _hoverLinkText = linkText;
         HideTooltipPopup();
 
-        // Moving the pointer leaves an open completion list alone. Asking
-        // about the pointer would replace the completions at the caret.
-        if (_completionRequested || IsCompletionPopupOpen)
-        {
-            return;
-        }
-
-        // A link answers its own tooltip, so the position channel is not
-        // asked for one and cannot replace it.
+        // A link answers its own tooltip, so the hover channel is not asked
+        // for one and cannot replace it.
         if (link is null)
         {
             RequestHoverProvider(position);

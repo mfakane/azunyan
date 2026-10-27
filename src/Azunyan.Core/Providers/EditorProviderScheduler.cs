@@ -202,6 +202,7 @@ public sealed class EditorProviderScheduler : IDisposable
     private readonly ChannelState _document = new();
     private readonly ChannelState _viewport = new();
     private readonly ChannelState _position = new();
+    private readonly ChannelState _hover = new();
     private bool _disposed;
 
     public EditorProviderScheduler(EditorProviderSet providers)
@@ -302,6 +303,32 @@ public sealed class EditorProviderScheduler : IDisposable
             cancellationToken);
     }
 
+    /// <summary>
+    /// Asks for the tooltip where the pointer rests. It has a channel of its
+    /// own, so it neither supersedes nor is superseded by what the caret asks.
+    /// </summary>
+    public Task<PositionProviderResults?> RequestHoverAsync(
+        TextSnapshot snapshot,
+        int position,
+        TextSelection selection,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        var context = new EditorProviderContext(snapshot, position, selection);
+        var providers = _providers.CreateSnapshot();
+        return RequestAsync(
+            _hover,
+            context,
+            (requestId, providerContext, token) =>
+                CollectPositionAsync(
+                    providers,
+                    requestId,
+                    providerContext,
+                    includeCompletion: false,
+                    token),
+            cancellationToken);
+    }
+
     public void CancelAll()
     {
         lock (_gate)
@@ -310,6 +337,7 @@ public sealed class EditorProviderScheduler : IDisposable
             _document.Cancel();
             _viewport.Cancel();
             _position.Cancel();
+            _hover.Cancel();
         }
     }
 
@@ -326,6 +354,7 @@ public sealed class EditorProviderScheduler : IDisposable
             _document.Cancel();
             _viewport.Cancel();
             _position.Cancel();
+            _hover.Cancel();
         }
     }
 
