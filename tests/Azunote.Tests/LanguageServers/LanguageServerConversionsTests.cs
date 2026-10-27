@@ -50,6 +50,12 @@ public sealed class LanguageServerConversionsTests
                 "filterText": "Html",
                 "insertTextFormat": 2,
                 "insertText": "Html(${1:value})$0"
+              },
+              {
+                "label": "Escaped",
+                "filterText": "Html",
+                "insertTextFormat": 2,
+                "insertText": "Html(\\$a, ${1:\\$b\\}}, ${2|c,d|})"
               }
             ]
             """);
@@ -59,6 +65,39 @@ public sealed class LanguageServerConversionsTests
         Assert.Equal(new TextRange(1, 2), result.ReplacementRange);
         Assert.Equal("Html", result.Items.Single(item => item.Label == "@Html").InsertText);
         Assert.Equal("Html(value)", result.Items.Single(item => item.Label == "Snippet").InsertText);
+        Assert.Equal("Html($a, $b}, c)", result.Items.Single(item => item.Label == "Escaped").InsertText);
+    }
+
+    [Fact]
+    public void Completion_filters_by_the_text_the_edit_replaces()
+    {
+        // As vscode-json-language-server answers inside a string value.
+        var context = Context("""{ "mode": "f""", 12);
+        var completion = JsonNode.Parse("""
+            [
+              {
+                "label": "\"fast\"",
+                "insertTextFormat": 2,
+                "textEdit": {
+                  "range": { "start": { "line": 0, "character": 10 }, "end": { "line": 0, "character": 12 } },
+                  "newText": "\"fast\""
+                }
+              },
+              {
+                "label": "\"slow\"",
+                "insertTextFormat": 2,
+                "textEdit": {
+                  "range": { "start": { "line": 0, "character": 10 }, "end": { "line": 0, "character": 12 } },
+                  "newText": "\"slow\""
+                }
+              }
+            ]
+            """);
+
+        var result = LanguageServerConversions.ToCompletionResult(completion, context)!;
+
+        Assert.Equal(new TextRange(11, 1), result.ReplacementRange);
+        Assert.Equal("fast\"", Assert.Single(result.Items).InsertText);
     }
 
     [Fact]

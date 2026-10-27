@@ -50,7 +50,8 @@ starts it anew.
   with the server's command as their source. They are updated as the document
   changes.
 - **Completion**: Edit > Show Completions (Ctrl+Space) and the server's trigger
-  characters suggest what the server offers instead of document words.
+  characters suggest what the server offers instead of document words. A
+  suggestion with placeholders is inserted with their default text.
 - **Descriptions**: resting the pointer on a symbol shows what the server says
   about it, after any problem there.
 

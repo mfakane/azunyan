@@ -134,7 +134,9 @@ internal sealed class LanguageServerClient : IAsyncDisposable
                     {
                         ["completionItem"] = new JsonObject
                         {
-                            ["snippetSupport"] = false,
+                            // Some servers offer no completion without snippets.
+                            // Snippets are inserted as plain text.
+                            ["snippetSupport"] = true,
                             ["documentationFormat"] = new JsonArray("plaintext", "markdown")
                         }
                     },

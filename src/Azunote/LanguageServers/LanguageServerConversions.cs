@@ -10,7 +10,7 @@ internal static partial class LanguageServerConversions
 {
     private const int MaximumCompletionCount = 200;
 
-    [GeneratedRegex(@"\$\{\d+:([^}]*)\}|\$\{\d+\|([^,}]*)[^}]*\}|\$\{\d+\}|\$\d+", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\\([\\$}])|\$\{\d+:((?:\\.|[^\\}])*)\}|\$\{\d+\|([^,}]*)[^}]*\}|\$\{\d+\}|\$\d+", RegexOptions.CultureInvariant)]
     private static partial Regex SnippetPlaceholderPattern();
 
     /// <summary>The offset of an LSP position, clamped into the text.</summary>
@@ -98,38 +98,41 @@ internal static partial class LanguageServerConversions
                 continue;
             }
 
+            var edit = item["textEdit"];
+            var editRange = edit?["range"] ?? edit?["insert"];
+            var editStart = editRange is null ? wordStart : Math.Min(ToOffset(snapshot, editRange["start"]), position);
+
+            // The server filters by the text its edit replaces, such as a word and its opening quote.
+            var filterPrefix = editStart < wordStart ? text[editStart..position] : prefix;
             var filterText = GetString(item["filterText"]) ?? label;
-            if (!filterText.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+            if (!filterText.StartsWith(filterPrefix, StringComparison.OrdinalIgnoreCase)
+                && !label.StartsWith(filterPrefix, StringComparison.OrdinalIgnoreCase)
                 && !label.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            var edit = item["textEdit"];
             var insertText = GetString(edit?["newText"]) ?? GetString(item["insertText"]) ?? label;
             if (GetInt(item["insertTextFormat"], 1) == 2)
             {
                 insertText = SnippetPlaceholderPattern().Replace(
                     insertText,
                     match => match.Groups[1].Success ? match.Groups[1].Value
-                        : match.Groups[2].Success ? match.Groups[2].Value
+                        : match.Groups[2].Success ? UnescapeSnippet(match.Groups[2].Value)
+                        : match.Groups[3].Success ? match.Groups[3].Value
                         : string.Empty);
             }
 
-            if ((edit?["range"] ?? edit?["insert"]) is { } editRange)
+            if (editStart < wordStart)
             {
-                var editStart = Math.Min(ToOffset(snapshot, editRange["start"]), position);
-                if (editStart < wordStart)
-                {
-                    var replaced = text[editStart..wordStart];
-                    insertText = insertText.StartsWith(replaced, StringComparison.Ordinal)
-                        ? insertText[replaced.Length..]
-                        : insertText;
-                }
-                else if (editStart > wordStart)
-                {
-                    insertText = text[wordStart..editStart] + insertText;
-                }
+                var replaced = text[editStart..wordStart];
+                insertText = insertText.StartsWith(replaced, StringComparison.Ordinal)
+                    ? insertText[replaced.Length..]
+                    : insertText;
+            }
+            else if (editStart > wordStart)
+            {
+                insertText = text[wordStart..editStart] + insertText;
             }
 
             candidates.Add((
@@ -225,6 +228,12 @@ internal static partial class LanguageServerConversions
                 ? new TextRange(position - 1, 1)
                 : new TextRange(position, 0);
     }
+
+    private static string UnescapeSnippet(string text) =>
+        SnippetEscapePattern().Replace(text, match => match.Groups[1].Value);
+
+    [GeneratedRegex(@"\\([\\$}])", RegexOptions.CultureInvariant)]
+    private static partial Regex SnippetEscapePattern();
 
     private static bool IsWordCharacter(char value) => char.IsLetterOrDigit(value) || value == '_';
 
