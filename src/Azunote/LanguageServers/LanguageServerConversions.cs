@@ -178,6 +178,20 @@ internal static partial class LanguageServerConversions
     }
 
     /// <summary>
+    /// The edits of a formatting answer, last first, so that applying them in
+    /// order leaves the ranges of those still to come where they were. Edits
+    /// at one position keep the server's order.
+    /// </summary>
+    public static IReadOnlyList<(TextRange Range, string NewText)> ToTextEdits(JsonNode? edits, TextSnapshot snapshot) =>
+        edits is JsonArray array
+            ? [.. array.OfType<JsonObject>()
+                .Select((edit, index) => (Range: ToRange(snapshot, edit["range"]), NewText: GetString(edit["newText"]) ?? string.Empty, Index: index))
+                .OrderByDescending(edit => edit.Range.Start)
+                .ThenByDescending(edit => edit.Index)
+                .Select(edit => (edit.Range, edit.NewText))]
+            : [];
+
+    /// <summary>
     /// The text of hover contents or documentation: a string, a marked string,
     /// markup content, or an array of them. Markdown code fences are dropped
     /// since the tooltip shows plain text.

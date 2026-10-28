@@ -673,6 +673,12 @@
                     Command="{x:Bind ViewModel.ToggleCommentCommand}"
                     IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
                 />
+                <MenuFlyoutItem
+                    Text="Format Document"
+                    KeyboardAcceleratorTextOverride="Shift+Alt+F"
+                    Command="{x:Bind ViewModel.FormatDocumentCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanFormatDocument, Mode=OneWay}"
+                />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem
                     Text="Select All"

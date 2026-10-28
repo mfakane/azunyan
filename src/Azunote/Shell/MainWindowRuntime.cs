@@ -585,6 +585,23 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public void RestartLanguageServer() => _languageServer?.Restart();
 
+    public async Task FormatDocumentAsync()
+    {
+        if (_languageServer is null || _session.State.IsReadOnly)
+        {
+            return;
+        }
+
+        try
+        {
+            await _languageServer.FormatAsync();
+        }
+        catch (Exception exception) when (exception is IOException or JsonRpcException or ObjectDisposedException)
+        {
+            await _prompt.ShowErrorAsync("Could not format document", exception.Message);
+        }
+    }
+
     public Task ShowLanguageServerLogAsync() =>
         _languageServer?.Log is { } log && _openLanguageServerLog is not null
             ? _openLanguageServerLog(log)
@@ -953,7 +970,7 @@ internal sealed class MainWindowRuntime : IDisposable
 
     private void LanguageServer_Changed(object? sender, EventArgs args)
     {
-        _viewModel.SetLanguageServer(_languageServer!.Indicator);
+        _viewModel.SetLanguageServer(_languageServer!.Indicator, _languageServer.CanFormat);
         var triggers = _languageServer.CompletionTriggerCharacters;
         if (!triggers.SequenceEqual(_languageServerTriggers))
         {

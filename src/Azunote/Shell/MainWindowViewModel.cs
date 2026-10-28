@@ -31,6 +31,7 @@ internal sealed class MainWindowViewModel :
     private string _findResult = string.Empty;
     private bool _isReplaceMode;
     private bool _isReadOnly;
+    private bool _languageServerFormats;
     private int _runningExternalToolCount;
     private bool _isMatchCase;
     private bool _isInSelection;
@@ -73,6 +74,7 @@ internal sealed class MainWindowViewModel :
         DeleteLineCommand = Command(() => Actions.DeleteLines());
         AddNextOccurrenceCommand = Command(() => Actions.AddNextOccurrence());
         ToggleCommentCommand = Command(() => Actions.ToggleComment());
+        FormatDocumentCommand = Async(() => Actions.FormatDocumentAsync());
         ReopenWithEncodingCommand = Command(parameter =>
         {
             if (parameter is TextEncoding encoding)
@@ -245,6 +247,8 @@ internal sealed class MainWindowViewModel :
     public ICommand DeleteLineCommand { get; }
     public ICommand AddNextOccurrenceCommand { get; }
     public ICommand ToggleCommentCommand { get; }
+
+    public ICommand FormatDocumentCommand { get; }
     public ICommand ReopenWithEncodingCommand { get; }
     public ICommand SaveWithEncodingCommand { get; }
     public ICommand ReopenWithOtherEncodingCommand { get; }
@@ -280,10 +284,13 @@ internal sealed class MainWindowViewModel :
     public bool IsReadOnly
     {
         get => _isReadOnly;
-        set => SetProperty(ref _isReadOnly, value, dependentProperties: [nameof(CanEdit)]);
+        set => SetProperty(ref _isReadOnly, value, dependentProperties: [nameof(CanEdit), nameof(CanFormatDocument)]);
     }
 
     public bool CanEdit => !IsReadOnly;
+
+    /// <summary>Whether the document's language server runs and can format it.</summary>
+    public bool CanFormatDocument => _languageServerFormats && CanEdit;
     public string ErrorCountText { get; private set; } = "0";
     public string WarningCountText { get; private set; } = "0";
     public string InformationCountText { get; private set; } = "0";
@@ -328,9 +335,10 @@ internal sealed class MainWindowViewModel :
 
     public string LanguageServerToolTip { get; private set; } = string.Empty;
 
-    public void SetLanguageServer(LanguageServerIndicator indicator)
+    public void SetLanguageServer(LanguageServerIndicator indicator, bool formats)
     {
         ArgumentNullException.ThrowIfNull(indicator);
+        _languageServerFormats = formats;
         IsLanguageServerAvailable = indicator.State != LanguageServerIndicatorState.Hidden;
         IsLanguageServerOn = indicator.State is not (LanguageServerIndicatorState.Hidden or LanguageServerIndicatorState.Off);
         LanguageServerVisibility = IsLanguageServerAvailable ? Visibility.Visible : Visibility.Collapsed;
@@ -360,6 +368,7 @@ internal sealed class MainWindowViewModel :
         OnPropertyChanged(nameof(LanguageServerBusyVisibility));
         OnPropertyChanged(nameof(LanguageServerFailureVisibility));
         OnPropertyChanged(nameof(LanguageServerToolTip));
+        OnPropertyChanged(nameof(CanFormatDocument));
     }
 
     public int RunningExternalToolCount
@@ -679,6 +688,7 @@ internal interface IMainWindowActions
     void DeleteLines();
     void AddNextOccurrence();
     void ToggleComment();
+    Task FormatDocumentAsync();
     void ReopenWithEncoding(TextEncoding encoding);
     void SaveWithEncoding(TextEncoding encoding);
     void ShowEncodingPicker(bool reopen);

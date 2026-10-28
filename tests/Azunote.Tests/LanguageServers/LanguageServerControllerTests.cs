@@ -199,6 +199,52 @@ public sealed class LanguageServerControllerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Formatting_applies_the_servers_edits_as_one_step_and_keeps_the_caret()
+    {
+        _enabled.Add((Workspace, "fake-server"));
+        _server.Capabilities["documentFormattingProvider"] = true;
+        _server.Handlers["textDocument/formatting"] = _ => JsonNode.Parse("""
+            [{ "range": { "start": { "line": 0, "character": 3 }, "end": { "line": 0, "character": 4 } }, "newText": "  " },
+             { "range": { "start": { "line": 0, "character": 14 }, "end": { "line": 0, "character": 14 } }, "newText": "\n" }]
+            """);
+        using var controller = CreateController();
+        controller.Update();
+        await WaitForAsync(() => controller.CanFormat);
+        _editor.SetSelection(TextSelection.Caret(12));
+
+        await controller.FormatAsync();
+
+        Assert.Equal("let  value = 1;\n", _editor.Text);
+        Assert.Equal(TextSelection.Caret(13), _editor.Selection);
+        var options = Assert.Single(_server.ReceivedOf("textDocument/formatting"))!["options"]!;
+        Assert.Equal(4, options["tabSize"]!.GetValue<int>());
+        Assert.False(options["insertSpaces"]!.GetValue<bool>());
+        _editor.Undo();
+        Assert.Equal("let value = 1;", _editor.Text);
+    }
+
+    [Fact]
+    public async Task Formatting_leaves_a_document_edited_while_the_server_worked()
+    {
+        _enabled.Add((Workspace, "fake-server"));
+        _server.Capabilities["documentFormattingProvider"] = true;
+        _server.Handlers["textDocument/formatting"] = _ =>
+        {
+            _editor.Replace(new TextRange(0, 0), "// ");
+            return JsonNode.Parse("""
+                [{ "range": { "start": { "line": 0, "character": 3 }, "end": { "line": 0, "character": 4 } }, "newText": "  " }]
+                """);
+        };
+        using var controller = CreateController();
+        controller.Update();
+        await WaitForAsync(() => controller.CanFormat);
+
+        await controller.FormatAsync();
+
+        Assert.Equal("// let value = 1;", _editor.Text);
+    }
+
+    [Fact]
     public async Task Without_a_running_server_completion_falls_back()
     {
         using var controller = CreateController();

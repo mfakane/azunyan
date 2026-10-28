@@ -7,3 +7,6 @@
 # command = "vscode-json-language-server"
 # args = ["--stdio"]
 # allowOutsideWorkspace = true
+#
+# [languageServer.initializationOptions]
+# provideFormatter = true

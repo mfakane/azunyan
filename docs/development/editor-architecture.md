@@ -457,8 +457,9 @@ scheduled like the editor's key commands, so the native TextBox never sees an
 unmatched release. Azunote uses it to give an enabled external tool precedence
 over the editor for the tool's shortcut, and otherwise to bind its editing
 commands: Alt+Up/Down moves the caret lines, Shift+Alt+Up/Down copies them,
-Ctrl+Shift+K deletes them, Ctrl+/ toggles comments, and Ctrl+D adds the next
-occurrence of the selection as another caret.
+Ctrl+Shift+K deletes them, Ctrl+/ toggles comments, Ctrl+D adds the next
+occurrence of the selection as another caret, and Shift+Alt+F formats the
+document with its language server.
 
 Managed commands are scheduled immediately after KeyDown returns, including
 repeat KeyDown events. KeyUp never performs the document command: it only

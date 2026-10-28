@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json.Nodes;
 using Azunyan.Core;
 
@@ -44,7 +45,7 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
     internal const string DiagnosticsSourceKey = "languageServer";
     private static readonly TimeSpan ChangeDelay = TimeSpan.FromMilliseconds(200);
 
-    private readonly IEditorBuffer _editor;
+    private readonly IEditorView _editor;
     private readonly Func<DocumentSessionState> _state;
     private readonly Func<string> _languageModeId;
     private readonly Func<LanguageServerDefinition?> _definition;
@@ -60,7 +61,7 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
     private bool _disposed;
 
     public LanguageServerController(
-        IEditorBuffer editor,
+        IEditorView editor,
         Func<DocumentSessionState> state,
         Func<string> languageModeId,
         Func<LanguageServerDefinition?> definition,
@@ -100,6 +101,8 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
 
     /// <summary>The log of the server the document holds, while it is turned on.</summary>
     public LanguageServerLog? Log => _lease?.Instance.Log;
+
+    public bool CanFormat => _active?.Client.SupportsFormatting == true;
 
     public ICompletionProvider GetCompletionProvider(ICompletionProvider? fallback) =>
         new CompletionProvider(this, fallback);
@@ -183,6 +186,50 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
         {
             Observe(active.Client.ReopenAsync(active.Uri, target.LanguageId, _editor.Text));
         }
+    }
+
+    /// <summary>
+    /// Formats the document as the server suggests, as one step to undo, with
+    /// the document's indentation. Nothing changes when the document was edited
+    /// while the server worked on it.
+    /// </summary>
+    public async Task FormatAsync()
+    {
+        if (_active is not { Client.SupportsFormatting: true } active)
+        {
+            return;
+        }
+
+        var snapshot = _editor.Snapshot;
+        var indentation = TextEditorCommands.GetDocumentIndentationSettings(
+            snapshot,
+            _editor.IndentSize,
+            _editor.TabDisplaySize,
+            _editor.IndentationInputMode);
+        await active.Client.ChangeAsync(active.Uri, snapshot.Text);
+        var result = await active.Client.FormattingAsync(active.Uri, indentation, CancellationToken.None);
+        var edits = LanguageServerConversions.ToTextEdits(result, snapshot);
+        if (edits.Count == 0 || !ReferenceEquals(_editor.Snapshot, snapshot))
+        {
+            return;
+        }
+
+        // One replacement of the text the edits cover is one step to undo.
+        var start = edits[^1].Range.Start;
+        var end = edits.Max(edit => edit.Range.End);
+        var formatted = new StringBuilder(snapshot.Text, start, end - start, end - start);
+        var selection = _editor.Selection;
+        var anchor = selection.Anchor;
+        var caret = selection.Active;
+        foreach (var (range, newText) in edits)
+        {
+            formatted.Remove(range.Start - start, range.Length).Insert(range.Start - start, newText);
+            anchor = MapThroughEdit(anchor, range, newText);
+            caret = MapThroughEdit(caret, range, newText);
+        }
+
+        _editor.Replace(TextRange.FromBounds(start, end), formatted.ToString());
+        _editor.SetSelection(new TextSelection(anchor, caret));
     }
 
     /// <summary>Tells the server the document was saved, after the session became clean.</summary>
@@ -339,6 +386,15 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
                 break;
         }
     }
+
+    /// <summary>
+    /// Where a position ends up after an edit: it follows the text after the
+    /// edit, and stays inside text the edit rewrote.
+    /// </summary>
+    private static int MapThroughEdit(int position, TextRange range, string newText) =>
+        position >= range.End ? position - range.Length + newText.Length
+            : position > range.Start ? range.Start + Math.Min(position - range.Start, newText.Length)
+            : position;
 
     private void DropActive()
     {

@@ -61,6 +61,10 @@ those carrying a whole document, are cut short.
   suggestion with placeholders is inserted with their default text.
 - **Descriptions**: resting the pointer on a symbol shows what the server says
   about it, after any problem there.
+- **Formatting**: Edit > Format Document (Shift+Alt+F) rewrites the document
+  as the server suggests, with the document's indentation, as one step to undo.
+  It is available while a server that formats runs. An enabled
+  [tool](tool-definitions.md) with the same shortcut takes the shortcut.
 
 One server process serves every document in its workspace folder, from every
 window and every mode that names the same command and arguments. It is stopped
@@ -107,4 +111,8 @@ typeCheckingMode = "basic"
 command = "vscode-json-language-server"
 args = ["--stdio"]
 allowOutsideWorkspace = true
+
+# The JSON server formats only when asked to.
+[languageServer.initializationOptions]
+provideFormatter = true
 ~~~

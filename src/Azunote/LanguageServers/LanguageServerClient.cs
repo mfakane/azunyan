@@ -75,6 +75,8 @@ internal sealed class LanguageServerClient : IAsyncDisposable
 
     public bool SupportsHover { get; private set; }
 
+    public bool SupportsFormatting { get; private set; }
+
     /// <summary>The last lines the server wrote to standard error, to explain a failure.</summary>
     public string ErrorOutput
     {
@@ -280,6 +282,17 @@ internal sealed class LanguageServerClient : IAsyncDisposable
     public Task<JsonNode?> HoverAsync(string uri, LineColumn position, CancellationToken cancellationToken) =>
         _connection.SendRequestAsync("textDocument/hover", CreatePositionParameters(uri, position), cancellationToken);
 
+    public Task<JsonNode?> FormattingAsync(string uri, IndentationSettings indentation, CancellationToken cancellationToken) =>
+        _connection.SendRequestAsync("textDocument/formatting", new JsonObject
+        {
+            ["textDocument"] = new JsonObject { ["uri"] = uri },
+            ["options"] = new JsonObject
+            {
+                ["tabSize"] = indentation.Size,
+                ["insertSpaces"] = indentation.Kind == IndentationKind.Spaces
+            }
+        }, cancellationToken);
+
     /// <summary>Asks the server to exit, and ends the process if it does not.</summary>
     public async ValueTask DisposeAsync()
     {
@@ -415,13 +428,16 @@ internal sealed class LanguageServerClient : IAsyncDisposable
                 : [];
         }
 
-        SupportsHover = capabilities?["hoverProvider"] switch
-        {
-            JsonObject => true,
-            JsonValue value => value.GetValueKind() == JsonValueKind.True,
-            _ => false
-        };
+        SupportsHover = IsProvided(capabilities?["hoverProvider"]);
+        SupportsFormatting = IsProvided(capabilities?["documentFormattingProvider"]);
     }
+
+    private static bool IsProvided(JsonNode? provider) => provider switch
+    {
+        JsonObject => true,
+        JsonValue value => value.GetValueKind() == JsonValueKind.True,
+        _ => false
+    };
 
     private Task<JsonNode?> HandleRequestAsync(string method, JsonNode? parameters) => method switch
     {

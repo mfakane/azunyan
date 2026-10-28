@@ -165,6 +165,25 @@ public sealed class LanguageServerConversionsTests
         Assert.Equal($"def run(){Environment.NewLine}{Environment.NewLine}Runs it.", tooltip.Content);
     }
 
+    [Fact]
+    public void Formatting_edits_come_last_first_and_keep_the_order_of_those_at_one_position()
+    {
+        var edits = JsonNode.Parse("""
+            [
+              { "range": { "start": { "line": 0, "character": 1 }, "end": { "line": 0, "character": 2 } }, "newText": "" },
+              { "range": { "start": { "line": 1, "character": 0 }, "end": { "line": 1, "character": 0 } }, "newText": "a" },
+              { "range": { "start": { "line": 1, "character": 0 }, "end": { "line": 1, "character": 0 } }, "newText": "b" }
+            ]
+            """);
+
+        var result = LanguageServerConversions.ToTextEdits(edits, new TextSnapshot("{ \n}"));
+
+        Assert.Equal(
+            [(new TextRange(3, 0), "b"), (new TextRange(3, 0), "a"), (new TextRange(1, 1), "")],
+            result);
+        Assert.Empty(LanguageServerConversions.ToTextEdits(null, new TextSnapshot("{}")));
+    }
+
     private static EditorProviderContext Context(string text, int position) =>
         new(new TextSnapshot(text), position, TextSelection.Caret(position));
 }

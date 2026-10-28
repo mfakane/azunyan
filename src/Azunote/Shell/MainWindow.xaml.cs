@@ -36,6 +36,8 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
             runtime => runtime.DeleteLines(),
         [new(VirtualKey.D, VirtualKeyModifiers.Control)] = runtime => runtime.AddNextOccurrence(),
         [new(OemSlashKey, VirtualKeyModifiers.Control)] = runtime => runtime.ToggleComment(),
+        [new(VirtualKey.F, VirtualKeyModifiers.Menu | VirtualKeyModifiers.Shift)] =
+            runtime => _ = runtime.FormatDocumentAsync(),
     };
 
     private bool _completionShortcutInvoked;
@@ -835,6 +837,8 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     void IMainWindowActions.AddNextOccurrence() => _runtime.AddNextOccurrence();
 
     void IMainWindowActions.ToggleComment() => _runtime.ToggleComment();
+
+    Task IMainWindowActions.FormatDocumentAsync() => _runtime.FormatDocumentAsync();
 
     void IMainWindowActions.ReopenWithEncoding(TextEncoding encoding) =>
         _runtime.ReopenWithEncoding(encoding);
