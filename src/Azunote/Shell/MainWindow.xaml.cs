@@ -819,6 +819,8 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
 
     void IMainWindowActions.ToggleLanguageServer() => _runtime.ToggleLanguageServer();
 
+    void IMainWindowActions.RestartLanguageServer() => _runtime.RestartLanguageServer();
+
     Task IMainWindowActions.ShowLanguageServerLogAsync() => _runtime.ShowLanguageServerLogAsync();
 
     private void LanguageServerStatus_Tapped(object sender, TappedRoutedEventArgs e) =>

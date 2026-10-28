@@ -106,6 +106,7 @@ internal sealed class MainWindowViewModel :
         SetIndentationInputModeCommand = Command(SetIndentationInputMode);
         ToggleStatusBarCommand = Command(() => Actions.ToggleStatusBar());
         ToggleLanguageServerCommand = Command(() => Actions.ToggleLanguageServer());
+        RestartLanguageServerCommand = Command(() => Actions.RestartLanguageServer());
         ShowLanguageServerLogCommand = Async(() => Actions.ShowLanguageServerLogAsync());
         CopyFilePathCommand = Command(() => Actions.CopyFilePath());
         ShowFileInExplorerCommand = Async(() => Actions.ShowFileInExplorerAsync());
@@ -259,6 +260,8 @@ internal sealed class MainWindowViewModel :
     public ICommand SetIndentationInputModeCommand { get; }
     public ICommand ToggleStatusBarCommand { get; }
     public ICommand ToggleLanguageServerCommand { get; }
+
+    public ICommand RestartLanguageServerCommand { get; }
 
     public ICommand ShowLanguageServerLogCommand { get; }
     public ICommand CopyFilePathCommand { get; }
@@ -690,6 +693,8 @@ internal interface IMainWindowActions
     void SetIndentationInputMode(IndentationInputMode mode);
     void ToggleStatusBar();
     void ToggleLanguageServer();
+
+    void RestartLanguageServer();
 
     Task ShowLanguageServerLogAsync();
     void CopyFilePath();

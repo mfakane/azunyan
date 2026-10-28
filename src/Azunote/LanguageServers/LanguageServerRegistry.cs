@@ -90,6 +90,38 @@ internal sealed class LanguageServerInstance
         }
     }
 
+    /// <summary>
+    /// Stops the server's process and starts a new one in its place. The
+    /// documents holding it keep their hold and open again once it runs.
+    /// </summary>
+    internal void Restart(
+        Func<LanguageServerLaunch, LanguageServerLog, LanguageServerClient> start,
+        TimeSpan initializeTimeout)
+    {
+        LanguageServerClient? client;
+        lock (_gate)
+        {
+            if (IsStopped)
+            {
+                return;
+            }
+
+            client = _client;
+            _client = null;
+            Status = LanguageServerStatus.Starting;
+            FailureMessage = null;
+        }
+
+        Log.Write("Restarting");
+        StatusChanged?.Invoke(this, EventArgs.Empty);
+        if (client is not null)
+        {
+            _ = client.DisposeAsync().AsTask();
+        }
+
+        _ = StartAsync(start, initializeTimeout);
+    }
+
     internal ValueTask StopAsync()
     {
         LanguageServerClient? client;
@@ -252,6 +284,13 @@ internal sealed class LanguageServerRegistry : IDisposable
     }
 
     public void NotifyEnablementChanged() => EnablementChanged?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>Starts a held server anew, such as after it failed or its settings changed.</summary>
+    public void Restart(LanguageServerInstance instance)
+    {
+        ArgumentNullException.ThrowIfNull(instance);
+        instance.Restart(_start, InitializeTimeout);
+    }
 
     /// <summary>
     /// Holds the server for a document, starting it if no document holds it

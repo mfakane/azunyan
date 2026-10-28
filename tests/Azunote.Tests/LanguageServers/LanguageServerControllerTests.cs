@@ -124,6 +124,29 @@ public sealed class LanguageServerControllerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_restart_opens_the_document_in_the_new_server()
+    {
+        await using var second = new FakeLanguageServer();
+        var servers = new Queue<FakeLanguageServer>([_server, second]);
+        _registry.Dispose();
+        _registry = new LanguageServerRegistry(
+            (_, _) => true,
+            (_, _, _) => { },
+            (launch, log) => servers.Dequeue().CreateClient(launch.WorkspaceFolder, log: log));
+        using var controller = CreateController();
+        controller.Update();
+        await _server.WaitForAsync("textDocument/didOpen");
+
+        controller.Restart();
+        await second.WaitForAsync("textDocument/didOpen");
+        await WaitForAsync(() => controller.Indicator.State == LanguageServerIndicatorState.Running);
+
+        await _server.WaitForAsync("shutdown");
+        var open = Assert.Single(second.ReceivedOf("textDocument/didOpen"))!["textDocument"]!;
+        Assert.Equal("let value = 1;", open["text"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task Problems_the_server_reports_become_the_documents_problems()
     {
         _enabled.Add((Workspace, "fake-server"));

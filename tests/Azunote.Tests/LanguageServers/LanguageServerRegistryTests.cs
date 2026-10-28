@@ -133,6 +133,32 @@ public sealed class LanguageServerRegistryTests
         await server.DisposeAsync();
     }
 
+    [Fact]
+    public async Task A_restart_stops_the_process_and_starts_a_new_one_for_the_same_holders()
+    {
+        await using var first = new FakeLanguageServer();
+        await using var second = new FakeLanguageServer();
+        var servers = new Queue<FakeLanguageServer>([first, second]);
+        using var registry = new LanguageServerRegistry(
+            (_, _) => true,
+            (_, _, _) => { },
+            (_, log) => servers.Dequeue().CreateClient(Workspace, log: log));
+        using var lease = registry.Acquire(Launch());
+        await WaitForStatusAsync(lease.Instance, LanguageServerStatus.Running);
+        var before = lease.Instance.Client;
+
+        registry.Restart(lease.Instance);
+        Assert.Equal(LanguageServerStatus.Starting, lease.Instance.Status);
+        await WaitForStatusAsync(lease.Instance, LanguageServerStatus.Running);
+
+        Assert.NotSame(before, lease.Instance.Client);
+        Assert.Empty(servers);
+        await first.WaitForAsync("shutdown");
+        Assert.Single(second.ReceivedOf("initialize"));
+        lease.Instance.Log.Subscribe(_ => { }, out var log).Dispose();
+        Assert.Contains("Restarting", log, StringComparison.Ordinal);
+    }
+
     private static LanguageServerLaunch Launch() =>
         new(
             Definition,

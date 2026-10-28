@@ -583,6 +583,8 @@ internal sealed class MainWindowRuntime : IDisposable
     /// <summary>Turns the document's language server on or off for its workspace folder.</summary>
     public void ToggleLanguageServer() => _languageServer?.Toggle();
 
+    public void RestartLanguageServer() => _languageServer?.Restart();
+
     public Task ShowLanguageServerLogAsync() =>
         _languageServer?.Log is { } log && _openLanguageServerLog is not null
             ? _openLanguageServerLog(log)

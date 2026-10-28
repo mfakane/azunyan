@@ -23,32 +23,33 @@ path = ["${workspaceFolder}/node_modules/.bin"]
 When the document's mode has a server, the document is saved in a
 [workspace folder](language-modes.md#workspace-folder), and the server's
 command is found, **View > Language Server** becomes available and the status
-bar shows ⚡ before the mode's name as a shortcut to it. Choosing it turns the
-server on for that workspace folder and starts it; choosing it again turns it
-off and stops it. Azunote remembers which servers are on for which folders, and
-starts them again when a document in the folder is opened. Other windows on the
-same folder follow along.
+bar shows ⚡ before the mode's name as a shortcut to its **Enable** item.
+Choosing it turns the server on for that workspace folder and starts it;
+choosing it again turns it off and stops it. Azunote remembers which servers
+are on for which folders, and starts them again when a document in the folder
+is opened. Other windows on the same folder follow along.
 
 A server runs programs and reads settings from the workspace folder, so turn it
 on only for folders you trust. A server that is on for one folder stays off for
 others, and changing its `command` turns it off everywhere.
 
-A document outside every workspace folder gets the menu item and the ⚡ only
+A document outside every workspace folder gets the menu and the ⚡ only
 when the server has `allowOutsideWorkspace = true`. Such a server is turned on
 once for all files outside a workspace folder, and runs without one, which suits
 servers that look at a single file, such as those for JSON and YAML.
 
 The ⚡ is dimmed while the server is off, turns into a spinner while it starts,
 and is highlighted while it runs. If the server fails to start or stops by
-itself, the ⚡ shows a warning and resting the pointer on it tells why. The menu
-item stays checked, so choosing it turns the server off and choosing it again
-starts it anew.
+itself, the ⚡ shows a warning and resting the pointer on it tells why.
+**Enable** stays checked, and **Restart** starts the server anew for every
+document it serves. Restart also picks up an updated server program, or settings
+the server reads only when it starts.
 
-**View > Language Server Log** opens a read-only window with what the server
-and Azunote have said to each other: how the server was started, every message
-either way, what the server wrote to standard error, and why it failed. It
-starts with the last 2,000 lines and keeps adding new ones until it is closed.
-Very long messages, such as those carrying a whole document, are cut short.
+**Show Log** opens a read-only window with what the server and Azunote have said
+to each other: how the server was started, every message either way, what the
+server wrote to standard error, and why it failed. It starts with the last 2,000
+lines and keeps adding new ones until it is closed. Very long messages, such as
+those carrying a whole document, are cut short.
 
 ## What a server provides
 

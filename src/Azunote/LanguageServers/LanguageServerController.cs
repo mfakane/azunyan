@@ -161,6 +161,15 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
             Indicator.State == LanguageServerIndicatorState.Off);
     }
 
+    /// <summary>Starts the document's server anew, for every document it serves.</summary>
+    public void Restart()
+    {
+        if (_lease is { } lease)
+        {
+            _registry.Restart(lease.Instance);
+        }
+    }
+
     /// <summary>
     /// Looks again after a file was opened or read from disk, which cleared
     /// the window's problems: a document the server already had is opened
@@ -317,22 +326,29 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
                 SetIndicator(new LanguageServerIndicator(LanguageServerIndicatorState.Running, command), force: opened);
                 break;
             case LanguageServerStatus.Failed:
-                if (_active is { } failed)
-                {
-                    _active = null;
-                    failed.Client.DiagnosticsPublished -= Client_DiagnosticsPublished;
-                }
-
-                _diagnostics.Replace(DiagnosticsSourceKey, []);
+                DropActive();
                 SetIndicator(new LanguageServerIndicator(
                     LanguageServerIndicatorState.Failed,
                     command,
                     instance.FailureMessage));
                 break;
             default:
+                // A restart leaves the old process behind; the new one gets the document again.
+                DropActive();
                 SetIndicator(new LanguageServerIndicator(LanguageServerIndicatorState.Starting, command));
                 break;
         }
+    }
+
+    private void DropActive()
+    {
+        if (_active is { } active)
+        {
+            _active = null;
+            active.Client.DiagnosticsPublished -= Client_DiagnosticsPublished;
+        }
+
+        _diagnostics.Replace(DiagnosticsSourceKey, []);
     }
 
     private void SetIndicator(LanguageServerIndicator indicator, bool force = false)
