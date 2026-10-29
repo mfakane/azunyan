@@ -64,6 +64,24 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void Only_the_kinds_of_problems_found_are_counted()
+    {
+        var viewModel = CreateViewModel();
+
+        viewModel.SetProblems(2, 0, 0, null);
+
+        Assert.Equal(Visibility.Visible, viewModel.ProblemsVisibility);
+        Assert.Equal(Visibility.Visible, viewModel.ErrorCountVisibility);
+        Assert.Equal(Visibility.Collapsed, viewModel.WarningCountVisibility);
+        Assert.Equal(Visibility.Collapsed, viewModel.InformationCountVisibility);
+
+        viewModel.SetProblems(0, 0, 0, null);
+
+        Assert.Equal(Visibility.Collapsed, viewModel.ProblemsVisibility);
+        Assert.Equal(Visibility.Collapsed, viewModel.ErrorCountVisibility);
+    }
+
+    [Fact]
     public void Running_external_tool_count_drives_the_status_indicator()
     {
         var viewModel = CreateViewModel();

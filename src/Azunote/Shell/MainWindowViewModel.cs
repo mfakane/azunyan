@@ -301,6 +301,11 @@ internal sealed class MainWindowViewModel :
     public string InformationCountText { get; private set; } = "0";
     public Visibility ProblemsVisibility { get; private set; } = Visibility.Collapsed;
 
+    // Only the kinds with problems are counted in the status bar.
+    public Visibility ErrorCountVisibility { get; private set; } = Visibility.Collapsed;
+    public Visibility WarningCountVisibility { get; private set; } = Visibility.Collapsed;
+    public Visibility InformationCountVisibility { get; private set; } = Visibility.Collapsed;
+
     /// <summary>The message of the problem at the caret, shown beside the counts.</summary>
     public string ProblemAtCaret { get; private set; } = string.Empty;
 
@@ -310,11 +315,17 @@ internal sealed class MainWindowViewModel :
         WarningCountText = warnings.ToString(CultureInfo.CurrentCulture);
         InformationCountText = informations.ToString(CultureInfo.CurrentCulture);
         ProblemsVisibility = errors + warnings + informations > 0 ? Visibility.Visible : Visibility.Collapsed;
+        ErrorCountVisibility = errors > 0 ? Visibility.Visible : Visibility.Collapsed;
+        WarningCountVisibility = warnings > 0 ? Visibility.Visible : Visibility.Collapsed;
+        InformationCountVisibility = informations > 0 ? Visibility.Visible : Visibility.Collapsed;
         ProblemAtCaret = messageAtCaret ?? string.Empty;
         OnPropertyChanged(nameof(ErrorCountText));
         OnPropertyChanged(nameof(WarningCountText));
         OnPropertyChanged(nameof(InformationCountText));
         OnPropertyChanged(nameof(ProblemsVisibility));
+        OnPropertyChanged(nameof(ErrorCountVisibility));
+        OnPropertyChanged(nameof(WarningCountVisibility));
+        OnPropertyChanged(nameof(InformationCountVisibility));
         OnPropertyChanged(nameof(ProblemAtCaret));
     }
 

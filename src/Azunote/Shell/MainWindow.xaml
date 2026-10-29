@@ -1316,28 +1316,46 @@
                     x:Name="ProblemsStatus"
                     Grid.Column="6"
                     Orientation="Horizontal"
-                    Spacing="4"
+                    Spacing="10"
                     Background="Transparent"
                     ToolTipService.ToolTip="Show Problems (Ctrl+Shift+M)"
                     Visibility="{x:Bind ViewModel.ProblemsVisibility, Mode=OneWay}"
                     Tapped="ProblemsStatus_Tapped"
                 >
-                    <FontIcon Glyph="&#xEA39;" FontSize="12" />
-                    <TextBlock
-                        x:Name="ErrorCountStatus"
-                        Text="{x:Bind ViewModel.ErrorCountText, Mode=OneWay}"
-                        AutomationProperties.HelpText="Errors"
-                    />
-                    <FontIcon Glyph="&#xE7BA;" FontSize="12" Margin="6,0,0,0" />
-                    <TextBlock
-                        Text="{x:Bind ViewModel.WarningCountText, Mode=OneWay}"
-                        AutomationProperties.HelpText="Warnings"
-                    />
-                    <FontIcon Glyph="&#xE946;" FontSize="12" Margin="6,0,0,0" />
-                    <TextBlock
-                        Text="{x:Bind ViewModel.InformationCountText, Mode=OneWay}"
-                        AutomationProperties.HelpText="Information"
-                    />
+                    <StackPanel
+                        Orientation="Horizontal"
+                        Spacing="4"
+                        Visibility="{x:Bind ViewModel.ErrorCountVisibility, Mode=OneWay}"
+                    >
+                        <FontIcon Glyph="&#xEA39;" FontSize="12" />
+                        <TextBlock
+                            x:Name="ErrorCountStatus"
+                            Text="{x:Bind ViewModel.ErrorCountText, Mode=OneWay}"
+                            AutomationProperties.HelpText="Errors"
+                        />
+                    </StackPanel>
+                    <StackPanel
+                        Orientation="Horizontal"
+                        Spacing="4"
+                        Visibility="{x:Bind ViewModel.WarningCountVisibility, Mode=OneWay}"
+                    >
+                        <FontIcon Glyph="&#xE7BA;" FontSize="12" />
+                        <TextBlock
+                            Text="{x:Bind ViewModel.WarningCountText, Mode=OneWay}"
+                            AutomationProperties.HelpText="Warnings"
+                        />
+                    </StackPanel>
+                    <StackPanel
+                        Orientation="Horizontal"
+                        Spacing="4"
+                        Visibility="{x:Bind ViewModel.InformationCountVisibility, Mode=OneWay}"
+                    >
+                        <FontIcon Glyph="&#xE946;" FontSize="12" />
+                        <TextBlock
+                            Text="{x:Bind ViewModel.InformationCountText, Mode=OneWay}"
+                            AutomationProperties.HelpText="Information"
+                        />
+                    </StackPanel>
                 </StackPanel>
                 <!--
                     The path takes the width it needs, up to all of it, and the
