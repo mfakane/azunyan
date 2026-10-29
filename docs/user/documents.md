@@ -3,7 +3,7 @@
 Each Azunote window holds one document: a file, or untitled text that has not
 been saved yet.
 
-The status bar shows the file's path from its
+The status bar shows the file's path from the name of its
 [workspace folder](language-modes.md#workspace-folder), or from the home folder
 as `~`. A path too long for the window is cut short in its folders, keeping the
 file name. Resting the pointer on it shows the full path, and clicking it

@@ -102,8 +102,9 @@ public sealed class DocumentStatusPresenterTests
     }
 
     [Theory]
-    [InlineData(@"C:\Users\me\repo\src\app.cs", @"C:\Users\me\repo", "src", @"\app.cs")]
-    [InlineData(@"C:\Users\me\repo\app.cs", @"C:\Users\me\repo\", "", "app.cs")]
+    [InlineData(@"C:\Users\me\repo\src\app.cs", @"C:\Users\me\repo", @"repo\src", @"\app.cs")]
+    [InlineData(@"C:\Users\me\repo\app.cs", @"C:\Users\me\repo\", "repo", @"\app.cs")]
+    [InlineData(@"D:\src\app.cs", @"D:\", @"D:\src", @"\app.cs")]
     [InlineData(@"C:\Users\me\notes\todo.md", null, @"~\notes", @"\todo.md")]
     [InlineData(@"C:\Users\me\todo.md", null, "~", @"\todo.md")]
     [InlineData(@"C:\Users\meow\todo.md", null, @"C:\Users\meow", @"\todo.md")]

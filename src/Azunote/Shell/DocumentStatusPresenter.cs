@@ -80,7 +80,7 @@ internal sealed class DocumentStatusPresenter
     }
 
     /// <summary>
-    /// Splits a path into the folder, relative to the workspace folder or
+    /// Splits a path into the folder, from the workspace folder's name or
     /// with the home folder as <c>~</c>, and the file name with the separator
     /// before it, so the folder can be cut short while the name stays.
     /// </summary>
@@ -93,7 +93,13 @@ internal sealed class DocumentStatusPresenter
         var name = Path.GetFileName(filePath);
         if (TryGetRelativeFolder(folder, workspaceFolder, out var relative))
         {
-            folder = relative;
+            // Named after the workspace folder, which tells apart files in
+            // several of them, unless it is a whole drive.
+            var root = Path.TrimEndingDirectorySeparator(workspaceFolder!);
+            var rootName = Path.GetFileName(root);
+            folder = rootName.Length == 0
+                ? Path.Join(workspaceFolder, relative)
+                : Path.Join(rootName, relative);
         }
         else if (TryGetRelativeFolder(folder, homeFolder, out relative))
         {
