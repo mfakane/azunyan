@@ -253,7 +253,8 @@ public sealed record ExternalToolDefinition
         IReadOnlyList<string>? searchPath = null,
         string? inputPrompt = null,
         bool preserveChatHistory = false,
-        string? diagnosticsPattern = null)
+        string? diagnosticsPattern = null,
+        IReadOnlyList<string>? workspacePatterns = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
         if (commandMode is not ExternalToolCommandMode.Executable
@@ -286,6 +287,7 @@ public sealed record ExternalToolDefinition
 
         WorkingDirectory = workingDirectory;
         SearchPath = searchPath ?? [];
+        WorkspacePatterns = workspacePatterns ?? [];
         Environment = environment ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         DefinitionDirectory = string.IsNullOrWhiteSpace(definitionDirectory)
             ? null
@@ -333,6 +335,9 @@ public sealed record ExternalToolDefinition
     public string? WorkingDirectory { get; }
 
     public IReadOnlyList<string> SearchPath { get; }
+
+    /// <summary>Patterns that mark the tool's workspace folder in place of the language mode's.</summary>
+    public IReadOnlyList<string> WorkspacePatterns { get; }
 
     public IReadOnlyDictionary<string, string> Environment { get; }
 

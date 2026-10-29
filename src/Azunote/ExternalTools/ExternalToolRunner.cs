@@ -60,6 +60,7 @@ public sealed class ExternalToolRunner
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(context);
 
+        context = context.WithWorkspacePatterns(definition.WorkspacePatterns);
         var sourceInput = context.GetInput(definition.InputMode);
         var standardOutput = new StringBuilder();
         var standardError = new StringBuilder();

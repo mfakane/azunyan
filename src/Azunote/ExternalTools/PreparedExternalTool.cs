@@ -16,12 +16,13 @@ internal sealed class PreparedExternalTool
                 new Dictionary<string, string>(definition.Environment, StringComparer.OrdinalIgnoreCase)),
             definition.DefinitionDirectory, definition.CommandMode, definition.Stream,
             definition.SearchPath, definition.InputPrompt, definition.PreserveChatHistory,
-            definition.DiagnosticsPattern);
+            definition.DiagnosticsPattern, [.. definition.WorkspacePatterns]);
         Definition.DefinitionPath = definition.DefinitionPath;
         var when = settings.When;
         _conditions = new ExternalToolSettings
         {
             Visibility = settings.Visibility,
+            WorkspacePatterns = [.. settings.WorkspacePatterns],
             When = new()
             {
                 Extensions = [.. when.Extensions], Patterns = [.. when.Patterns],

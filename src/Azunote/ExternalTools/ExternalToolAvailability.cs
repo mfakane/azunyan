@@ -22,6 +22,7 @@ public static class ExternalToolAvailability
         ArgumentNullException.ThrowIfNull(context);
         using var measurement = ShellPerformance.Measure("tools.evaluate");
 
+        context = context.WithWorkspacePatterns(settings.WorkspacePatterns ?? []);
         var conditionFailure = CheckConditions(settings.When ?? new(), context);
         var visibility = ParseVisibility(settings.Visibility);
         if (conditionFailure is not null)

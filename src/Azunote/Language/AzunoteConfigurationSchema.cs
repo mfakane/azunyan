@@ -95,7 +95,8 @@ public static class AzunoteSchemaCatalog
                     Field("shortcut", AzunoteSchemaValueKind.String, "property", documentation: "Optional keyboard shortcut, such as Alt+Shift+F."),
                     Field("priority", AzunoteSchemaValueKind.Integer, documentation: "Shortcut tie-break. Higher wins among enabled tools on the same key. Defaults to 0."),
                     Field("menus", AzunoteSchemaValueKind.Array, documentation: "Menu targets: tools, context, or both. Defaults to tools."),
-                    EnumField("visibility", "always", "whenAvailable")
+                    EnumField("visibility", "always", "whenAvailable"),
+                    Field("workspacePatterns", AzunoteSchemaValueKind.Array, documentation: "Globs for files that mark a workspace folder for this tool, in place of the language mode's.")
                 ]),
             new AzunoteSchemaTable(
                 "launch",

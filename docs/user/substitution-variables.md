@@ -27,9 +27,9 @@ These variables follow the names of VS Code's predefined variables.
 | Variable | Expands to |
 | --- | --- |
 | `${userHome}` | The current user's home folder. |
-| `${workspaceFolder}` | The [workspace folder](language-modes.md#workspace-folder) of the document: the nearest folder above it that contains `.git`, an `.editorconfig` with `root = true`, or a file matching its language mode's `workspacePatterns`. |
+| `${workspaceFolder}` | The [workspace folder](language-modes.md#workspace-folder) of the document: the nearest folder above it that contains `.git`, an `.editorconfig` with `root = true`, or a file matching its language mode's `workspacePatterns`, or the tool's own [`workspacePatterns`](tool-definitions.md#top-level-fields) when it has them. |
 | `${workspaceFolder:pattern}` | The nearest folder above the document that contains a file matching the glob `pattern`. Separate several patterns with `\|`, for example `${workspaceFolder:*.sln\|*.slnx}`. |
-| `${workspaceFile}` | The file in `${workspaceFolder}` that matches its language mode's `workspacePatterns`, or empty when none does. |
+| `${workspaceFile}` | The file in `${workspaceFolder}` that matches those `workspacePatterns`, or empty when none does. |
 | `${workspaceFile:pattern}` | The file matching `pattern` in `${workspaceFolder:pattern}`. |
 | `${workspaceFolderBasename}` | The name of `${workspaceFolder}`. |
 | `${workspaceFolderBasename:pattern}` | The name of `${workspaceFolder:pattern}`. |

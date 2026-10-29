@@ -37,6 +37,7 @@ Azunote.
 | `priority` | Which tool runs when several available tools share a shortcut: the highest value wins, and equal values keep menu order. Defaults to `0`. |
 | `menus` | Where the tool is shown: `tools`, `context`, or both. Defaults to `["tools"]`. |
 | `visibility` | `whenAvailable` hides the tool when it does not apply or its command cannot be found. `always` shows it disabled instead. |
+| `workspacePatterns` | Glob patterns for files that mark the tool's [workspace folder](language-modes.md#workspace-folder), such as `["package.json"]`, in place of the language mode's `workspacePatterns`. `.git` and a root `.editorconfig` still mark one. `${workspaceFolder}`, `${workspaceFile}`, `${relativeFile}`, and `[when]` then all use that folder. |
 
 ## `[launch]`
 

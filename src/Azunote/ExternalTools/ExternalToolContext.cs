@@ -127,7 +127,7 @@ public sealed partial record ExternalToolContext
 
     public string? ToolDirectory { get; internal init; }
 
-    public string? WorkspaceFolder { get; }
+    public string? WorkspaceFolder { get; private init; }
 
     public string? WorkspaceFolderBasename => GetPathBasename(WorkspaceFolder);
 
@@ -178,8 +178,11 @@ public sealed partial record ExternalToolContext
     /// </summary>
     public IReadOnlyList<string> LanguageExtensions { get; }
 
-    /// <summary>The language mode's patterns that mark a workspace folder besides the defaults.</summary>
-    public IReadOnlyList<string> WorkspacePatterns { get; }
+    /// <summary>
+    /// The patterns that mark a workspace folder besides the defaults: the
+    /// language mode's, or a tool's own.
+    /// </summary>
+    public IReadOnlyList<string> WorkspacePatterns { get; private init; }
 
     public TextEncoding Encoding { get; }
 
@@ -350,6 +353,19 @@ public sealed partial record ExternalToolContext
             InputCaptures = captures ?? EmptyInputCaptures
         };
     }
+
+    /// <summary>
+    /// The context for a tool with its own workspace patterns, which replace
+    /// the language mode's. Without any, the context is unchanged.
+    /// </summary>
+    public ExternalToolContext WithWorkspacePatterns(IReadOnlyList<string> patterns) =>
+        patterns.Count == 0 || patterns.SequenceEqual(WorkspacePatterns, StringComparer.Ordinal)
+            ? this
+            : this with
+            {
+                WorkspacePatterns = patterns,
+                WorkspaceFolder = _findWorkspace(DocumentFilePath ?? ExecutionFilePath, null, patterns)
+            };
 
     public ExternalToolContext WithPromptInput(ExternalToolPromptInput promptInput)
     {

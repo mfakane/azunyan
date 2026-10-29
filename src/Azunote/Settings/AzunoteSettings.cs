@@ -701,6 +701,9 @@ public sealed class ExternalToolSettings
 
     public string Visibility { get; set; } = ExternalToolEnumValues.ToTomlValue(ExternalToolVisibility.Always);
 
+    /// <summary>Patterns that mark this tool's workspace folder in place of the language mode's.</summary>
+    public string[] WorkspacePatterns { get; set; } = [];
+
     public ExternalToolLaunchSettings Launch { get; set; } = new();
 
     public ExternalToolWhenSettings When { get; set; } = new();
@@ -758,7 +761,8 @@ public sealed class ExternalToolSettings
             Launch.Path?.Values ?? [],
             input.Prompt,
             Launch.PreserveChatHistory,
-            Diagnostics.Pattern);
+            Diagnostics.Pattern,
+            WorkspacePatterns);
         definition.DefinitionPath = DefinitionPath;
         return definition;
     }
@@ -766,6 +770,7 @@ public sealed class ExternalToolSettings
     internal void Validate()
     {
         Menus ??= [ExternalToolEnumValues.ToTomlValue(ExternalToolMenuTarget.Tools)];
+        WorkspacePatterns ??= [];
         Launch ??= new();
         Launch.Arguments ??= [];
         Launch.Path ??= new ExternalToolSearchPath([]);

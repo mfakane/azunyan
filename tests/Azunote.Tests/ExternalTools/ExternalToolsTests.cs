@@ -594,6 +594,52 @@ public sealed class ExternalToolsTests
     }
 
     [Fact]
+    public async Task A_tool_s_workspace_patterns_replace_the_language_mode_s()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var root = Path.Combine(Path.GetTempPath(), $"azunote-workspace-{Guid.NewGuid():N}");
+        var package = Path.Combine(root, "package");
+        var path = Path.Combine(package, "src", "index.ts");
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(root, ".git"));
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(Path.Combine(root, "root.slnx"), string.Empty);
+            File.WriteAllText(Path.Combine(package, "package.json"), "{}");
+            var context = new ExternalToolContext(
+                path, path, string.Empty, string.Empty, workspacePatterns: ["*.slnx"]);
+            ExternalToolSettings Tool(params string[] workspacePatterns) => new()
+            {
+                Name = "Tool",
+                WorkspacePatterns = workspacePatterns,
+                Launch = new() { Command = "cmd.exe", Arguments = ["/c", "more"], Stdin = "${workspaceFolder}|${workspaceFile}|${relativeFile}" },
+                When = new() { Exists = new ExternalToolSearchPath(["${workspaceFolder}/package.json"]) }
+            };
+
+            Assert.False(ExternalToolAvailability.Evaluate(Tool(), context).IsEnabled);
+            Assert.True(ExternalToolAvailability.Evaluate(Tool("package.json"), context).IsEnabled);
+
+            var result = await ExternalToolRunner.RunAsync(Tool("package.json").ToDefinition(), context);
+            Assert.True(result.Succeeded, result.StandardError);
+            Assert.Equal(
+                $"{package}|{Path.Combine(package, "package.json")}|{Path.Combine("src", "index.ts")}",
+                result.StandardOutput.TrimEnd('\r', '\n'));
+            Assert.Equal(Path.Combine(root, "root.slnx"), context.WithWorkspacePatterns([]).WorkspaceFile);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void Launch_resolver_prefers_a_search_path_and_skips_a_missing_directory()
     {
         if (!OperatingSystem.IsWindows())
@@ -1918,6 +1964,7 @@ public sealed class ExternalToolsTests
                 shortcut = "Alt+Shift+F"
                 priority = 10
                 visibility = "whenAvailable"
+                workspacePatterns = ["package.json"]
 
                 [launch]
                 command = "cmd.exe"
@@ -1945,6 +1992,7 @@ public sealed class ExternalToolsTests
             Assert.Equal("Alt+Shift+F", tool.Shortcut);
             Assert.Equal(10, tool.Priority);
             Assert.Equal("whenAvailable", tool.Visibility);
+            Assert.Equal(["package.json"], tool.ToDefinition().WorkspacePatterns);
             Assert.Equal("cmd.exe", tool.ToDefinition().FileName);
             Assert.Equal(
                 ["${workspaceFolder:package.json}/node_modules/.bin"],
