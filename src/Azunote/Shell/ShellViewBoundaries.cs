@@ -17,7 +17,9 @@ internal sealed record StatusBarState(
     string LanguageMode,
     string FilePath,
     bool HasFilePath = false,
-    LineEndingKind LineEndingKind = LineEndingKind.None);
+    LineEndingKind LineEndingKind = LineEndingKind.None,
+    string FileFolder = "",
+    string FileName = "");
 
 internal sealed record WindowMenuEntry(
     string Id,

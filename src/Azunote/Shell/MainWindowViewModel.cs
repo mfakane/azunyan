@@ -177,6 +177,8 @@ internal sealed class MainWindowViewModel :
     public string IndentationStatus => _status.Indentation;
     public string LanguageModeStatus => _status.LanguageMode;
     public string FilePathStatus => _status.FilePath;
+    public string FileFolderStatus => _status.FileFolder;
+    public string FileNameStatus => _status.FileName;
     public bool HasFilePath => _status.HasFilePath;
     public bool IsFindPanelVisible { get => _isFindPanelVisible; set => SetProperty(ref _isFindPanelVisible, value, dependentProperties: [nameof(FindPanelVisibility)]); }
     public Visibility FindPanelVisibility => IsFindPanelVisible ? Visibility.Visible : Visibility.Collapsed;
@@ -415,6 +417,8 @@ internal sealed class MainWindowViewModel :
         OnPropertyChanged(nameof(IndentationStatus));
         OnPropertyChanged(nameof(LanguageModeStatus));
         OnPropertyChanged(nameof(FilePathStatus));
+        OnPropertyChanged(nameof(FileFolderStatus));
+        OnPropertyChanged(nameof(FileNameStatus));
         OnPropertyChanged(nameof(HasFilePath));
     }
 

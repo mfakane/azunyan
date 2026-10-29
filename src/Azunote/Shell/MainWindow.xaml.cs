@@ -179,6 +179,27 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     private void FilePathStatus_Tapped(object sender, TappedRoutedEventArgs e) =>
         _runtime.ShowFilePathMenu();
 
+    // The path never takes more than the last column, the space the fixed
+    // items leave, so it is cut in its folder, and in the file name only once
+    // the folder is gone, rather than pushed out of the window. The column is
+    // the measure, as the panel in it grows to what overflows it.
+    private void StatusBarGrid_LayoutUpdated(object? sender, object e)
+    {
+        var available = Math.Max(
+            0,
+            StatusBarGrid.ColumnDefinitions[^1].ActualWidth - StatusTrailingPanel.ColumnSpacing);
+        if (FileNameStatus.MaxWidth != available)
+        {
+            FileNameStatus.MaxWidth = available;
+        }
+
+        var folderWidth = Math.Max(0, available - FileNameStatus.DesiredSize.Width);
+        if (FileFolderStatus.MaxWidth != folderWidth)
+        {
+            FileFolderStatus.MaxWidth = folderWidth;
+        }
+    }
+
     private async void PositionStatus_Tapped(object sender, TappedRoutedEventArgs e) =>
         await _runtime.ShowGoToLineAsync();
 

@@ -153,7 +153,8 @@ internal sealed class MainWindowRuntime : IDisposable
             _session,
             _viewModel,
             _viewModel,
-            () => _languageModes.CurrentModeDisplayName);
+            () => _languageModes.CurrentModeDisplayName,
+            () => _languageModes.CurrentModeWorkspacePatterns);
         _findReplace = new FindReplaceController(
             _view,
             _viewModel,

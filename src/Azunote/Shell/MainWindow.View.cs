@@ -33,7 +33,7 @@ public sealed partial class MainWindow
     private MenuFlyout _statusIndentSizeMenu => StatusIndentSizeMenu;
     private MenuFlyout _statusFilePathMenu => StatusFilePathMenu;
     private TextBlock _indentationStatus => IndentationStatus;
-    private TextBlock _filePathStatus => FilePathStatus;
+    private FrameworkElement _filePathStatus => FilePathStatus;
     private MainWindowRadioGroupNames _radioGroups => ViewModel.Groups;
     private MainWindowViewModel _viewModel => ViewModel;
     private Style _auxiliarySplitMenuFlyoutItemStyle => AuxiliarySplitMenuFlyoutItemStyle;

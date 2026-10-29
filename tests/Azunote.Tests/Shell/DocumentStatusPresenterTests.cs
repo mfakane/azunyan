@@ -100,4 +100,22 @@ public sealed class DocumentStatusPresenterTests
 
         Assert.False(status.State?.HasFilePath);
     }
+
+    [Theory]
+    [InlineData(@"C:\Users\me\repo\src\app.cs", @"C:\Users\me\repo", "src", @"\app.cs")]
+    [InlineData(@"C:\Users\me\repo\app.cs", @"C:\Users\me\repo\", "", "app.cs")]
+    [InlineData(@"C:\Users\me\notes\todo.md", null, @"~\notes", @"\todo.md")]
+    [InlineData(@"C:\Users\me\todo.md", null, "~", @"\todo.md")]
+    [InlineData(@"C:\Users\meow\todo.md", null, @"C:\Users\meow", @"\todo.md")]
+    [InlineData(@"D:\todo.md", null, @"D:\", "todo.md")]
+    public void File_path_is_shown_from_the_workspace_folder_or_home(
+        string filePath,
+        string? workspaceFolder,
+        string folder,
+        string name)
+    {
+        Assert.Equal(
+            (folder, name),
+            DocumentStatusPresenter.ShortenFilePath(filePath, workspaceFolder, @"C:\Users\me"));
+    }
 }

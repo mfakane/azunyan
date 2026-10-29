@@ -1219,7 +1219,16 @@
             Padding="12,6"
             Visibility="{x:Bind ViewModel.StatusBarVisibility, Mode=OneWay}"
         >
-            <Grid ColumnSpacing="18">
+            <Border.Resources>
+                <Style TargetType="TextBlock">
+                    <Setter Property="FontSize" Value="12" />
+                </Style>
+            </Border.Resources>
+            <Grid
+                x:Name="StatusBarGrid"
+                ColumnSpacing="12"
+                LayoutUpdated="StatusBarGrid_LayoutUpdated"
+            >
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
@@ -1268,13 +1277,13 @@
                     >
                         <FontIcon
                             Glyph="&#xE945;"
-                            FontSize="14"
+                            FontSize="12"
                             Opacity="{x:Bind ViewModel.LanguageServerOpacity, Mode=OneWay}"
                             Visibility="{x:Bind ViewModel.LanguageServerIconVisibility, Mode=OneWay}"
                         />
                         <ProgressRing
-                            Width="14"
-                            Height="14"
+                            Width="12"
+                            Height="12"
                             MinWidth="0"
                             MinHeight="0"
                             IsActive="{x:Bind ViewModel.IsLanguageServerBusy, Mode=OneWay}"
@@ -1282,7 +1291,7 @@
                         />
                         <FontIcon
                             Glyph="&#xE7BA;"
-                            FontSize="12"
+                            FontSize="10"
                             Visibility="{x:Bind ViewModel.LanguageServerFailureVisibility, Mode=OneWay}"
                         />
                     </StackPanel>
@@ -1293,57 +1302,87 @@
                     />
                 </StackPanel>
                 <StackPanel
-                    x:Name="ProblemsStatus"
-                    Grid.Column="5"
-                    Orientation="Horizontal"
-                    Spacing="4"
-                    ToolTipService.ToolTip="Show Problems (Ctrl+Shift+M)"
-                    Visibility="{x:Bind ViewModel.ProblemsVisibility, Mode=OneWay}"
-                    Tapped="ProblemsStatus_Tapped"
-                >
-                    <FontIcon Glyph="&#xEA39;" FontSize="14" />
-                    <TextBlock
-                        x:Name="ErrorCountStatus"
-                        Text="{x:Bind ViewModel.ErrorCountText, Mode=OneWay}"
-                        AutomationProperties.HelpText="Errors"
-                    />
-                    <FontIcon Glyph="&#xE7BA;" FontSize="14" Margin="6,0,0,0" />
-                    <TextBlock
-                        Text="{x:Bind ViewModel.WarningCountText, Mode=OneWay}"
-                        AutomationProperties.HelpText="Warnings"
-                    />
-                    <FontIcon Glyph="&#xE946;" FontSize="14" Margin="6,0,0,0" />
-                    <TextBlock
-                        Text="{x:Bind ViewModel.InformationCountText, Mode=OneWay}"
-                        AutomationProperties.HelpText="Information"
-                    />
-                    <TextBlock
-                        x:Name="ProblemAtCaretStatus"
-                        MaxWidth="480"
-                        Margin="8,0,0,0"
-                        Text="{x:Bind ViewModel.ProblemAtCaret, Mode=OneWay}"
-                        TextTrimming="CharacterEllipsis"
-                    />
-                </StackPanel>
-                <StackPanel
                     x:Name="ExternalToolStatus"
-                    Grid.Column="6"
+                    Grid.Column="5"
                     Orientation="Horizontal"
                     Spacing="4"
                     ToolTipService.ToolTip="Running external tools"
                     Visibility="{x:Bind ViewModel.RunningExternalToolVisibility, Mode=OneWay}"
                 >
-                    <FontIcon Glyph="&#xEC7A;" FontSize="14" />
+                    <FontIcon Glyph="&#xEC7A;" FontSize="12" />
                     <TextBlock Text="{x:Bind ViewModel.RunningExternalToolCountText, Mode=OneWay}" />
                 </StackPanel>
-                <TextBlock
-                    x:Name="FilePathStatus"
+                <StackPanel
+                    x:Name="ProblemsStatus"
+                    Grid.Column="6"
+                    Orientation="Horizontal"
+                    Spacing="4"
+                    Background="Transparent"
+                    ToolTipService.ToolTip="Show Problems (Ctrl+Shift+M)"
+                    Visibility="{x:Bind ViewModel.ProblemsVisibility, Mode=OneWay}"
+                    Tapped="ProblemsStatus_Tapped"
+                >
+                    <FontIcon Glyph="&#xEA39;" FontSize="12" />
+                    <TextBlock
+                        x:Name="ErrorCountStatus"
+                        Text="{x:Bind ViewModel.ErrorCountText, Mode=OneWay}"
+                        AutomationProperties.HelpText="Errors"
+                    />
+                    <FontIcon Glyph="&#xE7BA;" FontSize="12" Margin="6,0,0,0" />
+                    <TextBlock
+                        Text="{x:Bind ViewModel.WarningCountText, Mode=OneWay}"
+                        AutomationProperties.HelpText="Warnings"
+                    />
+                    <FontIcon Glyph="&#xE946;" FontSize="12" Margin="6,0,0,0" />
+                    <TextBlock
+                        Text="{x:Bind ViewModel.InformationCountText, Mode=OneWay}"
+                        AutomationProperties.HelpText="Information"
+                    />
+                </StackPanel>
+                <!--
+                    The path takes the width it needs, up to all of it, and the
+                    problem at the caret gets what is left, so it is cut short
+                    first. The path is cut in the folder, keeping the file name.
+                -->
+                <Grid
+                    x:Name="StatusTrailingPanel"
                     Grid.Column="7"
-                    HorizontalAlignment="Right"
-                    Text="{x:Bind ViewModel.FilePathStatus, Mode=OneWay}"
-                    TextTrimming="CharacterEllipsis"
-                    Tapped="FilePathStatus_Tapped"
-                />
+                    ColumnSpacing="12"
+                >
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock
+                        x:Name="ProblemAtCaretStatus"
+                        MaxWidth="480"
+                        HorizontalAlignment="Left"
+                        Text="{x:Bind ViewModel.ProblemAtCaret, Mode=OneWay}"
+                        TextTrimming="CharacterEllipsis"
+                        Visibility="{x:Bind ViewModel.ProblemsVisibility, Mode=OneWay}"
+                        Tapped="ProblemsStatus_Tapped"
+                    />
+                    <StackPanel
+                        x:Name="FilePathStatus"
+                        Grid.Column="1"
+                        Orientation="Horizontal"
+                        Background="Transparent"
+                        ToolTipService.ToolTip="{x:Bind ViewModel.FilePathStatus, Mode=OneWay}"
+                        AutomationProperties.Name="{x:Bind ViewModel.FilePathStatus, Mode=OneWay}"
+                        Tapped="FilePathStatus_Tapped"
+                    >
+                        <TextBlock
+                            x:Name="FileFolderStatus"
+                            Text="{x:Bind ViewModel.FileFolderStatus, Mode=OneWay}"
+                            TextTrimming="CharacterEllipsis"
+                        />
+                        <TextBlock
+                            x:Name="FileNameStatus"
+                            Text="{x:Bind ViewModel.FileNameStatus, Mode=OneWay}"
+                            TextTrimming="CharacterEllipsis"
+                        />
+                    </StackPanel>
+                </Grid>
             </Grid>
         </Border>
         <!--
