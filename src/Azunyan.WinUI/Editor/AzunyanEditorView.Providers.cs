@@ -27,6 +27,20 @@ public sealed partial class AzunyanEditorView
             RequestSignatureHelpProvider();
         }
 
+        requestViewport &= _providers.Gutter is not null
+            || _providers.Inlay is not null
+            || _providers.BlockAdornment is not null;
+
+        // Asking again for the same text, as when the server says its hints
+        // changed, keeps the inlays shown until the answer replaces them,
+        // instead of every one of them blinking out meanwhile.
+        var unchangedViewport = documentChange is null
+            && requestViewport
+            && previousFrame?.Viewport is { } currentViewport
+            && ReferenceEquals(currentViewport.Context.Snapshot, snapshot)
+                ? currentViewport
+                : null;
+
         if (requestDocument
             && _providers.Syntax is null
             && _providers.Decorations is null
@@ -36,14 +50,10 @@ public sealed partial class AzunyanEditorView
             _documentProviderDelayCancellation?.Cancel();
             _documentProviderDelayCancellation?.Dispose();
             _documentProviderDelayCancellation = null;
-            _providerFrame = new EditorProviderFrame(snapshot, selection);
+            _providerFrame = new EditorProviderFrame(snapshot, selection, null, unchangedViewport);
             RenderViewport();
             requestDocument = false;
         }
-
-        requestViewport &= _providers.Gutter is not null
-            || _providers.Inlay is not null
-            || _providers.BlockAdornment is not null;
         requestPosition &= _providers.Tooltip is not null
             || requestCompletion && _providers.Completion is not null;
 
@@ -71,7 +81,7 @@ public sealed partial class AzunyanEditorView
                     snapshot,
                     documentChange!.Change,
                     provisionalRange),
-                previousViewport?.MapThroughChange(snapshot, documentChange!.Change));
+                previousViewport?.MapThroughChange(snapshot, documentChange!.Change) ?? unchangedViewport);
             RenderViewport();
             _ = ApplyDocumentProviderResultAsync(
                 RequestDocumentProviderResultAsync(
