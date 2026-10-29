@@ -35,7 +35,7 @@ internal sealed class MainWindowRuntime : IDisposable
     private readonly DocumentDiagnostics _diagnostics = new();
     private readonly LanguageServerController? _languageServer;
     private readonly Func<LanguageServerLog, Task>? _openLanguageServerLog;
-    private IReadOnlyList<string> _languageServerTriggers = [];
+    private (IReadOnlyList<string> Completion, IReadOnlyList<string> SignatureHelp) _languageServerTriggers = ([], []);
     private DocumentSessionState _previousState;
     private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer _backupTimer;
     private int _runningExternalToolCount;
@@ -616,6 +616,8 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public void ShowCompletion() => _editorCommands.ShowCompletion();
 
+    public void ShowParameterHints() => _editorCommands.ShowParameterHints();
+
     public Task ShowGoToLineAsync() => _goToLine.ShowAsync();
 
     public void ShowFindPanel(bool replace) => _findReplace.Show(replace && !_session.State.IsReadOnly);
@@ -971,8 +973,11 @@ internal sealed class MainWindowRuntime : IDisposable
     private void LanguageServer_Changed(object? sender, EventArgs args)
     {
         _viewModel.SetLanguageServer(_languageServer!.Indicator, _languageServer.CanFormat);
-        var triggers = _languageServer.CompletionTriggerCharacters;
-        if (!triggers.SequenceEqual(_languageServerTriggers))
+        var triggers = (
+            Completion: _languageServer.CompletionTriggerCharacters,
+            SignatureHelp: _languageServer.SignatureHelpTriggerCharacters);
+        if (!triggers.Completion.SequenceEqual(_languageServerTriggers.Completion)
+            || !triggers.SignatureHelp.SequenceEqual(_languageServerTriggers.SignatureHelp))
         {
             _languageServerTriggers = triggers;
             _languageModes.Reapply();

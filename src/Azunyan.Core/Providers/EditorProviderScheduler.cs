@@ -229,6 +229,20 @@ public sealed class PositionProviderResults
     }
 }
 
+public sealed class SignatureHelpResults
+{
+    internal SignatureHelpResults(EditorProviderContext context, SignatureHelp? signatureHelp)
+    {
+        Context = context;
+        SignatureHelp = signatureHelp;
+    }
+
+    public EditorProviderContext Context { get; }
+
+    /// <summary>The signatures at the position, or null when it is in no call.</summary>
+    public SignatureHelp? SignatureHelp { get; }
+}
+
 /// <summary>
 /// Runs provider groups with independent generations. A caret move only
 /// invalidates tooltip/completion; syntax and folding remain snapshot-scoped.
@@ -241,6 +255,7 @@ public sealed class EditorProviderScheduler : IDisposable
     private readonly ChannelState _viewport = new();
     private readonly ChannelState _position = new();
     private readonly ChannelState _hover = new();
+    private readonly ChannelState _signatureHelp = new();
     private bool _disposed;
 
     public EditorProviderScheduler(EditorProviderSet providers)
@@ -370,6 +385,33 @@ public sealed class EditorProviderScheduler : IDisposable
             cancellationToken);
     }
 
+    /// <summary>
+    /// Asks for the signatures of the call at the caret. Like the pointer's
+    /// tooltip it has a channel of its own, so the completions asked at the
+    /// same caret do not supersede it.
+    /// </summary>
+    public Task<SignatureHelpResults?> RequestSignatureHelpAsync(
+        TextSnapshot snapshot,
+        int position,
+        TextSelection selection,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        var context = new EditorProviderContext(snapshot, position, selection);
+        var provider = _providers.CreateSnapshot().SignatureHelp;
+        return RequestAsync(
+            _signatureHelp,
+            context,
+            async (_, providerContext, token) => new SignatureHelpResults(
+                providerContext,
+                provider is null
+                    ? null
+                    : NormalizeSignatureHelp(await InvokeOptionalAsync(
+                        () => provider.GetSignatureHelpAsync(providerContext, token),
+                        token).ConfigureAwait(false))),
+            cancellationToken);
+    }
+
     public void CancelAll()
     {
         lock (_gate)
@@ -379,6 +421,7 @@ public sealed class EditorProviderScheduler : IDisposable
             _viewport.Cancel();
             _position.Cancel();
             _hover.Cancel();
+            _signatureHelp.Cancel();
         }
     }
 
@@ -396,8 +439,15 @@ public sealed class EditorProviderScheduler : IDisposable
             _viewport.Cancel();
             _position.Cancel();
             _hover.Cancel();
+            _signatureHelp.Cancel();
         }
     }
+
+    /// <summary>Help without a signature is none, and the active signature is one of them.</summary>
+    private static SignatureHelp? NormalizeSignatureHelp(SignatureHelp? help) =>
+        help is null || help.Signatures.Count == 0
+            ? null
+            : new SignatureHelp(help.Signatures, Math.Clamp(help.ActiveSignature, 0, help.Signatures.Count - 1));
 
     private async Task<TResult?> RequestAsync<TResult>(
         ChannelState channel,

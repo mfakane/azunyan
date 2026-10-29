@@ -38,6 +38,8 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         [new(OemSlashKey, VirtualKeyModifiers.Control)] = runtime => runtime.ToggleComment(),
         [new(VirtualKey.F, VirtualKeyModifiers.Menu | VirtualKeyModifiers.Shift)] =
             runtime => _ = runtime.FormatDocumentAsync(),
+        [new(VirtualKey.Space, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift)] =
+            runtime => runtime.ShowParameterHints(),
     };
 
     private bool _completionShortcutInvoked;
@@ -576,7 +578,7 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
             return;
         }
 
-        if (e.Key == VirtualKey.Space && IsKeyDown(VirtualKey.Control))
+        if (e.Key == VirtualKey.Space && IsKeyDown(VirtualKey.Control) && !IsKeyDown(VirtualKey.Shift))
         {
             var acceleratorInvoked = _completionShortcutInvoked;
             _completionShortcutInvoked = false;
@@ -857,6 +859,8 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     void IMainWindowActions.ShowReplace() => _runtime.ShowFindPanel(replace: true);
 
     void IMainWindowActions.ShowCompletion() => _runtime.ShowCompletion();
+
+    void IMainWindowActions.ShowParameterHints() => _runtime.ShowParameterHints();
 
     Task IMainWindowActions.GoToLineAsync() => _runtime.ShowGoToLineAsync();
 

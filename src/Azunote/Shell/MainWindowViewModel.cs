@@ -101,6 +101,7 @@ internal sealed class MainWindowViewModel :
         ShowFindCommand = Command(() => Actions.ShowFind());
         ShowReplaceCommand = Command(() => Actions.ShowReplace());
         ShowCompletionCommand = Command(() => Actions.ShowCompletion());
+        ShowParameterHintsCommand = Command(() => Actions.ShowParameterHints());
         GoToLineCommand = Async(() => Actions.GoToLineAsync());
         ToggleWordWrapCommand = Command(() => Actions.ToggleWordWrap());
         SetTabDisplaySizeCommand = Command(SetTabDisplaySize);
@@ -257,6 +258,8 @@ internal sealed class MainWindowViewModel :
     public ICommand ShowFindCommand { get; }
     public ICommand ShowReplaceCommand { get; }
     public ICommand ShowCompletionCommand { get; }
+
+    public ICommand ShowParameterHintsCommand { get; }
     public ICommand GoToLineCommand { get; }
     public ICommand ToggleWordWrapCommand { get; }
     public ICommand SetTabDisplaySizeCommand { get; }
@@ -696,6 +699,8 @@ internal interface IMainWindowActions
     void ShowFind();
     void ShowReplace();
     void ShowCompletion();
+
+    void ShowParameterHints();
     Task GoToLineAsync();
     void ToggleWordWrap();
     void SetTabDisplaySize(int size);

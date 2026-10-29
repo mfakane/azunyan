@@ -710,6 +710,12 @@
                         />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
+                <MenuFlyoutItem
+                    Text="Show Parameter Hints"
+                    KeyboardAcceleratorTextOverride="Ctrl+Shift+Space"
+                    Command="{x:Bind ViewModel.ShowParameterHintsCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanEdit, Mode=OneWay}"
+                />
             </MenuBarItem>
             <MenuBarItem Title="View">
                 <MenuFlyoutSubItem

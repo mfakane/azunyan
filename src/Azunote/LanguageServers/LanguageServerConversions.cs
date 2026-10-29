@@ -178,6 +178,64 @@ internal static partial class LanguageServerConversions
     }
 
     /// <summary>
+    /// The server's signatures. A parameter's label is either its text, found
+    /// in the signature's label after the parameters before it, or its offsets
+    /// there. A signature's own active parameter wins over the answer's, and
+    /// one past the parameters makes none active.
+    /// </summary>
+    public static SignatureHelp? ToSignatureHelp(JsonNode? help)
+    {
+        if (help?["signatures"] is not JsonArray signatures)
+        {
+            return null;
+        }
+
+        var defaultActiveParameter = GetInt(help["activeParameter"]);
+        var result = new List<SignatureInformation>(signatures.Count);
+        foreach (var signature in signatures.OfType<JsonObject>())
+        {
+            if (GetString(signature["label"]) is not { Length: > 0 } label)
+            {
+                continue;
+            }
+
+            var parameters = new List<SignatureParameter>();
+            var searchFrom = 0;
+            foreach (var parameter in (signature["parameters"] as JsonArray ?? []).OfType<JsonObject>())
+            {
+                TextRange? range = parameter["label"] switch
+                {
+                    JsonArray { Count: 2 } offsets
+                        when GetInt(offsets[0], -1) is var start and >= 0
+                            && GetInt(offsets[1], -1) is var end && end >= start && end <= label.Length
+                        => TextRange.FromBounds(start, end),
+                    var name when GetString(name) is { Length: > 0 } text
+                        && label.IndexOf(text, searchFrom, StringComparison.Ordinal) is var index and >= 0
+                        => new TextRange(index, text.Length),
+                    _ => null
+                };
+
+                // A label not found still counts, so the indices stay the server's.
+                parameters.Add(new SignatureParameter(
+                    range ?? new TextRange(label.Length, 0),
+                    GetMarkupText(parameter["documentation"])));
+                searchFrom = range?.End ?? searchFrom;
+            }
+
+            var activeParameter = GetInt(signature["activeParameter"], defaultActiveParameter);
+            result.Add(new SignatureInformation(
+                label,
+                parameters,
+                GetMarkupText(signature["documentation"]),
+                activeParameter >= 0 && activeParameter < parameters.Count ? activeParameter : -1));
+        }
+
+        return result.Count == 0
+            ? null
+            : new SignatureHelp(result, Math.Clamp(GetInt(help["activeSignature"]), 0, result.Count - 1));
+    }
+
+    /// <summary>
     /// The server's inlay hints as inlays. A type hint follows the text before
     /// it as that text grows, and other hints, such as parameter names, stay
     /// before the text after them.

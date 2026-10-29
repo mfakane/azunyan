@@ -273,6 +273,29 @@ public sealed class LanguageServerControllerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Signatures_are_asked_at_the_caret_with_the_server_s_triggers()
+    {
+        _enabled.Add((Workspace, "fake-server"));
+        _server.Capabilities["signatureHelpProvider"] = JsonNode.Parse("""{ "triggerCharacters": ["(", ","] }""");
+        _server.Handlers["textDocument/signatureHelp"] = _ => JsonNode.Parse("""
+            { "signatures": [{ "label": "f(x)", "parameters": [{ "label": "x" }] }], "activeParameter": 0 }
+            """);
+        using var controller = CreateController();
+        Assert.Null(await controller.SignatureHelpProvider.GetSignatureHelpAsync(
+            new EditorProviderContext(_editor.Snapshot, 4, TextSelection.Caret(4))));
+
+        controller.Update();
+        await WaitForAsync(() => controller.Indicator.State == LanguageServerIndicatorState.Running);
+        var help = await controller.SignatureHelpProvider.GetSignatureHelpAsync(
+            new EditorProviderContext(_editor.Snapshot, 4, TextSelection.Caret(4)));
+
+        Assert.Equal(["(", ","], controller.SignatureHelpTriggerCharacters);
+        Assert.Equal(new TextRange(2, 1), Assert.Single(Assert.Single(help!.Signatures).Parameters).Label);
+        var position = Assert.Single(_server.ReceivedOf("textDocument/signatureHelp"))!["position"]!;
+        Assert.Equal(4, position["character"]!.GetValue<int>());
+    }
+
+    [Fact]
     public async Task Without_a_running_server_completion_falls_back()
     {
         using var controller = CreateController();

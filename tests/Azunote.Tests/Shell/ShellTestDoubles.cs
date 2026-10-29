@@ -120,6 +120,10 @@ internal sealed class FakeEditorView : IEditorView
     {
     }
 
+    public void RequestSignatureHelp()
+    {
+    }
+
     public void ShowCompletion(CompletionResult completions) => LastCompletion = completions;
 
     public Task<ExternalToolPromptInput?> PromptInlineChatAsync(

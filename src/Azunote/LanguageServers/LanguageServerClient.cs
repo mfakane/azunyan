@@ -82,6 +82,10 @@ internal sealed class LanguageServerClient : IAsyncDisposable
 
     public bool SupportsInlayHints { get; private set; }
 
+    public bool SupportsSignatureHelp { get; private set; }
+
+    public IReadOnlyList<string> SignatureHelpTriggerCharacters { get; private set; } = [];
+
     /// <summary>The last lines the server wrote to standard error, to explain a failure.</summary>
     public string ErrorOutput
     {
@@ -155,6 +159,15 @@ internal sealed class LanguageServerClient : IAsyncDisposable
                     ["hover"] = new JsonObject
                     {
                         ["contentFormat"] = new JsonArray("plaintext", "markdown")
+                    },
+                    ["signatureHelp"] = new JsonObject
+                    {
+                        ["signatureInformation"] = new JsonObject
+                        {
+                            ["documentationFormat"] = new JsonArray("plaintext", "markdown"),
+                            ["parameterInformation"] = new JsonObject { ["labelOffsetSupport"] = true },
+                            ["activeParameterSupport"] = true
+                        }
                     },
                     ["inlayHint"] = new JsonObject(),
                     ["publishDiagnostics"] = new JsonObject { ["versionSupport"] = true }
@@ -288,6 +301,9 @@ internal sealed class LanguageServerClient : IAsyncDisposable
 
     public Task<JsonNode?> HoverAsync(string uri, LineColumn position, CancellationToken cancellationToken) =>
         _connection.SendRequestAsync("textDocument/hover", CreatePositionParameters(uri, position), cancellationToken);
+
+    public Task<JsonNode?> SignatureHelpAsync(string uri, LineColumn position, CancellationToken cancellationToken) =>
+        _connection.SendRequestAsync("textDocument/signatureHelp", CreatePositionParameters(uri, position), cancellationToken);
 
     public Task<JsonNode?> InlayHintAsync(string uri, LineColumn start, LineColumn end, CancellationToken cancellationToken) =>
         _connection.SendRequestAsync("textDocument/inlayHint", new JsonObject
@@ -441,15 +457,24 @@ internal sealed class LanguageServerClient : IAsyncDisposable
         if (capabilities?["completionProvider"] is JsonObject completion)
         {
             SupportsCompletion = true;
-            CompletionTriggerCharacters = completion["triggerCharacters"] is JsonArray triggers
-                ? [.. triggers.Select(trigger => trigger?.GetValue<string>()).OfType<string>().Where(trigger => trigger.Length > 0)]
-                : [];
+            CompletionTriggerCharacters = ReadTriggers(completion["triggerCharacters"]);
+        }
+
+        if (capabilities?["signatureHelpProvider"] is JsonObject signatureHelp)
+        {
+            SupportsSignatureHelp = true;
+            SignatureHelpTriggerCharacters = ReadTriggers(signatureHelp["triggerCharacters"]);
         }
 
         SupportsHover = IsProvided(capabilities?["hoverProvider"]);
         SupportsFormatting = IsProvided(capabilities?["documentFormattingProvider"]);
         SupportsInlayHints = IsProvided(capabilities?["inlayHintProvider"]);
     }
+
+    private static string[] ReadTriggers(JsonNode? triggers) =>
+        triggers is JsonArray array
+            ? [.. array.Select(trigger => trigger?.GetValue<string>()).OfType<string>().Where(trigger => trigger.Length > 0)]
+            : [];
 
     private static bool IsProvided(JsonNode? provider) => provider switch
     {

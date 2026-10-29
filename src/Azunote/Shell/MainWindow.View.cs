@@ -287,6 +287,8 @@ public sealed partial class MainWindow
         _editor.Providers.Decorations = _diagnosticsProvider;
         _editor.Providers.Gutter = null;
         _editor.Providers.Inlay = languageServer?.InlayProvider;
+        _editor.Providers.SignatureHelp = languageServer?.SignatureHelpProvider;
+        _editor.SignatureHelpTriggerCharacters = languageServer?.SignatureHelpTriggerCharacters ?? [];
         _editor.Providers.BlockAdornment = null;
     }
 
@@ -1164,6 +1166,7 @@ public sealed partial class MainWindow
             _window._editor.ToggleBlockComment(open, close);
         public void Select(TextRange range) => _window.Select(range);
         public void RequestCompletion() => _window.RequestCompletion();
+        public void RequestSignatureHelp() => _window._editor.RequestSignatureHelp();
         public void ShowCompletion(CompletionResult completions) => _window.ShowCompletion(completions);
         public Task<ExternalToolPromptInput?> PromptInlineChatAsync(
             string conversationKey,

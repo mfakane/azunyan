@@ -202,6 +202,45 @@ public sealed class LanguageServerConversionsTests
             inlays.Select(inlay => (inlay.Anchor, inlay.Content.Text)));
     }
 
+    [Fact]
+    public void Signature_help_finds_parameters_by_text_or_offsets()
+    {
+        var help = JsonNode.Parse("""
+            {
+              "activeSignature": 1,
+              "activeParameter": 1,
+              "signatures": [
+                { "label": "Add(int a)", "parameters": [{ "label": "int a" }] },
+                {
+                  "label": "Add(int a, int a2)",
+                  "documentation": { "kind": "markdown", "value": "Adds." },
+                  "parameters": [
+                    { "label": "int a" },
+                    { "label": "int a2", "documentation": "The second." }
+                  ]
+                },
+                { "label": "Add(long x)", "parameters": [{ "label": [4, 10] }], "activeParameter": 0 },
+                { "label": "" }
+              ]
+            }
+            """);
+
+        var result = LanguageServerConversions.ToSignatureHelp(help)!;
+
+        Assert.Equal(1, result.ActiveSignature);
+        Assert.Equal(3, result.Signatures.Count);
+        Assert.Equal(-1, result.Signatures[0].ActiveParameter);
+        var second = result.Signatures[1];
+        Assert.Equal([new TextRange(4, 5), new TextRange(11, 6)], second.Parameters.Select(parameter => parameter.Label));
+        Assert.Equal(1, second.ActiveParameter);
+        Assert.Equal("The second.", second.Parameters[1].Documentation);
+        Assert.Equal("Adds.", second.Documentation);
+        Assert.Equal(TextRange.FromBounds(4, 10), Assert.Single(result.Signatures[2].Parameters).Label);
+        Assert.Equal(0, result.Signatures[2].ActiveParameter);
+        Assert.Null(LanguageServerConversions.ToSignatureHelp(JsonNode.Parse("""{ "signatures": [] }""")));
+        Assert.Null(LanguageServerConversions.ToSignatureHelp(null));
+    }
+
     private static EditorProviderContext Context(string text, int position) =>
         new(new TextSnapshot(text), position, TextSelection.Caret(position));
 }

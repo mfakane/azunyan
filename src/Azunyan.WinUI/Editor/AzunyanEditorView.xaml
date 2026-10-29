@@ -151,6 +151,28 @@
                     </StackPanel>
                 </Border>
             </Popup>
+            <Popup
+                x:Name="SignatureHelpPopup"
+                IsHitTestVisible="False"
+                IsOpen="False">
+                <Border
+                    x:Name="SignatureHelpBorder"
+                    MaxWidth="560"
+                    Padding="10,7"
+                    Background="Transparent"
+                    BorderBrush="Transparent"
+                    BorderThickness="1">
+                    <StackPanel>
+                        <TextBlock
+                            x:Name="SignatureHelpLabel"
+                            TextWrapping="Wrap" />
+                        <TextBlock
+                            x:Name="SignatureHelpDocumentation"
+                            Margin="0,4,0,0"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+            </Popup>
         </Grid>
     </Grid>
 </UserControl>

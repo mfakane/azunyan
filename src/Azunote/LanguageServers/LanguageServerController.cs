@@ -23,7 +23,7 @@ internal sealed record LanguageServerIndicator(
     public static LanguageServerIndicator Hidden { get; } = new(LanguageServerIndicatorState.Hidden);
 }
 
-/// <summary>Completion, descriptions and inlay hints the editor gets from the document's language server.</summary>
+/// <summary>Completion, descriptions, inlay hints and signatures the editor gets from the document's language server.</summary>
 internal interface ILanguageServerProviders
 {
     /// <summary>The server's completion when it runs and offers some; otherwise <paramref name="fallback"/>.</summary>
@@ -33,7 +33,11 @@ internal interface ILanguageServerProviders
 
     IInlayProvider InlayProvider { get; }
 
+    ISignatureHelpProvider SignatureHelpProvider { get; }
+
     IReadOnlyList<string> CompletionTriggerCharacters { get; }
+
+    IReadOnlyList<string> SignatureHelpTriggerCharacters { get; }
 }
 
 /// <summary>
@@ -96,6 +100,7 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
         _registry.EnablementChanged += Registry_EnablementChanged;
         TooltipProvider = new HoverProvider(this);
         InlayProvider = new InlayHintProvider(this);
+        SignatureHelpProvider = new SignatureProvider(this);
     }
 
     /// <summary>Raised on the UI thread when <see cref="Indicator"/> or the server's triggers change.</summary>
@@ -107,8 +112,13 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
 
     public IInlayProvider InlayProvider { get; }
 
+    public ISignatureHelpProvider SignatureHelpProvider { get; }
+
     public IReadOnlyList<string> CompletionTriggerCharacters =>
         _active?.Client.CompletionTriggerCharacters ?? [];
+
+    public IReadOnlyList<string> SignatureHelpTriggerCharacters =>
+        _active?.Client.SignatureHelpTriggerCharacters ?? [];
 
     /// <summary>The log of the server the document holds, while it is turned on.</summary>
     public LanguageServerLog? Log => _lease?.Instance.Log;
@@ -555,6 +565,26 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
                 (client, uri, position, token) => client.HoverAsync(uri, position, token),
                 cancellationToken).ConfigureAwait(false);
             return LanguageServerConversions.ToTooltip(result, context);
+        }
+    }
+
+    private sealed class SignatureProvider(LanguageServerController owner) : ISignatureHelpProvider
+    {
+        public async ValueTask<SignatureHelp?> GetSignatureHelpAsync(
+            EditorProviderContext context,
+            CancellationToken cancellationToken = default)
+        {
+            if (owner._active is not { Client.SupportsSignatureHelp: true } active)
+            {
+                return null;
+            }
+
+            var result = await RequestAsync(
+                active,
+                context,
+                (client, uri, position, token) => client.SignatureHelpAsync(uri, position, token),
+                cancellationToken).ConfigureAwait(false);
+            return LanguageServerConversions.ToSignatureHelp(result);
         }
     }
 

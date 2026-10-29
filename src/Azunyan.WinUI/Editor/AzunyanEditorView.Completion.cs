@@ -209,11 +209,18 @@ public sealed partial class AzunyanEditorView
             inputOrigin.X,
             inputOrigin.X + anchorRect.X);
         // The completion list opens under the caret's line, so the tooltip
-        // goes above its own line while the list is open.
+        // goes above its own line while the list is open, and above the
+        // signature help that is there too.
         if (IsCompletionPopupOpen)
         {
             TooltipBorder.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-            TooltipPopup.VerticalOffset = inputOrigin.Y + anchorRect.Y - TooltipBorder.DesiredSize.Height - 4;
+            var top = inputOrigin.Y + anchorRect.Y;
+            if (IsSignatureHelpPopupOpen)
+            {
+                top = Math.Min(top, SignatureHelpPopup.VerticalOffset);
+            }
+
+            TooltipPopup.VerticalOffset = top - TooltipBorder.DesiredSize.Height - 4;
         }
         else
         {
@@ -270,16 +277,19 @@ public sealed partial class AzunyanEditorView
 
     private bool HasCompletionPrefix() => GetCompletionPrefix().Length > 0;
 
-    private bool IsCompletionTrigger(TextSnapshot snapshot, int caretPosition)
+    private bool IsCompletionTrigger(TextSnapshot snapshot, int caretPosition) =>
+        EndsWithTrigger(_completionTriggerCharacters, snapshot, caretPosition);
+
+    private static bool EndsWithTrigger(string[] triggers, TextSnapshot snapshot, int caretPosition)
     {
-        if (_completionTriggerCharacters.Length == 0
+        if (triggers.Length == 0
             || caretPosition <= 0
             || caretPosition > snapshot.Length)
         {
             return false;
         }
 
-        return _completionTriggerCharacters.Any(trigger =>
+        return triggers.Any(trigger =>
             trigger.Length <= caretPosition
             && string.Equals(
                 snapshot.GetText(caretPosition - trigger.Length, trigger.Length),

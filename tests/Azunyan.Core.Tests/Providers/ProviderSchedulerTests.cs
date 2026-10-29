@@ -170,6 +170,42 @@ public sealed class ProviderSchedulerTests
     }
 
     [Fact]
+    public async Task Signature_help_has_its_own_channel_and_none_without_signatures()
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var signatures = new[] { new SignatureInformation("f(a)"), new SignatureInformation("f(a, b)") };
+        var providers = new EditorProviderSet
+        {
+            Completion = new DelegateCompletionProvider(async context =>
+            {
+                started.SetResult();
+                await release.Task;
+                return new CompletionResult(TextRange.Empty(context.Position), new[] { new CompletionItem("caret") });
+            }),
+            SignatureHelp = new DelegateSignatureHelpProvider(context => context.Position == 0
+                ? new SignatureHelp([])
+                : new SignatureHelp(signatures, activeSignature: 5))
+        };
+        using var scheduler = new EditorProviderScheduler(providers);
+        var snapshot = new TextSnapshot("f(1, ");
+
+        var position = scheduler.RequestPositionAsync(snapshot, 5, TextSelection.Caret(5));
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        var help = await scheduler.RequestSignatureHelpAsync(snapshot, 5, TextSelection.Caret(5))
+            .WaitAsync(TimeSpan.FromSeconds(1));
+        release.SetResult();
+        var caret = await position.WaitAsync(TimeSpan.FromSeconds(1));
+        var none = await scheduler.RequestSignatureHelpAsync(snapshot, 0, TextSelection.Caret(0))
+            .WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(1, help!.SignatureHelp!.ActiveSignature);
+        Assert.Equal("caret", Assert.Single(caret!.Completions!.Items).Label);
+        Assert.NotNull(none);
+        Assert.Null(none.SignatureHelp);
+    }
+
+    [Fact]
     public async Task A_position_request_without_the_tooltip_does_not_ask_for_one()
     {
         var asked = 0;
@@ -374,6 +410,14 @@ public sealed class ProviderSchedulerTests
             SyntaxAnalysis previousAnalysis,
             CancellationToken cancellationToken = default) =>
             new((await _handler(context, previousSnapshot, change)).ToArray());
+    }
+
+    private sealed class DelegateSignatureHelpProvider(Func<EditorProviderContext, SignatureHelp?> handler)
+        : ISignatureHelpProvider
+    {
+        public ValueTask<SignatureHelp?> GetSignatureHelpAsync(
+            EditorProviderContext context,
+            CancellationToken cancellationToken = default) => ValueTask.FromResult(handler(context));
     }
 
     private sealed class DelegateInlayProvider : IInlayProvider

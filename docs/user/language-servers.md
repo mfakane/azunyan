@@ -61,6 +61,11 @@ those carrying a whole document, are cut short.
   suggestion with placeholders is inserted with their default text.
 - **Descriptions**: resting the pointer on a symbol shows what the server says
   about it, after any problem there.
+- **Parameter hints**: typing a character the server names, such as `(` or
+  `,`, shows the signature of the call above the line, with the parameter
+  being typed in bold. Edit > Show Parameter Hints (Ctrl+Shift+Space) shows it
+  at the caret. Up and Down switch between overloads, and Esc or a click
+  in the text closes it; it also closes once the caret leaves the call.
 - **Inlay hints**: the server's hints, such as parameter names before
   arguments and inferred types after names, appear in the text in a dimmed
   style. They are asked for the visible lines once typing or scrolling pauses.

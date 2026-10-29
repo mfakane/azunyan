@@ -392,6 +392,13 @@ on every keystroke.
 - signature help.
 
 They run on caret or hover changes and use their own cancellation generation.
+Signature help has a channel of its own like hover, so the completion asked at
+the same caret does not cancel it. The editor asks for it after the host's
+signature help trigger characters are typed or on request, asks again on every
+edit and keyboard caret move while it is shown, and ends it when the provider
+answers none, such as once the caret leaves the call. A pointer press ends it
+too: a call being typed has no closing parenthesis yet, so the provider can
+still see a caret placed far after it as inside the call.
 
 Each provider channel has independent cancellation, request IDs, result store,
 and error isolation. A result is publishable only when its snapshot and request
@@ -461,8 +468,8 @@ unmatched release. Azunote uses it to give an enabled external tool precedence
 over the editor for the tool's shortcut, and otherwise to bind its editing
 commands: Alt+Up/Down moves the caret lines, Shift+Alt+Up/Down copies them,
 Ctrl+Shift+K deletes them, Ctrl+/ toggles comments, Ctrl+D adds the next
-occurrence of the selection as another caret, and Shift+Alt+F formats the
-document with its language server.
+occurrence of the selection as another caret, Shift+Alt+F formats the
+document with its language server, and Ctrl+Shift+Space shows parameter hints.
 
 Managed commands are scheduled immediately after KeyDown returns, including
 repeat KeyDown events. KeyUp never performs the document command: it only

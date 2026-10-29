@@ -59,6 +59,12 @@ internal sealed class EditorCommandController
         _editor.RequestCompletion();
     }
 
+    public void ShowParameterHints()
+    {
+        _editor.Focus();
+        _editor.RequestSignatureHelp();
+    }
+
     public bool ToggleWordWrap()
     {
         SetWordWrap(!_wordWrapEnabled);

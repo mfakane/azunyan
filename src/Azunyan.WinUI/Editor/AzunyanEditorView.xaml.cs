@@ -496,6 +496,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         editor._completionRequested = false;
         editor._explicitCompletionRequested = false;
         editor.HideCompletionPopup();
+        editor.EndSignatureHelp();
         editor._automationPeer?.NotifyReadOnlyChanged((bool)args.OldValue, (bool)args.NewValue);
     }
 
@@ -1910,6 +1911,13 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 _explicitCompletionRequested = false;
                 _completionRequested = false;
             }
+
+            if (isEdit
+                && args.Change.IsInsertion
+                && EndsWithTrigger(_signatureHelpTriggerCharacters, args.NewSnapshot, args.NewSelection.CaretPosition))
+            {
+                StartSignatureHelp();
+            }
         }
 
         // A shared buffer may be edited by another editor view. Local edit
@@ -1951,6 +1959,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         _completionRequested = false;
         _explicitCompletionRequested = false;
         HideCompletionPopup();
+        EndSignatureHelp();
         RenderViewport();
         CompositionChanged?.Invoke(this, EventArgs.Empty);
         if (!args.IsComposing)
@@ -2447,6 +2456,24 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                     HideCompletionPopup();
                     _completionRequested = false;
                     _explicitCompletionRequested = false;
+                    args.Handled = true;
+                    return;
+            }
+        }
+        else if (IsSignatureHelpPopupOpen)
+        {
+            switch (args.Key)
+            {
+                case VirtualKey.Up or VirtualKey.Down
+                    when _signatureHelpResult?.SignatureHelp?.Signatures.Count > 1
+                        && !IsKeyDown(VirtualKey.Shift)
+                        && !IsKeyDown(VirtualKey.Control)
+                        && !IsKeyDown(VirtualKey.Menu):
+                    MoveSignatureSelection(args.Key == VirtualKey.Down ? 1 : -1);
+                    args.Handled = true;
+                    return;
+                case VirtualKey.Escape:
+                    EndSignatureHelp();
                     args.Handled = true;
                     return;
             }
@@ -3140,6 +3167,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
         HideCompletionPopup();
         HideTooltipPopup();
+        EndSignatureHelp();
         if (args.TryGetPosition(this, out var point))
         {
             EditorContextMenu.ShowAt(
@@ -3226,6 +3254,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
         _completionRequested = false;
         HideCompletionPopup();
+        // A call being typed has no closing parenthesis yet, so to the server
+        // everything after it can still be inside the call.
+        EndSignatureHelp();
         _hoverPosition = -1;
         _hoverLinkRange = null;
         HideTooltipPopup();
@@ -4239,6 +4270,10 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         TooltipBorder.BorderBrush = new SolidColorBrush(_colorScheme.TooltipBorder);
         TooltipTitle.Foreground = new SolidColorBrush(_colorScheme.TooltipForeground);
         TooltipContent.Foreground = new SolidColorBrush(_colorScheme.TooltipForeground);
+        SignatureHelpBorder.Background = new SolidColorBrush(_colorScheme.TooltipBackground);
+        SignatureHelpBorder.BorderBrush = new SolidColorBrush(_colorScheme.TooltipBorder);
+        SignatureHelpLabel.Foreground = new SolidColorBrush(_colorScheme.TooltipForeground);
+        SignatureHelpDocumentation.Foreground = new SolidColorBrush(_colorScheme.TooltipForeground);
     }
 
     private void UpdateTextSurfaceMode()

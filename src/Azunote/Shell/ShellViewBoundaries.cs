@@ -76,6 +76,8 @@ internal interface IEditorView : IEditorBuffer
 
     void RequestCompletion();
 
+    void RequestSignatureHelp();
+
     void ShowCompletion(CompletionResult completions);
 
     Task<ExternalToolPromptInput?> PromptInlineChatAsync(

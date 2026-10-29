@@ -22,6 +22,10 @@ public sealed partial class AzunyanEditorView
         var snapshot = Snapshot;
         var selection = Document.Selection;
         var previousFrame = _providerFrame;
+        if (requestPosition)
+        {
+            RequestSignatureHelpProvider();
+        }
 
         if (requestDocument
             && _providers.Syntax is null
@@ -337,6 +341,7 @@ public sealed partial class AzunyanEditorView
         NextProviderGeneration(ref _positionProviderGeneration);
         NextProviderGeneration(ref _hoverProviderGeneration);
         _hoverResult = null;
+        EndSignatureHelp();
     }
 
     private static long NextProviderGeneration(ref long generation) =>

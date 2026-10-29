@@ -217,6 +217,7 @@ public sealed partial class AzunyanEditorView
         UpdateProjectedScrollExtent(viewportHeight);
         UpdateCompletionPopup();
         QueueInlineChatPopupPositionUpdate();
+        UpdateSignatureHelpPopup();
         UpdateTooltipPopup();
         _automationPeer?.NotifyLayoutChanged();
         if (traceRender)

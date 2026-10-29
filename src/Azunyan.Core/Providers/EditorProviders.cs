@@ -213,6 +213,70 @@ public sealed class CompletionResult
 }
 
 /// <summary>
+/// One parameter of a signature: the part of the signature's label that names
+/// it, and what it is for.
+/// </summary>
+public sealed record SignatureParameter
+{
+    public SignatureParameter(TextRange label, string? documentation = null)
+    {
+        Label = label;
+        Documentation = documentation;
+    }
+
+    public TextRange Label { get; }
+
+    public string? Documentation { get; }
+}
+
+/// <summary>
+/// One signature of the call at the caret, such as one overload of a method.
+/// <see cref="ActiveParameter"/> is the index of the parameter being typed, or
+/// -1 when none is.
+/// </summary>
+public sealed record SignatureInformation
+{
+    public SignatureInformation(
+        string label,
+        IReadOnlyList<SignatureParameter>? parameters = null,
+        string? documentation = null,
+        int activeParameter = -1)
+    {
+        ArgumentNullException.ThrowIfNull(label);
+        Label = label;
+        Parameters = Array.AsReadOnly((parameters ?? []).ToArray());
+        Documentation = documentation;
+        ActiveParameter = activeParameter;
+    }
+
+    public string Label { get; }
+
+    public IReadOnlyList<SignatureParameter> Parameters { get; }
+
+    public string? Documentation { get; }
+
+    public int ActiveParameter { get; }
+}
+
+/// <summary>
+/// The signatures of the call at the caret, with the one that best matches the
+/// arguments so far.
+/// </summary>
+public sealed class SignatureHelp
+{
+    public SignatureHelp(IReadOnlyList<SignatureInformation> signatures, int activeSignature = 0)
+    {
+        ArgumentNullException.ThrowIfNull(signatures);
+        Signatures = Array.AsReadOnly(signatures.ToArray());
+        ActiveSignature = activeSignature;
+    }
+
+    public IReadOnlyList<SignatureInformation> Signatures { get; }
+
+    public int ActiveSignature { get; }
+}
+
+/// <summary>
 /// One item in the editor gutter. Line is zero based and refers to the
 /// snapshot supplied in the provider request.
 /// </summary>
@@ -294,6 +358,13 @@ public interface ICompletionProvider
         CancellationToken cancellationToken = default);
 }
 
+public interface ISignatureHelpProvider
+{
+    ValueTask<SignatureHelp?> GetSignatureHelpAsync(
+        EditorProviderContext context,
+        CancellationToken cancellationToken = default);
+}
+
 public interface IGutterProvider
 {
     ValueTask<IReadOnlyList<GutterItem>> GetGutterItemsAsync(
@@ -352,6 +423,8 @@ public sealed class EditorProviderSet
 
     public IBlockAdornmentProvider? BlockAdornment { get; set; }
 
+    public ISignatureHelpProvider? SignatureHelp { get; set; }
+
     /// <summary>
     /// Captures the current provider references for one request. The mutable
     /// set remains convenient for hosts, while a scheduler can use this
@@ -366,7 +439,8 @@ public sealed class EditorProviderSet
             Gutter,
             Folding,
             Inlay,
-            BlockAdornment);
+            BlockAdornment,
+            SignatureHelp);
 }
 
 /// <summary>
@@ -382,7 +456,8 @@ public sealed class EditorProviderConfiguration
         IGutterProvider? gutter,
         IFoldingProvider? folding,
         IInlayProvider? inlay,
-        IBlockAdornmentProvider? blockAdornment)
+        IBlockAdornmentProvider? blockAdornment,
+        ISignatureHelpProvider? signatureHelp)
     {
         Syntax = syntax;
         Decorations = decorations;
@@ -392,6 +467,7 @@ public sealed class EditorProviderConfiguration
         Folding = folding;
         Inlay = inlay;
         BlockAdornment = blockAdornment;
+        SignatureHelp = signatureHelp;
     }
 
     public ISyntaxProvider? Syntax { get; }
@@ -409,6 +485,8 @@ public sealed class EditorProviderConfiguration
     public IInlayProvider? Inlay { get; }
 
     public IBlockAdornmentProvider? BlockAdornment { get; }
+
+    public ISignatureHelpProvider? SignatureHelp { get; }
 }
 
 /// <summary>
