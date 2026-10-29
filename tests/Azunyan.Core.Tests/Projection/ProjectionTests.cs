@@ -170,6 +170,72 @@ public sealed class ProjectionTests
     }
 
     [Fact]
+    public void Incremental_decorated_projection_matches_full_projection_across_seeded_random_edits()
+    {
+        // Line breaks of every kind, and inlays and folds that appear, move,
+        // and go away with each edit, as hints asked again after typing do.
+        var pieces = new[] { "", "a", "(", ", ", "\r\n", "\n", "\r" };
+        for (var run = 0; run < 200; run++)
+        {
+            var random = new Random(run);
+            var document = new Document("ab\r\ncd\r\nef(\r\n\r\ngh");
+            var previous = TextProjectionBuilder.Build(document.Snapshot);
+            var history = new List<string>();
+            for (var iteration = 0; iteration < 12; iteration++)
+            {
+                var oldSnapshot = document.Snapshot;
+                var start = random.Next(oldSnapshot.Length + 1);
+                var length = random.Next(Math.Min(3, oldSnapshot.Length - start) + 1);
+                var inserted = pieces[random.Next(pieces.Length)];
+                var change = document.Replace(new TextRange(start, length), inserted);
+                var snapshot = document.Snapshot;
+                var inlays = Enumerable.Range(0, random.Next(3))
+                    .Select(index => new InlineAdornment(
+                        $"hint-{index}",
+                        DocumentAnchor.Before(random.Next(snapshot.Length + 1)),
+                        "parameter",
+                        new AdornmentContent("x:")))
+                    .ToArray();
+                var folds = random.Next(3) == 0 && snapshot.Length > 1
+                    ? new[] { RandomFold(random, snapshot) }
+                    : Array.Empty<FoldRange>();
+                history.Add(
+                    $"run={run}, range={start}:{length}, inserted={Escape(inserted)}, "
+                    + $"folds=[{string.Join(",", folds.Select(fold => fold.Range))}], "
+                    + $"inlays=[{string.Join(",", inlays.Select(inlay => inlay.Anchor.Position.Offset))}]");
+
+                var incremental = TextProjectionBuilder.BuildIncremental(
+                    oldSnapshot,
+                    snapshot,
+                    previous,
+                    change,
+                    folds,
+                    inlays);
+                var expected = TextProjectionBuilder.Build(snapshot, folds, inlays);
+
+                Assert.True(
+                    expected.Lines.Select(DescribeLine).SequenceEqual(incremental.Lines.Select(DescribeLine)),
+                    string.Join("; ", history));
+                previous = incremental;
+            }
+        }
+
+        static FoldRange RandomFold(Random random, TextSnapshot snapshot)
+        {
+            var start = random.Next(snapshot.Length - 1);
+            return new FoldRange(
+                "fold",
+                new TextRange(start, random.Next(1, Math.Min(6, snapshot.Length - start) + 1)));
+        }
+
+        static string DescribeLine(ProjectedLine line) =>
+            $"{line.LogicalLine}:{line.SourceRange}:{string.Join("|", line.Inlines.Select(DescribeInline))}";
+
+        static string Escape(string text) =>
+            text.Replace("\r", "\\r", StringComparison.Ordinal).Replace("\n", "\\n", StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Incremental_decorated_projection_matches_full_projection_when_adornments_change()
     {
         var document = new Document("aa\nbb\ncc\ndd\nee\n");

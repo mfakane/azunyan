@@ -705,20 +705,18 @@ public sealed class TextProjectionBuilder
         var newImpact = new List<TextRange> { change.NewRange };
         AddChangedFoldRanges(previous.Folds, normalizedFolds, change, oldImpact, newImpact);
         AddChangedInlayRanges(previous.Inlays, normalizedInlays, change, oldImpact, newImpact);
-
-        var oldWindow = GetLineWindow(
-            oldSnapshot,
-            CombineRanges(oldImpact),
-            EndsAfterLineBreak(oldSnapshot, change.OldRange));
-        var newWindow = GetLineWindow(snapshot, CombineRanges(newImpact));
-        newWindow = IncludeTrailingLineIfNeeded(
-            oldWindow,
-            oldSnapshot.Lines,
-            snapshot,
-            newWindow);
-        var oldLines = previous.Snapshot.Lines;
-        var newLines = snapshot.Lines;
         var delta = change.NewText.Length - change.OldRange.Length;
+
+        // An inlay that appears is only in the new impact, so it is taken
+        // back to the old text to be in the old window too. Each range gives
+        // its own lines, as an empty one stands for the line it is at, which
+        // a combined range would lose.
+        var oldWindow = Union(
+            GetChangedLineWindow(oldSnapshot, change.OldRange),
+            GetLineWindow(
+                oldSnapshot,
+                oldImpact.Concat(newImpact.Select(range => UnmapRange(range, change, delta)))));
+        var newWindow = MapLineWindow(oldSnapshot, snapshot, oldWindow, change, delta);
         var chunks = new List<ProjectedLineChunk>();
 
         // The line table is indexed by visual line, and a fold can hide a
@@ -779,7 +777,7 @@ public sealed class TextProjectionBuilder
         impact.AddRange(newImpact);
         var window = impact.Count == 0
             ? (StartLine: 0, EndLine: 0)
-            : GetLineWindow(snapshot, CombineRanges(impact));
+            : GetLineWindow(snapshot, impact);
         var oldWindow = window;
         var newWindow = window;
 
@@ -1059,31 +1057,33 @@ public sealed class TextProjectionBuilder
         return TextRange.FromBounds(start, end);
     }
 
-    private static TextRange CombineRanges(List<TextRange> ranges)
+    /// <summary>Maps a range after the change back to the text before it.</summary>
+    private static TextRange UnmapRange(TextRange range, TextChange change, int delta)
     {
-        if (ranges.Count == 0)
-        {
-            return TextRange.Empty(0);
-        }
-
-        var start = ranges.Min(range => range.Start);
-        var end = ranges.Max(range => range.End);
+        var start = UnmapPosition(range.Start, change, delta);
+        var end = Math.Max(start, UnmapPosition(range.End, change, delta));
         return TextRange.FromBounds(start, end);
     }
 
-    private static TextProjection BuildPlainIncremental(
+    private static int UnmapPosition(int position, TextChange change, int delta) =>
+        position <= change.NewRange.Start
+            ? position
+            : position >= change.NewRange.End
+                ? position - delta
+                : change.OldRange.Start;
+
+    /// <summary>
+    /// Finds the new lines that replace the old window's lines, so the lines
+    /// before and after it are kept and only rebased.
+    /// </summary>
+    private static (int StartLine, int EndLine) MapLineWindow(
         TextSnapshot oldSnapshot,
         TextSnapshot snapshot,
-        TextProjection previous,
-        TextChange change)
+        (int StartLine, int EndLine) oldWindow,
+        TextChange change,
+        int delta)
     {
-        var oldLines = previous.Snapshot.Lines;
-        var newLines = snapshot.Lines;
-        var delta = change.NewText.Length - change.OldRange.Length;
-        var oldWindow = GetLineWindow(
-            oldSnapshot,
-            change.OldRange,
-            EndsAfterLineBreak(oldSnapshot, change.OldRange));
+        var oldLines = oldSnapshot.Lines;
         var oldWindowStart = oldLines.GetLineStart(oldWindow.StartLine);
         var oldWindowEnd = oldWindow.EndLine == oldLines.LineCount
             ? oldSnapshot.Length
@@ -1101,7 +1101,20 @@ public sealed class TextProjectionBuilder
             TextRange.FromBounds(
                 Math.Clamp(newWindowStart, 0, snapshot.Length),
                 Math.Clamp(newWindowEnd, newWindowStart, snapshot.Length)));
-        newWindow = IncludeTrailingLineIfNeeded(oldWindow, oldLines, snapshot, newWindow);
+        return IncludeTrailingLineIfNeeded(oldWindow, oldLines, snapshot, newWindow);
+    }
+
+    private static TextProjection BuildPlainIncremental(
+        TextSnapshot oldSnapshot,
+        TextSnapshot snapshot,
+        TextProjection previous,
+        TextChange change)
+    {
+        var oldLines = previous.Snapshot.Lines;
+        var newLines = snapshot.Lines;
+        var delta = change.NewText.Length - change.OldRange.Length;
+        var oldWindow = GetChangedLineWindow(oldSnapshot, change.OldRange);
+        var newWindow = MapLineWindow(oldSnapshot, snapshot, oldWindow, change, delta);
         var chunks = new List<ProjectedLineChunk>();
         previous.LineTable.AddRange(chunks, 0, oldWindow.StartLine);
 
@@ -1299,10 +1312,37 @@ public sealed class TextProjectionBuilder
         return (firstLine, endLine);
     }
 
+    private static (int StartLine, int EndLine) GetLineWindow(
+        TextSnapshot snapshot,
+        IEnumerable<TextRange> ranges) =>
+        ranges
+            .Select(range => GetLineWindow(snapshot, range))
+            .Aggregate(Union);
+
+    private static (int StartLine, int EndLine) Union(
+        (int StartLine, int EndLine) left,
+        (int StartLine, int EndLine) right) =>
+        (Math.Min(left.StartLine, right.StartLine), Math.Max(left.EndLine, right.EndLine));
+
+    /// <summary>
+    /// Finds the old lines an edit of the range changes. A line break at
+    /// either edge can join the lines around it: removing one, or splitting
+    /// or completing a CR LF pair.
+    /// </summary>
+    private static (int StartLine, int EndLine) GetChangedLineWindow(
+        TextSnapshot snapshot,
+        TextRange range)
+    {
+        var window = GetLineWindow(snapshot, range, EndsAfterLineBreak(snapshot, range));
+        return range.Start > 0 && snapshot[range.Start - 1] == '\r'
+            ? (snapshot.Lines.GetLine(range.Start - 1), window.EndLine)
+            : window;
+    }
+
     private static bool EndsAfterLineBreak(TextSnapshot snapshot, TextRange range) =>
         range.End > range.Start
         && range.End <= snapshot.Length
-        && snapshot.GetText(new TextRange(range.End - 1, 1)) == "\n";
+        && snapshot[range.End - 1] is '\n' or '\r';
 
     private static (int StartLine, int EndLine) IncludeTrailingLineIfNeeded(
         (int StartLine, int EndLine) oldWindow,
