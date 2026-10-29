@@ -161,6 +161,44 @@ public sealed class ViewportProviderResults
     public IReadOnlyList<InlineAdornment> Inlays { get; }
 
     public IReadOnlyList<BlockAdornment> BlockAdornments { get; }
+
+    /// <summary>
+    /// Moves the inlays and block adornments outside an edit along with their
+    /// text, to show while providers answer for the new snapshot, so the line
+    /// does not jump on every keystroke. Those inside replaced text and the
+    /// line-based gutter are dropped.
+    /// </summary>
+    public ViewportProviderResults MapThroughChange(TextSnapshot snapshot, TextChange change)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        var oldSnapshot = Context.Snapshot;
+        TextChangeMapper.Validate(change, oldSnapshot, snapshot);
+        var position = TextChangeMapper.MapPosition(oldSnapshot, snapshot, change, Context.Position);
+        var context = new EditorProviderContext(
+            snapshot,
+            position,
+            TextSelection.Caret(position),
+            Context.VisibleRange is { } visibleRange
+                ? TextChangeMapper.MapRange(oldSnapshot, snapshot, change, visibleRange)
+                : null);
+        return new ViewportProviderResults(
+            context,
+            [],
+            [.. Inlays
+                .Where(inlay => !IsReplaced(inlay.Anchor, change))
+                .Select(inlay => inlay with { Anchor = TextChangeMapper.MapAnchor(oldSnapshot, snapshot, change, inlay.Anchor) })],
+            [.. BlockAdornments
+                .Where(block => !IsReplaced(block.Anchor, change))
+                .Select(block => new BlockAdornment(
+                    block.Id,
+                    TextChangeMapper.MapAnchor(oldSnapshot, snapshot, change, block.Anchor),
+                    block.DesiredHeight,
+                    block.Kind,
+                    block.Content))]);
+    }
+
+    private static bool IsReplaced(DocumentAnchor anchor, TextChange change) =>
+        change.OldRange.Start < anchor.Position.Offset && anchor.Position.Offset < change.OldRange.End;
 }
 
 public sealed class PositionProviderResults

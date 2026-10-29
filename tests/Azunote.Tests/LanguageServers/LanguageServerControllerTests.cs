@@ -245,6 +245,34 @@ public sealed class LanguageServerControllerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Inlay_hints_are_asked_for_the_visible_range_and_again_when_the_server_asks()
+    {
+        _enabled.Add((Workspace, "fake-server"));
+        _server.Capabilities["inlayHintProvider"] = true;
+        _server.Handlers["textDocument/inlayHint"] = _ => JsonNode.Parse("""
+            [{ "position": { "line": 0, "character": 9 }, "label": ": number", "kind": 1 }]
+            """);
+        using var controller = CreateController();
+        controller.Update();
+        await WaitForAsync(() => controller.Indicator.State == LanguageServerIndicatorState.Running);
+        var refreshes = _editor.RefreshProvidersCount;
+        Assert.True(refreshes > 0);
+
+        var snapshot = _editor.Snapshot;
+        var inlays = await controller.InlayProvider.GetInlaysAsync(
+            new EditorProviderContext(snapshot, 0, TextSelection.Caret(0), new TextRange(0, snapshot.Length)));
+
+        var inlay = Assert.Single(inlays);
+        Assert.Equal(DocumentAnchor.After(9), inlay.Anchor);
+        Assert.Equal(": number", inlay.Content.Text);
+        var range = Assert.Single(_server.ReceivedOf("textDocument/inlayHint"))!["range"]!;
+        Assert.Equal(14, range["end"]!["character"]!.GetValue<int>());
+
+        await _server.RequestAsync("workspace/inlayHint/refresh", null);
+        await WaitForAsync(() => _editor.RefreshProvidersCount > refreshes);
+    }
+
+    [Fact]
     public async Task Without_a_running_server_completion_falls_back()
     {
         using var controller = CreateController();

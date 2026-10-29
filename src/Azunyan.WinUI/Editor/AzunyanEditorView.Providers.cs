@@ -54,6 +54,11 @@ public sealed partial class AzunyanEditorView
                 && ReferenceEquals(previousResults.Snapshot, documentChange!.OldSnapshot)
                     ? previousResults
                     : null;
+            var previousViewport = canUseDocumentChange
+                && previousFrame?.Viewport is { } previousViewportResults
+                && ReferenceEquals(previousViewportResults.Context.Snapshot, documentChange!.OldSnapshot)
+                    ? previousViewportResults
+                    : null;
             var provisionalRange = GetProvisionalDocumentRange(snapshot, selection.CaretPosition);
             _providerFrame = new EditorProviderFrame(
                 snapshot,
@@ -61,7 +66,8 @@ public sealed partial class AzunyanEditorView
                 previousDocument?.MapUnchangedRanges(
                     snapshot,
                     documentChange!.Change,
-                    provisionalRange));
+                    provisionalRange),
+                previousViewport?.MapThroughChange(snapshot, documentChange!.Change));
             RenderViewport();
             _ = ApplyDocumentProviderResultAsync(
                 RequestDocumentProviderResultAsync(

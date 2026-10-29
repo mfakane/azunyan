@@ -184,6 +184,24 @@ public sealed class LanguageServerConversionsTests
         Assert.Empty(LanguageServerConversions.ToTextEdits(null, new TextSnapshot("{}")));
     }
 
+    [Fact]
+    public void Inlay_hints_join_their_label_parts_and_padding()
+    {
+        var hints = JsonNode.Parse("""
+            [
+              { "position": { "line": 0, "character": 6 }, "label": "x:", "kind": 2, "paddingRight": true },
+              { "position": { "line": 0, "character": 3 }, "label": [{ "value": ": " }, { "value": "int" }], "kind": 1 },
+              { "position": { "line": 0, "character": 1 }, "label": "" }
+            ]
+            """);
+
+        var inlays = LanguageServerConversions.ToInlays(hints, new TextSnapshot("let a(1)"));
+
+        Assert.Equal(
+            [(DocumentAnchor.Before(6), "x: "), (DocumentAnchor.After(3), ": int")],
+            inlays.Select(inlay => (inlay.Anchor, inlay.Content.Text)));
+    }
+
     private static EditorProviderContext Context(string text, int position) =>
         new(new TextSnapshot(text), position, TextSelection.Caret(position));
 }

@@ -23,13 +23,15 @@ internal sealed record LanguageServerIndicator(
     public static LanguageServerIndicator Hidden { get; } = new(LanguageServerIndicatorState.Hidden);
 }
 
-/// <summary>Completion and descriptions the editor gets from the document's language server.</summary>
+/// <summary>Completion, descriptions and inlay hints the editor gets from the document's language server.</summary>
 internal interface ILanguageServerProviders
 {
     /// <summary>The server's completion when it runs and offers some; otherwise <paramref name="fallback"/>.</summary>
     ICompletionProvider GetCompletionProvider(ICompletionProvider? fallback);
 
     ITooltipProvider TooltipProvider { get; }
+
+    IInlayProvider InlayProvider { get; }
 
     IReadOnlyList<string> CompletionTriggerCharacters { get; }
 }
@@ -44,6 +46,12 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
 {
     internal const string DiagnosticsSourceKey = "languageServer";
     private static readonly TimeSpan ChangeDelay = TimeSpan.FromMilliseconds(200);
+
+    /// <summary>
+    /// How long the view rests before its inlay hints are asked for, so that
+    /// typing and scrolling ask once they pause.
+    /// </summary>
+    private static readonly TimeSpan InlayHintDelay = TimeSpan.FromMilliseconds(200);
 
     private readonly IEditorView _editor;
     private readonly Func<DocumentSessionState> _state;
@@ -87,6 +95,7 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
         _editor.Edited += Editor_Edited;
         _registry.EnablementChanged += Registry_EnablementChanged;
         TooltipProvider = new HoverProvider(this);
+        InlayProvider = new InlayHintProvider(this);
     }
 
     /// <summary>Raised on the UI thread when <see cref="Indicator"/> or the server's triggers change.</summary>
@@ -95,6 +104,8 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
     public LanguageServerIndicator Indicator { get; private set; } = LanguageServerIndicator.Hidden;
 
     public ITooltipProvider TooltipProvider { get; }
+
+    public IInlayProvider InlayProvider { get; }
 
     public IReadOnlyList<string> CompletionTriggerCharacters =>
         _active?.Client.CompletionTriggerCharacters ?? [];
@@ -336,7 +347,9 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
         {
             _active = null;
             active.Client.DiagnosticsPublished -= Client_DiagnosticsPublished;
+            active.Client.InlayHintsChanged -= Client_InlayHintsChanged;
             Observe(active.Client.CloseAsync(active.Uri));
+            _editor.RefreshProviders();
         }
 
         if (_lease is { } lease)
@@ -366,7 +379,9 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
                 {
                     _active = new Active(client, target.Uri);
                     client.DiagnosticsPublished += Client_DiagnosticsPublished;
+                    client.InlayHintsChanged += Client_InlayHintsChanged;
                     Observe(client.OpenAsync(target.Uri, target.LanguageId, _editor.Text));
+                    _editor.RefreshProviders();
                 }
 
                 // A new server can bring other completion triggers.
@@ -402,6 +417,8 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
         {
             _active = null;
             active.Client.DiagnosticsPublished -= Client_DiagnosticsPublished;
+            active.Client.InlayHintsChanged -= Client_InlayHintsChanged;
+            _editor.RefreshProviders();
         }
 
         _diagnostics.Replace(DiagnosticsSourceKey, []);
@@ -468,6 +485,15 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
                     _target?.Launch.Definition.Command ?? "language server"));
         });
 
+    private void Client_InlayHintsChanged() =>
+        _dispatcher.TryEnqueue(() =>
+        {
+            if (_active is not null)
+            {
+                _editor.RefreshProviders();
+            }
+        });
+
     private static void Observe(Task task) =>
         _ = task.ContinueWith(
             completed => ErrorReporter.LogException("Language server", completed.Exception!.GetBaseException()),
@@ -529,6 +555,33 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
                 (client, uri, position, token) => client.HoverAsync(uri, position, token),
                 cancellationToken).ConfigureAwait(false);
             return LanguageServerConversions.ToTooltip(result, context);
+        }
+    }
+
+    private sealed class InlayHintProvider(LanguageServerController owner) : IInlayProvider
+    {
+        public async ValueTask<IReadOnlyList<InlineAdornment>> GetInlaysAsync(
+            EditorProviderContext context,
+            CancellationToken cancellationToken = default)
+        {
+            if (owner._active is not { Client.SupportsInlayHints: true } active
+                || context.VisibleRange is not { } range)
+            {
+                return [];
+            }
+
+            await Task.Delay(InlayHintDelay, cancellationToken).ConfigureAwait(false);
+            var lines = context.Snapshot.Lines;
+            var result = await RequestAsync(
+                active,
+                context,
+                (client, uri, _, token) => client.InlayHintAsync(
+                    uri,
+                    lines.GetLineColumn(range.Start),
+                    lines.GetLineColumn(range.End),
+                    token),
+                cancellationToken).ConfigureAwait(false);
+            return LanguageServerConversions.ToInlays(result, context.Snapshot);
         }
     }
 

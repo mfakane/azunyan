@@ -66,6 +66,9 @@ internal sealed class LanguageServerClient : IAsyncDisposable
     /// <summary>Raised on the reading task when the server publishes problems for an open document.</summary>
     public event Action<LanguageServerDiagnostics>? DiagnosticsPublished;
 
+    /// <summary>Raised on the reading task when the server asks for its inlay hints again.</summary>
+    public event Action? InlayHintsChanged;
+
     /// <summary>Completes when the server stops talking, whether it exited or was stopped.</summary>
     public Task Completion => _connection.Completion;
 
@@ -76,6 +79,8 @@ internal sealed class LanguageServerClient : IAsyncDisposable
     public bool SupportsHover { get; private set; }
 
     public bool SupportsFormatting { get; private set; }
+
+    public bool SupportsInlayHints { get; private set; }
 
     /// <summary>The last lines the server wrote to standard error, to explain a failure.</summary>
     public string ErrorOutput
@@ -131,7 +136,8 @@ internal sealed class LanguageServerClient : IAsyncDisposable
                 ["workspace"] = new JsonObject
                 {
                     ["configuration"] = true,
-                    ["workspaceFolders"] = true
+                    ["workspaceFolders"] = true,
+                    ["inlayHint"] = new JsonObject { ["refreshSupport"] = true }
                 },
                 ["textDocument"] = new JsonObject
                 {
@@ -150,6 +156,7 @@ internal sealed class LanguageServerClient : IAsyncDisposable
                     {
                         ["contentFormat"] = new JsonArray("plaintext", "markdown")
                     },
+                    ["inlayHint"] = new JsonObject(),
                     ["publishDiagnostics"] = new JsonObject { ["versionSupport"] = true }
                 }
             }
@@ -281,6 +288,17 @@ internal sealed class LanguageServerClient : IAsyncDisposable
 
     public Task<JsonNode?> HoverAsync(string uri, LineColumn position, CancellationToken cancellationToken) =>
         _connection.SendRequestAsync("textDocument/hover", CreatePositionParameters(uri, position), cancellationToken);
+
+    public Task<JsonNode?> InlayHintAsync(string uri, LineColumn start, LineColumn end, CancellationToken cancellationToken) =>
+        _connection.SendRequestAsync("textDocument/inlayHint", new JsonObject
+        {
+            ["textDocument"] = new JsonObject { ["uri"] = uri },
+            ["range"] = new JsonObject
+            {
+                ["start"] = new JsonObject { ["line"] = start.Line, ["character"] = start.Column },
+                ["end"] = new JsonObject { ["line"] = end.Line, ["character"] = end.Column }
+            }
+        }, cancellationToken);
 
     public Task<JsonNode?> FormattingAsync(string uri, IndentationSettings indentation, CancellationToken cancellationToken) =>
         _connection.SendRequestAsync("textDocument/formatting", new JsonObject
@@ -430,6 +448,7 @@ internal sealed class LanguageServerClient : IAsyncDisposable
 
         SupportsHover = IsProvided(capabilities?["hoverProvider"]);
         SupportsFormatting = IsProvided(capabilities?["documentFormattingProvider"]);
+        SupportsInlayHints = IsProvided(capabilities?["inlayHintProvider"]);
     }
 
     private static bool IsProvided(JsonNode? provider) => provider switch
@@ -444,6 +463,7 @@ internal sealed class LanguageServerClient : IAsyncDisposable
         "workspace/configuration" => Task.FromResult<JsonNode?>(GetConfiguration(parameters?["items"] as JsonArray)),
         "workspace/workspaceFolders" => Task.FromResult<JsonNode?>(GetWorkspaceFolders()),
         "workspace/applyEdit" => Task.FromResult<JsonNode?>(new JsonObject { ["applied"] = false }),
+        "workspace/inlayHint/refresh" => RefreshInlayHints(),
         "client/registerCapability"
             or "client/unregisterCapability"
             or "window/workDoneProgress/create"
@@ -452,6 +472,12 @@ internal sealed class LanguageServerClient : IAsyncDisposable
             JsonRpcException.MethodNotFound,
             $"Azunote does not handle {method}."))
     };
+
+    private Task<JsonNode?> RefreshInlayHints()
+    {
+        InlayHintsChanged?.Invoke();
+        return Task.FromResult<JsonNode?>(null);
+    }
 
     private JsonArray? GetWorkspaceFolders() =>
         _workspaceFolder.Length == 0

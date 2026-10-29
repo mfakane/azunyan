@@ -59,6 +59,41 @@ public sealed class ProvisionalProviderResultsTests
             span.Range.Start < target.End && target.Start < span.Range.End));
     }
 
+    [Fact]
+    public async Task Inlays_move_with_their_text_and_those_inside_replaced_text_are_dropped()
+    {
+        var oldSnapshot = new TextSnapshot("run(alpha, beta, gamma)");
+        using var scheduler = new EditorProviderScheduler(new EditorProviderSet
+        {
+            Inlay = new FixedInlayProvider(
+            [
+                new InlineAdornment("a", DocumentAnchor.Before(4), "hint", new AdornmentContent("x: ")),
+                new InlineAdornment("b", DocumentAnchor.Before(13), "hint", new AdornmentContent("y: ")),
+                new InlineAdornment("c", DocumentAnchor.Before(17), "hint", new AdornmentContent("z: "))
+            ])
+        });
+        var previous = (await scheduler.RequestViewportAsync(
+            oldSnapshot,
+            TextRange.FromBounds(0, oldSnapshot.Length),
+            TextSelection.Caret(0)))!;
+        var document = new Document(oldSnapshot.Text);
+        var change = document.Replace(TextRange.FromBounds(11, 15), "b");
+
+        var mapped = previous.MapThroughChange(document.Snapshot, change);
+
+        Assert.Same(document.Snapshot, mapped.Context.Snapshot);
+        Assert.Equal(
+            [("a", 4), ("c", 14)],
+            mapped.Inlays.Select(inlay => (inlay.Id, inlay.Anchor.Position.Offset)));
+    }
+
+    private sealed class FixedInlayProvider(IReadOnlyList<InlineAdornment> inlays) : IInlayProvider
+    {
+        public ValueTask<IReadOnlyList<InlineAdornment>> GetInlaysAsync(
+            EditorProviderContext context,
+            CancellationToken cancellationToken = default) => ValueTask.FromResult(inlays);
+    }
+
     private sealed class FixedSyntaxProvider(IReadOnlyList<SyntaxSpan> spans) : ISyntaxProvider
     {
         public ValueTask<IReadOnlyList<SyntaxSpan>> GetSyntaxAsync(

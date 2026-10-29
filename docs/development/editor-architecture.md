@@ -380,7 +380,10 @@ full snapshot results.
 - expensive gutter annotations.
 
 They receive the snapshot and an expanded visible document range. Their cache
-is invalidated by snapshot identity and requested range.
+is invalidated by snapshot identity and requested range. Until they answer for
+an edited snapshot, the previous inlays and block adornments are moved through
+the edit, and those inside replaced text are dropped, so a line does not jump
+on every keystroke.
 
 ### Position-scoped providers
 

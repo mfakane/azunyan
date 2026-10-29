@@ -61,6 +61,10 @@ those carrying a whole document, are cut short.
   suggestion with placeholders is inserted with their default text.
 - **Descriptions**: resting the pointer on a symbol shows what the server says
   about it, after any problem there.
+- **Inlay hints**: the server's hints, such as parameter names before
+  arguments and inferred types after names, appear in the text in a dimmed
+  style. They are asked for the visible lines once typing or scrolling pauses.
+  Many servers show them only when a setting turns them on.
 - **Formatting**: Edit > Format Document (Shift+Alt+F) rewrites the document
   as the server suggests, with the document's indentation, as one step to undo.
   It is available while a server that formats runs. An enabled

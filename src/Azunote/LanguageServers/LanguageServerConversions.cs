@@ -178,6 +178,45 @@ internal static partial class LanguageServerConversions
     }
 
     /// <summary>
+    /// The server's inlay hints as inlays. A type hint follows the text before
+    /// it as that text grows, and other hints, such as parameter names, stay
+    /// before the text after them.
+    /// </summary>
+    public static IReadOnlyList<InlineAdornment> ToInlays(JsonNode? hints, TextSnapshot snapshot)
+    {
+        if (hints is not JsonArray array)
+        {
+            return [];
+        }
+
+        var result = new List<InlineAdornment>(array.Count);
+        foreach (var hint in array.OfType<JsonObject>())
+        {
+            var label = hint["label"] switch
+            {
+                JsonArray parts => string.Concat(parts.Select(part => GetString(part?["value"]))),
+                var value => GetString(value)
+            };
+            if (string.IsNullOrWhiteSpace(label))
+            {
+                continue;
+            }
+
+            var offset = ToOffset(snapshot, hint["position"]);
+            var text = (hint["paddingLeft"]?.GetValueKind() == JsonValueKind.True ? " " : string.Empty)
+                + label.ReplaceLineEndings(" ")
+                + (hint["paddingRight"]?.GetValueKind() == JsonValueKind.True ? " " : string.Empty);
+            result.Add(new InlineAdornment(
+                $"inlayHint:{result.Count:D6}",
+                GetInt(hint["kind"]) == 1 ? DocumentAnchor.After(offset) : DocumentAnchor.Before(offset),
+                "inlayHint",
+                new AdornmentContent(text)));
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// The edits of a formatting answer, last first, so that applying them in
     /// order leaves the ranges of those still to come where they were. Edits
     /// at one position keep the server's order.
