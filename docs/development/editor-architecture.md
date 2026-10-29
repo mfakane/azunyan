@@ -379,7 +379,8 @@ full snapshot results.
 - CodeLens/block adornments;
 - expensive gutter annotations.
 
-They receive the snapshot and an expanded visible document range. Their cache
+They receive the snapshot and the visible document range expanded by a page
+above and below, so lines scrolled into view already have their results. Their cache
 is invalidated by snapshot identity and requested range. Until they answer for
 an edited snapshot, the previous inlays and block adornments are moved through
 the edit, and those inside replaced text are dropped, so a line does not jump

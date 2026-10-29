@@ -88,7 +88,7 @@ public sealed partial class AzunyanEditorView
             _ = ApplyViewportProviderResultAsync(
                 _providerScheduler.RequestViewportAsync(
                     snapshot,
-                    GetVisibleDocumentRange(),
+                    GetProviderViewportRange(),
                     selection),
                 generation);
         }

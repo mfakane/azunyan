@@ -68,7 +68,8 @@ those carrying a whole document, are cut short.
   in the text closes it; it also closes once the caret leaves the call.
 - **Inlay hints**: the server's hints, such as parameter names before
   arguments and inferred types after names, appear in the text in a dimmed
-  style. They are asked for the visible lines once typing or scrolling pauses.
+  style. They are asked for the visible lines and a screen above and below
+  them once typing or scrolling pauses.
   Many servers show them only when a setting turns them on.
 - **Formatting**: Edit > Format Document (Shift+Alt+F) rewrites the document
   as the server suggests, with the document's indentation, as one step to undo.

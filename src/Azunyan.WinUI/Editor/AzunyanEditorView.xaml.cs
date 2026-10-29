@@ -4051,6 +4051,23 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             && target.Range.Start < range.End;
     }
 
+    /// <summary>
+    /// The visible lines with a page above and below them, so lines scrolled
+    /// into view already have their inlays instead of gaining them a moment
+    /// later.
+    /// </summary>
+    private TextRange GetProviderViewportRange()
+    {
+        var visible = GetVisibleDocumentRange();
+        var lines = Snapshot.Lines;
+        var first = lines.GetLine(visible.Start);
+        var last = lines.GetLine(visible.End);
+        var page = last - first + 1;
+        return TextRange.FromBounds(
+            lines.GetLineStart(Math.Max(0, first - page)),
+            lines.GetLineEnd(Math.Min(lines.LineCount - 1, last + page)));
+    }
+
     private TextRange GetVisibleDocumentRange()
     {
         var snapshot = Snapshot;
