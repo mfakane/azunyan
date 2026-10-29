@@ -19,6 +19,8 @@ internal static class AzunotePlaceholderCatalog
         new("workspaceFolderBasename", "Placeholder", "Name of the workspace folder without any slashes.", "${workspaceFolderBasename} -> work"),
         new("workspaceFolderBasename:*.csproj", "Placeholder", "Name of the nearest ancestor containing a matching workspace file.", "${workspaceFolderBasename:*.csproj} -> work"),
         new("workspaceFolderBasename:*.sln|*.slnx", "Placeholder", "Name of the nearest ancestor containing either matching workspace file.", "${workspaceFolderBasename:*.sln|*.slnx} -> work"),
+        new("workspaceFile", "Placeholder", "File in the workspace folder matching the language mode's workspace patterns.", "${workspaceFile} -> C:\\work\\work.slnx"),
+        new("workspaceFile:*.sln|*.slnx", "Placeholder", "Matching file in the nearest ancestor containing one.", "${workspaceFile:*.sln|*.slnx} -> C:\\work\\work.slnx"),
         new("file", "Placeholder", "Path passed to the external process for the current document.", "${file} -> C:\\work\\notes\\current.azunote"),
         new("fileWorkspaceFolder", "Placeholder", "Workspace folder containing the current document.", "${fileWorkspaceFolder} -> C:\\work"),
         new("relativeFile", "Placeholder", "Current document path relative to the workspace folder.", "${relativeFile} -> notes\\current.azunote"),

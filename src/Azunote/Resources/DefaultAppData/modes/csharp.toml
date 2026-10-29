@@ -3,8 +3,11 @@
 # Servers pages of the Azunote documentation.
 
 # Folders holding these files are workspace folders too.
-# workspacePatterns = ["*.sln", "*.slnx"]
+# workspacePatterns = ["*.slnx", "*.sln"]
 
 # dotnet tool install --global csharp-ls
+# ${workspaceFile} is the solution that matched workspacePatterns. Without
+# --solution, csharp-ls loads the first solution anywhere below the folder.
 # [languageServer]
 # command = "csharp-ls"
+# args = ["--solution", "${workspaceFile}"]

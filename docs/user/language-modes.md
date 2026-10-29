@@ -117,5 +117,6 @@ Whichever is found first while going up from the document wins, so with
 
 The workspace folder is what
 [`${workspaceFolder}`](substitution-variables.md) expands to and where a
-[language server](language-servers.md) runs. Changing the language mode of a
+[language server](language-servers.md) runs, and `${workspaceFile}` names the
+file in it that matches `workspacePatterns`. Changing the language mode of a
 document can change it.

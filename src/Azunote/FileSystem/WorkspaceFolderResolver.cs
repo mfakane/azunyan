@@ -67,6 +67,52 @@ internal static class WorkspaceFolderResolver
         return null;
     }
 
+    /// <summary>
+    /// Finds the file for <c>${workspaceFile}</c> in a workspace folder: the
+    /// first file matching the patterns, which are tried in their order, with
+    /// the matches of one pattern taken in name order.
+    /// </summary>
+    public static string? FindFile(string? folder, IEnumerable<string> patterns)
+    {
+        if (string.IsNullOrWhiteSpace(folder))
+        {
+            return null;
+        }
+
+        foreach (var pattern in patterns)
+        {
+            if (CreateMatcher(pattern) is not { } matcher)
+            {
+                continue;
+            }
+
+            try
+            {
+                var match = matcher.Execute(new DirectoryInfoWrapper(new DirectoryInfo(folder))).Files
+                    .Select(file => file.Path)
+                    .Order(StringComparer.OrdinalIgnoreCase)
+                    .FirstOrDefault();
+                if (match is not null)
+                {
+                    return Path.GetFullPath(Path.Combine(folder, match));
+                }
+            }
+            catch (Exception exception) when (
+                exception is IOException
+                    or UnauthorizedAccessException
+                    or ArgumentException)
+            {
+                // Like the folder search, an inaccessible folder only means no file.
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Splits a <c>|</c>-separated pattern expression.</summary>
+    public static string[] SplitPatterns(string patternExpression) =>
+        patternExpression.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
     private static bool IsDefaultWorkspaceFolder(string directory, Action? readFailed) =>
         Directory.Exists(Path.Combine(directory, GitDirectoryName))
             || File.Exists(Path.Combine(directory, GitDirectoryName))
@@ -76,9 +122,7 @@ internal static class WorkspaceFolderResolver
     {
         var matcher = new Matcher(StringComparison.OrdinalIgnoreCase);
         var hasPattern = false;
-        foreach (var pattern in patternExpression.Split(
-                     '|',
-                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        foreach (var pattern in SplitPatterns(patternExpression))
         {
             try
             {

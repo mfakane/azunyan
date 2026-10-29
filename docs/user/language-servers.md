@@ -109,6 +109,21 @@ args = ["--stdio"]
 typeCheckingMode = "basic"
 ~~~
 
+A server that loads one project file can be given the file that marks the
+workspace folder. csharp-ls otherwise loads the first solution it finds
+anywhere below the folder, which can be one in a submodule. In a folder that is
+a workspace only because of `.git`, `${workspaceFile}` is empty and the server
+gets an empty argument.
+
+~~~toml
+# modes/csharp.toml
+workspacePatterns = ["*.slnx", "*.sln"]
+
+[languageServer]
+command = "csharp-ls"
+args = ["--solution", "${workspaceFile}"]
+~~~
+
 ~~~toml
 # modes/json.toml
 [languageServer]

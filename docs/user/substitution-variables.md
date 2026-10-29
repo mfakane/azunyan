@@ -29,6 +29,8 @@ These variables follow the names of VS Code's predefined variables.
 | `${userHome}` | The current user's home folder. |
 | `${workspaceFolder}` | The [workspace folder](language-modes.md#workspace-folder) of the document: the nearest folder above it that contains `.git`, an `.editorconfig` with `root = true`, or a file matching its language mode's `workspacePatterns`. |
 | `${workspaceFolder:pattern}` | The nearest folder above the document that contains a file matching the glob `pattern`. Separate several patterns with `\|`, for example `${workspaceFolder:*.sln\|*.slnx}`. |
+| `${workspaceFile}` | The file in `${workspaceFolder}` that matches its language mode's `workspacePatterns`, or empty when none does. |
+| `${workspaceFile:pattern}` | The file matching `pattern` in `${workspaceFolder:pattern}`. |
 | `${workspaceFolderBasename}` | The name of `${workspaceFolder}`. |
 | `${workspaceFolderBasename:pattern}` | The name of `${workspaceFolder:pattern}`. |
 | `${file}` | The path of the file given to the tool. For a document with unsaved changes, or an untitled one, this is a [temporary copy](tool-definitions.md#temporary-copies). |
@@ -59,6 +61,15 @@ path is needed.
 folder above it. Patterns are relative to the folder being checked, so use `**`
 for a file that may be further down, such as `**/*.csproj`. If nothing matches,
 the variable expands to an empty string.
+
+When several files match, `${workspaceFile}` takes the one matching the
+earliest pattern, and among those the first by name, so
+`${workspaceFile:*.slnx|*.sln}` prefers a `.slnx` file.
+
+A pattern searches on its own, so `${workspaceFolder:pattern}` and
+`${workspaceFile:pattern}` can be in a folder above `${workspaceFolder}`, such
+as the outer repository for a document in a submodule. Use `${workspaceFile}`
+to name a file in the folder a [language server](language-servers.md) runs in.
 
 ## Azunote variables
 

@@ -341,6 +341,52 @@ public sealed class ExternalToolsTests
                 context.Expand("${workspaceFolderBasename:*.sln|*.slnx}"));
             Assert.Equal(string.Empty, context.Expand("${workspaceFolder:*.sln}"));
             Assert.Equal(string.Empty, context.Expand("${workspaceFolderBasename:*.sln}"));
+            Assert.Equal(
+                Path.GetFullPath(Path.Combine(root, "project.slnx")),
+                context.Expand("${workspaceFile:*.sln|*.slnx}"));
+            Assert.Equal(string.Empty, context.Expand("${workspaceFile}"));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void Context_expands_workspace_file_from_the_mode_patterns_in_their_order()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"azunote-workspace-{Guid.NewGuid():N}");
+        var nested = Path.Combine(root, "external", "library");
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(nested, ".git"));
+            Directory.CreateDirectory(Path.Combine(root, ".git"));
+            File.WriteAllText(Path.Combine(root, "b.sln"), string.Empty);
+            File.WriteAllText(Path.Combine(root, "a.sln"), string.Empty);
+            File.WriteAllText(Path.Combine(root, "project.slnx"), string.Empty);
+            File.WriteAllText(Path.Combine(nested, "library.sln"), string.Empty);
+
+            ExternalToolContext Context(string path, params string[] patterns) =>
+                new(path, path, string.Empty, string.Empty, workspacePatterns: patterns);
+
+            var rootFile = Path.Combine(root, "Program.cs");
+            Assert.Equal(
+                Path.GetFullPath(Path.Combine(root, "project.slnx")),
+                Context(rootFile, "*.slnx", "*.sln").Expand("${workspaceFile}"));
+            Assert.Equal(
+                Path.GetFullPath(Path.Combine(root, "a.sln")),
+                Context(rootFile, "*.sln", "*.slnx").Expand("${workspaceFile}"));
+            Assert.Equal(string.Empty, Context(rootFile).Expand("${workspaceFile}"));
+
+            // The folder's own .git makes it the workspace folder, which a pattern can look past.
+            var nestedContext = Context(Path.Combine(nested, "Library.cs"), "*.slnx");
+            Assert.Equal(string.Empty, nestedContext.Expand("${workspaceFile}"));
+            Assert.Equal(
+                Path.GetFullPath(Path.Combine(root, "project.slnx")),
+                nestedContext.Expand("${workspaceFile:*.slnx}"));
         }
         finally
         {

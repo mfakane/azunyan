@@ -131,6 +131,9 @@ public sealed partial record ExternalToolContext
 
     public string? WorkspaceFolderBasename => GetPathBasename(WorkspaceFolder);
 
+    /// <summary>The file in <see cref="WorkspaceFolder"/> matching the language mode's workspace patterns.</summary>
+    public string? WorkspaceFile => WorkspaceFolderResolver.FindFile(WorkspaceFolder, WorkspacePatterns);
+
     public string? FileWorkspaceFolder => WorkspaceFolder;
 
     public string? RelativeFile => GetRelativeWorkspacePath(DocumentFilePath);
@@ -246,6 +249,15 @@ public sealed partial record ExternalToolContext
                     []) ?? string.Empty;
             }
 
+            const string workspaceFilePatternPrefix = "workspaceFile:";
+            if (name.StartsWith(workspaceFilePatternPrefix, StringComparison.Ordinal))
+            {
+                var patterns = name[workspaceFilePatternPrefix.Length..];
+                return WorkspaceFolderResolver.FindFile(
+                    _findWorkspace(DocumentFilePath ?? ExecutionFilePath, patterns, []),
+                    WorkspaceFolderResolver.SplitPatterns(patterns)) ?? string.Empty;
+            }
+
             const string workspaceFolderBasenamePatternPrefix = "workspaceFolderBasename:";
             if (name.StartsWith(workspaceFolderBasenamePatternPrefix, StringComparison.Ordinal))
             {
@@ -277,6 +289,7 @@ public sealed partial record ExternalToolContext
                 "tempFile" => TempFile ?? string.Empty,
                 "toolFolder" => ToolDirectory ?? string.Empty,
                 "workspaceFolder" => WorkspaceFolder ?? string.Empty,
+                "workspaceFile" => WorkspaceFile ?? string.Empty,
                 "document" => Document,
                 "selectedText" => Selection,
                 "input" => Input,
