@@ -1216,12 +1216,15 @@
         <Border
             x:Name="StatusBarPanel"
             Grid.Row="4"
-            Padding="12,6"
+            Padding="12,6,12,8"
             Visibility="{x:Bind ViewModel.StatusBarVisibility, Mode=OneWay}"
         >
             <Border.Resources>
                 <Style TargetType="TextBlock">
-                    <Setter Property="FontSize" Value="12" />
+                    <Setter Property="FontSize" Value="13" />
+                </Style>
+                <Style TargetType="FontIcon">
+                    <Setter Property="Margin" Value="0,0,0,-2" />
                 </Style>
             </Border.Resources>
             <Grid
@@ -1263,12 +1266,11 @@
                     Text="{x:Bind ViewModel.IndentationStatus, Mode=OneWay}"
                     Tapped="IndentationStatus_Tapped"
                 />
-                <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="6">
+                <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4">
                     <StackPanel
                         x:Name="LanguageServerStatus"
                         VerticalAlignment="Center"
                         Orientation="Horizontal"
-                        Spacing="2"
                         Background="Transparent"
                         ToolTipService.ToolTip="{x:Bind ViewModel.LanguageServerToolTip, Mode=OneWay}"
                         AutomationProperties.Name="{x:Bind ViewModel.LanguageServerToolTip, Mode=OneWay}"
@@ -1277,15 +1279,16 @@
                     >
                         <FontIcon
                             Glyph="&#xE945;"
-                            FontSize="12"
+                            FontSize="13"
                             Opacity="{x:Bind ViewModel.LanguageServerOpacity, Mode=OneWay}"
                             Visibility="{x:Bind ViewModel.LanguageServerIconVisibility, Mode=OneWay}"
                         />
                         <ProgressRing
-                            Width="12"
-                            Height="12"
+                            Width="13"
+                            Height="13"
                             MinWidth="0"
                             MinHeight="0"
+                            Margin="0,0,0,-2"
                             IsActive="{x:Bind ViewModel.IsLanguageServerBusy, Mode=OneWay}"
                             Visibility="{x:Bind ViewModel.LanguageServerBusyVisibility, Mode=OneWay}"
                         />
@@ -1309,14 +1312,17 @@
                     ToolTipService.ToolTip="Running external tools"
                     Visibility="{x:Bind ViewModel.RunningExternalToolVisibility, Mode=OneWay}"
                 >
-                    <FontIcon Glyph="&#xEC7A;" FontSize="12" />
+                    <FontIcon
+                        Glyph="&#xEC7A;"
+                        FontSize="13" 
+                    />
                     <TextBlock Text="{x:Bind ViewModel.RunningExternalToolCountText, Mode=OneWay}" />
                 </StackPanel>
                 <StackPanel
                     x:Name="ProblemsStatus"
                     Grid.Column="6"
                     Orientation="Horizontal"
-                    Spacing="10"
+                    Spacing="8"
                     Background="Transparent"
                     ToolTipService.ToolTip="Show Problems (Ctrl+Shift+M)"
                     Visibility="{x:Bind ViewModel.ProblemsVisibility, Mode=OneWay}"
@@ -1327,7 +1333,10 @@
                         Spacing="4"
                         Visibility="{x:Bind ViewModel.ErrorCountVisibility, Mode=OneWay}"
                     >
-                        <FontIcon Glyph="&#xEA39;" FontSize="12" />
+                        <FontIcon
+                            Glyph="&#xEA39;"
+                            FontSize="13"
+                        />
                         <TextBlock
                             x:Name="ErrorCountStatus"
                             Text="{x:Bind ViewModel.ErrorCountText, Mode=OneWay}"
@@ -1339,7 +1348,10 @@
                         Spacing="4"
                         Visibility="{x:Bind ViewModel.WarningCountVisibility, Mode=OneWay}"
                     >
-                        <FontIcon Glyph="&#xE7BA;" FontSize="12" />
+                        <FontIcon
+                            Glyph="&#xE7BA;"
+                            FontSize="13"
+                        />
                         <TextBlock
                             Text="{x:Bind ViewModel.WarningCountText, Mode=OneWay}"
                             AutomationProperties.HelpText="Warnings"
@@ -1350,7 +1362,10 @@
                         Spacing="4"
                         Visibility="{x:Bind ViewModel.InformationCountVisibility, Mode=OneWay}"
                     >
-                        <FontIcon Glyph="&#xE946;" FontSize="12" />
+                        <FontIcon
+                            Glyph="&#xE946;"
+                            FontSize="13"
+                        />
                         <TextBlock
                             Text="{x:Bind ViewModel.InformationCountText, Mode=OneWay}"
                             AutomationProperties.HelpText="Information"
