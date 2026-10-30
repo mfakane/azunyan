@@ -96,6 +96,11 @@ public sealed partial class CompletionPopup : UserControl
             _updatingItems = true;
             try
             {
+                // The rows animate in when the popup opens, but not when
+                // typing narrows them, which would make them flicker.
+                CompletionList.ItemContainerTransitions = PopupHost.IsOpen
+                    ? []
+                    : CompletionRowTransitions;
                 CompletionList.Items.Clear();
                 foreach (var item in result.Items)
                 {

@@ -401,6 +401,11 @@ answers none, such as once the caret leaves the call. A pointer press ends it
 too: a call being typed has no closing parenthesis yet, so the provider can
 still see a caret placed far after it as inside the call.
 
+While completion candidates for an edit are on their way, the popup keeps the
+ones shown, as long as the edit only typed or erased the word they complete;
+accepting one then replaces that word as it now stands. The rows animate in
+when the popup opens and change without animation while it stays open.
+
 Each provider channel has independent cancellation, request IDs, result store,
 and error isolation. A result is publishable only when its snapshot and request
 generation still match that channel. Partial result-store updates are allowed;

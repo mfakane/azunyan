@@ -26,7 +26,16 @@
                     Background="Transparent"
                     Foreground="Transparent"
                     IsItemClickEnabled="True"
-                    SelectionMode="Single" />
+                    SelectionMode="Single">
+                    <ListView.ItemContainerTransitions>
+                        <TransitionCollection x:Name="CompletionRowTransitions">
+                            <AddDeleteThemeTransition />
+                            <ContentThemeTransition />
+                            <ReorderThemeTransition />
+                            <EntranceThemeTransition IsStaggeringEnabled="False" />
+                        </TransitionCollection>
+                    </ListView.ItemContainerTransitions>
+                </ListView>
                 <Border
                     x:Name="CompletionDetailsBorder"
                     Grid.Column="1"

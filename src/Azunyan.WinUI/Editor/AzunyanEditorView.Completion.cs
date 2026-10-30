@@ -20,6 +20,16 @@ public sealed partial class AzunyanEditorView
         }
 
         var frame = GetCurrentFrame();
+        if (frame is { Position: null }
+            && CompletionPopup.IsOpen
+            && TryGetShownCompletionRange(out _))
+        {
+            // The candidates for the edit are on their way; the ones shown
+            // stay until they arrive instead of the popup blinking out.
+            ShowCompletionPopup(_shownCompletion!.Completions!);
+            return;
+        }
+
         var completions = frame?.Position?.Completions;
         StopCompletionSessionIfEmpty(frame, completions);
         if (frame is null
@@ -41,11 +51,17 @@ public sealed partial class AzunyanEditorView
             return;
         }
 
+        _shownCompletion = frame.Position;
+        ShowCompletionPopup(completions);
+    }
+
+    private void ShowCompletionPopup(CompletionResult completions)
+    {
         _autoIndentOnEnter = false;
         _suppressVerticalCaretNavigation = true;
 
         if (!TryGetRendererCaretRect(
-                DocumentAnchor.Before(frame.Selection.CaretPosition),
+                DocumentAnchor.Before(Document.Selection.CaretPosition),
                 out var caretRect))
         {
             HideCompletionPopup();
@@ -58,6 +74,49 @@ public sealed partial class AzunyanEditorView
             completions,
             inputOrigin.X + caretRect.X,
             inputOrigin.Y + caretRect.Y + caretRect.Height);
+    }
+
+    /// <summary>
+    /// Finds what the shown candidates replace in the current text, which
+    /// they still can while an edit since they were asked for has only typed
+    /// or erased the word at the caret.
+    /// </summary>
+    private bool TryGetShownCompletionRange(out TextRange range)
+    {
+        range = default;
+        if (_shownCompletion is not { Completions: { } completions } shown)
+        {
+            return false;
+        }
+
+        var snapshot = Snapshot;
+        var oldSnapshot = shown.Context.Snapshot;
+        var oldCaret = shown.Context.Position;
+        var start = completions.ReplacementRange.Start;
+        var caret = Document.Selection.CaretPosition;
+        var kept = Math.Min(caret, oldCaret);
+        if (caret < start || oldCaret < start || kept > snapshot.Length)
+        {
+            return false;
+        }
+
+        if (!string.Equals(
+                oldSnapshot.GetText(start, kept - start),
+                snapshot.GetText(start, kept - start),
+                StringComparison.Ordinal)
+            || !snapshot.GetText(kept, caret - kept).All(IsIdentifierPart))
+        {
+            return false;
+        }
+
+        var end = caret + Math.Max(0, completions.ReplacementRange.End - oldCaret);
+        if (end > snapshot.Length)
+        {
+            return false;
+        }
+
+        range = TextRange.FromBounds(start, end);
+        return true;
     }
 
     /// <summary>
@@ -241,16 +300,20 @@ public sealed partial class AzunyanEditorView
         var frame = GetCurrentFrame();
         var completions = frame?.Position?.Completions;
         var range = args.ReplacementRange;
-        if (frame is null
-            || frame.Position is null
-            || completions is null
-            || !ReferenceEquals(args.Result, completions)
-            || frame.Position!.Context.Position != frame.Selection.CaretPosition
-            || frame.Selection.CaretPosition < range.Start
-            || frame.Selection.CaretPosition > range.End
-            || range.Start > Snapshot.Length
-            || range.End > Snapshot.Length
-            || (!_explicitCompletionRequested && !HasUsefulCompletion(completions)))
+        var isPending = frame is { Position: null }
+            && ReferenceEquals(args.Result, _shownCompletion?.Completions)
+            && TryGetShownCompletionRange(out range);
+        if (!isPending
+            && (frame is null
+                || frame.Position is null
+                || completions is null
+                || !ReferenceEquals(args.Result, completions)
+                || frame.Position!.Context.Position != frame.Selection.CaretPosition
+                || frame.Selection.CaretPosition < range.Start
+                || frame.Selection.CaretPosition > range.End
+                || range.Start > Snapshot.Length
+                || range.End > Snapshot.Length
+                || (!_explicitCompletionRequested && !HasUsefulCompletion(completions))))
         {
             args.Cancel = true;
             _completionRequested = false;
@@ -323,6 +386,7 @@ public sealed partial class AzunyanEditorView
     {
         _autoIndentOnEnter = true;
         _suppressVerticalCaretNavigation = false;
+        _shownCompletion = null;
         CompletionPopup.Hide();
     }
 
