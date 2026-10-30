@@ -22,11 +22,22 @@ public sealed partial class AzunyanEditorView
         var frame = GetCurrentFrame();
         if (frame is { Position: null }
             && CompletionPopup.IsOpen
-            && TryGetShownCompletionRange(out _))
+            && TryGetShownCompletionRange(out var shownRange))
         {
             // The candidates for the edit are on their way; the ones shown
-            // stay until they arrive instead of the popup blinking out.
-            ShowCompletionPopup(_shownCompletion!.Completions!);
+            // stay until they arrive, narrowed to the word as typed, instead
+            // of the popup blinking out.
+            var narrowed = NarrowShownCompletion(shownRange);
+            if (narrowed.Items.Count > 0
+                && (_explicitCompletionRequested || HasUsefulCompletion(narrowed)))
+            {
+                ShowCompletionPopup(narrowed);
+            }
+            else
+            {
+                HideCompletionPopup();
+            }
+
             return;
         }
 
@@ -52,6 +63,7 @@ public sealed partial class AzunyanEditorView
         }
 
         _shownCompletion = frame.Position;
+        _narrowedCompletion = null;
         ShowCompletionPopup(completions);
     }
 
@@ -74,6 +86,32 @@ public sealed partial class AzunyanEditorView
             completions,
             inputOrigin.X + caretRect.X,
             inputOrigin.Y + caretRect.Y + caretRect.Height);
+    }
+
+    /// <summary>
+    /// The shown candidates that still match the word at the caret. They are
+    /// narrowed again only when the word changes, so the selection stays
+    /// while nothing is typed.
+    /// </summary>
+    private CompletionResult NarrowShownCompletion(TextRange range)
+    {
+        var completions = _shownCompletion!.Completions!;
+        var word = Snapshot.GetText(range.Start, Document.Selection.CaretPosition - range.Start);
+        if (range == completions.ReplacementRange
+            && ReferenceEquals(Snapshot, _shownCompletion.Context.Snapshot))
+        {
+            return completions;
+        }
+
+        if (_narrowedCompletion is not { } narrowed
+            || narrowed.Word != word
+            || narrowed.Result.ReplacementRange != range)
+        {
+            narrowed = (word, completions.Narrow(range, word));
+            _narrowedCompletion = narrowed;
+        }
+
+        return narrowed.Result;
     }
 
     /// <summary>
@@ -301,7 +339,8 @@ public sealed partial class AzunyanEditorView
         var completions = frame?.Position?.Completions;
         var range = args.ReplacementRange;
         var isPending = frame is { Position: null }
-            && ReferenceEquals(args.Result, _shownCompletion?.Completions)
+            && (ReferenceEquals(args.Result, _shownCompletion?.Completions)
+                || ReferenceEquals(args.Result, _narrowedCompletion?.Result))
             && TryGetShownCompletionRange(out range);
         if (!isPending
             && (frame is null
@@ -387,6 +426,7 @@ public sealed partial class AzunyanEditorView
         _autoIndentOnEnter = true;
         _suppressVerticalCaretNavigation = false;
         _shownCompletion = null;
+        _narrowedCompletion = null;
         CompletionPopup.Hide();
     }
 

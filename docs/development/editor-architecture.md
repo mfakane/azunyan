@@ -402,8 +402,10 @@ too: a call being typed has no closing parenthesis yet, so the provider can
 still see a caret placed far after it as inside the call.
 
 While completion candidates for an edit are on their way, the popup keeps the
-ones shown, as long as the edit only typed or erased the word they complete;
-accepting one then replaces that word as it now stands. The rows animate in
+ones shown, as long as the edit only typed or erased the word they complete,
+narrowed by `FuzzyMatch.MatchCompletion` against the word as typed, as the
+language server conversion narrows its answers; accepting one then
+replaces that word as it now stands. The rows animate in
 when the popup opens and change without animation while it stays open.
 
 Each provider channel has independent cancellation, request IDs, result store,

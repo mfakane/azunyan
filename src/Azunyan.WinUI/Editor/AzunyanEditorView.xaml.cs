@@ -85,6 +85,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private bool _completionRequested;
     private bool _explicitCompletionRequested;
     private PositionProviderResults? _shownCompletion;
+    private (string Word, CompletionResult Result)? _narrowedCompletion;
     private bool _applyingCompletion;
     private readonly List<MenuFlyoutItemBase> _additionalContextMenuItems = [];
     private MenuFlyoutSeparator? _additionalContextMenuSeparator;

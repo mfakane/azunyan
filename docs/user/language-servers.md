@@ -57,7 +57,9 @@ those carrying a whole document, are cut short.
   with the server's command as their source. They are updated as the document
   changes.
 - **Completion**: Edit > Show Completions (Ctrl+Space) and the server's trigger
-  characters suggest what the server offers instead of document words. A
+  characters suggest what the server offers instead of document words. The
+  word typed narrows them by its letters in order, the first at the start of a
+  word in the name, so `wl` finds `WriteLine`; closer matches come first. A
   suggestion with placeholders is inserted with their default text.
 - **Descriptions**: resting the pointer on a symbol shows what the server says
   about it, after any problem there.

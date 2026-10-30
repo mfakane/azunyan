@@ -68,7 +68,9 @@ internal static partial class LanguageServerConversions
     }
 
     /// <summary>
-    /// The server's items that match the word before the caret. The editor
+    /// The server's items that match the word before the caret as
+    /// <see cref="FuzzyMatch.MatchCompletion"/> does, best first and then in
+    /// the server's sort order. The editor
     /// replaces one range for every item, so an item that would replace more
     /// or less than that word has its text adjusted to the same result.
     /// </summary>
@@ -90,7 +92,7 @@ internal static partial class LanguageServerConversions
         }
 
         var prefix = text[wordStart..position];
-        var candidates = new List<(string SortText, int Index, CompletionItem Item)>();
+        var candidates = new List<(int Score, string SortText, int Index, CompletionItem Item)>();
         foreach (var (item, index) in items.OfType<JsonObject>().Select((item, index) => (item, index)))
         {
             if (GetString(item["label"]) is not { Length: > 0 } label)
@@ -105,9 +107,12 @@ internal static partial class LanguageServerConversions
             // The server filters by the text its edit replaces, such as a word and its opening quote.
             var filterPrefix = editStart < wordStart ? text[editStart..position] : prefix;
             var filterText = GetString(item["filterText"]) ?? label;
-            if (!filterText.StartsWith(filterPrefix, StringComparison.OrdinalIgnoreCase)
-                && !label.StartsWith(filterPrefix, StringComparison.OrdinalIgnoreCase)
-                && !label.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            var score = Math.Max(
+                FuzzyMatch.MatchCompletion(filterPrefix, filterText) ?? -1,
+                Math.Max(
+                    FuzzyMatch.MatchCompletion(filterPrefix, label) ?? -1,
+                    FuzzyMatch.MatchCompletion(prefix, label) ?? -1));
+            if (score < 0)
             {
                 continue;
             }
@@ -136,13 +141,15 @@ internal static partial class LanguageServerConversions
             }
 
             candidates.Add((
+                score,
                 GetString(item["sortText"]) ?? label,
                 index,
                 new CompletionItem(
                     label,
                     insertText,
                     GetString(item["detail"]),
-                    GetMarkupText(item["documentation"]))));
+                    GetMarkupText(item["documentation"]),
+                    filterText: GetString(item["filterText"]))));
         }
 
         if (candidates.Count == 0)
@@ -151,7 +158,8 @@ internal static partial class LanguageServerConversions
         }
 
         var sorted = candidates
-            .OrderBy(candidate => candidate.SortText, StringComparer.Ordinal)
+            .OrderByDescending(candidate => candidate.Score)
+            .ThenBy(candidate => candidate.SortText, StringComparer.Ordinal)
             .ThenBy(candidate => candidate.Index)
             .Take(MaximumCompletionCount)
             .Select((candidate, order) => new CompletionItem(
@@ -159,7 +167,8 @@ internal static partial class LanguageServerConversions
                 candidate.Item.InsertText,
                 candidate.Item.Detail,
                 candidate.Item.Documentation,
-                order))
+                order,
+                candidate.Item.FilterText))
             .ToArray();
         return new CompletionResult(TextRange.FromBounds(wordStart, position), sorted);
     }

@@ -32,6 +32,34 @@ public sealed class LanguageServerConversionsTests
     }
 
     [Fact]
+    public void Completion_matches_the_word_from_word_starts_best_first()
+    {
+        var context = Context("Console.wl", "Console.wl".Length);
+        var completion = JsonNode.Parse("""
+            [
+              { "label": "WindowLeft", "sortText": "9" },
+              { "label": "Write", "sortText": "1" },
+              { "label": "WriteLine", "sortText": "2" },
+              { "label": "Bell", "sortText": "3" }
+            ]
+            """);
+
+        var result = LanguageServerConversions.ToCompletionResult(completion, context)!;
+
+        Assert.Equal(["WriteLine", "WindowLeft"], result.Items.Select(item => item.Label));
+
+        context = Context("Console.wil", "Console.wil".Length);
+        result = LanguageServerConversions.ToCompletionResult(completion, context)!;
+
+        Assert.Equal(["WindowLeft", "WriteLine"], result.Items.Select(item => item.Label));
+
+        context = Context("Console.writel", "Console.writel".Length);
+        result = LanguageServerConversions.ToCompletionResult(completion, context)!;
+
+        Assert.Equal(["WriteLine"], result.Items.Select(item => item.Label));
+    }
+
+    [Fact]
     public void Completion_adjusts_an_edit_that_replaces_more_than_the_word()
     {
         var context = Context("@Ht", 3);

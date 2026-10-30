@@ -161,7 +161,8 @@ public sealed record TooltipData
 /// <summary>
 /// One completion candidate. InsertText defaults to Label, which keeps simple
 /// keyword and document-word providers small while allowing richer providers
-/// to insert a different value.
+/// to insert a different value. FilterText, also Label by default, is what the
+/// typed word is matched against.
 /// </summary>
 public sealed record CompletionItem
 {
@@ -170,7 +171,8 @@ public sealed record CompletionItem
         string? insertText = null,
         string? detail = null,
         string? documentation = null,
-        int sortOrder = 0)
+        int sortOrder = 0,
+        string? filterText = null)
     {
         ArgumentNullException.ThrowIfNull(label);
         Label = label;
@@ -178,11 +180,14 @@ public sealed record CompletionItem
         Detail = detail;
         Documentation = documentation;
         SortOrder = sortOrder;
+        FilterText = filterText ?? label;
     }
 
     public string Label { get; }
 
     public string InsertText { get; }
+
+    public string FilterText { get; }
 
     public string? Detail { get; }
 
@@ -210,6 +215,27 @@ public sealed class CompletionResult
 
     public static CompletionResult Empty(TextRange replacementRange) =>
         new(replacementRange, Array.Empty<CompletionItem>());
+
+    /// <summary>
+    /// The items whose filter text or label matches <paramref name="word"/>
+    /// as <see cref="FuzzyMatch.MatchCompletion"/> does, best first and
+    /// otherwise in their order, to replace <paramref name="replacementRange"/>.
+    /// </summary>
+    public CompletionResult Narrow(TextRange replacementRange, string word)
+    {
+        ArgumentNullException.ThrowIfNull(word);
+        return new CompletionResult(
+            replacementRange,
+            Items
+                .Select((item, index) => (Item: item, Index: index, Score: Math.Max(
+                    FuzzyMatch.MatchCompletion(word, item.FilterText) ?? -1,
+                    FuzzyMatch.MatchCompletion(word, item.Label) ?? -1)))
+                .Where(match => match.Score >= 0)
+                .OrderByDescending(match => match.Score)
+                .ThenBy(match => match.Index)
+                .Select(match => match.Item)
+                .ToArray());
+    }
 }
 
 /// <summary>
