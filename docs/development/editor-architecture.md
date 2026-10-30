@@ -482,7 +482,10 @@ repeat KeyDown events. KeyUp never performs the document command: it only
 balances the native TextBox's handled-key state and flushes the coalesced
 sliding-window synchronization after the physical chord is fully released.
 This lets the projected caret move while a modifier remains held without
-mutating the native TextBox inside its active key pipeline.
+mutating the native TextBox inside its active key pipeline. Whether a key is
+still held is checked against the keyboard state, not only the KeyUp events
+seen, since a KeyUp can go to another window, as Alt does after Alt+Tab, and a
+key thought held would put off the synchronization for good.
 
 ## 10. Accessibility
 

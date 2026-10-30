@@ -1492,7 +1492,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             RenderViewport();
         }
 
-        if (_nativeKeysDown.Count == 0)
+        if (!AreNativeKeysDown())
         {
             RequestInputWindowSynchronization();
         }
@@ -2141,7 +2141,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             return;
         }
 
-        if (_nativeKeysDown.Count != 0)
+        if (AreNativeKeysDown())
         {
             // Keep the projected document and caret responsive while a
             // shortcut modifier remains held, but do not mutate the native
@@ -2336,7 +2336,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         if (!_pasteBatchRefreshPending
             || _pasteOperationRunning
             || IsComposing
-            || _nativeKeysDown.Count != 0)
+            || AreNativeKeysDown())
         {
             return;
         }
@@ -2359,7 +2359,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         if (_disposed
             || _pasteOperationRunning
             || IsComposing
-            || _nativeKeysDown.Count != 0
+            || AreNativeKeysDown()
             || !_pasteBatchRefreshPending)
         {
             return;
@@ -2426,6 +2426,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     private void OnInputKeyDown(object sender, KeyRoutedEventArgs args)
     {
+        ForgetReleasedNativeKeys();
         var isRepeat = !_nativeKeysDown.Add(args.Key);
         if (args.Key is VirtualKey.Control or VirtualKey.Menu && !isRepeat)
         {
@@ -2958,7 +2959,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         LogDiagnostic(
             AzunyanDiagnosticCategory.Key,
             $"keyup key={args.Key}; {DescribeDiagnosticState()}");
-        if (_nativeKeysDown.Count == 0)
+        if (!AreNativeKeysDown())
         {
             if (_pasteBatchRefreshPending)
             {
@@ -3131,6 +3132,21 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         _automationPeer?.NotifyFocusChanged();
+    }
+
+    /// <summary>
+    /// Drops the keys no longer held. A KeyUp can go to another window while
+    /// the editor keeps its focus, as the Alt of Alt+Tab does, and a key left
+    /// held would put off synchronizing the native TextBox for good, so
+    /// typing lands where its stale text puts the caret.
+    /// </summary>
+    private void ForgetReleasedNativeKeys() =>
+        _nativeKeysDown.RemoveWhere(key => !IsKeyDown(key));
+
+    private bool AreNativeKeysDown()
+    {
+        ForgetReleasedNativeKeys();
+        return _nativeKeysDown.Count != 0;
     }
 
     private static bool IsKeyDown(VirtualKey key) =>
