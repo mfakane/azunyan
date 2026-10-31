@@ -172,7 +172,7 @@ public sealed partial class MainWindow
         }
         else
         {
-            _rootGrid.DispatcherQueue.TryEnqueue(ApplyWindowGroupAccentCore);
+            _rootGrid.DispatcherQueue.TryEnqueueReporting(ApplyWindowGroupAccentCore);
         }
     }
 

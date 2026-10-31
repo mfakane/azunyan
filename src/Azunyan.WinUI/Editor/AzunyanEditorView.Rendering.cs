@@ -167,7 +167,7 @@ public sealed partial class AzunyanEditorView
                 out var caretRect))
         {
             InputWindow.SetCaretRect(caretRect);
-            DispatcherQueue.TryEnqueue(ReconcileInputWindowCaret);
+            DispatcherQueue.TryEnqueueReporting(ReconcileInputWindowCaret);
         }
         CreateProjectedAutomationChildren();
         if (wasAtBottom

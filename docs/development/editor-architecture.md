@@ -664,10 +664,15 @@ publish `TryGetCaretRect(DocumentAnchor, out Rect)` in `EditorHost` coordinates.
 `AzunyanTextInputWindow` consumes that contract while keeping its native text
 context bounded and independent from document rendering.
 
-Azunote's application shell also installs a failure boundary around the WinUI
-dispatcher, AppDomain, and unobserved-task paths. Managed UI failures are
-shown to the user with the per-user log path; process-level failures are
-recorded even when the UI can no longer be trusted.
+Azunote's application shell treats an unhandled exception, from a XAML event,
+an await, or another thread, as the end of the process: it logs the exception
+with a dump, backs up unsaved documents when on the UI thread, tells the user
+with the log path in a message box, and exits. A failed task nobody awaited is
+only logged. An exception in work the dispatcher calls back, queued with
+`TryEnqueue` or on a `DispatcherQueueTimer` tick, would instead stop the
+process at once without reaching `Application.UnhandledException`, so such
+work is queued with `TryEnqueueReporting` and ticks are handled with `OnTick`
+from `DispatcherQueueReporting`, which hand the exception to that event.
 
 No new editor feature should depend on those transitional rendering details.
 

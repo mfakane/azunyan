@@ -143,7 +143,7 @@ public sealed class TextBoxCompletionController : IDisposable
         }
 
         _refreshScheduled = true;
-        if (!_textBox.DispatcherQueue.TryEnqueue(() =>
+        if (!_textBox.DispatcherQueue.TryEnqueueReporting(() =>
             {
                 _refreshScheduled = false;
                 if (!_disposed)
@@ -233,7 +233,7 @@ public sealed class TextBoxCompletionController : IDisposable
 
     private void TextBox_LostFocus(object sender, RoutedEventArgs args)
     {
-        _textBox.DispatcherQueue.TryEnqueue(() =>
+        _textBox.DispatcherQueue.TryEnqueueReporting(() =>
         {
             try
             {

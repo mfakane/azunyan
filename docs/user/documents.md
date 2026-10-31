@@ -21,7 +21,9 @@ On the next launch, each of those documents opens in its own window with its
 changes still unsaved. A document with a file reopens that file with the
 changes applied on top, so Undo returns to the file as it is on disk; if the
 file no longer exists, the text opens as an untitled document. The same happens
-after Azunote stops unexpectedly.
+after Azunote stops unexpectedly. When Azunote runs into an error it cannot
+recover from, it backs up unsaved documents, tells what went wrong and where the
+details were logged, and closes.
 
 Besides edits to the text, two things leave a document unsaved:
 

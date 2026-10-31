@@ -1,4 +1,5 @@
 using Azunyan.Core;
+using Azunyan.WinUI;
 
 namespace Azunote;
 
@@ -171,7 +172,7 @@ internal sealed class MainWindowRuntime : IDisposable
         _backupTimer = _view.DispatcherQueue.CreateTimer();
         _backupTimer.Interval = BackupDelay;
         _backupTimer.IsRepeating = false;
-        _backupTimer.Tick += (_, _) => _backups.Flush();
+        _backupTimer.OnTick((_, _) => _backups.Flush());
 
         if (languageServers is not null)
         {
@@ -376,20 +377,6 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public Task ShowStartupErrorAsync(string title, string message) =>
         _prompt.ShowErrorAsync(title, message);
-
-    public void ShowUnhandledError(Exception exception, string logPath)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        ArgumentException.ThrowIfNullOrWhiteSpace(logPath);
-
-        var detail = string.IsNullOrWhiteSpace(exception.Message)
-            ? exception.GetType().Name
-            : exception.Message;
-        var message = $"{detail}\n\nDetails were written to:\n{logPath}";
-        _dispatcher.TryEnqueue(() => _ = _prompt.ShowErrorAsync(
-            "Azunote encountered an unexpected error",
-            message));
-    }
 
     public void Undo() => _editorCommands.Undo();
 

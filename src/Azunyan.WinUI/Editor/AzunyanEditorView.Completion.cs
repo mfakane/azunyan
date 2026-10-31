@@ -168,12 +168,15 @@ public sealed partial class AzunyanEditorView
     {
         NextProviderGeneration(ref _hoverProviderGeneration);
         _hoverResult = null;
-        _hoverTimer ??= DispatcherQueue.CreateTimer();
-        _hoverTimer.Interval = HoverDelay;
-        _hoverTimer.IsRepeating = false;
+        if (_hoverTimer is null)
+        {
+            _hoverTimer = DispatcherQueue.CreateTimer();
+            _hoverTimer.Interval = HoverDelay;
+            _hoverTimer.IsRepeating = false;
+            _hoverTimer.OnTick(OnHoverTimerTick);
+        }
+
         _hoverTimer.Stop();
-        _hoverTimer.Tick -= OnHoverTimerTick;
-        _hoverTimer.Tick += OnHoverTimerTick;
         _hoverTimer.Start();
     }
 
@@ -229,7 +232,7 @@ public sealed partial class AzunyanEditorView
             return;
         }
 
-        DispatcherQueue.TryEnqueue(() =>
+        DispatcherQueue.TryEnqueueReporting(() =>
         {
             if (!IsLoaded
                 || generation != _hoverProviderGeneration

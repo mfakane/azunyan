@@ -179,26 +179,11 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
         _disposed = true;
         EndTypedInputUndoGroup();
-        if (_pasteBatchRefreshTimer is { } pasteBatchRefreshTimer)
-        {
-            pasteBatchRefreshTimer.Stop();
-            pasteBatchRefreshTimer.Tick -= OnPasteBatchRefreshTimerTick;
-        }
-
+        _pasteBatchRefreshTimer?.Stop();
         _pasteBatchRefreshTimer = null;
-        if (_typedInputUndoGroupTimer is { } typedInputUndoGroupTimer)
-        {
-            typedInputUndoGroupTimer.Stop();
-            typedInputUndoGroupTimer.Tick -= OnTypedInputUndoGroupTimerTick;
-        }
-
+        _typedInputUndoGroupTimer?.Stop();
         _typedInputUndoGroupTimer = null;
-        if (_hoverTimer is { } hoverTimer)
-        {
-            hoverTimer.Stop();
-            hoverTimer.Tick -= OnHoverTimerTick;
-        }
-
+        _hoverTimer?.Stop();
         _hoverTimer = null;
         _documentProviderDelayCancellation?.Cancel();
         _documentProviderDelayCancellation?.Dispose();
@@ -801,7 +786,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         T result = default!;
         Exception? exception = null;
         using var completed = new ManualResetEventSlim();
-        if (!DispatcherQueue.TryEnqueue(() =>
+        if (!DispatcherQueue.TryEnqueueReporting(() =>
             {
                 try
                 {
@@ -1346,7 +1331,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         // window has completed its first layout. Re-apply it on the next UI
         // turn so real keyboard input reaches the inner TextBox, not only the
         // projected editor automation peer.
-        DispatcherQueue.TryEnqueue(() =>
+        DispatcherQueue.TryEnqueueReporting(() =>
         {
             if (!_disposed && IsLoaded)
             {
@@ -1886,7 +1871,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
         _pendingProviderDocumentChange = args;
         _pendingAutomationDocumentChange = args;
-        DispatcherQueue.TryEnqueue(FlushPendingAutomationDocumentChange);
+        DispatcherQueue.TryEnqueueReporting(FlushPendingAutomationDocumentChange);
         if (!IsComposing
             && !_applyingCompletion
             && InputHost.FocusState != FocusState.Unfocused)
@@ -1980,7 +1965,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     {
         if (IsLoaded)
         {
-            DispatcherQueue.TryEnqueue(RenderViewport);
+            DispatcherQueue.TryEnqueueReporting(RenderViewport);
         }
     }
 
@@ -2260,7 +2245,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         _inputWindowSynchronizationScheduled = true;
-        if (!DispatcherQueue.TryEnqueue(() =>
+        if (!DispatcherQueue.TryEnqueueReporting(() =>
             {
                 _inputWindowSynchronizationScheduled = false;
                 if (!_disposed && !IsComposing)
@@ -2293,12 +2278,15 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         _lastTypedInputTimestamp = now;
-        _typedInputUndoGroupTimer ??= DispatcherQueue.CreateTimer();
-        _typedInputUndoGroupTimer.Interval = TypedInputUndoGroupInterval;
-        _typedInputUndoGroupTimer.IsRepeating = false;
+        if (_typedInputUndoGroupTimer is null)
+        {
+            _typedInputUndoGroupTimer = DispatcherQueue.CreateTimer();
+            _typedInputUndoGroupTimer.Interval = TypedInputUndoGroupInterval;
+            _typedInputUndoGroupTimer.IsRepeating = false;
+            _typedInputUndoGroupTimer.OnTick(OnTypedInputUndoGroupTimerTick);
+        }
+
         _typedInputUndoGroupTimer.Stop();
-        _typedInputUndoGroupTimer.Tick -= OnTypedInputUndoGroupTimerTick;
-        _typedInputUndoGroupTimer.Tick += OnTypedInputUndoGroupTimerTick;
         _typedInputUndoGroupTimer.Start();
     }
 
@@ -2345,13 +2333,16 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             return;
         }
 
-        _pasteBatchRefreshTimer ??= DispatcherQueue.CreateTimer();
-        _pasteBatchRefreshTimer.Interval = TimeSpan.FromMilliseconds(120);
-        _pasteBatchRefreshTimer.IsRepeating = false;
+        if (_pasteBatchRefreshTimer is null)
+        {
+            _pasteBatchRefreshTimer = DispatcherQueue.CreateTimer();
+            _pasteBatchRefreshTimer.Interval = TimeSpan.FromMilliseconds(120);
+            _pasteBatchRefreshTimer.IsRepeating = false;
+            _pasteBatchRefreshTimer.OnTick(OnPasteBatchRefreshTimerTick);
+        }
+
         _pasteBatchRefreshTimer.Stop();
         _pasteBatchRefreshScheduled = true;
-        _pasteBatchRefreshTimer.Tick -= OnPasteBatchRefreshTimerTick;
-        _pasteBatchRefreshTimer.Tick += OnPasteBatchRefreshTimerTick;
         _pasteBatchRefreshTimer.Start();
     }
 
@@ -2859,7 +2850,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         LogDiagnostic(
             AzunyanDiagnosticCategory.Key,
             $"queued-key-edit key={key}; {DescribeDiagnosticState()}");
-        if (!DispatcherQueue.TryEnqueue(() =>
+        if (!DispatcherQueue.TryEnqueueReporting(() =>
             {
                 if (!_disposed && inputEpoch == _keyInputEpoch)
                 {
@@ -3506,7 +3497,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         _pointerRenderScheduled = true;
-        if (DispatcherQueue.TryEnqueue(
+        if (DispatcherQueue.TryEnqueueReporting(
                 Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
                 () =>
                 {

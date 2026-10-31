@@ -51,7 +51,7 @@ public sealed partial class AzunyanEditorView
 
         InlinePromptPopup.IsOpen = true;
         QueueInlineChatPopupPositionUpdate();
-        DispatcherQueue.TryEnqueue(InlinePromptChatPanel.FocusInput);
+        DispatcherQueue.TryEnqueueReporting(InlinePromptChatPanel.FocusInput);
         return _inlinePromptSubmission.Task;
     }
 
@@ -61,7 +61,7 @@ public sealed partial class AzunyanEditorView
         ArgumentNullException.ThrowIfNull(response);
         if (!DispatcherQueue.HasThreadAccess)
         {
-            DispatcherQueue.TryEnqueue(() => AppendInlineChatResponse(conversationKey, response));
+            DispatcherQueue.TryEnqueueReporting(() => AppendInlineChatResponse(conversationKey, response));
             return;
         }
 
@@ -81,7 +81,7 @@ public sealed partial class AzunyanEditorView
     {
         if (!DispatcherQueue.HasThreadAccess)
         {
-            DispatcherQueue.TryEnqueue(() => BeginInlineChatResponse(conversationKey, responseId));
+            DispatcherQueue.TryEnqueueReporting(() => BeginInlineChatResponse(conversationKey, responseId));
             return;
         }
 
@@ -104,7 +104,7 @@ public sealed partial class AzunyanEditorView
         ArgumentNullException.ThrowIfNull(text);
         if (!DispatcherQueue.HasThreadAccess)
         {
-            DispatcherQueue.TryEnqueue(() => AppendInlineChatResponseChunk(
+            DispatcherQueue.TryEnqueueReporting(() => AppendInlineChatResponseChunk(
                 conversationKey,
                 responseId,
                 text));
@@ -124,7 +124,7 @@ public sealed partial class AzunyanEditorView
     {
         if (!DispatcherQueue.HasThreadAccess)
         {
-            DispatcherQueue.TryEnqueue(() => CompleteInlineChatResponse(conversationKey, responseId));
+            DispatcherQueue.TryEnqueueReporting(() => CompleteInlineChatResponse(conversationKey, responseId));
             return;
         }
 
@@ -154,7 +154,7 @@ public sealed partial class AzunyanEditorView
     {
         if (!DispatcherQueue.HasThreadAccess)
         {
-            DispatcherQueue.TryEnqueue(() => SetInlineChatProcessing(
+            DispatcherQueue.TryEnqueueReporting(() => SetInlineChatProcessing(
                 conversationKey,
                 isProcessing));
             return;

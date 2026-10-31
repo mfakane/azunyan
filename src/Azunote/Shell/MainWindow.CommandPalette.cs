@@ -1,4 +1,5 @@
 using System.Globalization;
+using Azunyan.WinUI;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
@@ -82,7 +83,7 @@ public sealed partial class MainWindow
         if (XamlRoot is { } root
             && VisualTreeHelper.GetOpenPopupsForXamlRoot(root).Any(popup => popup.Child is MenuFlyoutPresenter))
         {
-            DispatcherQueue.TryEnqueue(
+            DispatcherQueue.TryEnqueueReporting(
                 Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
                 () => ShowCommandPalette(text, placeholder, picks));
             return;

@@ -1,4 +1,5 @@
 using System.Text;
+using Azunyan.WinUI;
 using Microsoft.UI.Dispatching;
 
 namespace Azunote;
@@ -60,7 +61,7 @@ internal sealed class ApplicationCoordinator : IDisposable
         {
             _ = ProcessForwardedCommandLineAsync(command, standardInput, completion);
         }
-        else if (!dispatcher.TryEnqueue(() =>
+        else if (!dispatcher.TryEnqueueReporting(() =>
             _ = ProcessForwardedCommandLineAsync(command, standardInput, completion)))
         {
             completion.SetException(
@@ -444,7 +445,7 @@ internal sealed class ApplicationCoordinator : IDisposable
                     scheduled = true;
                 }
 
-                dispatcher.TryEnqueue(Flush);
+                dispatcher.TryEnqueueReporting(Flush);
             },
             out var kept);
         registration.Window.Runtime.AppendReadOnlyText(kept);
@@ -767,17 +768,6 @@ internal sealed class ApplicationCoordinator : IDisposable
         return index;
     }
 
-    public bool TryShowUnhandledError(Exception exception, string logPath)
-    {
-        if (Window is null)
-        {
-            return false;
-        }
-
-        Window.Runtime.ShowUnhandledError(exception, logPath);
-        return true;
-    }
-
     public void Dispose()
     {
         if (_disposed)
@@ -970,7 +960,7 @@ internal sealed class ApplicationCoordinator : IDisposable
 
         var completion = new TaskCompletionSource<object?>(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        if (!dispatcher.TryEnqueue(() =>
+        if (!dispatcher.TryEnqueueReporting(() =>
             {
                 try
                 {

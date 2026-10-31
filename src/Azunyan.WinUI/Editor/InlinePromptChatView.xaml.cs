@@ -40,7 +40,7 @@ public sealed partial class InlinePromptChatView : UserControl
         InitializeComponent();
         _sessionExpiryTimer = DispatcherQueue.CreateTimer();
         _sessionExpiryTimer.Interval = TimeSpan.FromMinutes(1);
-        _sessionExpiryTimer.Tick += SessionExpiryTimer_Tick;
+        _sessionExpiryTimer.OnTick(SessionExpiryTimer_Tick);
         Loaded += InlinePromptChatView_Loaded;
     }
 
@@ -375,7 +375,7 @@ public sealed partial class InlinePromptChatView : UserControl
 
     private void ScrollTranscriptToBottom()
     {
-        DispatcherQueue.TryEnqueue(() =>
+        DispatcherQueue.TryEnqueueReporting(() =>
         {
             InlinePromptTranscriptScrollViewer.UpdateLayout();
             InlinePromptTranscriptScrollViewer.ChangeView(

@@ -405,7 +405,7 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         }
 
         _proposalUpdatePending = true;
-        DispatcherQueue.TryEnqueue(() =>
+        DispatcherQueue.TryEnqueueReporting(() =>
         {
             _proposalUpdatePending = false;
             if (_proposal is { } proposal)
@@ -532,7 +532,7 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         }
 
         _followPending = true;
-        DispatcherQueue.TryEnqueue(() =>
+        DispatcherQueue.TryEnqueueReporting(() =>
         {
             _followPending = false;
             FollowProposalDocument();

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Azunyan.WinUI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Windows.ApplicationModel.DataTransfer;
@@ -20,7 +21,7 @@ internal sealed class DispatcherQueueUiDispatcher : IUiDispatcher
     public bool TryEnqueue(Action action)
     {
         ArgumentNullException.ThrowIfNull(action);
-        return _dispatcherQueue.TryEnqueue(() => action());
+        return _dispatcherQueue.TryEnqueueReporting(() => action());
     }
 }
 

@@ -9,7 +9,9 @@ public partial class App : Application, IDisposable
 {
     private const uint MessageBoxOk = 0x00000000;
     private const uint MessageBoxIconError = 0x00000010;
-    private static int _unhandledDialogShown;
+    private const uint MessageBoxTaskModal = 0x00002000;
+    private const int UnhandledExceptionExitCode = 1;
+    private static int _reportingThreadId;
     private readonly ApplicationCoordinator _application = new();
     private readonly SingleInstanceHost _singleInstance = new();
 
@@ -109,33 +111,29 @@ public partial class App : Application, IDisposable
         object? sender,
         System.UnhandledExceptionEventArgs args)
     {
-        if (args.ExceptionObject is Exception exception)
-        {
-            ReportUnhandledException("Unhandled AppDomain exception", exception);
-        }
-        else
-        {
-            var logPath = ErrorReporter.LogMessage(
-                "Unhandled AppDomain exception",
-                args.ExceptionObject?.ToString() ?? "Unknown exception object.");
-            ShowFallbackErrorDialog(
-                "Azunote encountered an unexpected error",
-                "An unexpected error occurred."
-                + Environment.NewLine
-                + Environment.NewLine
-                + $"Details were written to:{Environment.NewLine}{logPath}");
-        }
+        ReportUnhandledException(
+            "Unhandled AppDomain exception",
+            args.ExceptionObject as Exception
+                ?? new InvalidOperationException(args.ExceptionObject?.ToString() ?? "Unknown exception object."));
     }
 
+    /// <summary>
+    /// A task nobody awaited failed. It surfaces only when the task is
+    /// collected, long after the work that started it, so it is logged and
+    /// the application goes on.
+    /// </summary>
     private void OnUnobservedTaskException(
         object? sender,
         UnobservedTaskExceptionEventArgs args)
     {
-        var exception = args.Exception.Flatten();
-        ReportUnhandledException("Unobserved task exception", exception);
+        ErrorReporter.LogException("Unobserved task exception", args.Exception.Flatten());
         args.SetObserved();
     }
 
+    /// <summary>
+    /// Logs the exception, backs up unsaved changes, tells what happened, and
+    /// ends the process, whose state can no longer be trusted.
+    /// </summary>
     private void ReportUnhandledException(string source, Exception exception)
     {
         var dumpPath = NativeCrashReporter.WriteSnapshotDump();
@@ -145,21 +143,43 @@ public partial class App : Application, IDisposable
             ErrorReporter.LogMessage("Exception dump created", dumpPath);
         }
 
-        if (Interlocked.Exchange(ref _unhandledDialogShown, 1) != 0)
+        // Another exception while the dialog is up is only logged. On the
+        // dialog's thread its message loop has to go on; another thread waits
+        // for the process to end.
+        var threadId = Environment.CurrentManagedThreadId;
+        var reportingThreadId = Interlocked.CompareExchange(ref _reportingThreadId, threadId, 0);
+        if (reportingThreadId == threadId)
         {
             return;
+        }
+
+        if (reportingThreadId != 0)
+        {
+            Thread.Sleep(Timeout.Infinite);
+        }
+
+        // The windows' documents can be read only on their thread.
+        if (Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread() is not null)
+        {
+            try
+            {
+                _application.PrepareForSessionEnd();
+            }
+            catch (Exception backupException)
+            {
+                ErrorReporter.LogException("Back up documents before closing", backupException);
+            }
         }
 
         var detail = string.IsNullOrWhiteSpace(exception.Message)
             ? exception.GetType().Name
             : exception.Message;
-        var message = $"{detail}{Environment.NewLine}{Environment.NewLine}"
-            + $"Details were written to:{Environment.NewLine}{logPath}";
-
-        if (!_application.TryShowUnhandledError(exception, logPath))
-        {
-            ShowFallbackErrorDialog("Azunote encountered an unexpected error", message);
-        }
+        ShowFallbackErrorDialog(
+            "Azunote encountered an unexpected error",
+            $"Azunote has to close.{Environment.NewLine}{Environment.NewLine}"
+            + $"{detail}{Environment.NewLine}{Environment.NewLine}"
+            + $"Details were written to:{Environment.NewLine}{logPath}");
+        Environment.Exit(UnhandledExceptionExitCode);
     }
 
     public void Dispose()
@@ -191,7 +211,7 @@ public partial class App : Application, IDisposable
                 nint.Zero,
                 message,
                 title,
-                MessageBoxOk | MessageBoxIconError);
+                MessageBoxOk | MessageBoxIconError | MessageBoxTaskModal);
         }
         catch (Exception exception)
         {

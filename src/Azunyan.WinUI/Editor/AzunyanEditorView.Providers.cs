@@ -201,7 +201,7 @@ public sealed partial class AzunyanEditorView
             return;
         }
 
-        DispatcherQueue.TryEnqueue(() =>
+        DispatcherQueue.TryEnqueueReporting(() =>
         {
             try
             {
@@ -250,7 +250,7 @@ public sealed partial class AzunyanEditorView
             return;
         }
 
-        DispatcherQueue.TryEnqueue(() =>
+        DispatcherQueue.TryEnqueueReporting(() =>
         {
             try
             {
@@ -295,7 +295,7 @@ public sealed partial class AzunyanEditorView
             return;
         }
 
-        DispatcherQueue.TryEnqueue(() =>
+        DispatcherQueue.TryEnqueueReporting(() =>
         {
             try
             {

@@ -100,7 +100,7 @@ public sealed partial class AzunyanEditorView
             return;
         }
 
-        DispatcherQueue.TryEnqueue(() =>
+        DispatcherQueue.TryEnqueueReporting(() =>
         {
             if (!IsLoaded
                 || generation != _signatureHelpGeneration
