@@ -82,8 +82,10 @@ public sealed partial class AzunyanEditorView
 
         var inputOrigin = ProjectedSurfaceHost.TransformToVisual(EditorHost)
             .TransformPoint(new Point(0, 0));
+        var start = completions.ReplacementRange.Start;
         CompletionPopup.Show(
             completions,
+            Snapshot.GetText(start, Document.Selection.CaretPosition - start),
             inputOrigin.X + caretRect.X,
             inputOrigin.Y + caretRect.Y + caretRect.Height);
     }

@@ -112,17 +112,18 @@ public static class FuzzyMatch
     /// Scores the word typed for a completion against a candidate's
     /// <paramref name="text"/>. Its first character has to match where a word
     /// starts, so <c>wl</c> finds <c>WriteLine</c> but <c>rite</c> does not
-    /// find <c>Write</c>. An empty word matches every candidate equally.
+    /// find <c>Write</c>. An empty word matches every candidate equally, at
+    /// no position.
     /// </summary>
-    public static int? MatchCompletion(string word, string text)
+    public static (int Score, IReadOnlyList<int> Positions)? MatchCompletion(string word, string text)
     {
         if (word.Length == 0)
         {
-            return 0;
+            return (0, []);
         }
 
         return Match(word, text) is { } match && IsWordStart(text, match.Positions[0])
-            ? match.Score
+            ? match
             : null;
     }
 }

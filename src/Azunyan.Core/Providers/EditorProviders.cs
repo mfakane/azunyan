@@ -228,8 +228,8 @@ public sealed class CompletionResult
             replacementRange,
             Items
                 .Select((item, index) => (Item: item, Index: index, Score: Math.Max(
-                    FuzzyMatch.MatchCompletion(word, item.FilterText) ?? -1,
-                    FuzzyMatch.MatchCompletion(word, item.Label) ?? -1)))
+                    FuzzyMatch.MatchCompletion(word, item.FilterText)?.Score ?? -1,
+                    FuzzyMatch.MatchCompletion(word, item.Label)?.Score ?? -1)))
                 .Where(match => match.Score >= 0)
                 .OrderByDescending(match => match.Score)
                 .ThenBy(match => match.Index)

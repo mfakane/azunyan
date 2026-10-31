@@ -406,7 +406,9 @@ ones shown, as long as the edit only typed or erased the word they complete,
 narrowed by `FuzzyMatch.MatchCompletion` against the word as typed, as the
 language server conversion narrows its answers; accepting one then
 replaces that word as it now stands. The rows animate in
-when the popup opens and change without animation while it stays open.
+when the popup opens and change without animation while it stays open. Each
+label shows the characters that `FuzzyMatch.MatchCompletion` matched in the
+color scheme's `PopupHighlightForeground`, in bold.
 
 Each provider channel has independent cancellation, request IDs, result store,
 and error isolation. A result is publishable only when its snapshot and request

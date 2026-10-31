@@ -1,5 +1,6 @@
 using Azunyan.Core;
 using Microsoft.UI.Input;
+using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -39,6 +40,7 @@ public sealed partial class CompletionPopup : UserControl
 {
     private IReadOnlyList<CompletionItem>? _items;
     private CompletionResult? _result;
+    private string _word = string.Empty;
     private AzunyanColorScheme _colorScheme = AzunyanColorScheme.Default;
     private bool _updatingItems;
 
@@ -71,8 +73,13 @@ public sealed partial class CompletionPopup : UserControl
         }
     }
 
+    /// <summary>
+    /// Shows <paramref name="result"/> with the characters of each label that
+    /// <paramref name="word"/>, the text typed so far, matches highlighted.
+    /// </summary>
     public void Show(
         CompletionResult result,
+        string word,
         double horizontalOffset,
         double verticalOffset,
         XamlRoot? xamlRoot = null)
@@ -91,7 +98,7 @@ public sealed partial class CompletionPopup : UserControl
 
         PopupHost.XamlRoot = xamlRoot;
 
-        if (!ReferenceEquals(_result, result))
+        if (!ReferenceEquals(_result, result) || _word != word)
         {
             _updatingItems = true;
             try
@@ -102,20 +109,27 @@ public sealed partial class CompletionPopup : UserControl
                     ? []
                     : CompletionRowTransitions;
                 CompletionList.Items.Clear();
+                var highlightForeground = new SolidColorBrush(_colorScheme.PopupHighlightForeground);
                 foreach (var item in result.Items)
                 {
-                    CompletionList.Items.Add(new TextBlock
+                    var label = new TextBlock
                     {
-                        Text = item.Label,
                         FontFamily = new FontFamily("Consolas"),
                         FontSize = 14,
                         Foreground = new SolidColorBrush(_colorScheme.PopupForeground),
                         Padding = new Thickness(8, 4, 8, 4)
-                    });
+                    };
+                    AppendHighlightedLabel(
+                        label.Inlines,
+                        highlightForeground,
+                        item.Label,
+                        FuzzyMatch.MatchCompletion(word, item.Label)?.Positions ?? []);
+                    CompletionList.Items.Add(label);
                 }
 
                 _items = result.Items;
                 _result = result;
+                _word = word;
                 CompletionList.SelectedIndex = result.Items.Count > 0 ? 0 : -1;
             }
             finally
@@ -205,6 +219,34 @@ public sealed partial class CompletionPopup : UserControl
                 return true;
             default:
                 return false;
+        }
+    }
+
+    private static void AppendHighlightedLabel(
+        Microsoft.UI.Xaml.Documents.InlineCollection inlines,
+        Brush highlightForeground,
+        string text,
+        IReadOnlyList<int> positions)
+    {
+        var start = 0;
+        while (start < text.Length)
+        {
+            var highlighted = positions.Contains(start);
+            var end = start + 1;
+            while (end < text.Length && positions.Contains(end) == highlighted)
+            {
+                end++;
+            }
+
+            var run = new Microsoft.UI.Xaml.Documents.Run { Text = text[start..end] };
+            if (highlighted)
+            {
+                run.FontWeight = FontWeights.Bold;
+                run.Foreground = highlightForeground;
+            }
+
+            inlines.Add(run);
+            start = end;
         }
     }
 

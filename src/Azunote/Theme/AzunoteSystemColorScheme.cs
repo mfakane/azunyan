@@ -95,6 +95,7 @@ internal static class AzunoteSystemColorScheme
             PopupBackground = popupBackground,
             PopupForeground = foreground,
             PopupBorder = border,
+            PopupHighlightForeground = accent,
             TooltipBackground = popupBackground,
             TooltipForeground = foreground,
             TooltipBorder = border,

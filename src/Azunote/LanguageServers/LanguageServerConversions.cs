@@ -108,10 +108,10 @@ internal static partial class LanguageServerConversions
             var filterPrefix = editStart < wordStart ? text[editStart..position] : prefix;
             var filterText = GetString(item["filterText"]) ?? label;
             var score = Math.Max(
-                FuzzyMatch.MatchCompletion(filterPrefix, filterText) ?? -1,
+                FuzzyMatch.MatchCompletion(filterPrefix, filterText)?.Score ?? -1,
                 Math.Max(
-                    FuzzyMatch.MatchCompletion(filterPrefix, label) ?? -1,
-                    FuzzyMatch.MatchCompletion(prefix, label) ?? -1));
+                    FuzzyMatch.MatchCompletion(filterPrefix, label)?.Score ?? -1,
+                    FuzzyMatch.MatchCompletion(prefix, label)?.Score ?? -1));
             if (score < 0)
             {
                 continue;

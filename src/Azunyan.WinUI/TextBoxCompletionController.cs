@@ -93,7 +93,12 @@ public sealed class TextBoxCompletionController : IDisposable
             return;
         }
 
-        _popup.Show(result, offset.X, offset.Y, _textBox.XamlRoot);
+        _popup.Show(
+            result,
+            text[result.ReplacementRange.Start..position],
+            offset.X,
+            offset.Y,
+            _textBox.XamlRoot);
     }
 
     public void Dispose()

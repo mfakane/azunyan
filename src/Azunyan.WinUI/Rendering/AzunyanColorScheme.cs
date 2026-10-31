@@ -33,6 +33,7 @@ public sealed record AzunyanColorScheme
         PopupBackground = Color.FromArgb(0xff, 0xf4, 0xf4, 0xf4),
         PopupForeground = Color.FromArgb(0xff, 0x1a, 0x1a, 0x1a),
         PopupBorder = Color.FromArgb(0xff, 0x80, 0x80, 0x80),
+        PopupHighlightForeground = Color.FromArgb(0xff, 0x00, 0x66, 0xcc),
         TooltipBackground = Color.FromArgb(0xff, 0xf4, 0xf4, 0xf4),
         TooltipForeground = Color.FromArgb(0xff, 0x1a, 0x1a, 0x1a),
         TooltipBorder = Color.FromArgb(0xff, 0x80, 0x80, 0x80)
@@ -98,6 +99,12 @@ public sealed record AzunyanColorScheme
     public Color PopupForeground { get; init; }
 
     public Color PopupBorder { get; init; }
+
+    /// <summary>
+    /// Foreground of the characters in a completion label that the word typed
+    /// matches.
+    /// </summary>
+    public Color PopupHighlightForeground { get; init; }
 
     public Color TooltipBackground { get; init; }
 

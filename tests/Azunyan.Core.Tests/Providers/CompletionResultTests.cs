@@ -13,7 +13,8 @@ public sealed class CompletionResultTests
         Assert.NotNull(FuzzyMatch.MatchCompletion("WRL", "WriteLine"));
         Assert.Null(FuzzyMatch.MatchCompletion("rite", "Write"));
         Assert.Null(FuzzyMatch.MatchCompletion("lw", "WriteLine"));
-        Assert.Equal(0, FuzzyMatch.MatchCompletion(string.Empty, "Write"));
+        Assert.Equal([0, 5], FuzzyMatch.MatchCompletion("wl", "WriteLine")!.Value.Positions);
+        Assert.Equal(0, FuzzyMatch.MatchCompletion(string.Empty, "Write")!.Value.Score);
     }
 
     [Fact]

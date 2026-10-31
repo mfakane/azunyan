@@ -59,7 +59,8 @@ those carrying a whole document, are cut short.
 - **Completion**: Edit > Show Completions (Ctrl+Space) and the server's trigger
   characters suggest what the server offers instead of document words. The
   word typed narrows them by its letters in order, the first at the start of a
-  word in the name, so `wl` finds `WriteLine`; closer matches come first. A
+  word in the name, so `wl` finds `WriteLine`; closer matches come first, with
+  the matching letters in bold and the accent color. A
   suggestion with placeholders is inserted with their default text.
 - **Descriptions**: resting the pointer on a symbol shows what the server says
   about it, after any problem there.
