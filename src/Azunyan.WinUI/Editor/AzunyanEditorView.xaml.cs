@@ -678,6 +678,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         _pendingProviderDocumentChange = null;
         _pendingAutomationDocumentChange = null;
         _pendingViewportAnchor = null;
+        _snippetSession = null;
         DetachDocument();
         _document.CloseView();
         _document = document;
@@ -1834,6 +1835,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         object? sender,
         DocumentChangedEventArgs args)
     {
+        FollowSnippetEdit(args);
         if (_pendingViewportAnchor is { } pendingAnchor
             && ReferenceEquals(pendingAnchor.Snapshot, args.OldSnapshot))
         {
@@ -2063,6 +2065,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     private void OnDocumentCaretSetChanged(object? sender, EventArgs args)
     {
+        FollowSnippetCarets();
         QueueInlineChatPopupPositionUpdate();
         if (_applyingDocumentCommand || _applyingInputChange)
         {
@@ -2477,6 +2480,25 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                     return;
                 case VirtualKey.Escape:
                     EndSignatureHelp();
+                    args.Handled = true;
+                    return;
+            }
+        }
+
+        if (_snippetSession is not null
+            && !IsComposing
+            && !IsKeyDown(VirtualKey.Control)
+            && !IsKeyDown(VirtualKey.Menu))
+        {
+            switch (args.Key)
+            {
+                case VirtualKey.Tab:
+                    var direction = IsKeyDown(VirtualKey.Shift) ? -1 : 1;
+                    QueueKeyEdit(args.Key, () => MoveSnippetStop(direction), repeatable: false);
+                    args.Handled = true;
+                    return;
+                case VirtualKey.Escape:
+                    EndSnippetSession();
                     args.Handled = true;
                     return;
             }

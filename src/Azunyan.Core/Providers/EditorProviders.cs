@@ -162,7 +162,8 @@ public sealed record TooltipData
 /// One completion candidate. InsertText defaults to Label, which keeps simple
 /// keyword and document-word providers small while allowing richer providers
 /// to insert a different value. FilterText, also Label by default, is what the
-/// typed word is matched against.
+/// typed word is matched against. Placeholders are the tab stops of a snippet
+/// in InsertText.
 /// </summary>
 public sealed record CompletionItem
 {
@@ -172,7 +173,8 @@ public sealed record CompletionItem
         string? detail = null,
         string? documentation = null,
         int sortOrder = 0,
-        string? filterText = null)
+        string? filterText = null,
+        IReadOnlyList<SnippetPlaceholder>? placeholders = null)
     {
         ArgumentNullException.ThrowIfNull(label);
         Label = label;
@@ -181,6 +183,7 @@ public sealed record CompletionItem
         Documentation = documentation;
         SortOrder = sortOrder;
         FilterText = filterText ?? label;
+        Placeholders = placeholders ?? [];
     }
 
     public string Label { get; }
@@ -188,6 +191,8 @@ public sealed record CompletionItem
     public string InsertText { get; }
 
     public string FilterText { get; }
+
+    public IReadOnlyList<SnippetPlaceholder> Placeholders { get; }
 
     public string? Detail { get; }
 

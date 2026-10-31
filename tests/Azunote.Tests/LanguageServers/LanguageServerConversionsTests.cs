@@ -84,6 +84,15 @@ public sealed class LanguageServerConversionsTests
                 "filterText": "Html",
                 "insertTextFormat": 2,
                 "insertText": "Html(\\$a, ${1:\\$b\\}}, ${2|c,d|})"
+              },
+              {
+                "label": "Call",
+                "filterText": "@Html",
+                "insertTextFormat": 2,
+                "textEdit": {
+                  "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 3 } },
+                  "newText": "@Html(${1:x}$0)"
+                }
               }
             ]
             """);
@@ -94,6 +103,14 @@ public sealed class LanguageServerConversionsTests
         Assert.Equal("Html", result.Items.Single(item => item.Label == "@Html").InsertText);
         Assert.Equal("Html(value)", result.Items.Single(item => item.Label == "Snippet").InsertText);
         Assert.Equal("Html($a, $b}, c)", result.Items.Single(item => item.Label == "Escaped").InsertText);
+        Assert.Equal(
+            [new SnippetPlaceholder(1, TextRange.FromBounds(5, 10)), new SnippetPlaceholder(0, new TextRange(11, 0))],
+            result.Items.Single(item => item.Label == "Snippet").Placeholders);
+        var call = result.Items.Single(item => item.Label == "Call");
+        Assert.Equal("Html(x)", call.InsertText);
+        Assert.Equal(
+            [new SnippetPlaceholder(1, new TextRange(5, 1)), new SnippetPlaceholder(0, new TextRange(6, 0))],
+            call.Placeholders);
     }
 
     [Fact]

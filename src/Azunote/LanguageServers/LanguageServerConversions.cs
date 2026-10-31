@@ -1,17 +1,13 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Text.RegularExpressions;
 using Azunyan.Core;
 
 namespace Azunote;
 
 /// <summary>Turns what a language server answers into Azunote's editor types.</summary>
-internal static partial class LanguageServerConversions
+internal static class LanguageServerConversions
 {
     private const int MaximumCompletionCount = 200;
-
-    [GeneratedRegex(@"\\([\\$}])|\$\{\d+:((?:\\.|[^\\}])*)\}|\$\{\d+\|([^,}]*)[^}]*\}|\$\{\d+\}|\$\d+", RegexOptions.CultureInvariant)]
-    private static partial Regex SnippetPlaceholderPattern();
 
     /// <summary>The offset of an LSP position, clamped into the text.</summary>
     public static int ToOffset(TextSnapshot snapshot, JsonNode? position)
@@ -118,26 +114,40 @@ internal static partial class LanguageServerConversions
             }
 
             var insertText = GetString(edit?["newText"]) ?? GetString(item["insertText"]) ?? label;
+            IReadOnlyList<SnippetPlaceholder> placeholders = [];
             if (GetInt(item["insertTextFormat"], 1) == 2)
             {
-                insertText = SnippetPlaceholderPattern().Replace(
-                    insertText,
-                    match => match.Groups[1].Success ? match.Groups[1].Value
-                        : match.Groups[2].Success ? UnescapeSnippet(match.Groups[2].Value)
-                        : match.Groups[3].Success ? match.Groups[3].Value
-                        : string.Empty);
+                var snippet = Snippet.Parse(insertText);
+                insertText = snippet.Text;
+                placeholders = snippet.Placeholders;
             }
 
+            // The placeholders move with the text, and one in the text taken
+            // off is left at its start.
+            var shift = 0;
             if (editStart < wordStart)
             {
                 var replaced = text[editStart..wordStart];
-                insertText = insertText.StartsWith(replaced, StringComparison.Ordinal)
-                    ? insertText[replaced.Length..]
-                    : insertText;
+                if (insertText.StartsWith(replaced, StringComparison.Ordinal))
+                {
+                    insertText = insertText[replaced.Length..];
+                    shift = -replaced.Length;
+                }
             }
             else if (editStart > wordStart)
             {
                 insertText = text[wordStart..editStart] + insertText;
+                shift = editStart - wordStart;
+            }
+
+            if (shift != 0)
+            {
+                placeholders = [.. placeholders.Select(placeholder => placeholder with
+                {
+                    Range = TextRange.FromBounds(
+                        Math.Max(0, placeholder.Range.Start + shift),
+                        Math.Max(0, placeholder.Range.End + shift))
+                })];
             }
 
             candidates.Add((
@@ -149,7 +159,8 @@ internal static partial class LanguageServerConversions
                     insertText,
                     GetString(item["detail"]),
                     GetMarkupText(item["documentation"]),
-                    filterText: GetString(item["filterText"]))));
+                    filterText: GetString(item["filterText"]),
+                    placeholders: placeholders)));
         }
 
         if (candidates.Count == 0)
@@ -168,7 +179,8 @@ internal static partial class LanguageServerConversions
                 candidate.Item.Detail,
                 candidate.Item.Documentation,
                 order,
-                candidate.Item.FilterText))
+                candidate.Item.FilterText,
+                candidate.Item.Placeholders))
             .ToArray();
         return new CompletionResult(TextRange.FromBounds(wordStart, position), sorted);
     }
@@ -348,12 +360,6 @@ internal static partial class LanguageServerConversions
                 ? new TextRange(position - 1, 1)
                 : new TextRange(position, 0);
     }
-
-    private static string UnescapeSnippet(string text) =>
-        SnippetEscapePattern().Replace(text, match => match.Groups[1].Value);
-
-    [GeneratedRegex(@"\\([\\$}])", RegexOptions.CultureInvariant)]
-    private static partial Regex SnippetEscapePattern();
 
     private static bool IsWordCharacter(char value) => char.IsLetterOrDigit(value) || value == '_';
 

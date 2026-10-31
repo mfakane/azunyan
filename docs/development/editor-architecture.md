@@ -410,6 +410,13 @@ when the popup opens and change without animation while it stays open. Each
 label shows the characters that `FuzzyMatch.MatchCompletion` matched in the
 color scheme's `PopupHighlightForeground`, in bold.
 
+A completion item's `Placeholders`, which `Snippet.Parse` reads from snippet
+syntax, start a `SnippetSession` once the item is inserted. The session selects
+each tab stop as a caret set with one selection per place of its number, so
+typing goes through the ordinary multi-caret edit, and it follows each document
+change by spreading the change evenly over those places. A change that does
+not fit that, an undo, or a caret outside the selected places ends it.
+
 Each provider channel has independent cancellation, request IDs, result store,
 and error isolation. A result is publishable only when its snapshot and request
 generation still match that channel. Partial result-store updates are allowed;

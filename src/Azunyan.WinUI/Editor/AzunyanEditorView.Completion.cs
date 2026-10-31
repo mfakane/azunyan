@@ -370,6 +370,7 @@ public sealed partial class AzunyanEditorView
         try
         {
             ReplaceDocumentRange(range, args.Item.InsertText);
+            StartSnippetSession(range.Start, args.Item);
         }
         finally
         {
