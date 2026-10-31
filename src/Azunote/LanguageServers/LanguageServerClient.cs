@@ -40,6 +40,7 @@ internal sealed class LanguageServerClient : IAsyncDisposable
     private readonly SemaphoreSlim _documentsLock = new(1, 1);
     private readonly Dictionary<string, OpenDocument> _documents = new(StringComparer.Ordinal);
     private readonly Queue<string> _errorOutput = new();
+    private readonly List<(string Token, string Title, string? Message, int? Percentage)> _progress = [];
     private readonly LanguageServerLog? _log;
     private bool _sendsOpenClose = true;
     private bool _sendsChanges = true;
@@ -68,6 +69,27 @@ internal sealed class LanguageServerClient : IAsyncDisposable
 
     /// <summary>Raised on the reading task when the server asks for its inlay hints again.</summary>
     public event Action? InlayHintsChanged;
+
+    /// <summary>Raised on the reading task when the server begins, reports or ends work in progress.</summary>
+    public event Action? ProgressChanged;
+
+    /// <summary>
+    /// What the server reports it is working on, such as loading a project,
+    /// one line for each piece of work in the order it began.
+    /// </summary>
+    public IReadOnlyList<string> Progress
+    {
+        get
+        {
+            lock (_progress)
+            {
+                return [.. _progress.Select(work =>
+                    work.Title
+                    + (string.IsNullOrEmpty(work.Message) ? string.Empty : $": {work.Message}")
+                    + (work.Percentage is { } percentage ? $" ({percentage}%)" : string.Empty))];
+            }
+        }
+    }
 
     /// <summary>Completes when the server stops talking, whether it exited or was stopped.</summary>
     public Task Completion => _connection.Completion;
@@ -137,6 +159,7 @@ internal sealed class LanguageServerClient : IAsyncDisposable
             ["capabilities"] = new JsonObject
             {
                 ["general"] = new JsonObject { ["positionEncodings"] = new JsonArray("utf-16") },
+                ["window"] = new JsonObject { ["workDoneProgress"] = true },
                 ["workspace"] = new JsonObject
                 {
                     ["configuration"] = true,
@@ -535,6 +558,12 @@ internal sealed class LanguageServerClient : IAsyncDisposable
 
     private void HandleNotification(string method, JsonNode? parameters)
     {
+        if (method == "$/progress")
+        {
+            HandleProgress(parameters);
+            return;
+        }
+
         if (method != "textDocument/publishDiagnostics"
             || parameters?["uri"]?.GetValue<string>() is not { } uri
             || parameters["diagnostics"] is not JsonArray diagnostics)
@@ -566,6 +595,54 @@ internal sealed class LanguageServerClient : IAsyncDisposable
         {
             DiagnosticsPublished?.Invoke(new LanguageServerDiagnostics(uri, text, diagnostics));
         }
+    }
+
+    private void HandleProgress(JsonNode? parameters)
+    {
+        if (parameters?["token"] is not JsonValue tokenValue || parameters["value"] is not JsonObject value)
+        {
+            return;
+        }
+
+        var token = tokenValue.ToJsonString();
+        var message = GetString(value["message"]);
+        var percentage = value["percentage"] is JsonValue { } percentageValue
+            && percentageValue.GetValueKind() == JsonValueKind.Number
+                ? (int)percentageValue.GetValue<double>()
+                : (int?)null;
+        lock (_progress)
+        {
+            var index = _progress.FindIndex(work => work.Token == token);
+            switch (GetString(value["kind"]))
+            {
+                case "begin":
+                    var title = GetString(value["title"]) ?? string.Empty;
+                    if (index >= 0)
+                    {
+                        _progress[index] = (token, title, message, percentage);
+                    }
+                    else
+                    {
+                        _progress.Add((token, title, message, percentage));
+                    }
+
+                    break;
+                case "report" when index >= 0:
+                    var work = _progress[index];
+                    _progress[index] = (token, work.Title, message ?? work.Message, percentage ?? work.Percentage);
+                    break;
+                case "end" when index >= 0:
+                    _progress.RemoveAt(index);
+                    break;
+                default:
+                    return;
+            }
+        }
+
+        ProgressChanged?.Invoke();
+
+        static string? GetString(JsonNode? node) =>
+            node is JsonValue value && value.GetValueKind() == JsonValueKind.String ? value.GetValue<string>() : null;
     }
 
     private async Task ReadErrorOutputAsync(StreamReader errorOutput)

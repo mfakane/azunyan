@@ -340,7 +340,7 @@ internal sealed class MainWindowViewModel :
     /// <summary>Dimmed while the server is off, full while it runs.</summary>
     public double LanguageServerOpacity { get; private set; } = 1;
 
-    /// <summary>A spinner takes the place of the icon while the server starts.</summary>
+    /// <summary>A spinner takes the place of the icon while the server starts or reports work in progress.</summary>
     public bool IsLanguageServerBusy { get; private set; }
 
     public Visibility LanguageServerIconVisibility => IsLanguageServerBusy ? Visibility.Collapsed : Visibility.Visible;
@@ -359,7 +359,8 @@ internal sealed class MainWindowViewModel :
         IsLanguageServerOn = indicator.State is not (LanguageServerIndicatorState.Hidden or LanguageServerIndicatorState.Off);
         LanguageServerVisibility = IsLanguageServerAvailable ? Visibility.Visible : Visibility.Collapsed;
         LanguageServerOpacity = indicator.State == LanguageServerIndicatorState.Off ? 0.4 : 1;
-        IsLanguageServerBusy = indicator.State == LanguageServerIndicatorState.Starting;
+        IsLanguageServerBusy = indicator.State == LanguageServerIndicatorState.Starting
+            || indicator.Progress is not null;
         LanguageServerFailureVisibility = indicator.State == LanguageServerIndicatorState.Failed
             ? Visibility.Visible
             : Visibility.Collapsed;
@@ -370,6 +371,8 @@ internal sealed class MainWindowViewModel :
                 $"{name} is off for files outside a workspace folder. Click to turn it on.",
             LanguageServerIndicatorState.Off => $"{name} is off for this folder. Click to turn it on.",
             LanguageServerIndicatorState.Starting => $"{name} is starting. Click to turn it off.",
+            LanguageServerIndicatorState.Running when indicator.Progress is not null =>
+                $"{name} is running.{Environment.NewLine}{indicator.Progress}{Environment.NewLine}Click to turn it off.",
             LanguageServerIndicatorState.Running => $"{name} is running. Click to turn it off.",
             LanguageServerIndicatorState.Failed =>
                 $"{name} failed: {indicator.Message}{Environment.NewLine}Click to turn it off.",

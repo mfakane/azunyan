@@ -13,12 +13,16 @@ internal enum LanguageServerIndicatorState
     Failed
 }
 
-/// <summary>What the ⚡ in the status bar shows for the document.</summary>
+/// <summary>
+/// What the ⚡ in the status bar shows for the document. Progress is what a
+/// running server reports it is working on, one line for each piece of work.
+/// </summary>
 internal sealed record LanguageServerIndicator(
     LanguageServerIndicatorState State,
     string? Command = null,
     string? Message = null,
-    bool OutsideWorkspace = false)
+    bool OutsideWorkspace = false,
+    string? Progress = null)
 {
     public static LanguageServerIndicator Hidden { get; } = new(LanguageServerIndicatorState.Hidden);
 }
@@ -358,6 +362,7 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
             _active = null;
             active.Client.DiagnosticsPublished -= Client_DiagnosticsPublished;
             active.Client.InlayHintsChanged -= Client_InlayHintsChanged;
+            active.Client.ProgressChanged -= Client_ProgressChanged;
             Observe(active.Client.CloseAsync(active.Uri));
             _editor.RefreshProviders();
         }
@@ -390,12 +395,19 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
                     _active = new Active(client, target.Uri);
                     client.DiagnosticsPublished += Client_DiagnosticsPublished;
                     client.InlayHintsChanged += Client_InlayHintsChanged;
+                    client.ProgressChanged += Client_ProgressChanged;
                     Observe(client.OpenAsync(target.Uri, target.LanguageId, _editor.Text));
                     _editor.RefreshProviders();
                 }
 
                 // A new server can bring other completion triggers.
-                SetIndicator(new LanguageServerIndicator(LanguageServerIndicatorState.Running, command), force: opened);
+                var progress = client.Progress;
+                SetIndicator(
+                    new LanguageServerIndicator(
+                        LanguageServerIndicatorState.Running,
+                        command,
+                        Progress: progress.Count == 0 ? null : string.Join(Environment.NewLine, progress)),
+                    force: opened);
                 break;
             case LanguageServerStatus.Failed:
                 DropActive();
@@ -428,6 +440,7 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
             _active = null;
             active.Client.DiagnosticsPublished -= Client_DiagnosticsPublished;
             active.Client.InlayHintsChanged -= Client_InlayHintsChanged;
+            active.Client.ProgressChanged -= Client_ProgressChanged;
             _editor.RefreshProviders();
         }
 
@@ -501,6 +514,15 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
             if (_active is not null)
             {
                 _editor.RefreshProviders();
+            }
+        });
+
+    private void Client_ProgressChanged() =>
+        _dispatcher.TryEnqueue(() =>
+        {
+            if (_active is not null)
+            {
+                ApplyInstanceStatus();
             }
         });
 

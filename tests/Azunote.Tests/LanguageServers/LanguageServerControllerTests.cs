@@ -124,6 +124,32 @@ public sealed class LanguageServerControllerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_indicator_shows_the_work_the_server_reports()
+    {
+        using var controller = CreateController();
+        controller.Update();
+        controller.Toggle();
+        await WaitForAsync(() => controller.Indicator.State == LanguageServerIndicatorState.Running);
+        Assert.Null(controller.Indicator.Progress);
+
+        await _server.NotifyAsync("$/progress", new JsonObject
+        {
+            ["token"] = "load",
+            ["value"] = new JsonObject { ["kind"] = "begin", ["title"] = "Loading" }
+        });
+        await WaitForAsync(() => controller.Indicator.Progress is not null);
+
+        Assert.Equal("Loading", controller.Indicator.Progress);
+
+        await _server.NotifyAsync("$/progress", new JsonObject
+        {
+            ["token"] = "load",
+            ["value"] = new JsonObject { ["kind"] = "end" }
+        });
+        await WaitForAsync(() => controller.Indicator.Progress is null);
+    }
+
+    [Fact]
     public async Task A_restart_opens_the_document_in_the_new_server()
     {
         await using var second = new FakeLanguageServer();

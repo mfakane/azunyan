@@ -175,6 +175,29 @@ public sealed class LanguageServerClientTests
     }
 
     [Fact]
+    public async Task Work_in_progress_is_kept_from_its_beginning_to_its_end()
+    {
+        await using var server = new FakeLanguageServer();
+        await using var client = server.CreateClient(Workspace);
+        await client.InitializeAsync(null, CancellationToken.None);
+
+        await server.NotifyAsync("$/progress", Progress("load", new JsonObject { ["kind"] = "begin", ["title"] = "Loading", ["message"] = "app.csproj" }));
+        await server.NotifyAsync("$/progress", Progress(7, new JsonObject { ["kind"] = "begin", ["title"] = "Indexing" }));
+        await server.NotifyAsync("$/progress", Progress("load", new JsonObject { ["kind"] = "report", ["percentage"] = 40 }));
+        await WaitUntilAsync(() => client.Progress.Count == 2 && client.Progress[0].Contains('%', StringComparison.Ordinal));
+
+        Assert.Equal(["Loading: app.csproj (40%)", "Indexing"], client.Progress);
+        Assert.True(server.ReceivedOf("initialize").Single()!["capabilities"]!["window"]!["workDoneProgress"]!.GetValue<bool>());
+
+        await server.NotifyAsync("$/progress", Progress("load", new JsonObject { ["kind"] = "end" }));
+        await WaitUntilAsync(() => client.Progress.Count == 1);
+
+        Assert.Equal(["Indexing"], client.Progress);
+
+        static JsonObject Progress(JsonNode token, JsonObject value) => new() { ["token"] = token, ["value"] = value };
+    }
+
+    [Fact]
     public async Task Requests_ask_for_the_position_of_the_document()
     {
         await using var server = new FakeLanguageServer();

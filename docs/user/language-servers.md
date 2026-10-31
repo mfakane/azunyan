@@ -39,7 +39,10 @@ once for all files outside a workspace folder, and runs without one, which suits
 servers that look at a single file, such as those for JSON and YAML.
 
 The ⚡ is dimmed while the server is off, turns into a spinner while it starts,
-and is highlighted while it runs. If the server fails to start or stops by
+and is highlighted while it runs. It turns into a spinner again while the
+server reports that it is working on something, such as loading a project, and
+resting the pointer on it tells what, with how far along it is when the server
+says. If the server fails to start or stops by
 itself, the ⚡ shows a warning and resting the pointer on it tells why.
 **Enable** stays checked, and **Restart** starts the server anew for every
 document it serves. Restart also picks up an updated server program, or settings
