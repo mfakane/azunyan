@@ -182,7 +182,8 @@ public sealed partial class AzunyanEditorView
         object args)
     {
         sender.Stop();
-        if (_hoverPosition >= 0 && _hoverLinkRange is null)
+        // An edit while the pointer rested can leave its position past the end.
+        if (_hoverPosition >= 0 && _hoverPosition <= Snapshot.Length && _hoverLinkRange is null)
         {
             RequestHoverProvider(_hoverPosition);
         }
