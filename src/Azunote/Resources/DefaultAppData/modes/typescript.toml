@@ -10,3 +10,10 @@
 # command = "typescript-language-server"
 # args = ["--stdio"]
 # path = ["${workspaceFolder}/node_modules/.bin"]
+#
+# # Completions that fill in class members and object literal methods, with
+# # Tab between their placeholders.
+# [languageServer.initializationOptions.preferences]
+# includeCompletionsWithSnippetText = true
+# includeCompletionsWithClassMemberSnippets = true
+# includeCompletionsWithObjectLiteralMethodSnippets = true
