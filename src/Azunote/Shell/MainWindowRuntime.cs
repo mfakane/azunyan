@@ -22,7 +22,6 @@ internal sealed class MainWindowRuntime : IDisposable
     private bool _hasPowerShellTool;
     private readonly EditorCommandController _editorCommands;
     private readonly FindReplaceController _findReplace;
-    private readonly GoToLineController _goToLine;
     private readonly DocumentStatusPresenter _status;
     private readonly IFilePathActions _filePathActions;
     private readonly Func<string, Task> _openFileInNewWindow;
@@ -165,9 +164,6 @@ internal sealed class MainWindowRuntime : IDisposable
             _view,
             RefreshDocumentView,
             ObserveTextChanged);
-        _goToLine = new GoToLineController(
-            _view,
-            new WinUiGoToLineDialog(() => _view.XamlRoot));
         _messageDialog = new WinUiMessageDialog(() => _view.XamlRoot);
         _externalToolDialog = new WinUiExternalToolDialog(() => _view.XamlRoot);
 
@@ -809,7 +805,22 @@ internal sealed class MainWindowRuntime : IDisposable
 
     public void ShowWorkspaceSymbolPalette() => _window.ShowWorkspaceSymbolPalette();
 
-    public Task ShowGoToLineAsync() => _goToLine.ShowAsync();
+    public void ShowGoToLine() => _window.ShowGoToLinePalette();
+
+    /// <summary>The caret's one-based line and column.</summary>
+    public (int Line, int Column) CaretLineColumn
+    {
+        get
+        {
+            var snapshot = _view.Snapshot;
+            var position = snapshot.Lines.GetLineColumn(Math.Clamp(_view.CaretPosition, 0, snapshot.Length));
+            return (position.Line + 1, position.Column + 1);
+        }
+    }
+
+    /// <summary>Puts the caret at <paramref name="target"/>, or the nearest place the document has.</summary>
+    public void GoToLine(GoToLineTarget target) =>
+        GoToPosition(GoToLineService.Resolve(_view.Snapshot, target));
 
     public void ShowFindPanel(bool replace) => _findReplace.Show(replace && !_session.State.IsReadOnly);
 

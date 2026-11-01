@@ -17,6 +17,7 @@ public sealed partial class MainWindow
     private const string CommandPalettePrefix = ">";
     private const string SymbolPalettePrefix = "@";
     private const string WorkspaceSymbolPalettePrefix = "#";
+    private const string GoToLinePalettePrefix = ":";
     private const int MaxCommandPaletteResults = 100;
     private const int MaxRecentPaletteCommands = 10;
     private static readonly TimeSpan WorkspaceSymbolDelay = TimeSpan.FromMilliseconds(150);
@@ -55,6 +56,8 @@ public sealed partial class MainWindow
             ShowCommandPalette(SymbolPalettePrefix);
         }
     }
+
+    internal void ShowGoToLinePalette() => ShowCommandPalette(GoToLinePalettePrefix);
 
     internal void ShowWorkspaceSymbolPalette()
     {
@@ -185,7 +188,7 @@ public sealed partial class MainWindow
         _paletteFilteredText = text;
         var prefix = _palettePicks is not null
             ? string.Empty
-            : new[] { CommandPalettePrefix, SymbolPalettePrefix, WorkspaceSymbolPalettePrefix }
+            : new[] { CommandPalettePrefix, SymbolPalettePrefix, WorkspaceSymbolPalettePrefix, GoToLinePalettePrefix }
                 .FirstOrDefault(candidate => text.StartsWith(candidate, StringComparison.Ordinal)) ?? string.Empty;
         var query = text[prefix.Length..].Trim();
         IReadOnlyList<CommandPaletteItem> items = _palettePicks is { } picks
@@ -197,9 +200,11 @@ public sealed partial class MainWindow
                 WorkspaceSymbolPalettePrefix => RequestWorkspaceSymbols(query),
                 _ => _paletteDocuments
             };
-        var matches = CommandPaletteSearch.Filter(query, items)
-            .Take(MaxCommandPaletteResults)
-            .ToArray();
+        var matches = prefix == GoToLinePalettePrefix
+            ? [new CommandPaletteMatch(CreateGoToLineItem(query), [])]
+            : CommandPaletteSearch.Filter(query, items)
+                .Take(MaxCommandPaletteResults)
+                .ToArray();
         if (matches.Length == _paletteMatches.Length
             && matches.Zip(_paletteMatches).All(pair =>
                 ReferenceEquals(pair.First.Item, pair.Second.Item)
@@ -222,6 +227,35 @@ public sealed partial class MainWindow
         }
 
         SelectCommandPaletteRow(0);
+    }
+
+    /// <summary>
+    /// The one row of <c>:</c>, which goes to the line, or line:column, typed
+    /// after it, and tells where the caret is until something valid is typed.
+    /// </summary>
+    private CommandPaletteItem CreateGoToLineItem(string query)
+    {
+        if (GoToLineService.TryParse(query, out var target))
+        {
+            return new CommandPaletteItem(
+                target.Column is { } column
+                    ? $"Go to line {target.Line}, column {column}"
+                    : $"Go to line {target.Line}",
+                string.Empty,
+                Shortcut: null,
+                IsEnabled: true,
+                IsChecked: false,
+                () => _runtime.GoToLine(target));
+        }
+
+        var (line, caretColumn) = _runtime.CaretLineColumn;
+        return new CommandPaletteItem(
+            "Type a line number, or line:column, to go to",
+            $"Current: Ln {line}, Col {caretColumn}",
+            Shortcut: null,
+            IsEnabled: false,
+            IsChecked: false,
+            () => { });
     }
 
     /// <summary>

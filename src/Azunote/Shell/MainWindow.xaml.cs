@@ -211,8 +211,8 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         }
     }
 
-    private async void PositionStatus_Tapped(object sender, TappedRoutedEventArgs e) =>
-        await _runtime.ShowGoToLineAsync();
+    private void PositionStatus_Tapped(object sender, TappedRoutedEventArgs e) =>
+        _runtime.ShowGoToLine();
 
     private void ShowCompletionAccelerator_Invoked(
         KeyboardAccelerator sender,
@@ -907,7 +907,7 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
 
     void IMainWindowActions.ShowWorkspaceSymbolPalette() => ShowWorkspaceSymbolPalette();
 
-    Task IMainWindowActions.GoToLineAsync() => _runtime.ShowGoToLineAsync();
+    void IMainWindowActions.ShowGoToLine() => _runtime.ShowGoToLine();
 
     void IMainWindowActions.ToggleWordWrap() => _runtime.ToggleWordWrap();
 

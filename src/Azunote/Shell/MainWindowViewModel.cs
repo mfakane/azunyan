@@ -115,7 +115,7 @@ internal sealed class MainWindowViewModel :
         ShowReplaceCommand = Command(() => Actions.ShowReplace());
         ShowCompletionCommand = Command(() => Actions.ShowCompletion());
         ShowParameterHintsCommand = Command(() => Actions.ShowParameterHints());
-        GoToLineCommand = Async(() => Actions.GoToLineAsync());
+        GoToLineCommand = Command(() => Actions.ShowGoToLine());
         ToggleWordWrapCommand = Command(() => Actions.ToggleWordWrap());
         SetTabDisplaySizeCommand = Command(SetTabDisplaySize);
         SetIndentSizeCommand = Command(SetIndentSize);
@@ -795,7 +795,7 @@ internal interface IMainWindowActions
     void ShowCompletion();
 
     void ShowParameterHints();
-    Task GoToLineAsync();
+    void ShowGoToLine();
     void ToggleWordWrap();
     void SetTabDisplaySize(int size);
     void SetIndentSize(int? size);

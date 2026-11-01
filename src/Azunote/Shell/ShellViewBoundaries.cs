@@ -255,11 +255,6 @@ internal interface IExternalToolDialog
     Task<ExternalToolDefinition?> ShowAsync(CancellationToken cancellationToken = default);
 }
 
-internal interface IGoToLineDialog
-{
-    Task<GoToLineTarget?> ShowAsync(string initialText);
-}
-
 internal interface IMessageDialog
 {
     Task ShowAsync(string title, string message);
