@@ -310,6 +310,25 @@ internal static class LanguageServerConversions
             : [];
 
     /// <summary>
+    /// The files and positions a definition answer points to: a location, an
+    /// array of them, or an array of links, whose selection range is the name
+    /// to go to. A location outside the file system is left out.
+    /// </summary>
+    public static IReadOnlyList<(string Path, LineColumn Position)> ToLocations(JsonNode? locations) =>
+        [.. (locations as JsonArray ?? (IEnumerable<JsonNode?>)[locations])
+            .OfType<JsonObject>()
+            .Select(location => (
+                Uri: GetString(location["targetUri"] ?? location["uri"]),
+                Start: (location["targetSelectionRange"] ?? location["range"])?["start"]))
+            .Select(location => (
+                Path: location.Uri is null ? null : LanguageServerClient.ToPath(location.Uri),
+                Position: new LineColumn(
+                    Math.Max(0, GetInt(location.Start?["line"])),
+                    Math.Max(0, GetInt(location.Start?["character"])))))
+            .Where(location => location.Path is not null)
+            .Select(location => (location.Path!, location.Position))];
+
+    /// <summary>
     /// The text of hover contents or documentation: a string, a marked string,
     /// markup content, or an array of them. Markdown code fences are dropped
     /// since the tooltip shows plain text.

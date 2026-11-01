@@ -286,6 +286,31 @@ public sealed class LanguageServerConversionsTests
         Assert.Null(LanguageServerConversions.ToSignatureHelp(null));
     }
 
+    [Fact]
+    public void Definition_locations_read_locations_and_links_and_leave_out_other_schemes()
+    {
+        var first = Path.GetFullPath(@"C:\src\app\a.ts");
+        var second = Path.GetFullPath(@"C:\src\app\b.ts");
+        var links = JsonNode.Parse($$"""
+            [
+              {
+                "targetUri": "{{LanguageServerClient.ToUri(first)}}",
+                "targetRange": { "start": { "line": 1, "character": 0 }, "end": { "line": 3, "character": 1 } },
+                "targetSelectionRange": { "start": { "line": 1, "character": 9 }, "end": { "line": 1, "character": 12 } }
+              },
+              { "targetUri": "untitled:Untitled-1", "targetSelectionRange": { "start": { "line": 0, "character": 0 } } }
+            ]
+            """);
+        var location = JsonNode.Parse($$"""
+            { "uri": "{{LanguageServerClient.ToUri(second)}}", "range": { "start": { "line": 4, "character": 2 }, "end": { "line": 4, "character": 5 } } }
+            """);
+
+        Assert.Equal([(first, new LineColumn(1, 9))], LanguageServerConversions.ToLocations(links));
+        Assert.Equal([(second, new LineColumn(4, 2))], LanguageServerConversions.ToLocations(location));
+        Assert.Equal([(second, new LineColumn(4, 2))], LanguageServerConversions.ToLocations(new JsonArray(location!.DeepClone())));
+        Assert.Empty(LanguageServerConversions.ToLocations(null));
+    }
+
     private static EditorProviderContext Context(string text, int position) =>
         new(new TextSnapshot(text), position, TextSelection.Caret(position));
 }

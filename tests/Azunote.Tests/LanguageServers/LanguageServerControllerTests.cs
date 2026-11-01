@@ -271,6 +271,30 @@ public sealed class LanguageServerControllerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_definition_is_asked_for_the_position_in_the_current_text()
+    {
+        _enabled.Add((Workspace, "fake-server"));
+        _server.Capabilities["definitionProvider"] = true;
+        var target = Path.Combine(Workspace, "lib.ts");
+        _server.Handlers["textDocument/definition"] = _ => new JsonObject
+        {
+            ["uri"] = LanguageServerClient.ToUri(target),
+            ["range"] = JsonNode.Parse("""{ "start": { "line": 2, "character": 4 }, "end": { "line": 2, "character": 9 } }""")
+        };
+        using var controller = CreateController();
+        controller.Update();
+        await WaitForAsync(() => controller.CanGoToDefinition);
+        _editor.Replace(new TextRange(0, 0), "// ");
+
+        var locations = await controller.FindDefinitionAsync(8);
+
+        Assert.Equal([(target, new LineColumn(2, 4))], locations);
+        var request = Assert.Single(_server.ReceivedOf("textDocument/definition"))!;
+        Assert.Equal(8, request["position"]!["character"]!.GetValue<int>());
+        Assert.Equal(_editor.Text, _server.ReceivedOf("textDocument/didChange").Last()!["contentChanges"]![0]!["text"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task Inlay_hints_are_asked_for_the_visible_range_and_again_when_the_server_asks()
     {
         _enabled.Add((Workspace, "fake-server"));

@@ -106,6 +106,8 @@ internal sealed class LanguageServerClient : IAsyncDisposable
 
     public bool SupportsSignatureHelp { get; private set; }
 
+    public bool SupportsDefinition { get; private set; }
+
     public IReadOnlyList<string> SignatureHelpTriggerCharacters { get; private set; } = [];
 
     /// <summary>The last lines the server wrote to standard error, to explain a failure.</summary>
@@ -192,6 +194,7 @@ internal sealed class LanguageServerClient : IAsyncDisposable
                             ["activeParameterSupport"] = true
                         }
                     },
+                    ["definition"] = new JsonObject { ["linkSupport"] = true },
                     ["inlayHint"] = new JsonObject(),
                     ["publishDiagnostics"] = new JsonObject { ["versionSupport"] = true }
                 }
@@ -327,6 +330,9 @@ internal sealed class LanguageServerClient : IAsyncDisposable
 
     public Task<JsonNode?> SignatureHelpAsync(string uri, LineColumn position, CancellationToken cancellationToken) =>
         _connection.SendRequestAsync("textDocument/signatureHelp", CreatePositionParameters(uri, position), cancellationToken);
+
+    public Task<JsonNode?> DefinitionAsync(string uri, LineColumn position, CancellationToken cancellationToken) =>
+        _connection.SendRequestAsync("textDocument/definition", CreatePositionParameters(uri, position), cancellationToken);
 
     public Task<JsonNode?> InlayHintAsync(string uri, LineColumn start, LineColumn end, CancellationToken cancellationToken) =>
         _connection.SendRequestAsync("textDocument/inlayHint", new JsonObject
@@ -492,6 +498,7 @@ internal sealed class LanguageServerClient : IAsyncDisposable
         SupportsHover = IsProvided(capabilities?["hoverProvider"]);
         SupportsFormatting = IsProvided(capabilities?["documentFormattingProvider"]);
         SupportsInlayHints = IsProvided(capabilities?["inlayHintProvider"]);
+        SupportsDefinition = IsProvided(capabilities?["definitionProvider"]);
     }
 
     private static string[] ReadTriggers(JsonNode? triggers) =>

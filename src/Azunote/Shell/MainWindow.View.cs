@@ -47,6 +47,9 @@ public sealed partial class MainWindow
     private readonly Dictionary<ExternalToolSettings, List<MenuFlyoutItemBase>> _toolControls = [];
     private readonly List<MenuFlyoutItemBase> _externalToolMenuItems = [];
     private readonly List<MenuFlyoutItemBase> _externalToolContextMenuItems = [];
+    private MenuFlyoutItem _goToDefinitionContextMenuItem = null!;
+    private MenuFlyoutItem _parameterHintsContextMenuItem = null!;
+    private readonly MenuFlyoutSeparator _languageServerContextMenuSeparator = new();
     private readonly List<MenuFlyoutItemBase> _recentFileMenuItems = [];
     private readonly List<MenuFlyoutItemBase> _windowMenuItems = [];
     private readonly List<MenuFlyoutSeparator> _windowMenuSeparators = [];
@@ -70,6 +73,15 @@ public sealed partial class MainWindow
         catch (Exception exception)
         {
             ErrorReporter.LogException($"Open link: {args.Text}", exception);
+        }
+    }
+
+    private void Editor_DefinitionRequested(object? sender, DefinitionRequestedEventArgs args)
+    {
+        if (_viewModel.CanGoToDefinition)
+        {
+            args.Handled = true;
+            _ = _runtime.GoToDefinitionAsync(args.Position);
         }
     }
 
@@ -104,6 +116,20 @@ public sealed partial class MainWindow
             $"Editor exception/{source}",
             exception);
         Editor.LinkInvoked += Editor_LinkInvoked;
+        Editor.DefinitionRequested += Editor_DefinitionRequested;
+        _goToDefinitionContextMenuItem = new MenuFlyoutItem
+        {
+            Text = "Go to Definition",
+            KeyboardAcceleratorTextOverride = "F12",
+            Command = _viewModel.GoToDefinitionCommand
+        };
+        _parameterHintsContextMenuItem = new MenuFlyoutItem
+        {
+            Text = "Show Parameter Hints",
+            KeyboardAcceleratorTextOverride = "Ctrl+Shift+Space",
+            Command = _viewModel.ShowParameterHintsCommand
+        };
+        SetEditorContextMenuItems([]);
         _editorBuffer = new AzunyanEditorBuffer(Editor);
         _findNotificationFlyout = FindNotificationFlyout;
         _findNotificationText = _findNotificationFlyout.Content as TextBlock
@@ -732,7 +758,7 @@ public sealed partial class MainWindow
 
         var contextMenuItems = CreateExternalToolContextMenuItems(
             _viewModel.ExternalToolContextItems);
-        _editor.SetAdditionalContextMenuItems(contextMenuItems);
+        SetEditorContextMenuItems(contextMenuItems);
         _externalToolContextMenuItems.AddRange(contextMenuItems);
 
         RegisterExternalToolAccelerators(nodes, onSelected);
@@ -779,8 +805,36 @@ public sealed partial class MainWindow
 
     private void ClearExternalToolContextMenuItems()
     {
-        _editor.SetAdditionalContextMenuItems([]);
+        SetEditorContextMenuItems([]);
         _externalToolContextMenuItems.Clear();
+    }
+
+    /// <summary>
+    /// Adds the language server's commands to the editor's context menu, and
+    /// the external tools after them.
+    /// </summary>
+    private void SetEditorContextMenuItems(IReadOnlyList<MenuFlyoutItemBase> toolItems) =>
+        _editor.SetAdditionalContextMenuItems(
+        [
+            _goToDefinitionContextMenuItem,
+            _parameterHintsContextMenuItem,
+            .. toolItems.Count == 0 ? Array.Empty<MenuFlyoutItemBase>() : [_languageServerContextMenuSeparator],
+            .. toolItems
+        ]);
+
+    /// <summary>Shows the language server's commands in the context menu only while its server offers them.</summary>
+    internal void UpdateLanguageServerContextMenuItems()
+    {
+        _goToDefinitionContextMenuItem.Visibility = _viewModel.CanGoToDefinition
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        _parameterHintsContextMenuItem.Visibility = _viewModel.CanShowLanguageServerParameterHints
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        _languageServerContextMenuSeparator.Visibility =
+            _viewModel.CanGoToDefinition || _viewModel.CanShowLanguageServerParameterHints
+                ? Visibility.Visible
+                : Visibility.Collapsed;
     }
 
     private void RegisterExternalToolAccelerators(

@@ -32,6 +32,8 @@ internal sealed class MainWindowViewModel :
     private bool _isReplaceMode;
     private bool _isReadOnly;
     private bool _languageServerFormats;
+    private bool _languageServerFindsDefinitions;
+    private bool _languageServerShowsParameterHints;
     private int _runningExternalToolCount;
     private bool _isMatchCase;
     private bool _isInSelection;
@@ -75,6 +77,7 @@ internal sealed class MainWindowViewModel :
         AddNextOccurrenceCommand = Command(() => Actions.AddNextOccurrence());
         ToggleCommentCommand = Command(() => Actions.ToggleComment());
         FormatDocumentCommand = Async(() => Actions.FormatDocumentAsync());
+        GoToDefinitionCommand = Async(() => Actions.GoToDefinitionAsync());
         ReopenWithEncodingCommand = Command(parameter =>
         {
             if (parameter is TextEncoding encoding)
@@ -252,6 +255,7 @@ internal sealed class MainWindowViewModel :
     public ICommand ToggleCommentCommand { get; }
 
     public ICommand FormatDocumentCommand { get; }
+    public ICommand GoToDefinitionCommand { get; }
     public ICommand ReopenWithEncodingCommand { get; }
     public ICommand SaveWithEncodingCommand { get; }
     public ICommand ReopenWithOtherEncodingCommand { get; }
@@ -289,13 +293,20 @@ internal sealed class MainWindowViewModel :
     public bool IsReadOnly
     {
         get => _isReadOnly;
-        set => SetProperty(ref _isReadOnly, value, dependentProperties: [nameof(CanEdit), nameof(CanFormatDocument)]);
+        set => SetProperty(ref _isReadOnly, value, dependentProperties:
+            [nameof(CanEdit), nameof(CanFormatDocument), nameof(CanShowLanguageServerParameterHints)]);
     }
 
     public bool CanEdit => !IsReadOnly;
 
     /// <summary>Whether the document's language server runs and can format it.</summary>
     public bool CanFormatDocument => _languageServerFormats && CanEdit;
+
+    /// <summary>Whether the document's language server runs and finds definitions.</summary>
+    public bool CanGoToDefinition => _languageServerFindsDefinitions;
+
+    /// <summary>Whether the document's language server runs and tells the parameters of a call being typed.</summary>
+    public bool CanShowLanguageServerParameterHints => _languageServerShowsParameterHints && CanEdit;
     public string ErrorCountText { get; private set; } = "0";
     public string WarningCountText { get; private set; } = "0";
     public string InformationCountText { get; private set; } = "0";
@@ -351,10 +362,16 @@ internal sealed class MainWindowViewModel :
 
     public string LanguageServerToolTip { get; private set; } = string.Empty;
 
-    public void SetLanguageServer(LanguageServerIndicator indicator, bool formats)
+    public void SetLanguageServer(
+        LanguageServerIndicator indicator,
+        bool formats,
+        bool findsDefinitions,
+        bool showsParameterHints)
     {
         ArgumentNullException.ThrowIfNull(indicator);
         _languageServerFormats = formats;
+        _languageServerFindsDefinitions = findsDefinitions;
+        _languageServerShowsParameterHints = showsParameterHints;
         IsLanguageServerAvailable = indicator.State != LanguageServerIndicatorState.Hidden;
         IsLanguageServerOn = indicator.State is not (LanguageServerIndicatorState.Hidden or LanguageServerIndicatorState.Off);
         LanguageServerVisibility = IsLanguageServerAvailable ? Visibility.Visible : Visibility.Collapsed;
@@ -388,6 +405,8 @@ internal sealed class MainWindowViewModel :
         OnPropertyChanged(nameof(LanguageServerFailureVisibility));
         OnPropertyChanged(nameof(LanguageServerToolTip));
         OnPropertyChanged(nameof(CanFormatDocument));
+        OnPropertyChanged(nameof(CanGoToDefinition));
+        OnPropertyChanged(nameof(CanShowLanguageServerParameterHints));
     }
 
     public int RunningExternalToolCount
@@ -710,6 +729,8 @@ internal interface IMainWindowActions
     void AddNextOccurrence();
     void ToggleComment();
     Task FormatDocumentAsync();
+
+    Task GoToDefinitionAsync();
     void ReopenWithEncoding(TextEncoding encoding);
     void SaveWithEncoding(TextEncoding encoding);
     void ShowEncodingPicker(bool reopen);

@@ -55,7 +55,7 @@ The command palette (Ctrl+Shift+P) finds tools along with the other menu
 commands.
 
 The `menus` field also puts a tool in the editor context menu, after the
-built-in commands. There, a tool's name includes its folders, such as
+built-in commands and the language server's. There, a tool's name includes its folders, such as
 `Formatting: CSharp: Format`.
 
 ## Default tools

@@ -36,6 +36,7 @@ internal sealed class MainWindowRuntime : IDisposable
     private readonly DocumentDiagnostics _diagnostics = new();
     private readonly LanguageServerController? _languageServer;
     private readonly Func<LanguageServerLog, Task>? _openLanguageServerLog;
+    private readonly Func<string, LineColumn, Task>? _openFileAt;
     private (IReadOnlyList<string> Completion, IReadOnlyList<string> SignatureHelp) _languageServerTriggers = ([], []);
     private DocumentSessionState _previousState;
     private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer _backupTimer;
@@ -60,7 +61,8 @@ internal sealed class MainWindowRuntime : IDisposable
         Func<string?, Task<IExternalToolDocument>>? openStreamedTextInNewWindow = null,
         Func<ExternalToolProposal, Task>? openProposal = null,
         LanguageServerRegistry? languageServers = null,
-        Func<LanguageServerLog, Task>? openLanguageServerLog = null)
+        Func<LanguageServerLog, Task>? openLanguageServerLog = null,
+        Func<string, LineColumn, Task>? openFileAt = null)
     {
         _window = window ?? throw new ArgumentNullException(nameof(window));
         _view = new MainWindow.ViewBoundary(window);
@@ -75,6 +77,7 @@ internal sealed class MainWindowRuntime : IDisposable
         _recordStatusBarVisible = recordStatusBarVisible ?? throw new ArgumentNullException(nameof(recordStatusBarVisible));
         _session = session ?? new DocumentSession();
         _openLanguageServerLog = openLanguageServerLog;
+        _openFileAt = openFileAt;
         if (document is not null)
         {
             _view.SetDocument(document);
@@ -590,6 +593,40 @@ internal sealed class MainWindowRuntime : IDisposable
         }
     }
 
+    /// <summary>
+    /// Goes to where the language server says the name at
+    /// <paramref name="position"/>, or else at the caret, is defined: in the
+    /// window that has its file, or in a new one. When the server lists more
+    /// than one place, it goes to the first.
+    /// </summary>
+    public async Task GoToDefinitionAsync(int? position = null)
+    {
+        if (_languageServer is null || _openFileAt is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var locations = await _languageServer.FindDefinitionAsync(position ?? _view.Selection.Active);
+            if (locations.Count > 0)
+            {
+                await _openFileAt(locations[0].Path, locations[0].Position);
+            }
+        }
+        catch (Exception exception) when (exception is IOException or JsonRpcException or ObjectDisposedException)
+        {
+            await _prompt.ShowErrorAsync("Could not go to definition", exception.Message);
+        }
+    }
+
+    /// <summary>Puts the caret at <paramref name="position"/>, and the view around it.</summary>
+    public void GoToPosition(LineColumn position)
+    {
+        _view.SetPosition(position);
+        _view.Focus();
+    }
+
     public Task ShowLanguageServerLogAsync() =>
         _languageServer?.Log is { } log && _openLanguageServerLog is not null
             ? _openLanguageServerLog(log)
@@ -960,7 +997,11 @@ internal sealed class MainWindowRuntime : IDisposable
 
     private void LanguageServer_Changed(object? sender, EventArgs args)
     {
-        _viewModel.SetLanguageServer(_languageServer!.Indicator, _languageServer.CanFormat);
+        _viewModel.SetLanguageServer(
+            _languageServer!.Indicator,
+            _languageServer.CanFormat,
+            _languageServer.CanGoToDefinition,
+            _languageServer.CanShowParameterHints);
         var triggers = (
             Completion: _languageServer.CompletionTriggerCharacters,
             SignatureHelp: _languageServer.SignatureHelpTriggerCharacters);

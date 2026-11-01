@@ -228,6 +228,12 @@ host. A provider can classify anything as a link, not only a URL: the Markdown
 rule reports the destination of an inline link, which is how a relative target
 such as `./other.md` becomes navigable.
 
+Ctrl+Click on other text raises `DefinitionRequested` with the clicked
+position. A host that goes to a definition there sets `Handled`, and the click
+only places the caret; otherwise it is an ordinary click. A right-click outside
+every selection moves the caret before the context menu opens, so the host's
+commands in it act on what was clicked.
+
 Decorations such as underline, squiggle, background highlight, and diagnostic
 markers are separate drawing primitives. They reuse the glyph hit-test map and
 do not create duplicate text. The projected renderer draws a wavy underline

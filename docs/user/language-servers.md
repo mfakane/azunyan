@@ -69,12 +69,17 @@ those carrying a whole document, are cut short.
   in one changes every place with the same number at once. Tab from the last one
   goes to where the suggestion ends, `$0`, and Esc or moving the caret out of the
   placeholder stops moving between them.
+- **Go to definition**: Edit > Go to Definition (F12), Ctrl+Click on a name,
+  or Go to Definition in the context menu goes to where the server says the
+  name is defined. A definition in another file opens in the window that has
+  that file, or in a new one. When the server lists more than one place, it
+  goes to the first.
 - **Descriptions**: resting the pointer on a symbol shows what the server says
   about it, after any problem there.
 - **Parameter hints**: typing a character the server names, such as `(` or
   `,`, shows the signature of the call above the line, with the parameter
-  being typed in bold. Edit > Show Parameter Hints (Ctrl+Shift+Space) shows it
-  at the caret. Up and Down switch between overloads, and Esc or a click
+  being typed in bold. Edit > Show Parameter Hints (Ctrl+Shift+Space), or the
+  same command in the context menu, shows it at the caret. Up and Down switch between overloads, and Esc or a click
   in the text closes it; it also closes once the caret leaves the call.
 - **Inlay hints**: the server's hints, such as parameter names before
   arguments and inferred types after names, appear in the text in a dimmed
@@ -85,6 +90,10 @@ those carrying a whole document, are cut short.
   as the server suggests, with the document's indentation, as one step to undo.
   It is available while a server that formats runs. An enabled
   [tool](tool-definitions.md) with the same shortcut takes the shortcut.
+
+Go to Definition and Show Parameter Hints appear in the editor context menu
+only while a server that offers them runs. A right-click outside the selection
+moves the caret there first, so they act on what was clicked.
 
 One server process serves every document in its workspace folder, from every
 window and every mode that names the same command and arguments. It is stopped

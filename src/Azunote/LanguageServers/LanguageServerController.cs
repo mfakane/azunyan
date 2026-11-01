@@ -129,6 +129,10 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
 
     public bool CanFormat => _active?.Client.SupportsFormatting == true;
 
+    public bool CanGoToDefinition => _active?.Client.SupportsDefinition == true;
+
+    public bool CanShowParameterHints => _active?.Client.SupportsSignatureHelp == true;
+
     public ICompletionProvider GetCompletionProvider(ICompletionProvider? fallback) =>
         new CompletionProvider(this, fallback);
 
@@ -255,6 +259,26 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
 
         _editor.Replace(TextRange.FromBounds(start, end), formatted.ToString());
         _editor.SetSelection(new TextSelection(anchor, caret));
+    }
+
+    /// <summary>
+    /// Where the server says the name at <paramref name="position"/> is
+    /// defined, in the order it lists them. None when it has no answer.
+    /// </summary>
+    public async Task<IReadOnlyList<(string Path, LineColumn Position)>> FindDefinitionAsync(int position)
+    {
+        if (_active is not { Client.SupportsDefinition: true } active)
+        {
+            return [];
+        }
+
+        var snapshot = _editor.Snapshot;
+        await active.Client.ChangeAsync(active.Uri, snapshot.Text);
+        var result = await active.Client.DefinitionAsync(
+            active.Uri,
+            snapshot.Lines.GetLineColumn(position),
+            CancellationToken.None);
+        return LanguageServerConversions.ToLocations(result);
     }
 
     /// <summary>Tells the server the document was saved, after the session became clean.</summary>

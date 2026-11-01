@@ -40,6 +40,7 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
             runtime => _ = runtime.FormatDocumentAsync(),
         [new(VirtualKey.Space, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift)] =
             runtime => runtime.ShowParameterHints(),
+        [new(VirtualKey.F12, VirtualKeyModifiers.None)] = runtime => _ = runtime.GoToDefinitionAsync(),
     };
 
     private bool _completionShortcutInvoked;
@@ -79,7 +80,8 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
             application.OpenStreamedTextInNewWindowAsync,
             proposal => application.OpenProposalAsync(this, proposal),
             application.LanguageServers,
-            application.OpenLanguageServerLogAsync);
+            application.OpenLanguageServerLogAsync,
+            application.OpenFileAtAsync);
         ViewModel.Attach(this);
         // MenuBarItem does not expose its internal flyout's Opening event.
         // Refresh synchronously on entry so the flyout's first paint is final.
@@ -87,7 +89,11 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         ToolsMenuItem.PointerPressed += (_, _) => _runtime.RefreshExternalToolsMenuNow();
         ToolsMenuItem.GotFocus += (_, _) => _runtime.RefreshExternalToolsMenuNow();
         ToolsMenuItem.KeyDown += (_, _) => _runtime.RefreshExternalToolsMenuNow();
-        Editor.ContextMenuOpening += (_, _) => _runtime.RefreshExternalToolsMenuNow();
+        Editor.ContextMenuOpening += (_, _) =>
+        {
+            _runtime.RefreshExternalToolsMenuNow();
+            UpdateLanguageServerContextMenuItems();
+        };
         RegisterKeyboardAccelerators();
         WatchDocumentSelection();
 
@@ -862,6 +868,8 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     void IMainWindowActions.ToggleComment() => _runtime.ToggleComment();
 
     Task IMainWindowActions.FormatDocumentAsync() => _runtime.FormatDocumentAsync();
+
+    Task IMainWindowActions.GoToDefinitionAsync() => _runtime.GoToDefinitionAsync();
 
     void IMainWindowActions.ReopenWithEncoding(TextEncoding encoding) =>
         _runtime.ReopenWithEncoding(encoding);

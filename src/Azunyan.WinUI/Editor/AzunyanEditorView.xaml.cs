@@ -213,7 +213,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     }
 
     /// <summary>
-    /// Replaces items appended to the editor's built-in context menu.
+    /// Replaces items appended to the editor's built-in context menu. The
+    /// separator before them shows while one of them that is no separator does.
     /// </summary>
     public void SetAdditionalContextMenuItems(IReadOnlyList<MenuFlyoutItemBase> items)
     {
@@ -417,6 +418,12 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     /// provider classified as a link. The host owns navigation.
     /// </summary>
     public event EventHandler<LinkInvokedEventArgs>? LinkInvoked;
+
+    /// <summary>
+    /// Raised when the projected surface is Ctrl+Clicked on text that is no
+    /// link. The host owns finding the definition.
+    /// </summary>
+    public event EventHandler<DefinitionRequestedEventArgs>? DefinitionRequested;
 
     /// <summary>
     /// The hint shown while the pointer rests on a link. Setting it to an
@@ -3199,6 +3206,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         HideCompletionPopup();
         HideTooltipPopup();
         EndSignatureHelp();
+        MoveCaretToContextRequest(args);
         if (args.TryGetPosition(this, out var point))
         {
             EditorContextMenu.ShowAt(
@@ -3217,12 +3225,51 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         args.Handled = true;
     }
 
+    /// <summary>
+    /// A right-click outside every selection moves the caret where it was
+    /// made, so the menu's commands act there; inside one, the selection
+    /// stays for Cut and Copy.
+    /// </summary>
+    private void MoveCaretToContextRequest(ContextRequestedEventArgs args)
+    {
+        if (!IsProjectedTextSurface
+            || !args.TryGetPosition(EditorPointerSurface, out var point)
+            || !_defaultRenderer.TextRenderer.TryHitTest(
+                point.X,
+                point.Y,
+                InputWindow.NativeTextBoxControl.Padding.Left,
+                InputWindow.NativeTextBoxControl.Padding.Top,
+                GetHorizontalOffset(),
+                GetVerticalOffset(),
+                _characterWidth,
+                out var anchor,
+                out _))
+        {
+            return;
+        }
+
+        var position = anchor.Position.Offset;
+        if (_blockSelection is null
+            && !Document.CaretSet.Any(caret => caret.Selection.Start <= position && position <= caret.Selection.End))
+        {
+            SetDocumentSelection(TextSelection.Caret(position));
+        }
+    }
+
     /// <summary>Allows the host to request fresh advisory menu state without blocking opening.</summary>
     public event EventHandler? ContextMenuOpening;
 
     private void EditorContextMenu_Opening(object sender, object e)
     {
         ContextMenuOpening?.Invoke(this, EventArgs.Empty);
+        if (_additionalContextMenuSeparator is { } separator)
+        {
+            separator.Visibility = _additionalContextMenuItems.Any(item =>
+                    item is not MenuFlyoutSeparator && item.Visibility == Visibility.Visible)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
         var canCopy = HasCopyableSelection();
         CutContextMenuItem.IsEnabled = canCopy && !IsReadOnly;
         CopyContextMenuItem.IsEnabled = canCopy;
@@ -3328,6 +3375,21 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             args.Handled = true;
             LinkInvoked?.Invoke(this, new LinkInvokedEventArgs(linkText, linkRange));
             return;
+        }
+
+        if (adornmentId is null
+            && GetPointerModifiers(args) == VirtualKeyModifiers.Control
+            && textPosition is int definitionPosition)
+        {
+            var request = new DefinitionRequestedEventArgs(definitionPosition);
+            DefinitionRequested?.Invoke(this, request);
+            if (request.Handled)
+            {
+                SetDocumentSelection(TextSelection.Caret(anchor.Position.Offset));
+                InputWindow.Focus(FocusState.Pointer);
+                args.Handled = true;
+                return;
+            }
         }
 
         if (adornmentId is not null

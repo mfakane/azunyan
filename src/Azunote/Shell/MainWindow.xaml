@@ -679,6 +679,12 @@
                     Command="{x:Bind ViewModel.FormatDocumentCommand}"
                     IsEnabled="{x:Bind ViewModel.CanFormatDocument, Mode=OneWay}"
                 />
+                <MenuFlyoutItem
+                    Text="Go to Definition"
+                    KeyboardAcceleratorTextOverride="F12"
+                    Command="{x:Bind ViewModel.GoToDefinitionCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanGoToDefinition, Mode=OneWay}"
+                />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem
                     Text="Select All"

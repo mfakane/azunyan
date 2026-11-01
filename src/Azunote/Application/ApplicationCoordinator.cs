@@ -1,4 +1,5 @@
 using System.Text;
+using Azunyan.Core;
 using Azunyan.WinUI;
 using Microsoft.UI.Dispatching;
 
@@ -478,6 +479,22 @@ internal sealed class ApplicationCoordinator : IDisposable
         {
             await OpenFileInNewWindowAsync(path);
         }
+    }
+
+    /// <summary>Shows a file at a position, in the window that has it or else in a new one.</summary>
+    internal async Task OpenFileAtAsync(string path, LineColumn position)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        if (FindWindowForFile(path) is { } existing)
+        {
+            existing.Window.ActivateWindow();
+            existing.Window.Runtime.GoToPosition(position);
+            return;
+        }
+
+        var registration = CreateWindowRegistration();
+        await registration.Window.Runtime.OpenStartupDocumentAsync(path, position.Line + 1, position.Column + 1);
+        ActivateWindow(registration);
     }
 
     internal void DuplicateWindow(MainWindow source)
