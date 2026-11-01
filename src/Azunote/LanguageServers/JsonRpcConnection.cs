@@ -115,7 +115,6 @@ internal sealed class JsonRpcConnection : IAsyncDisposable
         {
         }
 
-        _writeLock.Dispose();
         _closing.Dispose();
     }
 

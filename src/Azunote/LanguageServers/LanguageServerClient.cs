@@ -407,6 +407,12 @@ internal sealed class LanguageServerClient : IAsyncDisposable
             return;
         }
 
+        // Lets a document change being sent finish first; any after it is dropped.
+        if (await _documentsLock.WaitAsync(ShutdownTimeout).ConfigureAwait(false))
+        {
+            _documentsLock.Release();
+        }
+
         if (!_connection.Completion.IsCompleted)
         {
             try
@@ -439,7 +445,6 @@ internal sealed class LanguageServerClient : IAsyncDisposable
 
         await _connection.DisposeAsync().ConfigureAwait(false);
         _process?.Dispose();
-        _documentsLock.Dispose();
     }
 
     internal static string ToUri(string path) => new Uri(Path.GetFullPath(path)).AbsoluteUri;
@@ -493,7 +498,10 @@ internal sealed class LanguageServerClient : IAsyncDisposable
         await _documentsLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            await action().ConfigureAwait(false);
+            if (Volatile.Read(ref _disposed) == 0)
+            {
+                await action().ConfigureAwait(false);
+            }
         }
         finally
         {

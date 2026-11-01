@@ -227,6 +227,22 @@ public sealed class LanguageServerClientTests
     }
 
     [Fact]
+    public async Task Document_changes_after_disposing_are_dropped()
+    {
+        await using var server = new FakeLanguageServer();
+        var client = server.CreateClient(Workspace);
+        await client.InitializeAsync(null, CancellationToken.None);
+        await client.OpenAsync(DocumentUri, "typescript", "one");
+
+        await client.DisposeAsync();
+        await client.ChangeAsync(DocumentUri, "two");
+        await client.CloseAsync(DocumentUri);
+
+        Assert.Empty(server.ReceivedOf("textDocument/didChange"));
+        Assert.Empty(server.ReceivedOf("textDocument/didClose"));
+    }
+
+    [Fact]
     public async Task A_server_that_closes_its_output_completes_the_client()
     {
         var server = new FakeLanguageServer();
