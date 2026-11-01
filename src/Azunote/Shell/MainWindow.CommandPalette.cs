@@ -555,7 +555,11 @@ public sealed partial class MainWindow
         var secondaryBrush = (Brush)resources["TextFillColorSecondaryBrush"];
 
         var title = new TextBlock { TextTrimming = TextTrimming.CharacterEllipsis };
-        AppendHighlightedText(title.Inlines, item.Title, match.TitlePositions);
+        AppendHighlightedText(
+            title.Inlines,
+            item.Title,
+            match.TitlePositions,
+            (Brush)resources["SystemControlForegroundAccentBrush"]);
         var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         text.Children.Add(title);
         if (item.Detail.Length > 0)
@@ -612,7 +616,8 @@ public sealed partial class MainWindow
     private static void AppendHighlightedText(
         InlineCollection inlines,
         string text,
-        IReadOnlyList<int> positions)
+        IReadOnlyList<int> positions,
+        Brush highlightForeground)
     {
         var start = 0;
         while (start < text.Length)
@@ -628,6 +633,7 @@ public sealed partial class MainWindow
             if (highlighted)
             {
                 run.FontWeight = FontWeights.Bold;
+                run.Foreground = highlightForeground;
             }
 
             inlines.Add(run);

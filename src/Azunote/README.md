@@ -168,7 +168,8 @@ workspace; text that starts with `:` goes to the line, or `line:column`,
 typed after it, which is what Go > Go to Line... (Ctrl+G) and clicking the
 position in the status bar open; any other text searches the documents of
 the other windows and the recent files. Characters match in order, not necessarily
-next to each other, so `mlu` finds Move Line Up. Choosing Open Recent or
+next to each other, so `mlu` finds Move Line Up, and the matching characters
+are shown in bold and the accent color. Choosing Open Recent or
 Language Mode lists the recent files or the language modes in the palette
 itself; so do File > Reopen/Save with Encoding > Other..., which lists every
 encoding, and Go > Show Problems... (Ctrl+Shift+M), which lists the
