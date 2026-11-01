@@ -311,6 +311,52 @@ public sealed class LanguageServerConversionsTests
         Assert.Empty(LanguageServerConversions.ToLocations(null));
     }
 
+    [Fact]
+    public void Document_symbols_are_flattened_in_document_order_with_their_containers()
+    {
+        var tree = JsonNode.Parse("""
+            [
+              { "name": "helper", "kind": 12,
+                "range": { "start": { "line": 9, "character": 0 } },
+                "selectionRange": { "start": { "line": 9, "character": 9 } } },
+              { "name": "Greeter", "kind": 5,
+                "range": { "start": { "line": 0, "character": 0 } },
+                "selectionRange": { "start": { "line": 0, "character": 6 } },
+                "children": [
+                  { "name": "greet", "kind": 6,
+                    "range": { "start": { "line": 1, "character": 4 } },
+                    "selectionRange": { "start": { "line": 1, "character": 4 } },
+                    "children": [
+                      { "name": "text", "kind": 13, "selectionRange": { "start": { "line": 2, "character": 14 } } }
+                    ] }
+                ] },
+              { "name": "", "kind": 13, "selectionRange": { "start": { "line": 5, "character": 0 } } }
+            ]
+            """);
+        var flat = JsonNode.Parse("""
+            [
+              { "name": "b", "kind": 99, "containerName": "A", "location": { "uri": "file:///c:/a.ts", "range": { "start": { "line": 3, "character": 2 } } } },
+              { "name": "A", "kind": 14, "location": { "uri": "file:///c:/a.ts", "range": { "start": { "line": 1, "character": 6 } } } }
+            ]
+            """);
+
+        Assert.Equal(
+            [
+                new LanguageServerSymbol("Greeter", "Class", null, new LineColumn(0, 6)),
+                new LanguageServerSymbol("greet", "Method", "Greeter", new LineColumn(1, 4)),
+                new LanguageServerSymbol("text", "Variable", "Greeter › greet", new LineColumn(2, 14)),
+                new LanguageServerSymbol("helper", "Function", null, new LineColumn(9, 9))
+            ],
+            LanguageServerConversions.ToSymbols(tree));
+        Assert.Equal(
+            [
+                new LanguageServerSymbol("A", "Constant", null, new LineColumn(1, 6)),
+                new LanguageServerSymbol("b", string.Empty, "A", new LineColumn(3, 2))
+            ],
+            LanguageServerConversions.ToSymbols(flat));
+        Assert.Empty(LanguageServerConversions.ToSymbols(null));
+    }
+
     private static EditorProviderContext Context(string text, int position) =>
         new(new TextSnapshot(text), position, TextSelection.Caret(position));
 }

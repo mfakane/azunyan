@@ -295,6 +295,26 @@ public sealed class LanguageServerControllerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Symbols_are_asked_for_the_current_text()
+    {
+        _enabled.Add((Workspace, "fake-server"));
+        _server.Capabilities["documentSymbolProvider"] = true;
+        _server.Handlers["textDocument/documentSymbol"] = _ => JsonNode.Parse("""
+            [{ "name": "value", "kind": 13, "range": { "start": { "line": 0, "character": 7 } }, "selectionRange": { "start": { "line": 0, "character": 7 } } }]
+            """);
+        using var controller = CreateController();
+        controller.Update();
+        await WaitForAsync(() => controller.CanListSymbols);
+        _editor.Replace(new TextRange(0, 0), "// ");
+
+        var symbols = await controller.ListSymbolsAsync();
+
+        Assert.Equal([new LanguageServerSymbol("value", "Variable", null, new LineColumn(0, 7))], symbols);
+        Assert.Single(_server.ReceivedOf("textDocument/documentSymbol"));
+        Assert.Equal(_editor.Text, _server.ReceivedOf("textDocument/didChange").Last()!["contentChanges"]![0]!["text"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task Inlay_hints_are_asked_for_the_visible_range_and_again_when_the_server_asks()
     {
         _enabled.Add((Workspace, "fake-server"));

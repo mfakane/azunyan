@@ -611,6 +611,12 @@
                     Command="{x:Bind ViewModel.GoToMatchingBracketCommand}"
                 />
                 <MenuFlyoutItem
+                    Text="Go to Symbol in File..."
+                    KeyboardAcceleratorTextOverride="Ctrl+Shift+O"
+                    Command="{x:Bind ViewModel.GoToSymbolCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanGoToSymbol, Mode=OneWay}"
+                />
+                <MenuFlyoutItem
                     Text="Go to Next Problem"
                     Command="{x:Bind ViewModel.GoToNextProblemCommand}"
                 >

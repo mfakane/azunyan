@@ -41,6 +41,8 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         [new(VirtualKey.Space, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift)] =
             runtime => runtime.ShowParameterHints(),
         [new(VirtualKey.F12, VirtualKeyModifiers.None)] = runtime => _ = runtime.GoToDefinitionAsync(),
+        [new(VirtualKey.O, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift)] =
+            runtime => runtime.ShowSymbolPalette(),
     };
 
     private bool _completionShortcutInvoked;
@@ -890,6 +892,8 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     void IMainWindowActions.ShowCompletion() => _runtime.ShowCompletion();
 
     void IMainWindowActions.ShowParameterHints() => _runtime.ShowParameterHints();
+
+    void IMainWindowActions.ShowSymbolPalette() => ShowSymbolPalette();
 
     Task IMainWindowActions.GoToLineAsync() => _runtime.ShowGoToLineAsync();
 

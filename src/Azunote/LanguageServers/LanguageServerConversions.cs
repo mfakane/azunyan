@@ -4,6 +4,13 @@ using Azunyan.Core;
 
 namespace Azunote;
 
+/// <summary>
+/// A name a language server lists in a document, such as a class or a
+/// function, with the kind of symbol it is, the names of the symbols it is in,
+/// and where its name is.
+/// </summary>
+internal sealed record LanguageServerSymbol(string Name, string Kind, string? Container, LineColumn Position);
+
 /// <summary>Turns what a language server answers into Azunote's editor types.</summary>
 internal static class LanguageServerConversions
 {
@@ -327,6 +334,68 @@ internal static class LanguageServerConversions
                     Math.Max(0, GetInt(location.Start?["character"])))))
             .Where(location => location.Path is not null)
             .Select(location => (location.Path!, location.Position))];
+
+    /// <summary>
+    /// The symbols of a document symbol answer in the order they appear in
+    /// the document, nested symbols with the names of those they are in. The
+    /// answer is a tree of symbols or a flat list of symbol information.
+    /// </summary>
+    public static IReadOnlyList<LanguageServerSymbol> ToSymbols(JsonNode? symbols)
+    {
+        var result = new List<LanguageServerSymbol>();
+        void Add(JsonArray? array, string? container)
+        {
+            foreach (var symbol in array?.OfType<JsonObject>() ?? [])
+            {
+                if (GetString(symbol["name"]) is not { Length: > 0 } name)
+                {
+                    continue;
+                }
+
+                var start = (symbol["selectionRange"] ?? symbol["location"]?["range"] ?? symbol["range"])?["start"];
+                result.Add(new LanguageServerSymbol(
+                    name,
+                    GetSymbolKindName(GetInt(symbol["kind"])),
+                    container ?? GetString(symbol["containerName"]),
+                    new LineColumn(Math.Max(0, GetInt(start?["line"])), Math.Max(0, GetInt(start?["character"])))));
+                Add(symbol["children"] as JsonArray, container is null ? name : $"{container} › {name}");
+            }
+        }
+
+        Add(symbols as JsonArray, null);
+        return [.. result.OrderBy(symbol => symbol.Position.Line).ThenBy(symbol => symbol.Position.Column)];
+    }
+
+    private static string GetSymbolKindName(int kind) => kind switch
+    {
+        1 => "File",
+        2 => "Module",
+        3 => "Namespace",
+        4 => "Package",
+        5 => "Class",
+        6 => "Method",
+        7 => "Property",
+        8 => "Field",
+        9 => "Constructor",
+        10 => "Enum",
+        11 => "Interface",
+        12 => "Function",
+        13 => "Variable",
+        14 => "Constant",
+        15 => "String",
+        16 => "Number",
+        17 => "Boolean",
+        18 => "Array",
+        19 => "Object",
+        20 => "Key",
+        21 => "Null",
+        22 => "Enum Member",
+        23 => "Struct",
+        24 => "Event",
+        25 => "Operator",
+        26 => "Type Parameter",
+        _ => string.Empty
+    };
 
     /// <summary>
     /// The text of hover contents or documentation: a string, a marked string,

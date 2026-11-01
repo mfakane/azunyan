@@ -133,6 +133,8 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
 
     public bool CanShowParameterHints => _active?.Client.SupportsSignatureHelp == true;
 
+    public bool CanListSymbols => _active?.Client.SupportsDocumentSymbols == true;
+
     public ICompletionProvider GetCompletionProvider(ICompletionProvider? fallback) =>
         new CompletionProvider(this, fallback);
 
@@ -279,6 +281,19 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
             snapshot.Lines.GetLineColumn(position),
             CancellationToken.None);
         return LanguageServerConversions.ToLocations(result);
+    }
+
+    /// <summary>The symbols the server lists in the current text, in document order.</summary>
+    public async Task<IReadOnlyList<LanguageServerSymbol>> ListSymbolsAsync()
+    {
+        if (_active is not { Client.SupportsDocumentSymbols: true } active)
+        {
+            return [];
+        }
+
+        await active.Client.ChangeAsync(active.Uri, _editor.Snapshot.Text);
+        var result = await active.Client.DocumentSymbolAsync(active.Uri, CancellationToken.None);
+        return LanguageServerConversions.ToSymbols(result);
     }
 
     /// <summary>Tells the server the document was saved, after the session became clean.</summary>

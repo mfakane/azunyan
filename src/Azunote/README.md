@@ -162,8 +162,9 @@ pipeline input and output, and shell completion.
 Help > Command Palette... (Ctrl+Shift+P or F1) opens a search box over the
 editor with `>` already typed. Text that starts with `>` searches the menu
 commands, including external tools and the choices in submenus such as
-View > Line Ending; any other text searches the documents of the other
-windows and the recent files. Characters match in order, not necessarily
+View > Line Ending; text that starts with `@` searches the symbols the
+document's language server lists; any other text searches the documents of
+the other windows and the recent files. Characters match in order, not necessarily
 next to each other, so `mlu` finds Move Line Up. Choosing Open Recent or
 Language Mode lists the recent files or the language modes in the palette
 itself; so do File > Reopen/Save with Encoding > Other..., which lists every

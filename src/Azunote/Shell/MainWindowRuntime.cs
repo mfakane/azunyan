@@ -620,6 +620,24 @@ internal sealed class MainWindowRuntime : IDisposable
         }
     }
 
+    /// <summary>The symbols the language server lists in the document, none when it cannot answer.</summary>
+    public async Task<IReadOnlyList<LanguageServerSymbol>> ListSymbolsAsync()
+    {
+        if (_languageServer is null)
+        {
+            return [];
+        }
+
+        try
+        {
+            return await _languageServer.ListSymbolsAsync();
+        }
+        catch (Exception exception) when (exception is IOException or JsonRpcException or ObjectDisposedException)
+        {
+            return [];
+        }
+    }
+
     /// <summary>Puts the caret at <paramref name="position"/>, and the view around it.</summary>
     public void GoToPosition(LineColumn position)
     {
@@ -642,6 +660,8 @@ internal sealed class MainWindowRuntime : IDisposable
     public void ShowCompletion() => _editorCommands.ShowCompletion();
 
     public void ShowParameterHints() => _editorCommands.ShowParameterHints();
+
+    public void ShowSymbolPalette() => _window.ShowSymbolPalette();
 
     public Task ShowGoToLineAsync() => _goToLine.ShowAsync();
 
@@ -1001,7 +1021,8 @@ internal sealed class MainWindowRuntime : IDisposable
             _languageServer!.Indicator,
             _languageServer.CanFormat,
             _languageServer.CanGoToDefinition,
-            _languageServer.CanShowParameterHints);
+            _languageServer.CanShowParameterHints,
+            _languageServer.CanListSymbols);
         var triggers = (
             Completion: _languageServer.CompletionTriggerCharacters,
             SignatureHelp: _languageServer.SignatureHelpTriggerCharacters);

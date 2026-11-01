@@ -15,6 +15,7 @@ namespace Azunote;
 public sealed partial class MainWindow
 {
     private const string CommandPalettePrefix = ">";
+    private const string SymbolPalettePrefix = "@";
     private const int MaxCommandPaletteResults = 100;
     private const int MaxRecentPaletteCommands = 10;
 
@@ -24,6 +25,10 @@ public sealed partial class MainWindow
     // The candidates are collected once when the palette opens.
     private CommandPaletteItem[] _paletteCommands = [];
     private List<CommandPaletteItem> _paletteDocuments = [];
+    // The symbols of the document, asked of the language server the first
+    // time the text starts with @ after the palette opens.
+    private CommandPaletteItem[]? _paletteSymbols;
+    private int _paletteSymbolsRequest;
     // The choices offered in place of the commands and documents, such as
     // the encodings of Other..., until the palette closes.
     private CommandPaletteItem[]? _palettePicks;
@@ -35,6 +40,14 @@ public sealed partial class MainWindow
     private bool IsCommandPaletteOpen => CommandPalettePanel.Visibility == Visibility.Visible;
 
     void IMainWindowActions.ShowCommandPalette() => ShowCommandPalette(CommandPalettePrefix);
+
+    internal void ShowSymbolPalette()
+    {
+        if (_viewModel.CanGoToSymbol)
+        {
+            ShowCommandPalette(SymbolPalettePrefix);
+        }
+    }
 
     internal void ShowEncodingPicker(TextEncoding current, string placeholder, Action<TextEncoding> select) =>
         ShowPalettePicker(
@@ -133,6 +146,8 @@ public sealed partial class MainWindow
         _paletteCommands = [];
         _paletteDocuments = [];
         _palettePicks = null;
+        _paletteSymbols = null;
+        _paletteSymbolsRequest++;
     }
 
     /// <summary>
@@ -149,12 +164,22 @@ public sealed partial class MainWindow
         }
 
         _paletteFilteredText = text;
-        var isCommandMode = _palettePicks is null
-            && text.StartsWith(CommandPalettePrefix, StringComparison.Ordinal);
+        var prefix = _palettePicks is not null
+            ? string.Empty
+            : text.StartsWith(CommandPalettePrefix, StringComparison.Ordinal)
+                ? CommandPalettePrefix
+                : text.StartsWith(SymbolPalettePrefix, StringComparison.Ordinal)
+                    ? SymbolPalettePrefix
+                    : string.Empty;
         IReadOnlyList<CommandPaletteItem> items = _palettePicks is { } picks
             ? picks
-            : isCommandMode ? _paletteCommands : _paletteDocuments;
-        var query = (isCommandMode ? text[CommandPalettePrefix.Length..] : text).Trim();
+            : prefix switch
+            {
+                CommandPalettePrefix => (IReadOnlyList<CommandPaletteItem>)_paletteCommands,
+                SymbolPalettePrefix => _paletteSymbols ?? RequestPaletteSymbols(),
+                _ => _paletteDocuments
+            };
+        var query = text[prefix.Length..].Trim();
         var matches = CommandPaletteSearch.Filter(query, items)
             .Take(MaxCommandPaletteResults)
             .ToArray();
@@ -180,6 +205,40 @@ public sealed partial class MainWindow
         }
 
         SelectCommandPaletteRow(0);
+    }
+
+    /// <summary>
+    /// Asks the language server for the document's symbols, which are shown
+    /// once they arrive if the palette is still open; until then there are none.
+    /// </summary>
+    private CommandPaletteItem[] RequestPaletteSymbols()
+    {
+        _paletteSymbols = [];
+        var request = ++_paletteSymbolsRequest;
+        _ = LoadPaletteSymbolsAsync(request);
+        return _paletteSymbols;
+    }
+
+    private async Task LoadPaletteSymbolsAsync(int request)
+    {
+        var symbols = await _runtime.ListSymbolsAsync();
+        if (request != _paletteSymbolsRequest)
+        {
+            return;
+        }
+
+        _paletteSymbols =
+        [
+            .. symbols.Select(symbol => new CommandPaletteItem(
+                symbol.Name,
+                symbol.Container ?? string.Empty,
+                symbol.Kind,
+                IsEnabled: true,
+                IsChecked: false,
+                () => _runtime.GoToPosition(symbol.Position)))
+        ];
+        _paletteFilteredText = null;
+        RefreshCommandPalette();
     }
 
     private void SelectCommandPaletteRow(int index)

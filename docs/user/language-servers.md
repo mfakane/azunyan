@@ -74,6 +74,12 @@ those carrying a whole document, are cut short.
   name is defined. A definition in another file opens in the window that has
   that file, or in a new one. When the server lists more than one place, it
   goes to the first.
+- **Go to symbol**: Edit > Go to Symbol in File... (Ctrl+Shift+O), or `@`
+  typed in the command palette, lists the symbols the server finds in the
+  document, such as classes, functions and their members, in the order they
+  appear. A symbol inside another shows that one's name under its own, and
+  typing narrows them as in the command palette. Choosing one puts the caret
+  on its name.
 - **Descriptions**: resting the pointer on a symbol shows what the server says
   about it, after any problem there.
 - **Parameter hints**: typing a character the server names, such as `(` or
