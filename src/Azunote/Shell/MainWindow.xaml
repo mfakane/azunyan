@@ -691,6 +691,12 @@
                     Command="{x:Bind ViewModel.GoToDefinitionCommand}"
                     IsEnabled="{x:Bind ViewModel.CanGoToDefinition, Mode=OneWay}"
                 />
+                <MenuFlyoutItem
+                    Text="Find All References"
+                    KeyboardAcceleratorTextOverride="Shift+F12"
+                    Command="{x:Bind ViewModel.FindReferencesCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanFindReferences, Mode=OneWay}"
+                />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem
                     Text="Select All"

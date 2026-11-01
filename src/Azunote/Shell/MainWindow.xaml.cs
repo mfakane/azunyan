@@ -41,6 +41,7 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
         [new(VirtualKey.Space, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift)] =
             runtime => runtime.ShowParameterHints(),
         [new(VirtualKey.F12, VirtualKeyModifiers.None)] = runtime => _ = runtime.GoToDefinitionAsync(),
+        [new(VirtualKey.F12, VirtualKeyModifiers.Shift)] = runtime => _ = runtime.FindReferencesAsync(),
         [new(VirtualKey.O, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift)] =
             runtime => runtime.ShowSymbolPalette(),
     };
@@ -872,6 +873,8 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     Task IMainWindowActions.FormatDocumentAsync() => _runtime.FormatDocumentAsync();
 
     Task IMainWindowActions.GoToDefinitionAsync() => _runtime.GoToDefinitionAsync();
+
+    Task IMainWindowActions.FindReferencesAsync() => _runtime.FindReferencesAsync();
 
     void IMainWindowActions.ReopenWithEncoding(TextEncoding encoding) =>
         _runtime.ReopenWithEncoding(encoding);

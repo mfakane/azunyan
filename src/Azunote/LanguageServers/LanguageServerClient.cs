@@ -110,6 +110,8 @@ internal sealed class LanguageServerClient : IAsyncDisposable
 
     public bool SupportsDocumentSymbols { get; private set; }
 
+    public bool SupportsReferences { get; private set; }
+
     public IReadOnlyList<string> SignatureHelpTriggerCharacters { get; private set; } = [];
 
     /// <summary>The last lines the server wrote to standard error, to explain a failure.</summary>
@@ -198,6 +200,7 @@ internal sealed class LanguageServerClient : IAsyncDisposable
                     },
                     ["definition"] = new JsonObject { ["linkSupport"] = true },
                     ["documentSymbol"] = new JsonObject { ["hierarchicalDocumentSymbolSupport"] = true },
+                    ["references"] = new JsonObject(),
                     ["inlayHint"] = new JsonObject(),
                     ["publishDiagnostics"] = new JsonObject { ["versionSupport"] = true }
                 }
@@ -336,6 +339,13 @@ internal sealed class LanguageServerClient : IAsyncDisposable
 
     public Task<JsonNode?> DefinitionAsync(string uri, LineColumn position, CancellationToken cancellationToken) =>
         _connection.SendRequestAsync("textDocument/definition", CreatePositionParameters(uri, position), cancellationToken);
+
+    public Task<JsonNode?> ReferencesAsync(string uri, LineColumn position, CancellationToken cancellationToken)
+    {
+        var parameters = CreatePositionParameters(uri, position);
+        parameters["context"] = new JsonObject { ["includeDeclaration"] = true };
+        return _connection.SendRequestAsync("textDocument/references", parameters, cancellationToken);
+    }
 
     public Task<JsonNode?> DocumentSymbolAsync(string uri, CancellationToken cancellationToken) =>
         _connection.SendRequestAsync("textDocument/documentSymbol", new JsonObject
@@ -509,6 +519,7 @@ internal sealed class LanguageServerClient : IAsyncDisposable
         SupportsInlayHints = IsProvided(capabilities?["inlayHintProvider"]);
         SupportsDefinition = IsProvided(capabilities?["definitionProvider"]);
         SupportsDocumentSymbols = IsProvided(capabilities?["documentSymbolProvider"]);
+        SupportsReferences = IsProvided(capabilities?["referencesProvider"]);
     }
 
     private static string[] ReadTriggers(JsonNode? triggers) =>

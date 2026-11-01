@@ -295,6 +295,38 @@ public sealed class LanguageServerControllerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task References_list_those_in_the_document_first_then_the_other_files_by_path()
+    {
+        _enabled.Add((Workspace, "fake-server"));
+        _server.Capabilities["referencesProvider"] = true;
+        var lib = Path.Combine(Workspace, "lib.ts");
+        var app = Path.Combine(Workspace, "app.ts");
+        JsonObject Location(string path, int line, int character) => new()
+        {
+            ["uri"] = LanguageServerClient.ToUri(path),
+            ["range"] = new JsonObject
+            {
+                ["start"] = new JsonObject { ["line"] = line, ["character"] = character },
+                ["end"] = new JsonObject { ["line"] = line, ["character"] = character + 5 }
+            }
+        };
+        _server.Handlers["textDocument/references"] = _ => new JsonArray(
+            Location(lib, 4, 2), Location(_filePath!, 0, 7), Location(app, 1, 0), Location(lib, 1, 9));
+        using var controller = CreateController();
+        controller.Update();
+        await WaitForAsync(() => controller.CanFindReferences);
+
+        var references = await controller.FindReferencesAsync(8);
+
+        Assert.Equal(
+            [(_filePath!, new LineColumn(0, 7)), (app, new LineColumn(1, 0)), (lib, new LineColumn(1, 9)), (lib, new LineColumn(4, 2))],
+            references);
+        var request = Assert.Single(_server.ReceivedOf("textDocument/references"))!;
+        Assert.Equal(8, request["position"]!["character"]!.GetValue<int>());
+        Assert.True(request["context"]!["includeDeclaration"]!.GetValue<bool>());
+    }
+
+    [Fact]
     public async Task Symbols_are_asked_for_the_current_text()
     {
         _enabled.Add((Workspace, "fake-server"));

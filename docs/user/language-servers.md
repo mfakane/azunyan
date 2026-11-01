@@ -74,6 +74,14 @@ those carrying a whole document, are cut short.
   name is defined. A definition in another file opens in the window that has
   that file, or in a new one. When the server lists more than one place, it
   goes to the first.
+- **Find references**: Edit > Find All References (Shift+F12), or the same
+  command in the context menu, lists in the command palette every place the
+  server says the name at the caret is used, its declaration included. Those
+  in the document come first, then those in other files by path. Each shows
+  its line, with the file's path from the workspace folder and its position
+  under it, and typing narrows them by either. Choosing one goes there as Go
+  to Definition does. A line in another file is shown as the file on disk has
+  it.
 - **Go to symbol**: Edit > Go to Symbol in File... (Ctrl+Shift+O), or `@`
   typed in the command palette, lists the symbols the server finds in the
   document, such as classes, functions and their members, in the order they
@@ -97,9 +105,10 @@ those carrying a whole document, are cut short.
   It is available while a server that formats runs. An enabled
   [tool](tool-definitions.md) with the same shortcut takes the shortcut.
 
-Go to Definition and Show Parameter Hints appear in the editor context menu
-only while a server that offers them runs. A right-click outside the selection
-moves the caret there first, so they act on what was clicked.
+Go to Definition, Find All References and Show Parameter Hints appear in the
+editor context menu only while a server that offers them runs. A right-click
+outside the selection moves the caret there first, so they act on what was
+clicked.
 
 One server process serves every document in its workspace folder, from every
 window and every mode that names the same command and arguments. It is stopped

@@ -48,6 +48,7 @@ public sealed partial class MainWindow
     private readonly List<MenuFlyoutItemBase> _externalToolMenuItems = [];
     private readonly List<MenuFlyoutItemBase> _externalToolContextMenuItems = [];
     private MenuFlyoutItem _goToDefinitionContextMenuItem = null!;
+    private MenuFlyoutItem _findReferencesContextMenuItem = null!;
     private MenuFlyoutItem _parameterHintsContextMenuItem = null!;
     private readonly MenuFlyoutSeparator _languageServerContextMenuSeparator = new();
     private readonly List<MenuFlyoutItemBase> _recentFileMenuItems = [];
@@ -122,6 +123,12 @@ public sealed partial class MainWindow
             Text = "Go to Definition",
             KeyboardAcceleratorTextOverride = "F12",
             Command = _viewModel.GoToDefinitionCommand
+        };
+        _findReferencesContextMenuItem = new MenuFlyoutItem
+        {
+            Text = "Find All References",
+            KeyboardAcceleratorTextOverride = "Shift+F12",
+            Command = _viewModel.FindReferencesCommand
         };
         _parameterHintsContextMenuItem = new MenuFlyoutItem
         {
@@ -817,6 +824,7 @@ public sealed partial class MainWindow
         _editor.SetAdditionalContextMenuItems(
         [
             _goToDefinitionContextMenuItem,
+            _findReferencesContextMenuItem,
             _parameterHintsContextMenuItem,
             .. toolItems.Count == 0 ? Array.Empty<MenuFlyoutItemBase>() : [_languageServerContextMenuSeparator],
             .. toolItems
@@ -828,11 +836,16 @@ public sealed partial class MainWindow
         _goToDefinitionContextMenuItem.Visibility = _viewModel.CanGoToDefinition
             ? Visibility.Visible
             : Visibility.Collapsed;
+        _findReferencesContextMenuItem.Visibility = _viewModel.CanFindReferences
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         _parameterHintsContextMenuItem.Visibility = _viewModel.CanShowLanguageServerParameterHints
             ? Visibility.Visible
             : Visibility.Collapsed;
         _languageServerContextMenuSeparator.Visibility =
-            _viewModel.CanGoToDefinition || _viewModel.CanShowLanguageServerParameterHints
+            _viewModel.CanGoToDefinition
+            || _viewModel.CanFindReferences
+            || _viewModel.CanShowLanguageServerParameterHints
                 ? Visibility.Visible
                 : Visibility.Collapsed;
     }

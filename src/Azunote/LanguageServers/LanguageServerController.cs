@@ -135,6 +135,11 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
 
     public bool CanListSymbols => _active?.Client.SupportsDocumentSymbols == true;
 
+    public bool CanFindReferences => _active?.Client.SupportsReferences == true;
+
+    /// <summary>The folder of the server the document holds, empty when it runs outside a workspace.</summary>
+    public string? WorkspaceFolder => _active is null ? null : _target?.Launch.WorkspaceFolder;
+
     public ICompletionProvider GetCompletionProvider(ICompletionProvider? fallback) =>
         new CompletionProvider(this, fallback);
 
@@ -281,6 +286,35 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
             snapshot.Lines.GetLineColumn(position),
             CancellationToken.None);
         return LanguageServerConversions.ToLocations(result);
+    }
+
+    /// <summary>
+    /// Where the server says the name at <paramref name="position"/> is used,
+    /// its declaration included: those in this document first, then those in
+    /// other files by path, each in the order they appear.
+    /// </summary>
+    public async Task<IReadOnlyList<(string Path, LineColumn Position)>> FindReferencesAsync(int position)
+    {
+        if (_active is not { Client.SupportsReferences: true } active)
+        {
+            return [];
+        }
+
+        var snapshot = _editor.Snapshot;
+        await active.Client.ChangeAsync(active.Uri, snapshot.Text);
+        var result = await active.Client.ReferencesAsync(
+            active.Uri,
+            snapshot.Lines.GetLineColumn(position),
+            CancellationToken.None);
+        var filePath = _state().FilePath;
+        return
+        [
+            .. LanguageServerConversions.ToLocations(result)
+                .OrderBy(location => !string.Equals(location.Path, filePath, StringComparison.OrdinalIgnoreCase))
+                .ThenBy(location => location.Path, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(location => location.Position.Line)
+                .ThenBy(location => location.Position.Column)
+        ];
     }
 
     /// <summary>The symbols the server lists in the current text, in document order.</summary>

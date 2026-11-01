@@ -35,6 +35,7 @@ internal sealed class MainWindowViewModel :
     private bool _languageServerFindsDefinitions;
     private bool _languageServerShowsParameterHints;
     private bool _languageServerListsSymbols;
+    private bool _languageServerFindsReferences;
     private int _runningExternalToolCount;
     private bool _isMatchCase;
     private bool _isInSelection;
@@ -80,6 +81,7 @@ internal sealed class MainWindowViewModel :
         FormatDocumentCommand = Async(() => Actions.FormatDocumentAsync());
         GoToDefinitionCommand = Async(() => Actions.GoToDefinitionAsync());
         GoToSymbolCommand = Command(() => Actions.ShowSymbolPalette());
+        FindReferencesCommand = Async(() => Actions.FindReferencesAsync());
         ReopenWithEncodingCommand = Command(parameter =>
         {
             if (parameter is TextEncoding encoding)
@@ -259,6 +261,7 @@ internal sealed class MainWindowViewModel :
     public ICommand FormatDocumentCommand { get; }
     public ICommand GoToDefinitionCommand { get; }
     public ICommand GoToSymbolCommand { get; }
+    public ICommand FindReferencesCommand { get; }
     public ICommand ReopenWithEncodingCommand { get; }
     public ICommand SaveWithEncodingCommand { get; }
     public ICommand ReopenWithOtherEncodingCommand { get; }
@@ -310,6 +313,9 @@ internal sealed class MainWindowViewModel :
 
     /// <summary>Whether the document's language server runs and lists the symbols in it.</summary>
     public bool CanGoToSymbol => _languageServerListsSymbols;
+
+    /// <summary>Whether the document's language server runs and finds where a name is used.</summary>
+    public bool CanFindReferences => _languageServerFindsReferences;
 
     /// <summary>Whether the document's language server runs and tells the parameters of a call being typed.</summary>
     public bool CanShowLanguageServerParameterHints => _languageServerShowsParameterHints && CanEdit;
@@ -373,13 +379,15 @@ internal sealed class MainWindowViewModel :
         bool formats,
         bool findsDefinitions,
         bool showsParameterHints,
-        bool listsSymbols)
+        bool listsSymbols,
+        bool findsReferences)
     {
         ArgumentNullException.ThrowIfNull(indicator);
         _languageServerFormats = formats;
         _languageServerFindsDefinitions = findsDefinitions;
         _languageServerShowsParameterHints = showsParameterHints;
         _languageServerListsSymbols = listsSymbols;
+        _languageServerFindsReferences = findsReferences;
         IsLanguageServerAvailable = indicator.State != LanguageServerIndicatorState.Hidden;
         IsLanguageServerOn = indicator.State is not (LanguageServerIndicatorState.Hidden or LanguageServerIndicatorState.Off);
         LanguageServerVisibility = IsLanguageServerAvailable ? Visibility.Visible : Visibility.Collapsed;
@@ -415,6 +423,7 @@ internal sealed class MainWindowViewModel :
         OnPropertyChanged(nameof(CanFormatDocument));
         OnPropertyChanged(nameof(CanGoToDefinition));
         OnPropertyChanged(nameof(CanGoToSymbol));
+        OnPropertyChanged(nameof(CanFindReferences));
         OnPropertyChanged(nameof(CanShowLanguageServerParameterHints));
     }
 
@@ -742,6 +751,8 @@ internal interface IMainWindowActions
     Task GoToDefinitionAsync();
 
     void ShowSymbolPalette();
+
+    Task FindReferencesAsync();
     void ReopenWithEncoding(TextEncoding encoding);
     void SaveWithEncoding(TextEncoding encoding);
     void ShowEncodingPicker(bool reopen);

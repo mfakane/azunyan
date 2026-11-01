@@ -620,6 +620,82 @@ internal sealed class MainWindowRuntime : IDisposable
         }
     }
 
+    /// <summary>
+    /// Lists in the command palette where the language server says the name
+    /// at <paramref name="position"/>, or else at the caret, is used, to go
+    /// to one. Each shows its line as it is in this document, or else as the
+    /// file on disk has it.
+    /// </summary>
+    public async Task FindReferencesAsync(int? position = null)
+    {
+        if (_languageServer is null || _openFileAt is null || !_languageServer.CanFindReferences)
+        {
+            return;
+        }
+
+        IReadOnlyList<(string Path, LineColumn Position)> references;
+        try
+        {
+            references = await _languageServer.FindReferencesAsync(position ?? _view.Selection.Active);
+        }
+        catch (Exception exception) when (exception is IOException or JsonRpcException or ObjectDisposedException)
+        {
+            await _prompt.ShowErrorAsync("Could not find references", exception.Message);
+            return;
+        }
+
+        var snapshot = _view.Snapshot;
+        var filePath = _session.State.FilePath;
+        var workspaceFolder = _languageServer.WorkspaceFolder;
+        var fileLines = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+        string GetLineText(string path, int line)
+        {
+            if (string.Equals(path, filePath, StringComparison.OrdinalIgnoreCase))
+            {
+                return line < snapshot.Lines.LineCount ? snapshot.GetText(snapshot.Lines.GetLineRange(line)) : string.Empty;
+            }
+
+            if (!fileLines.TryGetValue(path, out var lines))
+            {
+                try
+                {
+                    lines = File.ReadAllLines(path);
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+                {
+                    lines = [];
+                }
+
+                fileLines[path] = lines;
+            }
+
+            return line < lines.Length ? lines[line] : string.Empty;
+        }
+
+        _window.ShowPalettePicker(
+            references.Count switch
+            {
+                0 => "No references",
+                1 => "1 reference",
+                var count => $"{count} references"
+            },
+            [
+                .. references.Select(reference =>
+                {
+                    var name = string.IsNullOrEmpty(workspaceFolder)
+                        ? reference.Path
+                        : Path.GetRelativePath(workspaceFolder, reference.Path);
+                    return new CommandPaletteItem(
+                        GetLineText(reference.Path, reference.Position.Line).Trim(),
+                        $"{name} · Ln {reference.Position.Line + 1}, Col {reference.Position.Column + 1}",
+                        Shortcut: null,
+                        IsEnabled: true,
+                        IsChecked: false,
+                        () => _ = _openFileAt(reference.Path, reference.Position));
+                })
+            ]);
+    }
+
     /// <summary>The symbols the language server lists in the document, none when it cannot answer.</summary>
     public async Task<IReadOnlyList<LanguageServerSymbol>> ListSymbolsAsync()
     {
@@ -1022,7 +1098,8 @@ internal sealed class MainWindowRuntime : IDisposable
             _languageServer.CanFormat,
             _languageServer.CanGoToDefinition,
             _languageServer.CanShowParameterHints,
-            _languageServer.CanListSymbols);
+            _languageServer.CanListSymbols,
+            _languageServer.CanFindReferences);
         var triggers = (
             Completion: _languageServer.CompletionTriggerCharacters,
             SignatureHelp: _languageServer.SignatureHelpTriggerCharacters);
