@@ -485,7 +485,7 @@ text-producing/dead-key path. Ctrl+Alt is treated as AltGr rather than as an
 editor shortcut.
 
 Application-level commands are owned by the shell menu and its keyboard
-accelerators. For example, Edit > Go to Matching Bracket registers Ctrl+[ and
+accelerators. For example, Go > Go to Matching Bracket registers Ctrl+[ and
 invokes the editor's command API; the reusable editor component does not
 recognize that chord in its native-input key handler.
 

@@ -596,56 +596,6 @@
                         <KeyboardAccelerator Key="H" Modifiers="Control" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem
-                    Text="Go to Line..."
-                    Command="{x:Bind ViewModel.GoToLineCommand}"
-                >
-                    <MenuFlyoutItem.KeyboardAccelerators>
-                        <KeyboardAccelerator Key="G" Modifiers="Control" />
-                    </MenuFlyoutItem.KeyboardAccelerators>
-                </MenuFlyoutItem>
-                <MenuFlyoutItem
-                    x:Name="GoToMatchingBracketMenuItem"
-                    Text="Go to Matching Bracket"
-                    KeyboardAcceleratorTextOverride="Ctrl+["
-                    Command="{x:Bind ViewModel.GoToMatchingBracketCommand}"
-                />
-                <MenuFlyoutItem
-                    Text="Go to Symbol in File..."
-                    KeyboardAcceleratorTextOverride="Ctrl+Shift+O"
-                    Command="{x:Bind ViewModel.GoToSymbolCommand}"
-                    IsEnabled="{x:Bind ViewModel.CanGoToSymbol, Mode=OneWay}"
-                />
-                <MenuFlyoutItem
-                    Text="Go to Symbol in Workspace..."
-                    KeyboardAcceleratorTextOverride="Ctrl+T"
-                    Command="{x:Bind ViewModel.GoToWorkspaceSymbolCommand}"
-                    IsEnabled="{x:Bind ViewModel.CanGoToWorkspaceSymbol, Mode=OneWay}"
-                />
-                <MenuFlyoutItem
-                    Text="Go to Next Problem"
-                    Command="{x:Bind ViewModel.GoToNextProblemCommand}"
-                >
-                    <MenuFlyoutItem.KeyboardAccelerators>
-                        <KeyboardAccelerator Key="F8" />
-                    </MenuFlyoutItem.KeyboardAccelerators>
-                </MenuFlyoutItem>
-                <MenuFlyoutItem
-                    Text="Go to Previous Problem"
-                    Command="{x:Bind ViewModel.GoToPreviousProblemCommand}"
-                >
-                    <MenuFlyoutItem.KeyboardAccelerators>
-                        <KeyboardAccelerator Key="F8" Modifiers="Shift" />
-                    </MenuFlyoutItem.KeyboardAccelerators>
-                </MenuFlyoutItem>
-                <MenuFlyoutItem
-                    Text="Show Problems..."
-                    Command="{x:Bind ViewModel.ShowProblemsCommand}"
-                >
-                    <MenuFlyoutItem.KeyboardAccelerators>
-                        <KeyboardAccelerator Key="M" Modifiers="Control,Shift" />
-                    </MenuFlyoutItem.KeyboardAccelerators>
-                </MenuFlyoutItem>
                 <MenuFlyoutSeparator />
                 <MenuFlyoutSubItem Text="Line">
                     <MenuFlyoutItem
@@ -690,29 +640,6 @@
                     KeyboardAcceleratorTextOverride="Shift+Alt+F"
                     Command="{x:Bind ViewModel.FormatDocumentCommand}"
                     IsEnabled="{x:Bind ViewModel.CanFormatDocument, Mode=OneWay}"
-                />
-                <MenuFlyoutItem
-                    Text="Go to Definition"
-                    KeyboardAcceleratorTextOverride="F12"
-                    Command="{x:Bind ViewModel.GoToDefinitionCommand}"
-                    IsEnabled="{x:Bind ViewModel.CanGoToDefinition, Mode=OneWay}"
-                />
-                <MenuFlyoutItem
-                    Text="Go to Type Definition"
-                    Command="{x:Bind ViewModel.GoToTypeDefinitionCommand}"
-                    IsEnabled="{x:Bind ViewModel.CanGoToTypeDefinition, Mode=OneWay}"
-                />
-                <MenuFlyoutItem
-                    Text="Go to Implementations"
-                    KeyboardAcceleratorTextOverride="Ctrl+F12"
-                    Command="{x:Bind ViewModel.GoToImplementationCommand}"
-                    IsEnabled="{x:Bind ViewModel.CanGoToImplementation, Mode=OneWay}"
-                />
-                <MenuFlyoutItem
-                    Text="Find All References"
-                    KeyboardAcceleratorTextOverride="Shift+F12"
-                    Command="{x:Bind ViewModel.FindReferencesCommand}"
-                    IsEnabled="{x:Bind ViewModel.CanFindReferences, Mode=OneWay}"
                 />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem
@@ -912,6 +839,84 @@
                     IsChecked="{x:Bind ViewModel.IsStatusBarVisible, Mode=OneWay}"
                     Command="{x:Bind ViewModel.ToggleStatusBarCommand}"
                 />
+            </MenuBarItem>
+            <MenuBarItem Title="Go">
+                <MenuFlyoutItem
+                    Text="Go to Line..."
+                    Command="{x:Bind ViewModel.GoToLineCommand}"
+                >
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="G" Modifiers="Control" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem
+                    x:Name="GoToMatchingBracketMenuItem"
+                    Text="Go to Matching Bracket"
+                    KeyboardAcceleratorTextOverride="Ctrl+["
+                    Command="{x:Bind ViewModel.GoToMatchingBracketCommand}"
+                />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem
+                    Text="Go to Definition"
+                    KeyboardAcceleratorTextOverride="F12"
+                    Command="{x:Bind ViewModel.GoToDefinitionCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanGoToDefinition, Mode=OneWay}"
+                />
+                <MenuFlyoutItem
+                    Text="Go to Type Definition"
+                    Command="{x:Bind ViewModel.GoToTypeDefinitionCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanGoToTypeDefinition, Mode=OneWay}"
+                />
+                <MenuFlyoutItem
+                    Text="Go to Implementations"
+                    KeyboardAcceleratorTextOverride="Ctrl+F12"
+                    Command="{x:Bind ViewModel.GoToImplementationCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanGoToImplementation, Mode=OneWay}"
+                />
+                <MenuFlyoutItem
+                    Text="Find All References"
+                    KeyboardAcceleratorTextOverride="Shift+F12"
+                    Command="{x:Bind ViewModel.FindReferencesCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanFindReferences, Mode=OneWay}"
+                />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem
+                    Text="Go to Symbol in File..."
+                    KeyboardAcceleratorTextOverride="Ctrl+Shift+O"
+                    Command="{x:Bind ViewModel.GoToSymbolCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanGoToSymbol, Mode=OneWay}"
+                />
+                <MenuFlyoutItem
+                    Text="Go to Symbol in Workspace..."
+                    KeyboardAcceleratorTextOverride="Ctrl+T"
+                    Command="{x:Bind ViewModel.GoToWorkspaceSymbolCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanGoToWorkspaceSymbol, Mode=OneWay}"
+                />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem
+                    Text="Go to Next Problem"
+                    Command="{x:Bind ViewModel.GoToNextProblemCommand}"
+                >
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="F8" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem
+                    Text="Go to Previous Problem"
+                    Command="{x:Bind ViewModel.GoToPreviousProblemCommand}"
+                >
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="F8" Modifiers="Shift" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem
+                    Text="Show Problems..."
+                    Command="{x:Bind ViewModel.ShowProblemsCommand}"
+                >
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="M" Modifiers="Control,Shift" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
             </MenuBarItem>
             <MenuBarItem x:Name="ToolsMenuItem" Title="Tools">
                 <MenuFlyoutItem

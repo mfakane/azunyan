@@ -69,18 +69,18 @@ those carrying a whole document, are cut short.
   in one changes every place with the same number at once. Tab from the last one
   goes to where the suggestion ends, `$0`, and Esc or moving the caret out of the
   placeholder stops moving between them.
-- **Go to definition**: Edit > Go to Definition (F12), Ctrl+Click on a name,
+- **Go to definition**: Go > Go to Definition (F12), Ctrl+Click on a name,
   or Go to Definition in the context menu goes to where the server says the
   name is defined. Holding Ctrl underlines the name under the pointer. A
   definition in another file opens in the window that has that file, or in a
   new one. When the server lists more than one place, they are listed in the
   command palette as references are.
-- **Go to type definition and implementations**: Edit > Go to Type Definition
-  goes to where the type of the name at the caret is defined, and Edit > Go to
+- **Go to type definition and implementations**: Go > Go to Type Definition
+  goes to where the type of the name at the caret is defined, and Go > Go to
   Implementations (Ctrl+F12) to where the name, such as an interface or one of
   its methods, is implemented. Both are also in the context menu, and go as Go
   to Definition does.
-- **Find references**: Edit > Find All References (Shift+F12), or the same
+- **Find references**: Go > Find All References (Shift+F12), or the same
   command in the context menu, lists in the command palette every place the
   server says the name at the caret is used, its declaration included. Those
   in the document come first, then those in other files by path. Each shows
@@ -88,13 +88,13 @@ those carrying a whole document, are cut short.
   under it, and typing narrows them by either. Choosing one goes there as Go
   to Definition does. A line in another file is shown as the file on disk has
   it.
-- **Go to symbol**: Edit > Go to Symbol in File... (Ctrl+Shift+O), or `@`
+- **Go to symbol**: Go > Go to Symbol in File... (Ctrl+Shift+O), or `@`
   typed in the command palette, lists the symbols the server finds in the
   document, such as classes, functions and their members, in the order they
   appear. A symbol inside another shows that one's name under its own, and
   typing narrows them as in the command palette. Choosing one puts the caret
   on its name.
-- **Go to symbol in workspace**: Edit > Go to Symbol in Workspace... (Ctrl+T),
+- **Go to symbol in workspace**: Go > Go to Symbol in Workspace... (Ctrl+T),
   or `#` typed in the command palette, lists the symbols the server finds in
   its workspace for the text typed after `#`, asked again each time typing
   pauses. Each shows the file it is in, and choosing one goes there as Go to

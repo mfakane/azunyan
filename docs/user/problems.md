@@ -7,8 +7,8 @@ yellow for a warning, or blue for information, and resting the pointer on it
 shows the message and the tool that reported it.
 
 The status bar counts the problems of each kind found and shows the message
-of the one at the caret. Edit > Go to Next Problem (F8) and Go to Previous
-Problem (Shift+F8) select the next or previous one. Edit > Show Problems...
+of the one at the caret. Go > Go to Next Problem (F8) and Go to Previous
+Problem (Shift+F8) select the next or previous one. Go > Show Problems...
 (Ctrl+Shift+M), or clicking the counts in the status bar, lists them in the
 command palette, and choosing one selects it.
 
