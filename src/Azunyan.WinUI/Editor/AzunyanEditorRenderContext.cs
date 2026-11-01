@@ -114,6 +114,8 @@ internal sealed class AzunyanEditorRenderContext
             frame.ProviderFrame,
             toggleFold)
     {
+        SymbolHighlights = frame.SymbolHighlights;
+        DefinitionLinkRange = frame.DefinitionLinkRange;
         DiagnosticInputSequence = frame.DiagnosticInputSequence;
         DiagnosticInputStarted = frame.DiagnosticInputStarted;
         DiagnosticSink = frame.DiagnosticSink;
@@ -181,6 +183,10 @@ internal sealed class AzunyanEditorRenderContext
     public IReadOnlyList<FoldRange> Folds { get; }
 
     internal Action<string>? ToggleFold { get; }
+
+    public IReadOnlyList<TextRange> SymbolHighlights { get; } = [];
+
+    public TextRange? DefinitionLinkRange { get; }
 
     internal long DiagnosticInputSequence { get; }
 

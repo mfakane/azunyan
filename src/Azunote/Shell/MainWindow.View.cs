@@ -48,6 +48,8 @@ public sealed partial class MainWindow
     private readonly List<MenuFlyoutItemBase> _externalToolMenuItems = [];
     private readonly List<MenuFlyoutItemBase> _externalToolContextMenuItems = [];
     private MenuFlyoutItem _goToDefinitionContextMenuItem = null!;
+    private MenuFlyoutItem _goToTypeDefinitionContextMenuItem = null!;
+    private MenuFlyoutItem _goToImplementationContextMenuItem = null!;
     private MenuFlyoutItem _findReferencesContextMenuItem = null!;
     private MenuFlyoutItem _parameterHintsContextMenuItem = null!;
     private readonly MenuFlyoutSeparator _languageServerContextMenuSeparator = new();
@@ -123,6 +125,17 @@ public sealed partial class MainWindow
             Text = "Go to Definition",
             KeyboardAcceleratorTextOverride = "F12",
             Command = _viewModel.GoToDefinitionCommand
+        };
+        _goToTypeDefinitionContextMenuItem = new MenuFlyoutItem
+        {
+            Text = "Go to Type Definition",
+            Command = _viewModel.GoToTypeDefinitionCommand
+        };
+        _goToImplementationContextMenuItem = new MenuFlyoutItem
+        {
+            Text = "Go to Implementations",
+            KeyboardAcceleratorTextOverride = "Ctrl+F12",
+            Command = _viewModel.GoToImplementationCommand
         };
         _findReferencesContextMenuItem = new MenuFlyoutItem
         {
@@ -824,16 +837,29 @@ public sealed partial class MainWindow
         _editor.SetAdditionalContextMenuItems(
         [
             _goToDefinitionContextMenuItem,
+            _goToTypeDefinitionContextMenuItem,
+            _goToImplementationContextMenuItem,
             _findReferencesContextMenuItem,
             _parameterHintsContextMenuItem,
             .. toolItems.Count == 0 ? Array.Empty<MenuFlyoutItemBase>() : [_languageServerContextMenuSeparator],
             .. toolItems
         ]);
 
-    /// <summary>Shows the language server's commands in the context menu only while its server offers them.</summary>
+    /// <summary>
+    /// Shows the language server's commands in the context menu only while
+    /// its server offers them, and lets Ctrl underline a name to go to while
+    /// it finds definitions.
+    /// </summary>
     internal void UpdateLanguageServerContextMenuItems()
     {
+        _editor.IsDefinitionNavigationEnabled = _viewModel.CanGoToDefinition;
         _goToDefinitionContextMenuItem.Visibility = _viewModel.CanGoToDefinition
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        _goToTypeDefinitionContextMenuItem.Visibility = _viewModel.CanGoToTypeDefinition
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        _goToImplementationContextMenuItem.Visibility = _viewModel.CanGoToImplementation
             ? Visibility.Visible
             : Visibility.Collapsed;
         _findReferencesContextMenuItem.Visibility = _viewModel.CanFindReferences
@@ -844,6 +870,8 @@ public sealed partial class MainWindow
             : Visibility.Collapsed;
         _languageServerContextMenuSeparator.Visibility =
             _viewModel.CanGoToDefinition
+            || _viewModel.CanGoToTypeDefinition
+            || _viewModel.CanGoToImplementation
             || _viewModel.CanFindReferences
             || _viewModel.CanShowLanguageServerParameterHints
                 ? Visibility.Visible
@@ -1263,6 +1291,8 @@ public sealed partial class MainWindow
         public void SetFontFamily(string fontFamily) => _window.SetFontFamily(fontFamily);
         public void SetFontSize(double fontSize) => _window.SetFontSize(fontSize);
         public void RefreshProviders() => _window.RefreshProviders();
+        public void SetSymbolHighlights(IReadOnlyList<TextRange> ranges) =>
+            _window._editor.SetSymbolHighlights(ranges);
         public void SetWordWrap(bool enabled) => _window.SetWordWrap(enabled);
         public void SetTabDisplaySize(int size) => _window.SetTabDisplaySize(size);
         public void SetIndentSize(int? size) => _window.SetIndentSize(size);

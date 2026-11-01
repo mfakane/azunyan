@@ -106,6 +106,9 @@ internal interface IEditorView : IEditorBuffer
 
     void RefreshProviders();
 
+    /// <summary>Draws a background behind <paramref name="ranges"/> of the current text until it changes.</summary>
+    void SetSymbolHighlights(IReadOnlyList<TextRange> ranges);
+
     void SetWordWrap(bool enabled);
 
     void SetTabDisplaySize(int size);

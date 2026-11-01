@@ -108,9 +108,17 @@ internal sealed class LanguageServerClient : IAsyncDisposable
 
     public bool SupportsDefinition { get; private set; }
 
+    public bool SupportsTypeDefinition { get; private set; }
+
+    public bool SupportsImplementation { get; private set; }
+
     public bool SupportsDocumentSymbols { get; private set; }
 
     public bool SupportsReferences { get; private set; }
+
+    public bool SupportsWorkspaceSymbols { get; private set; }
+
+    public bool SupportsDocumentHighlight { get; private set; }
 
     public IReadOnlyList<string> SignatureHelpTriggerCharacters { get; private set; } = [];
 
@@ -170,6 +178,7 @@ internal sealed class LanguageServerClient : IAsyncDisposable
                 {
                     ["configuration"] = true,
                     ["workspaceFolders"] = true,
+                    ["symbol"] = new JsonObject(),
                     ["inlayHint"] = new JsonObject { ["refreshSupport"] = true }
                 },
                 ["textDocument"] = new JsonObject
@@ -199,8 +208,11 @@ internal sealed class LanguageServerClient : IAsyncDisposable
                         }
                     },
                     ["definition"] = new JsonObject { ["linkSupport"] = true },
+                    ["typeDefinition"] = new JsonObject { ["linkSupport"] = true },
+                    ["implementation"] = new JsonObject { ["linkSupport"] = true },
                     ["documentSymbol"] = new JsonObject { ["hierarchicalDocumentSymbolSupport"] = true },
                     ["references"] = new JsonObject(),
+                    ["documentHighlight"] = new JsonObject(),
                     ["inlayHint"] = new JsonObject(),
                     ["publishDiagnostics"] = new JsonObject { ["versionSupport"] = true }
                 }
@@ -340,12 +352,24 @@ internal sealed class LanguageServerClient : IAsyncDisposable
     public Task<JsonNode?> DefinitionAsync(string uri, LineColumn position, CancellationToken cancellationToken) =>
         _connection.SendRequestAsync("textDocument/definition", CreatePositionParameters(uri, position), cancellationToken);
 
+    public Task<JsonNode?> TypeDefinitionAsync(string uri, LineColumn position, CancellationToken cancellationToken) =>
+        _connection.SendRequestAsync("textDocument/typeDefinition", CreatePositionParameters(uri, position), cancellationToken);
+
+    public Task<JsonNode?> ImplementationAsync(string uri, LineColumn position, CancellationToken cancellationToken) =>
+        _connection.SendRequestAsync("textDocument/implementation", CreatePositionParameters(uri, position), cancellationToken);
+
     public Task<JsonNode?> ReferencesAsync(string uri, LineColumn position, CancellationToken cancellationToken)
     {
         var parameters = CreatePositionParameters(uri, position);
         parameters["context"] = new JsonObject { ["includeDeclaration"] = true };
         return _connection.SendRequestAsync("textDocument/references", parameters, cancellationToken);
     }
+
+    public Task<JsonNode?> DocumentHighlightAsync(string uri, LineColumn position, CancellationToken cancellationToken) =>
+        _connection.SendRequestAsync("textDocument/documentHighlight", CreatePositionParameters(uri, position), cancellationToken);
+
+    public Task<JsonNode?> WorkspaceSymbolAsync(string query, CancellationToken cancellationToken) =>
+        _connection.SendRequestAsync("workspace/symbol", new JsonObject { ["query"] = query }, cancellationToken);
 
     public Task<JsonNode?> DocumentSymbolAsync(string uri, CancellationToken cancellationToken) =>
         _connection.SendRequestAsync("textDocument/documentSymbol", new JsonObject
@@ -518,8 +542,12 @@ internal sealed class LanguageServerClient : IAsyncDisposable
         SupportsFormatting = IsProvided(capabilities?["documentFormattingProvider"]);
         SupportsInlayHints = IsProvided(capabilities?["inlayHintProvider"]);
         SupportsDefinition = IsProvided(capabilities?["definitionProvider"]);
+        SupportsTypeDefinition = IsProvided(capabilities?["typeDefinitionProvider"]);
+        SupportsImplementation = IsProvided(capabilities?["implementationProvider"]);
         SupportsDocumentSymbols = IsProvided(capabilities?["documentSymbolProvider"]);
         SupportsReferences = IsProvided(capabilities?["referencesProvider"]);
+        SupportsWorkspaceSymbols = IsProvided(capabilities?["workspaceSymbolProvider"]);
+        SupportsDocumentHighlight = IsProvided(capabilities?["documentHighlightProvider"]);
     }
 
     private static string[] ReadTriggers(JsonNode? triggers) =>

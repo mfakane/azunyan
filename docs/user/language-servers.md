@@ -71,9 +71,15 @@ those carrying a whole document, are cut short.
   placeholder stops moving between them.
 - **Go to definition**: Edit > Go to Definition (F12), Ctrl+Click on a name,
   or Go to Definition in the context menu goes to where the server says the
-  name is defined. A definition in another file opens in the window that has
-  that file, or in a new one. When the server lists more than one place, it
-  goes to the first.
+  name is defined. Holding Ctrl underlines the name under the pointer. A
+  definition in another file opens in the window that has that file, or in a
+  new one. When the server lists more than one place, they are listed in the
+  command palette as references are.
+- **Go to type definition and implementations**: Edit > Go to Type Definition
+  goes to where the type of the name at the caret is defined, and Edit > Go to
+  Implementations (Ctrl+F12) to where the name, such as an interface or one of
+  its methods, is implemented. Both are also in the context menu, and go as Go
+  to Definition does.
 - **Find references**: Edit > Find All References (Shift+F12), or the same
   command in the context menu, lists in the command palette every place the
   server says the name at the caret is used, its declaration included. Those
@@ -88,6 +94,14 @@ those carrying a whole document, are cut short.
   appear. A symbol inside another shows that one's name under its own, and
   typing narrows them as in the command palette. Choosing one puts the caret
   on its name.
+- **Go to symbol in workspace**: Edit > Go to Symbol in Workspace... (Ctrl+T),
+  or `#` typed in the command palette, lists the symbols the server finds in
+  its workspace for the text typed after `#`, asked again each time typing
+  pauses. Each shows the file it is in, and choosing one goes there as Go to
+  Definition does.
+- **Highlights**: when the caret rests on a name, the other places the server
+  says it is used in the document get a background. They stay while the caret
+  moves within one of them.
 - **Descriptions**: resting the pointer on a symbol shows what the server says
   about it, after any problem there.
 - **Parameter hints**: typing a character the server names, such as `(` or
@@ -105,10 +119,10 @@ those carrying a whole document, are cut short.
   It is available while a server that formats runs. An enabled
   [tool](tool-definitions.md) with the same shortcut takes the shortcut.
 
-Go to Definition, Find All References and Show Parameter Hints appear in the
-editor context menu only while a server that offers them runs. A right-click
-outside the selection moves the caret there first, so they act on what was
-clicked.
+Go to Definition, Go to Type Definition, Go to Implementations, Find All
+References and Show Parameter Hints appear in the editor context menu only
+while a server that offers them runs. A right-click outside the selection
+moves the caret there first, so they act on what was clicked.
 
 One server process serves every document in its workspace folder, from every
 window and every mode that names the same command and arguments. It is stopped

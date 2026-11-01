@@ -312,6 +312,28 @@ public sealed class LanguageServerConversionsTests
     }
 
     [Fact]
+    public void Workspace_symbols_keep_the_server_order_with_their_files()
+    {
+        var symbols = JsonNode.Parse("""
+            [
+              { "name": "greet", "kind": 12, "containerName": "",
+                "location": { "uri": "file:///c:/work/lib.ts", "range": { "start": { "line": 2, "character": 16 } } } },
+              { "name": "Greeter", "kind": 5, "containerName": "main",
+                "location": { "uri": "file:///c:/work/main.ts" } },
+              { "name": "", "kind": 13, "location": { "uri": "file:///c:/work/main.ts" } },
+              { "name": "lost", "kind": 13 }
+            ]
+            """);
+
+        Assert.Equal(
+            [
+                new LanguageServerWorkspaceSymbol("greet", "Function", null, LanguageServerClient.ToPath("file:///c:/work/lib.ts")!, new LineColumn(2, 16)),
+                new LanguageServerWorkspaceSymbol("Greeter", "Class", "main", LanguageServerClient.ToPath("file:///c:/work/main.ts")!, new LineColumn(0, 0))
+            ],
+            LanguageServerConversions.ToWorkspaceSymbols(symbols));
+    }
+
+    [Fact]
     public void Document_symbols_are_flattened_in_document_order_with_their_containers()
     {
         var tree = JsonNode.Parse("""

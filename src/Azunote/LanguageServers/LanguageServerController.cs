@@ -61,6 +61,9 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
     /// </summary>
     private static readonly TimeSpan InlayHintDelay = TimeSpan.FromMilliseconds(200);
 
+    /// <summary>The uses of the name at the caret are asked once it rests this long.</summary>
+    private static readonly TimeSpan HighlightDelay = TimeSpan.FromMilliseconds(250);
+
     private readonly IEditorView _editor;
     private readonly Func<DocumentSessionState> _state;
     private readonly Func<string> _languageModeId;
@@ -70,6 +73,10 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
     private readonly DocumentDiagnostics _diagnostics;
     private readonly IUiDispatcher _dispatcher;
     private readonly ITimer _changeTimer;
+    private readonly ITimer _highlightTimer;
+    private IReadOnlyList<TextRange> _highlights = [];
+    private TextSnapshot? _highlightSnapshot;
+    private int _highlightRequest;
     private Target? _target;
     private (string FilePath, string ModeId, LanguageServerDefinition Definition, IReadOnlyList<string> Patterns, Target? Target)? _resolved;
     private LanguageServerLease? _lease;
@@ -97,6 +104,11 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
         _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
         _changeTimer = (timeProvider ?? TimeProvider.System).CreateTimer(
             _ => _dispatcher.TryEnqueue(SendChange),
+            null,
+            Timeout.InfiniteTimeSpan,
+            Timeout.InfiniteTimeSpan);
+        _highlightTimer = (timeProvider ?? TimeProvider.System).CreateTimer(
+            _ => _dispatcher.TryEnqueue(() => _ = HighlightAsync()),
             null,
             Timeout.InfiniteTimeSpan,
             Timeout.InfiniteTimeSpan);
@@ -131,11 +143,17 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
 
     public bool CanGoToDefinition => _active?.Client.SupportsDefinition == true;
 
+    public bool CanGoToTypeDefinition => _active?.Client.SupportsTypeDefinition == true;
+
+    public bool CanGoToImplementation => _active?.Client.SupportsImplementation == true;
+
     public bool CanShowParameterHints => _active?.Client.SupportsSignatureHelp == true;
 
     public bool CanListSymbols => _active?.Client.SupportsDocumentSymbols == true;
 
     public bool CanFindReferences => _active?.Client.SupportsReferences == true;
+
+    public bool CanListWorkspaceSymbols => _active?.Client.SupportsWorkspaceSymbols == true;
 
     /// <summary>The folder of the server the document holds, empty when it runs outside a workspace.</summary>
     public string? WorkspaceFolder => _active is null ? null : _target?.Launch.WorkspaceFolder;
@@ -272,19 +290,30 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
     /// Where the server says the name at <paramref name="position"/> is
     /// defined, in the order it lists them. None when it has no answer.
     /// </summary>
-    public async Task<IReadOnlyList<(string Path, LineColumn Position)>> FindDefinitionAsync(int position)
+    public Task<IReadOnlyList<(string Path, LineColumn Position)>> FindDefinitionAsync(int position) =>
+        FindLocationsAsync(position, CanGoToDefinition, (client, uri, at) => client.DefinitionAsync(uri, at, CancellationToken.None));
+
+    /// <summary>Where the server says the type of the name at <paramref name="position"/> is defined.</summary>
+    public Task<IReadOnlyList<(string Path, LineColumn Position)>> FindTypeDefinitionAsync(int position) =>
+        FindLocationsAsync(position, CanGoToTypeDefinition, (client, uri, at) => client.TypeDefinitionAsync(uri, at, CancellationToken.None));
+
+    /// <summary>Where the server says the name at <paramref name="position"/> is implemented.</summary>
+    public Task<IReadOnlyList<(string Path, LineColumn Position)>> FindImplementationAsync(int position) =>
+        FindLocationsAsync(position, CanGoToImplementation, (client, uri, at) => client.ImplementationAsync(uri, at, CancellationToken.None));
+
+    private async Task<IReadOnlyList<(string Path, LineColumn Position)>> FindLocationsAsync(
+        int position,
+        bool supported,
+        Func<LanguageServerClient, string, LineColumn, Task<JsonNode?>> request)
     {
-        if (_active is not { Client.SupportsDefinition: true } active)
+        if (!supported || _active is not { } active)
         {
             return [];
         }
 
         var snapshot = _editor.Snapshot;
         await active.Client.ChangeAsync(active.Uri, snapshot.Text);
-        var result = await active.Client.DefinitionAsync(
-            active.Uri,
-            snapshot.Lines.GetLineColumn(position),
-            CancellationToken.None);
+        var result = await request(active.Client, active.Uri, snapshot.Lines.GetLineColumn(position));
         return LanguageServerConversions.ToLocations(result);
     }
 
@@ -317,6 +346,20 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
         ];
     }
 
+    /// <summary>The symbols the server finds in its workspace for <paramref name="query"/>.</summary>
+    public async Task<IReadOnlyList<LanguageServerWorkspaceSymbol>> ListWorkspaceSymbolsAsync(
+        string query,
+        CancellationToken cancellationToken)
+    {
+        if (_active is not { Client.SupportsWorkspaceSymbols: true } active)
+        {
+            return [];
+        }
+
+        var result = await active.Client.WorkspaceSymbolAsync(query, cancellationToken);
+        return LanguageServerConversions.ToWorkspaceSymbols(result);
+    }
+
     /// <summary>The symbols the server lists in the current text, in document order.</summary>
     public async Task<IReadOnlyList<LanguageServerSymbol>> ListSymbolsAsync()
     {
@@ -328,6 +371,73 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
         await active.Client.ChangeAsync(active.Uri, _editor.Snapshot.Text);
         var result = await active.Client.DocumentSymbolAsync(active.Uri, CancellationToken.None);
         return LanguageServerConversions.ToSymbols(result);
+    }
+
+    /// <summary>
+    /// Asks the server for the uses of the name at the caret once the caret
+    /// rests, keeping those shown while the caret stays in one of them.
+    /// </summary>
+    public void SelectionChanged()
+    {
+        _highlightRequest++;
+        var selection = _editor.Selection;
+        var inHighlight = selection.IsEmpty
+            && ReferenceEquals(_highlightSnapshot, _editor.Snapshot)
+            && _highlights.Any(range => range.Start <= selection.Active && selection.Active <= range.End);
+        if (inHighlight)
+        {
+            return;
+        }
+
+        ClearHighlights();
+        if (_active?.Client.SupportsDocumentHighlight == true && selection.IsEmpty)
+        {
+            _highlightTimer.Change(HighlightDelay, Timeout.InfiniteTimeSpan);
+        }
+    }
+
+    private async Task HighlightAsync()
+    {
+        var request = _highlightRequest;
+        if (_disposed || _active is not { Client.SupportsDocumentHighlight: true } active)
+        {
+            return;
+        }
+
+        var snapshot = _editor.Snapshot;
+        JsonNode? result;
+        try
+        {
+            await active.Client.ChangeAsync(active.Uri, snapshot.Text);
+            result = await active.Client.DocumentHighlightAsync(
+                active.Uri,
+                snapshot.Lines.GetLineColumn(_editor.Selection.Active),
+                CancellationToken.None);
+        }
+        catch (Exception exception) when (exception is IOException or JsonRpcException or ObjectDisposedException)
+        {
+            return;
+        }
+
+        if (request != _highlightRequest || !ReferenceEquals(_active, active) || !ReferenceEquals(snapshot, _editor.Snapshot))
+        {
+            return;
+        }
+
+        _highlights = LanguageServerConversions.ToHighlightRanges(result, snapshot);
+        _highlightSnapshot = snapshot;
+        _editor.SetSymbolHighlights(_highlights);
+    }
+
+    private void ClearHighlights()
+    {
+        _highlightTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        if (_highlights.Count > 0)
+        {
+            _highlights = [];
+            _highlightSnapshot = null;
+            _editor.SetSymbolHighlights([]);
+        }
     }
 
     /// <summary>Tells the server the document was saved, after the session became clean.</summary>
@@ -350,6 +460,7 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
         _editor.Edited -= Editor_Edited;
         _registry.EnablementChanged -= Registry_EnablementChanged;
         _changeTimer.Dispose();
+        _highlightTimer.Dispose();
         Detach();
     }
 
@@ -433,6 +544,7 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
         if (_active is { } active)
         {
             _active = null;
+            ClearHighlights();
             active.Client.DiagnosticsPublished -= Client_DiagnosticsPublished;
             active.Client.InlayHintsChanged -= Client_InlayHintsChanged;
             active.Client.ProgressChanged -= Client_ProgressChanged;
@@ -511,6 +623,7 @@ internal sealed class LanguageServerController : ILanguageServerProviders, IDisp
         if (_active is { } active)
         {
             _active = null;
+            ClearHighlights();
             active.Client.DiagnosticsPublished -= Client_DiagnosticsPublished;
             active.Client.InlayHintsChanged -= Client_InlayHintsChanged;
             active.Client.ProgressChanged -= Client_ProgressChanged;

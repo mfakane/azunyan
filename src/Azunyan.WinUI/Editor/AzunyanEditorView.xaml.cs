@@ -95,6 +95,12 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private Point? _lastPointerPosition;
     private InputSystemCursorShape? _cursorShape;
     private TextRange? _hoverLinkRange;
+    // The name under the pointer while Ctrl is down, for the text it was found in.
+    private TextRange? _definitionLinkRange;
+    private TextSnapshot? _definitionLinkSnapshot;
+    // Shown only while the text is the one they were set for.
+    private IReadOnlyList<TextRange> _symbolHighlights = [];
+    private TextSnapshot? _symbolHighlightSnapshot;
     private string _hoverLinkText = string.Empty;
     private TextBlockSelection? _blockSelection;
     private int? _pointerSelectionAnchor;
@@ -424,6 +430,38 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     /// link. The host owns finding the definition.
     /// </summary>
     public event EventHandler<DefinitionRequestedEventArgs>? DefinitionRequested;
+
+    /// <summary>
+    /// Whether the host goes to definitions on <see cref="DefinitionRequested"/>.
+    /// While it does, holding Ctrl underlines the name under the pointer.
+    /// </summary>
+    public bool IsDefinitionNavigationEnabled
+    {
+        get;
+        set
+        {
+            field = value;
+            RefreshPointerCursor();
+        }
+    }
+
+    /// <summary>
+    /// Draws a background behind <paramref name="ranges"/> of the current
+    /// text, such as the other uses of the name at the caret. They are hidden
+    /// once the text changes.
+    /// </summary>
+    public void SetSymbolHighlights(IReadOnlyList<TextRange> ranges)
+    {
+        ArgumentNullException.ThrowIfNull(ranges);
+        if (ranges.Count == 0 && _symbolHighlights.Count == 0)
+        {
+            return;
+        }
+
+        _symbolHighlights = ranges;
+        _symbolHighlightSnapshot = Snapshot;
+        RenderViewport();
+    }
 
     /// <summary>
     /// The hint shown while the pointer rests on a link. Setting it to an
@@ -2430,7 +2468,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     {
         ForgetReleasedNativeKeys();
         var isRepeat = !_nativeKeysDown.Add(args.Key);
-        if (args.Key is VirtualKey.Control or VirtualKey.Menu && !isRepeat)
+        if (args.Key is VirtualKey.Control or VirtualKey.Menu or VirtualKey.Shift && !isRepeat)
         {
             RefreshPointerCursor();
         }
@@ -2972,7 +3010,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     {
         _nativeKeysDown.Remove(args.Key);
         _queuedNonRepeatingKeys.Remove(args.Key);
-        if (args.Key is VirtualKey.Control or VirtualKey.Menu)
+        if (args.Key is VirtualKey.Control or VirtualKey.Menu or VirtualKey.Shift)
         {
             RefreshPointerCursor();
         }
@@ -3150,6 +3188,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             _mappedAlignedInputWindow = null;
             _keyInputEpoch++;
             InputWindow.NativeTextBoxControl.ResetHandledKeyState();
+            // Ctrl is released elsewhere, such as in a dialog Ctrl opened.
+            UpdateDefinitionLink(null);
         }
 
         _automationPeer?.NotifyFocusChanged();
@@ -3338,6 +3378,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         _hoverPosition = -1;
         _hoverLinkRange = null;
         HideTooltipPopup();
+        UpdateDefinitionLink(null);
 
         var point = args.GetCurrentPoint(EditorPointerSurface);
         if (point.PointerDeviceType == Microsoft.UI.Input.PointerDeviceType.Mouse
@@ -3815,8 +3856,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
             linkText = hoverLinkText;
         }
 
+        UpdateDefinitionLink(link is null ? hoverTextPosition : null);
         UpdateCursor(GetTextSurfaceCursorShape(
-            link is not null && IsKeyDown(VirtualKey.Control)));
+            link is not null && IsKeyDown(VirtualKey.Control) || _definitionLinkRange is not null));
 
         var position = anchor.Position.Offset;
         if (_hoverPosition == position && _hoverLinkRange == link)
@@ -3845,8 +3887,55 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         _hoverPosition = -1;
         _hoverLinkRange = null;
         _lastPointerPosition = null;
+        UpdateDefinitionLink(null);
         UpdateCursor(null);
         HideTooltipPopup();
+    }
+
+    /// <summary>
+    /// Underlines the name at <paramref name="position"/> while Ctrl alone is
+    /// down and a Ctrl+Click there would go to its definition, and removes the
+    /// underline otherwise.
+    /// </summary>
+    private void UpdateDefinitionLink(int? position)
+    {
+        TextRange? range = null;
+        if (IsDefinitionNavigationEnabled
+            && position is int at
+            && IsKeyDown(VirtualKey.Control)
+            && !IsKeyDown(VirtualKey.Shift)
+            && !IsKeyDown(VirtualKey.Menu))
+        {
+            var text = Snapshot.Text;
+            var word = UnicodeText.GetWordRange(text, at);
+            if (at < word.End && IsName(text.AsSpan(word.Start, word.Length)))
+            {
+                range = word;
+            }
+        }
+
+        if (range == _definitionLinkRange
+            && (range is null || ReferenceEquals(_definitionLinkSnapshot, Snapshot)))
+        {
+            return;
+        }
+
+        _definitionLinkRange = range;
+        _definitionLinkSnapshot = Snapshot;
+        RenderViewport();
+
+        static bool IsName(ReadOnlySpan<char> word)
+        {
+            foreach (var character in word)
+            {
+                if (char.IsLetterOrDigit(character) || character is '_' or '$')
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
     }
 
     /// <summary>
@@ -3885,7 +3974,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     }
 
     /// <summary>
-    /// Ctrl or Alt is pressed and released without moving the pointer, so the
+    /// Ctrl, Alt or Shift is pressed and released without moving the pointer, so the
     /// cursor is refreshed from the last known pointer position as well. A
     /// pointer that is away or driving a selection keeps the shape it has.
     /// </summary>
@@ -3913,14 +4002,15 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                 out _,
                 out var textPosition))
         {
+            UpdateDefinitionLink(null);
             UpdateCursor(null);
             return;
         }
 
+        var overLink = textPosition is int position && TryGetLinkAt(position, out _, out _);
+        UpdateDefinitionLink(overLink ? null : textPosition);
         UpdateCursor(GetTextSurfaceCursorShape(
-            IsKeyDown(VirtualKey.Control)
-            && textPosition is int position
-            && TryGetLinkAt(position, out _, out _)));
+            overLink && IsKeyDown(VirtualKey.Control) || _definitionLinkRange is not null));
     }
 
     /// <summary>

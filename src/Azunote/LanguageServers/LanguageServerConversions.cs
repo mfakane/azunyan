@@ -11,6 +11,14 @@ namespace Azunote;
 /// </summary>
 internal sealed record LanguageServerSymbol(string Name, string Kind, string? Container, LineColumn Position);
 
+/// <summary>A symbol a server finds in its workspace, with the file it is in.</summary>
+internal sealed record LanguageServerWorkspaceSymbol(
+    string Name,
+    string Kind,
+    string? Container,
+    string Path,
+    LineColumn Position);
+
 /// <summary>Turns what a language server answers into Azunote's editor types.</summary>
 internal static class LanguageServerConversions
 {
@@ -268,6 +276,13 @@ internal static class LanguageServerConversions
     /// it as that text grows, and other hints, such as parameter names, stay
     /// before the text after them.
     /// </summary>
+    /// <summary>The ranges of a document highlight answer that are not empty.</summary>
+    public static IReadOnlyList<TextRange> ToHighlightRanges(JsonNode? highlights, TextSnapshot snapshot) =>
+        [.. (highlights as JsonArray ?? [])
+            .OfType<JsonObject>()
+            .Select(highlight => ToRange(snapshot, highlight["range"]))
+            .Where(range => !range.IsEmpty)];
+
     public static IReadOnlyList<InlineAdornment> ToInlays(JsonNode? hints, TextSnapshot snapshot)
     {
         if (hints is not JsonArray array)
@@ -365,6 +380,26 @@ internal static class LanguageServerConversions
         Add(symbols as JsonArray, null);
         return [.. result.OrderBy(symbol => symbol.Position.Line).ThenBy(symbol => symbol.Position.Column)];
     }
+
+    /// <summary>
+    /// The symbols of a workspace symbol answer in the order the server lists
+    /// them. A symbol whose location has no range is at the start of its file.
+    /// </summary>
+    public static IReadOnlyList<LanguageServerWorkspaceSymbol> ToWorkspaceSymbols(JsonNode? symbols) =>
+        [.. (symbols as JsonArray ?? [])
+            .OfType<JsonObject>()
+            .Select(symbol => (
+                Symbol: symbol,
+                Name: GetString(symbol["name"]),
+                Path: GetString(symbol["location"]?["uri"]) is { } uri ? LanguageServerClient.ToPath(uri) : null,
+                Start: symbol["location"]?["range"]?["start"]))
+            .Where(symbol => symbol.Name is { Length: > 0 } && symbol.Path is not null)
+            .Select(symbol => new LanguageServerWorkspaceSymbol(
+                symbol.Name!,
+                GetSymbolKindName(GetInt(symbol.Symbol["kind"])),
+                GetString(symbol.Symbol["containerName"]) is { Length: > 0 } container ? container : null,
+                symbol.Path!,
+                new LineColumn(Math.Max(0, GetInt(symbol.Start?["line"])), Math.Max(0, GetInt(symbol.Start?["character"])))))];
 
     private static string GetSymbolKindName(int kind) => kind switch
     {

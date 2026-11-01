@@ -140,7 +140,11 @@ public sealed partial class AzunyanEditorView
             TabDisplaySize,
             _foldStateTracker.CollapsedIds,
             folds,
-            currentFrame);
+            currentFrame)
+        {
+            SymbolHighlights = ReferenceEquals(_symbolHighlightSnapshot, frameSnapshot) ? _symbolHighlights : [],
+            DefinitionLinkRange = ReferenceEquals(_definitionLinkSnapshot, frameSnapshot) ? _definitionLinkRange : null
+        };
         if (traceRender)
         {
             frame.DiagnosticInputSequence = _latestInputSequence;

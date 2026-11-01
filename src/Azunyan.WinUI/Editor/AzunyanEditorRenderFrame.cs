@@ -138,6 +138,12 @@ public sealed class AzunyanEditorRenderFrame
 
     public EditorProviderResults? ProviderResults { get; }
 
+    /// <summary>Ranges drawn with a background, such as the other uses of the name at the caret.</summary>
+    public IReadOnlyList<TextRange> SymbolHighlights { get; init; } = [];
+
+    /// <summary>The name a Ctrl+Click would go to the definition of, drawn underlined.</summary>
+    public TextRange? DefinitionLinkRange { get; init; }
+
     internal long DiagnosticInputSequence { get; set; }
 
     internal long DiagnosticInputStarted { get; set; }

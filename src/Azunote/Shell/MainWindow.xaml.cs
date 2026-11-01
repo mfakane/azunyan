@@ -42,6 +42,8 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
             runtime => runtime.ShowParameterHints(),
         [new(VirtualKey.F12, VirtualKeyModifiers.None)] = runtime => _ = runtime.GoToDefinitionAsync(),
         [new(VirtualKey.F12, VirtualKeyModifiers.Shift)] = runtime => _ = runtime.FindReferencesAsync(),
+        [new(VirtualKey.F12, VirtualKeyModifiers.Control)] = runtime => _ = runtime.GoToImplementationAsync(),
+        [new(VirtualKey.T, VirtualKeyModifiers.Control)] = runtime => runtime.ShowWorkspaceSymbolPalette(),
         [new(VirtualKey.O, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift)] =
             runtime => runtime.ShowSymbolPalette(),
     };
@@ -501,6 +503,7 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     {
         using var measurement = ShellPerformance.Measure("selection.changed");
         _runtime.RefreshStatus();
+        _runtime.ObserveSelectionChanged();
     }
 
     private void Document_SelectionChanged(object? sender, EventArgs e)
@@ -876,6 +879,10 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
 
     Task IMainWindowActions.FindReferencesAsync() => _runtime.FindReferencesAsync();
 
+    Task IMainWindowActions.GoToTypeDefinitionAsync() => _runtime.GoToTypeDefinitionAsync();
+
+    Task IMainWindowActions.GoToImplementationAsync() => _runtime.GoToImplementationAsync();
+
     void IMainWindowActions.ReopenWithEncoding(TextEncoding encoding) =>
         _runtime.ReopenWithEncoding(encoding);
 
@@ -897,6 +904,8 @@ public sealed partial class MainWindow : Window, IDisposable, IMainWindowActions
     void IMainWindowActions.ShowParameterHints() => _runtime.ShowParameterHints();
 
     void IMainWindowActions.ShowSymbolPalette() => ShowSymbolPalette();
+
+    void IMainWindowActions.ShowWorkspaceSymbolPalette() => ShowWorkspaceSymbolPalette();
 
     Task IMainWindowActions.GoToLineAsync() => _runtime.ShowGoToLineAsync();
 

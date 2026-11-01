@@ -327,6 +327,34 @@ public sealed class LanguageServerControllerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_uses_of_the_name_at_the_resting_caret_are_highlighted_until_it_leaves_them()
+    {
+        _enabled.Add((Workspace, "fake-server"));
+        _server.Capabilities["documentHighlightProvider"] = true;
+        _server.Handlers["textDocument/documentHighlight"] = _ => JsonNode.Parse("""
+            [{ "range": { "start": { "line": 0, "character": 4 }, "end": { "line": 0, "character": 9 } }, "kind": 3 }]
+            """);
+        using var controller = CreateController();
+        controller.Update();
+        await WaitForAsync(() => controller.Indicator.State == LanguageServerIndicatorState.Running);
+
+        _editor.SetSelection(TextSelection.Caret(6));
+        controller.SelectionChanged();
+        await WaitForAsync(() => _editor.SymbolHighlights.Count > 0);
+
+        Assert.Equal([new TextRange(4, 5)], _editor.SymbolHighlights);
+        Assert.Equal(6, Assert.Single(_server.ReceivedOf("textDocument/documentHighlight"))!["position"]!["character"]!.GetValue<int>());
+
+        _editor.SetSelection(TextSelection.Caret(9));
+        controller.SelectionChanged();
+        Assert.Equal([new TextRange(4, 5)], _editor.SymbolHighlights);
+
+        _editor.SetSelection(TextSelection.Caret(12));
+        controller.SelectionChanged();
+        Assert.Empty(_editor.SymbolHighlights);
+    }
+
+    [Fact]
     public async Task Symbols_are_asked_for_the_current_text()
     {
         _enabled.Add((Workspace, "fake-server"));

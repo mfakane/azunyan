@@ -36,6 +36,9 @@ internal sealed class MainWindowViewModel :
     private bool _languageServerShowsParameterHints;
     private bool _languageServerListsSymbols;
     private bool _languageServerFindsReferences;
+    private bool _languageServerFindsTypeDefinitions;
+    private bool _languageServerFindsImplementations;
+    private bool _languageServerListsWorkspaceSymbols;
     private int _runningExternalToolCount;
     private bool _isMatchCase;
     private bool _isInSelection;
@@ -82,6 +85,9 @@ internal sealed class MainWindowViewModel :
         GoToDefinitionCommand = Async(() => Actions.GoToDefinitionAsync());
         GoToSymbolCommand = Command(() => Actions.ShowSymbolPalette());
         FindReferencesCommand = Async(() => Actions.FindReferencesAsync());
+        GoToTypeDefinitionCommand = Async(() => Actions.GoToTypeDefinitionAsync());
+        GoToImplementationCommand = Async(() => Actions.GoToImplementationAsync());
+        GoToWorkspaceSymbolCommand = Command(() => Actions.ShowWorkspaceSymbolPalette());
         ReopenWithEncodingCommand = Command(parameter =>
         {
             if (parameter is TextEncoding encoding)
@@ -262,6 +268,9 @@ internal sealed class MainWindowViewModel :
     public ICommand GoToDefinitionCommand { get; }
     public ICommand GoToSymbolCommand { get; }
     public ICommand FindReferencesCommand { get; }
+    public ICommand GoToTypeDefinitionCommand { get; }
+    public ICommand GoToImplementationCommand { get; }
+    public ICommand GoToWorkspaceSymbolCommand { get; }
     public ICommand ReopenWithEncodingCommand { get; }
     public ICommand SaveWithEncodingCommand { get; }
     public ICommand ReopenWithOtherEncodingCommand { get; }
@@ -316,6 +325,15 @@ internal sealed class MainWindowViewModel :
 
     /// <summary>Whether the document's language server runs and finds where a name is used.</summary>
     public bool CanFindReferences => _languageServerFindsReferences;
+
+    /// <summary>Whether the document's language server runs and finds where a type is defined.</summary>
+    public bool CanGoToTypeDefinition => _languageServerFindsTypeDefinitions;
+
+    /// <summary>Whether the document's language server runs and finds where a name is implemented.</summary>
+    public bool CanGoToImplementation => _languageServerFindsImplementations;
+
+    /// <summary>Whether the document's language server runs and finds symbols in its workspace.</summary>
+    public bool CanGoToWorkspaceSymbol => _languageServerListsWorkspaceSymbols;
 
     /// <summary>Whether the document's language server runs and tells the parameters of a call being typed.</summary>
     public bool CanShowLanguageServerParameterHints => _languageServerShowsParameterHints && CanEdit;
@@ -380,7 +398,10 @@ internal sealed class MainWindowViewModel :
         bool findsDefinitions,
         bool showsParameterHints,
         bool listsSymbols,
-        bool findsReferences)
+        bool findsReferences,
+        bool findsTypeDefinitions,
+        bool findsImplementations,
+        bool listsWorkspaceSymbols)
     {
         ArgumentNullException.ThrowIfNull(indicator);
         _languageServerFormats = formats;
@@ -388,6 +409,9 @@ internal sealed class MainWindowViewModel :
         _languageServerShowsParameterHints = showsParameterHints;
         _languageServerListsSymbols = listsSymbols;
         _languageServerFindsReferences = findsReferences;
+        _languageServerFindsTypeDefinitions = findsTypeDefinitions;
+        _languageServerFindsImplementations = findsImplementations;
+        _languageServerListsWorkspaceSymbols = listsWorkspaceSymbols;
         IsLanguageServerAvailable = indicator.State != LanguageServerIndicatorState.Hidden;
         IsLanguageServerOn = indicator.State is not (LanguageServerIndicatorState.Hidden or LanguageServerIndicatorState.Off);
         LanguageServerVisibility = IsLanguageServerAvailable ? Visibility.Visible : Visibility.Collapsed;
@@ -424,6 +448,9 @@ internal sealed class MainWindowViewModel :
         OnPropertyChanged(nameof(CanGoToDefinition));
         OnPropertyChanged(nameof(CanGoToSymbol));
         OnPropertyChanged(nameof(CanFindReferences));
+        OnPropertyChanged(nameof(CanGoToTypeDefinition));
+        OnPropertyChanged(nameof(CanGoToImplementation));
+        OnPropertyChanged(nameof(CanGoToWorkspaceSymbol));
         OnPropertyChanged(nameof(CanShowLanguageServerParameterHints));
     }
 
@@ -753,6 +780,12 @@ internal interface IMainWindowActions
     void ShowSymbolPalette();
 
     Task FindReferencesAsync();
+
+    Task GoToTypeDefinitionAsync();
+
+    Task GoToImplementationAsync();
+
+    void ShowWorkspaceSymbolPalette();
     void ReopenWithEncoding(TextEncoding encoding);
     void SaveWithEncoding(TextEncoding encoding);
     void ShowEncodingPicker(bool reopen);

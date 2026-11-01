@@ -597,34 +597,64 @@ internal sealed class MainWindowRuntime : IDisposable
     /// Goes to where the language server says the name at
     /// <paramref name="position"/>, or else at the caret, is defined: in the
     /// window that has its file, or in a new one. When the server lists more
-    /// than one place, it goes to the first.
+    /// than one place, they are listed in the command palette to choose from.
     /// </summary>
-    public async Task GoToDefinitionAsync(int? position = null)
+    public Task GoToDefinitionAsync(int? position = null) => GoToLocationsAsync(
+        _languageServer is { CanGoToDefinition: true } server ? server.FindDefinitionAsync : null,
+        position,
+        "Could not go to definition",
+        "definitions");
+
+    /// <summary>Goes to where the type of the name is defined, as <see cref="GoToDefinitionAsync"/> does.</summary>
+    public Task GoToTypeDefinitionAsync(int? position = null) => GoToLocationsAsync(
+        _languageServer is { CanGoToTypeDefinition: true } server ? server.FindTypeDefinitionAsync : null,
+        position,
+        "Could not go to type definition",
+        "type definitions");
+
+    /// <summary>Goes to where the name is implemented, as <see cref="GoToDefinitionAsync"/> does.</summary>
+    public Task GoToImplementationAsync(int? position = null) => GoToLocationsAsync(
+        _languageServer is { CanGoToImplementation: true } server ? server.FindImplementationAsync : null,
+        position,
+        "Could not go to implementation",
+        "implementations");
+
+    private async Task GoToLocationsAsync(
+        Func<int, Task<IReadOnlyList<(string Path, LineColumn Position)>>>? find,
+        int? position,
+        string failureTitle,
+        string pluralNoun)
     {
-        if (_languageServer is null || _openFileAt is null)
+        if (find is null || _openFileAt is null)
         {
             return;
         }
 
+        IReadOnlyList<(string Path, LineColumn Position)> locations;
         try
         {
-            var locations = await _languageServer.FindDefinitionAsync(position ?? _view.Selection.Active);
-            if (locations.Count > 0)
-            {
-                await _openFileAt(locations[0].Path, locations[0].Position);
-            }
+            locations = await find(position ?? _view.Selection.Active);
         }
         catch (Exception exception) when (exception is IOException or JsonRpcException or ObjectDisposedException)
         {
-            await _prompt.ShowErrorAsync("Could not go to definition", exception.Message);
+            await _prompt.ShowErrorAsync(failureTitle, exception.Message);
+            return;
+        }
+
+        if (locations.Count == 1)
+        {
+            await _openFileAt(locations[0].Path, locations[0].Position);
+        }
+        else if (locations.Count > 1)
+        {
+            ShowLocations(locations, $"{locations.Count} {pluralNoun}");
         }
     }
 
     /// <summary>
     /// Lists in the command palette where the language server says the name
     /// at <paramref name="position"/>, or else at the caret, is used, to go
-    /// to one. Each shows its line as it is in this document, or else as the
-    /// file on disk has it.
+    /// to one.
     /// </summary>
     public async Task FindReferencesAsync(int? position = null)
     {
@@ -644,9 +674,25 @@ internal sealed class MainWindowRuntime : IDisposable
             return;
         }
 
+        ShowLocations(
+            references,
+            references.Count switch
+            {
+                0 => "No references",
+                1 => "1 reference",
+                var count => $"{count} references"
+            });
+    }
+
+    /// <summary>
+    /// Lists <paramref name="locations"/> in the command palette to go to
+    /// one. Each shows its line as it is in this document, or else as the
+    /// file on disk has it.
+    /// </summary>
+    private void ShowLocations(IReadOnlyList<(string Path, LineColumn Position)> locations, string placeholder)
+    {
         var snapshot = _view.Snapshot;
         var filePath = _session.State.FilePath;
-        var workspaceFolder = _languageServer.WorkspaceFolder;
         var fileLines = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
         string GetLineText(string path, int line)
         {
@@ -673,27 +719,46 @@ internal sealed class MainWindowRuntime : IDisposable
         }
 
         _window.ShowPalettePicker(
-            references.Count switch
-            {
-                0 => "No references",
-                1 => "1 reference",
-                var count => $"{count} references"
-            },
+            placeholder,
             [
-                .. references.Select(reference =>
-                {
-                    var name = string.IsNullOrEmpty(workspaceFolder)
-                        ? reference.Path
-                        : Path.GetRelativePath(workspaceFolder, reference.Path);
-                    return new CommandPaletteItem(
-                        GetLineText(reference.Path, reference.Position.Line).Trim(),
-                        $"{name} · Ln {reference.Position.Line + 1}, Col {reference.Position.Column + 1}",
-                        Shortcut: null,
-                        IsEnabled: true,
-                        IsChecked: false,
-                        () => _ = _openFileAt(reference.Path, reference.Position));
-                })
+                .. locations.Select(location => new CommandPaletteItem(
+                    GetLineText(location.Path, location.Position.Line).Trim(),
+                    $"{GetWorkspacePath(location.Path)} · Ln {location.Position.Line + 1}, Col {location.Position.Column + 1}",
+                    Shortcut: null,
+                    IsEnabled: true,
+                    IsChecked: false,
+                    () => _ = OpenFileAtAsync(location.Path, location.Position)))
             ]);
+    }
+
+    /// <summary><paramref name="path"/> from the language server's workspace folder, or whole outside one.</summary>
+    internal string GetWorkspacePath(string path) =>
+        _languageServer?.WorkspaceFolder is { Length: > 0 } workspaceFolder
+            ? Path.GetRelativePath(workspaceFolder, path)
+            : path;
+
+    /// <summary>Goes to <paramref name="position"/> of <paramref name="path"/> in the window that has it, or in a new one.</summary>
+    internal Task OpenFileAtAsync(string path, LineColumn position) =>
+        _openFileAt?.Invoke(path, position) ?? Task.CompletedTask;
+
+    /// <summary>The symbols the language server finds in its workspace, none when it cannot answer.</summary>
+    public async Task<IReadOnlyList<LanguageServerWorkspaceSymbol>> ListWorkspaceSymbolsAsync(
+        string query,
+        CancellationToken cancellationToken)
+    {
+        if (_languageServer is null)
+        {
+            return [];
+        }
+
+        try
+        {
+            return await _languageServer.ListWorkspaceSymbolsAsync(query, cancellationToken);
+        }
+        catch (Exception exception) when (exception is IOException or JsonRpcException or ObjectDisposedException or OperationCanceledException)
+        {
+            return [];
+        }
     }
 
     /// <summary>The symbols the language server lists in the document, none when it cannot answer.</summary>
@@ -738,6 +803,11 @@ internal sealed class MainWindowRuntime : IDisposable
     public void ShowParameterHints() => _editorCommands.ShowParameterHints();
 
     public void ShowSymbolPalette() => _window.ShowSymbolPalette();
+
+    /// <summary>Lets the language server highlight the uses of the name the caret rests on.</summary>
+    public void ObserveSelectionChanged() => _languageServer?.SelectionChanged();
+
+    public void ShowWorkspaceSymbolPalette() => _window.ShowWorkspaceSymbolPalette();
 
     public Task ShowGoToLineAsync() => _goToLine.ShowAsync();
 
@@ -1099,7 +1169,11 @@ internal sealed class MainWindowRuntime : IDisposable
             _languageServer.CanGoToDefinition,
             _languageServer.CanShowParameterHints,
             _languageServer.CanListSymbols,
-            _languageServer.CanFindReferences);
+            _languageServer.CanFindReferences,
+            _languageServer.CanGoToTypeDefinition,
+            _languageServer.CanGoToImplementation,
+            _languageServer.CanListWorkspaceSymbols);
+        _window.UpdateLanguageServerContextMenuItems();
         var triggers = (
             Completion: _languageServer.CompletionTriggerCharacters,
             SignatureHelp: _languageServer.SignatureHelpTriggerCharacters);

@@ -16,8 +16,10 @@ public sealed partial class MainWindow
 {
     private const string CommandPalettePrefix = ">";
     private const string SymbolPalettePrefix = "@";
+    private const string WorkspaceSymbolPalettePrefix = "#";
     private const int MaxCommandPaletteResults = 100;
     private const int MaxRecentPaletteCommands = 10;
+    private static readonly TimeSpan WorkspaceSymbolDelay = TimeSpan.FromMilliseconds(150);
 
     // Shared by every window, so a command run in one is offered first in all.
     private static readonly List<string> RecentPaletteCommands = [];
@@ -29,6 +31,11 @@ public sealed partial class MainWindow
     // time the text starts with @ after the palette opens.
     private CommandPaletteItem[]? _paletteSymbols;
     private int _paletteSymbolsRequest;
+    // The symbols the language server found in its workspace for the last
+    // query asked, shown until the answer for the current one arrives.
+    private CommandPaletteItem[] _paletteWorkspaceSymbols = [];
+    private string? _paletteWorkspaceQuery;
+    private CancellationTokenSource? _paletteWorkspaceRequest;
     // The choices offered in place of the commands and documents, such as
     // the encodings of Other..., until the palette closes.
     private CommandPaletteItem[]? _palettePicks;
@@ -46,6 +53,14 @@ public sealed partial class MainWindow
         if (_viewModel.CanGoToSymbol)
         {
             ShowCommandPalette(SymbolPalettePrefix);
+        }
+    }
+
+    internal void ShowWorkspaceSymbolPalette()
+    {
+        if (_viewModel.CanGoToWorkspaceSymbol)
+        {
+            ShowCommandPalette(WorkspaceSymbolPalettePrefix);
         }
     }
 
@@ -148,6 +163,10 @@ public sealed partial class MainWindow
         _palettePicks = null;
         _paletteSymbols = null;
         _paletteSymbolsRequest++;
+        _paletteWorkspaceRequest?.Cancel();
+        _paletteWorkspaceRequest = null;
+        _paletteWorkspaceSymbols = [];
+        _paletteWorkspaceQuery = null;
     }
 
     /// <summary>
@@ -166,20 +185,18 @@ public sealed partial class MainWindow
         _paletteFilteredText = text;
         var prefix = _palettePicks is not null
             ? string.Empty
-            : text.StartsWith(CommandPalettePrefix, StringComparison.Ordinal)
-                ? CommandPalettePrefix
-                : text.StartsWith(SymbolPalettePrefix, StringComparison.Ordinal)
-                    ? SymbolPalettePrefix
-                    : string.Empty;
+            : new[] { CommandPalettePrefix, SymbolPalettePrefix, WorkspaceSymbolPalettePrefix }
+                .FirstOrDefault(candidate => text.StartsWith(candidate, StringComparison.Ordinal)) ?? string.Empty;
+        var query = text[prefix.Length..].Trim();
         IReadOnlyList<CommandPaletteItem> items = _palettePicks is { } picks
             ? picks
             : prefix switch
             {
                 CommandPalettePrefix => (IReadOnlyList<CommandPaletteItem>)_paletteCommands,
                 SymbolPalettePrefix => _paletteSymbols ?? RequestPaletteSymbols(),
+                WorkspaceSymbolPalettePrefix => RequestWorkspaceSymbols(query),
                 _ => _paletteDocuments
             };
-        var query = text[prefix.Length..].Trim();
         var matches = CommandPaletteSearch.Filter(query, items)
             .Take(MaxCommandPaletteResults)
             .ToArray();
@@ -236,6 +253,59 @@ public sealed partial class MainWindow
                 IsEnabled: true,
                 IsChecked: false,
                 () => _runtime.GoToPosition(symbol.Position)))
+        ];
+        _paletteFilteredText = null;
+        RefreshCommandPalette();
+    }
+
+    /// <summary>
+    /// Asks the language server for the symbols of its workspace that match
+    /// <paramref name="query"/> once typing pauses, and returns those found
+    /// for the query before until the answer arrives.
+    /// </summary>
+    private CommandPaletteItem[] RequestWorkspaceSymbols(string query)
+    {
+        if (!string.Equals(query, _paletteWorkspaceQuery, StringComparison.Ordinal))
+        {
+            _paletteWorkspaceQuery = query;
+            _paletteWorkspaceRequest?.Cancel();
+            _paletteWorkspaceRequest = new CancellationTokenSource();
+            _ = LoadWorkspaceSymbolsAsync(query, _paletteWorkspaceRequest.Token);
+        }
+
+        return _paletteWorkspaceSymbols;
+    }
+
+    private async Task LoadWorkspaceSymbolsAsync(string query, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(WorkspaceSymbolDelay, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        var symbols = await _runtime.ListWorkspaceSymbolsAsync(query, cancellationToken);
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+
+        _paletteWorkspaceSymbols =
+        [
+            .. symbols.Select(symbol =>
+            {
+                var path = _runtime.GetWorkspacePath(symbol.Path);
+                return new CommandPaletteItem(
+                    symbol.Name,
+                    symbol.Container is { } container ? $"{container} · {path}" : path,
+                    symbol.Kind,
+                    IsEnabled: true,
+                    IsChecked: false,
+                    () => _ = _runtime.OpenFileAtAsync(symbol.Path, symbol.Position));
+            })
         ];
         _paletteFilteredText = null;
         RefreshCommandPalette();

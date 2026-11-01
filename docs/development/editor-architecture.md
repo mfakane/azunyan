@@ -232,7 +232,13 @@ Ctrl+Click on other text raises `DefinitionRequested` with the clicked
 position. A host that goes to a definition there sets `Handled`, and the click
 only places the caret; otherwise it is an ordinary click. A right-click outside
 every selection moves the caret before the context menu opens, so the host's
-commands in it act on what was clicked.
+commands in it act on what was clicked. While the host sets
+`IsDefinitionNavigationEnabled`, holding Ctrl alone underlines the name under
+the pointer and shows the hand cursor.
+
+`SetSymbolHighlights` draws a background behind ranges the host gives, such as
+the other uses of the name at the caret. They belong to the text they were set
+for and stop drawing once it changes.
 
 Decorations such as underline, squiggle, background highlight, and diagnostic
 markers are separate drawing primitives. They reuse the glyph hit-test map and

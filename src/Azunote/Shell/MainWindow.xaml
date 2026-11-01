@@ -617,6 +617,12 @@
                     IsEnabled="{x:Bind ViewModel.CanGoToSymbol, Mode=OneWay}"
                 />
                 <MenuFlyoutItem
+                    Text="Go to Symbol in Workspace..."
+                    KeyboardAcceleratorTextOverride="Ctrl+T"
+                    Command="{x:Bind ViewModel.GoToWorkspaceSymbolCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanGoToWorkspaceSymbol, Mode=OneWay}"
+                />
+                <MenuFlyoutItem
                     Text="Go to Next Problem"
                     Command="{x:Bind ViewModel.GoToNextProblemCommand}"
                 >
@@ -690,6 +696,17 @@
                     KeyboardAcceleratorTextOverride="F12"
                     Command="{x:Bind ViewModel.GoToDefinitionCommand}"
                     IsEnabled="{x:Bind ViewModel.CanGoToDefinition, Mode=OneWay}"
+                />
+                <MenuFlyoutItem
+                    Text="Go to Type Definition"
+                    Command="{x:Bind ViewModel.GoToTypeDefinitionCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanGoToTypeDefinition, Mode=OneWay}"
+                />
+                <MenuFlyoutItem
+                    Text="Go to Implementations"
+                    KeyboardAcceleratorTextOverride="Ctrl+F12"
+                    Command="{x:Bind ViewModel.GoToImplementationCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanGoToImplementation, Mode=OneWay}"
                 />
                 <MenuFlyoutItem
                     Text="Find All References"

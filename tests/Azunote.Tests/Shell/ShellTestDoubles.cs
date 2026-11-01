@@ -166,6 +166,10 @@ internal sealed class FakeEditorView : IEditorView
 
     public void RefreshProviders() => RefreshProvidersCount++;
 
+    public IReadOnlyList<TextRange> SymbolHighlights { get; private set; } = [];
+
+    public void SetSymbolHighlights(IReadOnlyList<TextRange> ranges) => SymbolHighlights = ranges;
+
     public void SetWordWrap(bool enabled) => WordWrapEnabled = enabled;
 
     public void SetTabDisplaySize(int size) => TabDisplaySize = size;

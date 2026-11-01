@@ -82,6 +82,9 @@ public sealed record AzunyanColorScheme
     /// </summary>
     public Color LinkForeground { get; init; }
 
+    /// <summary>Background of the other uses of the name at the caret.</summary>
+    public Color SymbolHighlightBackground { get; init; } = Color.FromArgb(0x40, 0x80, 0x80, 0x80);
+
     /// <summary>Foreground of added text, such as a diff's <c>+</c> lines.</summary>
     public Color InsertedForeground { get; init; } = Color.FromArgb(0xff, 0x22, 0x86, 0x3a);
 

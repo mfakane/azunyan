@@ -2029,6 +2029,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         }
 
         currentEntry.EnsureForegrounds(line.Runs, context.ColorScheme);
+        DrawSymbolHighlights(drawingSession, context, line, currentEntry.Layout, top);
         DrawSelection(drawingSession, context, line, currentEntry.Layout, top, row);
         if (context.BlockSelection is not null
             || !context.Selection.IsEmpty
@@ -2042,6 +2043,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             (float)top,
             context.ColorScheme.EditorForeground);
         DrawDecorations(drawingSession, context, line, currentEntry.Layout, top);
+        DrawDefinitionLink(drawingSession, context, line, currentEntry.Layout, top);
         DrawComposition(drawingSession, context, line, currentEntry.Layout, top);
         DrawCaret(drawingSession, context, line, currentEntry.Layout, top);
     }
@@ -2095,6 +2097,72 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
                     color);
             }
         }
+    }
+
+    private static void DrawSymbolHighlights(
+        CanvasDrawingSession drawingSession,
+        AzunyanEditorRenderContext context,
+        UnwrappedLineLayout layout,
+        DirectWriteTextLayout textLayout,
+        double top)
+    {
+        var left = context.ContentLeft - context.HorizontalOffset;
+        foreach (var highlight in context.SymbolHighlights)
+        {
+            foreach (var bounds in GetRangeBounds(layout, textLayout, highlight))
+            {
+                drawingSession.FillRectangle(
+                    new Rect(left + bounds.X, top, Math.Max(1, bounds.Width), context.LineHeight),
+                    context.ColorScheme.SymbolHighlightBackground);
+            }
+        }
+    }
+
+    private static void DrawDefinitionLink(
+        CanvasDrawingSession drawingSession,
+        AzunyanEditorRenderContext context,
+        UnwrappedLineLayout layout,
+        DirectWriteTextLayout textLayout,
+        double top)
+    {
+        if (context.DefinitionLinkRange is not { } range)
+        {
+            return;
+        }
+
+        var left = context.ContentLeft - context.HorizontalOffset;
+        var y = (float)(top + context.LineHeight - 2.5);
+        foreach (var bounds in GetRangeBounds(layout, textLayout, range))
+        {
+            drawingSession.DrawLine(
+                (float)(left + bounds.X),
+                y,
+                (float)(left + bounds.X + bounds.Width),
+                y,
+                context.ColorScheme.LinkForeground,
+                1f);
+        }
+    }
+
+    /// <summary>The bounds of the part of <paramref name="range"/> on this row.</summary>
+    private static IReadOnlyList<Rect> GetRangeBounds(
+        UnwrappedLineLayout layout,
+        DirectWriteTextLayout textLayout,
+        TextRange range)
+    {
+        var sourceRange = layout.SourceLine.SourceRange;
+        var start = Math.Max(sourceRange.Start, range.Start);
+        var end = Math.Min(sourceRange.End, range.End);
+        if (end <= start)
+        {
+            return [];
+        }
+
+        var visibleStart = Math.Max(layout.SourceLine.GetVisualColumn(DocumentAnchor.Before(start)), layout.VisualStart);
+        var visibleEnd = Math.Min(layout.SourceLine.GetVisualColumn(DocumentAnchor.After(end)), layout.VisualEnd);
+        return visibleEnd <= visibleStart
+            ? []
+            : textLayout.GetCharacterBounds(visibleStart - layout.VisualStart, visibleEnd - visibleStart);
     }
 
     private static void DrawWavyLine(
