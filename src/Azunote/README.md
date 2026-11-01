@@ -171,8 +171,9 @@ the other windows and the recent files. Characters match in order, not necessari
 next to each other, so `mlu` finds Move Line Up, and the matching characters
 are shown in bold and the accent color. Choosing Open Recent or
 Language Mode lists the recent files or the language modes in the palette
-itself; so do File > Reopen/Save with Encoding > Other..., which lists every
-encoding, and Go > Show Problems... (Ctrl+Shift+M), which lists the
+itself; so do File > Open Recent > More..., shown when there are more recent
+files than the 10 in the menu, File > Reopen/Save with Encoding > Other...,
+which lists every encoding, and Go > Show Problems... (Ctrl+Shift+M), which lists the
 problems to go to one. Clicking the language mode or the problem counts in
 the status bar does the same. Before anything is typed after `>`, the
 commands run recently in any window are listed first.

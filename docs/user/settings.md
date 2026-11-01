@@ -65,5 +65,5 @@ each item of `args` is passed as one argument.
 ## state.toml
 
 Azunote rewrites `state.toml` itself, so it should not be edited. It holds the
-last window layout, the Word Wrap and Status Bar choices, and up to 10 recently
+last window layout, the Word Wrap and Status Bar choices, and up to 50 recently
 opened files.

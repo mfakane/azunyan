@@ -20,6 +20,7 @@ namespace Azunote;
 public sealed partial class MainWindow
 {
     internal const int WindowGroupAccentPaletteSize = 6;
+    private const int MaxRecentFileMenuItems = 10;
 
     private AzunyanEditorView _editor => Editor;
     private Grid _rootGrid => RootGrid;
@@ -606,7 +607,7 @@ public sealed partial class MainWindow
             return;
         }
 
-        foreach (var entry in _viewModel.RecentFileItems)
+        foreach (var entry in _viewModel.RecentFileItems.Take(MaxRecentFileMenuItems))
         {
             var menuItem = new SplitMenuFlyoutItem
             {
@@ -638,6 +639,17 @@ public sealed partial class MainWindow
             menuItem.Items.Add(removeItem);
             _openRecentMenu.Items.Add(menuItem);
             _recentFileMenuItems.Add(menuItem);
+        }
+
+        if (_viewModel.RecentFileItems.Count > MaxRecentFileMenuItems)
+        {
+            var separator = new MenuFlyoutSeparator();
+            var moreItem = new MenuFlyoutItem { Text = "More..." };
+            moreItem.Click += (_, _) => ShowCommandPalette(string.Empty);
+            _openRecentMenu.Items.Add(separator);
+            _openRecentMenu.Items.Add(moreItem);
+            _recentFileMenuItems.Add(separator);
+            _recentFileMenuItems.Add(moreItem);
         }
     }
 
