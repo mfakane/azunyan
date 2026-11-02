@@ -9,8 +9,8 @@ const repo = path.resolve(site, '..');
 const docsSource = path.join(repo, 'docs', 'user');
 const docsTarget = path.join(site, 'src', 'content', 'docs', 'docs');
 const repoBlob = 'https://github.com/mfakane/azunyan/blob/master/';
-// Matches `base` in astro.config.mjs.
-const docsBase = '/azunyan/docs/';
+// The site is served from the root of its domain.
+const docsBase = '/docs/';
 
 // A link to a sibling page becomes that page's route; any other relative
 // link points at the file on GitHub.

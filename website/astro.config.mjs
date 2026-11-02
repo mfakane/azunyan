@@ -4,8 +4,7 @@ import starlight from '@astrojs/starlight';
 
 // https://astro.build/config
 export default defineConfig({
-	site: 'https://mfakane.github.io',
-	base: '/azunyan',
+	site: 'https://azunyan.sorairo.pictures',
 	integrations: [
 		starlight({
 			title: 'Azunote',
@@ -15,7 +14,7 @@ export default defineConfig({
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/mfakane/azunyan' }],
 			// Starlight writes the other Open Graph and Twitter Card tags itself.
 			head: [
-				{ tag: 'meta', attrs: { property: 'og:image', content: 'https://mfakane.github.io/azunyan/og-image.png' } },
+				{ tag: 'meta', attrs: { property: 'og:image', content: 'https://azunyan.sorairo.pictures/og-image.png' } },
 				{ tag: 'meta', attrs: { property: 'og:image:width', content: '1200' } },
 				{ tag: 'meta', attrs: { property: 'og:image:height', content: '630' } },
 				{ tag: 'meta', attrs: { property: 'og:image:alt', content: 'Azunote: a small document-per-window text editor for Windows.' } },
