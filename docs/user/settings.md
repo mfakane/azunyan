@@ -13,7 +13,9 @@ opens the folder in Explorer. It is created on first launch and contains:
 | `tools/` | [External tools](external-tools.md). |
 | `modes/` | [Custom language modes](language-modes.md) and changes to built-in ones. |
 | `backups/` | Copies of [unsaved documents](documents.md#unsaved-changes) for the next launch. |
-| `logs/` | Error logs, one file per day. |
+
+Error logs, one file per day, and crash dumps are written to `%TEMP%\Azunote`
+instead.
 
 Changes made to these files outside Azunote apply right away in every window.
 If a tool or language-mode definition is invalid, the previous menu stays in

@@ -26,6 +26,7 @@ export default defineConfig({
 					items: [
 						{ label: 'Overview', link: '/' },
 						{ label: 'Download', slug: 'download' },
+						{ label: 'Privacy Policy', slug: 'privacy' },
 					],
 				},
 				{
