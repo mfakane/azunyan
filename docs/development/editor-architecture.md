@@ -506,9 +506,10 @@ balances the native TextBox's handled-key state and flushes the coalesced
 sliding-window synchronization after the physical chord is fully released.
 This lets the projected caret move while a modifier remains held without
 mutating the native TextBox inside its active key pipeline. Whether a key is
-still held is checked against the keyboard state, not only the KeyUp events
-seen, since a KeyUp can go to another window, as Alt does after Alt+Tab, and a
-key thought held would put off the synchronization for good.
+still held is checked with `GetAsyncKeyState`, since the thread's keyboard
+state can retain Kanji after an IME consumes its release, or Alt after Alt+Tab.
+A stale pressed key would otherwise defer synchronization indefinitely.
+Command modifiers continue to use the keyboard state for the current message.
 
 ## 10. Accessibility
 

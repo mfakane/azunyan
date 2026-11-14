@@ -3202,7 +3202,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     /// typing lands where its stale text puts the caret.
     /// </summary>
     private void ForgetReleasedNativeKeys() =>
-        _nativeKeysDown.RemoveWhere(key => !IsKeyDown(key));
+        NativeKeyboardState.ForgetReleasedKeys(_nativeKeysDown);
 
     private bool AreNativeKeysDown()
     {
