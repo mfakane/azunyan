@@ -218,7 +218,11 @@ public sealed partial class AzunyanEditorView
 
         _pendingViewportAnchor = null;
 
-        UpdateProjectedScrollExtent(viewportHeight);
+        if (UpdateProjectedScrollExtent(viewportWidth, viewportHeight))
+        {
+            RenderViewport();
+            return;
+        }
         UpdateCompletionPopup();
         QueueInlineChatPopupPositionUpdate();
         UpdateSignatureHelpPopup();

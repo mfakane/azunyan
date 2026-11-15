@@ -40,6 +40,8 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
     private DocumentChangedEventArgs? _pendingDocumentChange;
     private TextLayoutCacheKey? _textLayoutCacheKey;
     private IReadOnlyList<SyntaxSpan>? _lineLayoutSyntax;
+    private readonly List<double> _lineWidths = new();
+    private TextProjection? _widthProjection;
     private bool _disposed;
 
     public ProjectedTextRenderer(CanvasControl gutterSurface, CanvasControl textSurface)
@@ -55,6 +57,8 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
     public event EventHandler? LayoutInvalidated;
 
     public double ContentHeight => _cachedLayout?.Heights.TotalHeight ?? 0;
+
+    public double ContentWidth { get; private set; }
 
     public void NotifyDocumentChanged(DocumentChangedEventArgs change)
     {
@@ -82,6 +86,8 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         ClearTextLayouts();
         _textLayoutCacheKey = null;
         _lineLayouts.Clear();
+        _lineWidths.Clear();
+        _widthProjection = null;
         _cachedLayout = null;
         _renderFrame = null;
         _pendingDocumentChange = null;
@@ -1330,6 +1336,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             context.LineHeight,
             Math.Min(context.LineHeight * 0.8, context.LineHeight));
         EnsureTextLayoutCache(context);
+        UpdateContentWidth(context, layoutState.Rows.Projection);
         var layouts = ViewportLayoutEngine.LayoutVisibleRows(
             context.Snapshot,
             layoutState.Rows,
@@ -1524,7 +1531,9 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
 
         ClearTextLayouts();
         _textLayoutCacheKey = null;
-        if (_renderFrame?.Context.TextWrapping == TextWrapping.Wrap)
+        _lineWidths.Clear();
+        _widthProjection = null;
+        if (_renderFrame is not null)
         {
             LayoutInvalidated?.Invoke(this, EventArgs.Empty);
         }
@@ -1572,8 +1581,67 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         {
             ClearTextLayouts();
             _lineLayouts.Clear();
+            _lineWidths.Clear();
+            _widthProjection = null;
             _textLayoutCacheKey = key;
         }
+    }
+
+    private void UpdateContentWidth(AzunyanEditorRenderContext context, TextProjection projection)
+    {
+        if (context.TextWrapping != TextWrapping.NoWrap)
+        {
+            ContentWidth = 0;
+            return;
+        }
+        if (!_textSurface.ReadyToDraw || ReferenceEquals(_widthProjection, projection))
+        {
+            return;
+        }
+
+        // Reuse the unchanged prefix and suffix without materializing rebased
+        // projected lines or shaping the entire document on each keystroke.
+        var updated = false;
+        if (_widthProjection is { } previous && projection.ChangeWindow is { } change)
+        {
+            var oldStart = previous.LineTable.GetVisualLineAtOrAfter(change.OldStartLine);
+            var oldEnd = previous.LineTable.GetVisualLineAtOrAfter(change.OldEndLine);
+            var newStart = projection.LineTable.GetVisualLineAtOrAfter(change.NewStartLine);
+            var newEnd = projection.LineTable.GetVisualLineAtOrAfter(change.NewEndLine);
+            if (oldStart == newStart && oldEnd <= _lineWidths.Count
+                && _lineWidths.Count - (oldEnd - oldStart) + (newEnd - newStart) == projection.Lines.Count)
+            {
+                _lineWidths.RemoveRange(oldStart, oldEnd - oldStart);
+                _lineWidths.InsertRange(newStart, Enumerable.Range(newStart, newEnd - newStart)
+                    .Select(index => MeasureLineWidth(context, projection.Lines[index])));
+                updated = true;
+            }
+        }
+        if (!updated)
+        {
+            _lineWidths.Clear();
+            _lineWidths.AddRange(projection.Lines.Select(line => MeasureLineWidth(context, line)));
+        }
+        ContentWidth = _lineWidths.Count == 0 ? 0 : _lineWidths.Max();
+        _widthProjection = projection;
+    }
+
+    private double MeasureLineWidth(AzunyanEditorRenderContext context, ProjectedLine line)
+    {
+        using var layout = DirectWriteTextLayout.Create(
+            _textSurface,
+            line.Inlines.Select(inline => new DirectWriteTextRun(
+                GetProjectedInlineText(context.Snapshot, inline),
+                context.ColorScheme.EditorForeground,
+                inline is InlineAdornment)).ToArray(),
+            context.FontFamily.Source,
+            (float)context.FontSize,
+            Math.Max(1, (float)(line.VisualLength * context.CharacterWidth)),
+            (float)context.LineHeight,
+            (float)context.LineHeight,
+            (float)(context.LineHeight * 0.8),
+            (float)(context.CharacterWidth * context.TabDisplaySize));
+        return layout.Width;
     }
 
     private void PruneLayoutCaches(IReadOnlyList<ViewportRowLayout> layouts)

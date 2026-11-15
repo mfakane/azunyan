@@ -55,6 +55,7 @@
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
                 <RowDefinition Height="*" />
+                <RowDefinition x:Name="ProjectedHorizontalScrollBarRow" Height="0" />
             </Grid.RowDefinitions>
             <Canvas
                 x:Name="InputWindowLayer"
@@ -101,6 +102,20 @@
                     VerticalAlignment="Stretch"
                     IsHitTestVisible="False" />
             </Grid>
+            <ScrollBar
+                x:Name="ProjectedHorizontalScrollBar"
+                Grid.Row="1"
+                Grid.Column="0"
+                Canvas.ZIndex="2"
+                Height="18"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Bottom"
+                Orientation="Horizontal"
+                IndicatorMode="MouseIndicator"
+                Visibility="Collapsed"
+                IsTabStop="False"
+                AutomationProperties.Name="Horizontal scroll"
+                AutomationProperties.AutomationId="ProjectedHorizontalScrollBar" />
             <ScrollBar
                 x:Name="ProjectedVerticalScrollBar"
                 Grid.Row="0"

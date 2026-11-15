@@ -79,6 +79,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
     private IFoldingProvider? _foldStateProvider;
     private (TextSnapshot Snapshot, DocumentAnchor Anchor, double OffsetWithinRow)? _pendingViewportAnchor;
     private double _projectedVerticalOffset;
+    private double _projectedHorizontalOffset;
     private bool _synchronizingProjectedScroll;
     private bool _projectedScrollInteraction;
     private bool _preservingViewport;
@@ -169,6 +170,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         InputWindow.NativeTextBoxControl.ContextFlyout = EditorContextMenu;
         CompletionPopup.Accepted += CompletionPopup_Accepted;
         ProjectedVerticalScrollBar.ValueChanged += OnProjectedVerticalScrollChanged;
+        ProjectedHorizontalScrollBar.ValueChanged += OnProjectedHorizontalScrollChanged;
         InputWindow.NativeTextBoxControl.AllowDrop = true;
         InputWindow.NativeTextBoxControl.IsSpellCheckEnabled = false;
         InputWindow.NativeTextBoxControl.IsTextPredictionEnabled = false;
@@ -2670,6 +2672,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                                 tabDisplaySize: TabDisplaySize));
                         }
                     });
+                    ScrollSelectionIntoView();
                 }, repeatable: true);
                 args.Handled = true;
                 break;
@@ -2693,6 +2696,7 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                                 tabDisplaySize: TabDisplaySize));
                         }
                     });
+                    ScrollSelectionIntoView();
                 }, repeatable: true);
                 args.Handled = true;
                 break;
@@ -4404,7 +4408,21 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         var maximum = GetProjectedScrollMaximum(
             viewportHeight);
         targetOffset = Math.Clamp(targetOffset, 0, maximum);
-        if (Math.Abs(targetOffset - _projectedVerticalOffset) <= 0.5)
+        var targetHorizontalOffset = _projectedHorizontalOffset;
+        if (TextWrapping == TextWrapping.NoWrap
+            && TryGetRendererCaretRect(
+                DocumentAnchor.Before(alignToTop ? range.Start : range.End), out var caretRect))
+        {
+            targetHorizontalOffset = new LayoutViewport(
+                _projectedHorizontalOffset, Math.Max(1, ProjectedSurfaceHost.ActualWidth))
+                .GetOffsetToReveal(
+                    caretRect.X + _projectedHorizontalOffset - Math.Max(0, padding.Left),
+                    caretRect.Right + _projectedHorizontalOffset + Math.Max(0, padding.Right));
+            targetHorizontalOffset = Math.Clamp(targetHorizontalOffset, 0,
+                GetProjectedHorizontalScrollMaximum(ProjectedSurfaceHost.ActualWidth));
+        }
+        if (Math.Abs(targetOffset - _projectedVerticalOffset) <= 0.5
+            && Math.Abs(targetHorizontalOffset - _projectedHorizontalOffset) <= 0.5)
         {
             return true;
         }
@@ -4414,6 +4432,8 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         {
             _projectedVerticalOffset = targetOffset;
             ProjectedVerticalScrollBar.Value = targetOffset;
+            _projectedHorizontalOffset = targetHorizontalOffset;
+            ProjectedHorizontalScrollBar.Value = targetHorizontalOffset;
         }
         finally
         {
@@ -4478,6 +4498,13 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
     private void UpdateTextSurfaceMode()
     {
+        if (!IsProjectedTextSurface || TextWrapping != TextWrapping.NoWrap)
+        {
+            ProjectedHorizontalScrollBar.Visibility = Visibility.Collapsed;
+            ProjectedHorizontalScrollBarRow.Height = new GridLength(0);
+            _projectedHorizontalOffset = 0;
+        }
+
         GutterCanvas.Background = new SolidColorBrush(
             IsProjectedTextSurface
                 ? Colors.Transparent
@@ -4556,8 +4583,31 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         : _scrollViewer?.VerticalOffset ?? 0;
 
     private double GetHorizontalOffset() => IsProjectedTextSurface
-        ? 0
+        ? _projectedHorizontalOffset
         : _scrollViewer?.HorizontalOffset ?? 0;
+
+    private void OnProjectedHorizontalScrollChanged(
+        object sender,
+        RangeBaseValueChangedEventArgs args)
+    {
+        if (!IsProjectedTextSurface || _synchronizingProjectedScroll)
+        {
+            return;
+        }
+
+        _projectedHorizontalOffset = args.NewValue;
+        _projectedScrollInteraction = true;
+        try
+        {
+            RenderViewport();
+        }
+        finally
+        {
+            _projectedScrollInteraction = false;
+        }
+
+        RequestProviderResults(false, true, false);
+    }
 
     private void OnProjectedVerticalScrollChanged(
         object sender,
@@ -4583,18 +4633,31 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         RequestProviderResults(false, true, false);
     }
 
-    private void UpdateProjectedScrollExtent(double viewportHeight)
+    private bool UpdateProjectedScrollExtent(double viewportWidth, double viewportHeight)
     {
         if (!IsProjectedTextSurface)
         {
-            return;
+            return false;
         }
 
         var maximum = GetProjectedScrollMaximum(viewportHeight);
         var offset = Math.Clamp(_projectedVerticalOffset, 0, maximum);
+        var horizontalMaximum = GetProjectedHorizontalScrollMaximum(viewportWidth);
+        var horizontalOffset = Math.Clamp(_projectedHorizontalOffset, 0, horizontalMaximum);
+        var horizontalVisible = horizontalMaximum > 0;
+        var offsetChanged = Math.Abs(horizontalOffset - _projectedHorizontalOffset) > 0.5
+            || Math.Abs(offset - _projectedVerticalOffset) > 0.5;
         _synchronizingProjectedScroll = true;
         try
         {
+            ProjectedHorizontalScrollBar.Visibility = horizontalVisible ? Visibility.Visible : Visibility.Collapsed;
+            ProjectedHorizontalScrollBarRow.Height = new GridLength(horizontalVisible ? 18 : 0);
+            ProjectedHorizontalScrollBar.ViewportSize = viewportWidth;
+            ProjectedHorizontalScrollBar.Maximum = horizontalMaximum;
+            ProjectedHorizontalScrollBar.LargeChange = Math.Max(1, viewportWidth);
+            ProjectedHorizontalScrollBar.SmallChange = Math.Max(1, _characterWidth);
+            ProjectedHorizontalScrollBar.Value = horizontalOffset;
+            _projectedHorizontalOffset = horizontalOffset;
             ProjectedVerticalScrollBar.ViewportSize = viewportHeight;
             ProjectedVerticalScrollBar.Maximum = maximum;
             ProjectedVerticalScrollBar.LargeChange = Math.Max(1, viewportHeight);
@@ -4606,6 +4669,21 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         {
             _synchronizingProjectedScroll = false;
         }
+
+        return offsetChanged;
+    }
+
+    private double GetProjectedHorizontalScrollMaximum(double viewportWidth)
+    {
+        if (TextWrapping != TextWrapping.NoWrap)
+        {
+            return 0;
+        }
+
+        var padding = InputWindow.NativeTextBoxControl.Padding;
+        return Math.Max(0, _defaultRenderer.TextRenderer.ContentWidth
+            + Math.Max(0, padding.Left) + Math.Max(0, padding.Right)
+            + 1.5 - Math.Max(1, viewportWidth));
     }
 
     private double GetProjectedScrollMaximum(double viewportHeight)

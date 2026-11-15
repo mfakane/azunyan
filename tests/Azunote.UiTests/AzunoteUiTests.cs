@@ -1203,6 +1203,86 @@ public sealed class AzunoteUiTests : IDisposable
     }
 
     [AzunoteUiFact]
+    public void Horizontal_scrollbar_tracks_unwrapped_overflow_and_hides_after_wrapping_or_shortening()
+    {
+        var window = _fixture.Window;
+        var editor = _fixture.Editor;
+        var value = AzunoteUiFixture.WaitForValuePattern(editor);
+        var text = AzunoteUiFixture.WaitForTextPattern(editor);
+        const string marker = "RIGHT_EDGE";
+        var longLine = new string('a', 250) + "\t日本語" + marker;
+
+        void SetWrapping(bool enabled)
+        {
+            AzunoteUiFixture.OpenMenu(window, "View");
+            var item = AzunoteUiFixture.WaitForElement(window, AutomationElement.NameProperty, "Word Wrap");
+            var toggle = (TogglePattern)item.GetCurrentPattern(TogglePattern.Pattern);
+            if ((toggle.Current.ToggleState == ToggleState.On) != enabled)
+            {
+                toggle.Toggle();
+            }
+            else
+            {
+                AzunoteUiFixture.CloseMenu(window, "View");
+            }
+        }
+
+        AutomationElement WaitForBar() => AzunoteUiFixture.WaitFor(
+            () => FindByAutomationId(window, "ProjectedHorizontalScrollBar") is { } bar
+                && !bar.Current.IsOffscreen && bar.Current.BoundingRectangle.Height > 0 ? bar : null,
+            "Overflow did not show the horizontal scrollbar.");
+
+        SetWrapping(false);
+        value.SetValue("short");
+        AzunoteUiFixture.WaitForElementHidden(window, AutomationElement.AutomationIdProperty, "ProjectedHorizontalScrollBar");
+
+        // The widest line is initially below the viewport.
+        value.SetValue(string.Concat(Enumerable.Repeat("short\n", 100)) + longLine);
+        var bar = WaitForBar();
+        var range = (RangeValuePattern)bar.GetCurrentPattern(RangeValuePattern.Pattern);
+        Assert.True(range.Current.Maximum > 0);
+        var maximum = range.Current.Maximum;
+        editor.SetFocus();
+        SendKeyChord(0x11, 0x24); // Ctrl+Home, then edit before the widest line.
+        SendKeyChord(0x58);
+        AzunoteUiFixture.WaitForDocumentText(text, content => content.StartsWith("xshort", StringComparison.Ordinal));
+        Assert.Equal(maximum, ((RangeValuePattern)WaitForBar().GetCurrentPattern(RangeValuePattern.Pattern)).Current.Maximum);
+
+        value.SetValue(longLine);
+        bar = WaitForBar();
+        range = (RangeValuePattern)bar.GetCurrentPattern(RangeValuePattern.Pattern);
+        var first = text.DocumentRange.FindText("aaa", false, false)!;
+        var firstX = first.GetBoundingRectangles()[0].X;
+        range.SetValue(range.Current.Maximum);
+        AzunoteUiFixture.WaitFor(
+            () => text.DocumentRange.FindText("aaa", false, false)!.GetBoundingRectangles()[0].X < firstX - 100
+                ? editor : null,
+            "The scrollbar did not move the rendered text.");
+        var end = text.DocumentRange.FindText(marker, false, false)!;
+        var endRect = end.GetBoundingRectangles()[0];
+        Assert.True(endRect.Right <= bar.Current.BoundingRectangle.Right + 2);
+        editor.SetFocus();
+        SendKeyChord(0x24); // Home must reveal the start of the line.
+        AzunoteUiFixture.WaitFor(
+            () => range.Current.Value < 1 ? editor : null,
+            "Home did not scroll back to the line start.");
+        SendKeyChord(0x23); // End must reveal the end of the line.
+        AzunoteUiFixture.WaitFor(
+            () => range.Current.Value >= range.Current.Maximum - 1 ? editor : null,
+            "End did not reveal the caret beyond the viewport.");
+
+        SetWrapping(true);
+        AzunoteUiFixture.WaitForElementHidden(window, AutomationElement.AutomationIdProperty, "ProjectedHorizontalScrollBar");
+        SetWrapping(false);
+        range = (RangeValuePattern)WaitForBar().GetCurrentPattern(RangeValuePattern.Pattern);
+        range.SetValue(range.Current.Maximum);
+        value.SetValue("short");
+        AzunoteUiFixture.WaitForElementHidden(window, AutomationElement.AutomationIdProperty, "ProjectedHorizontalScrollBar");
+        Assert.Equal("short", text.DocumentRange.GetText(-1));
+        Assert.True(text.DocumentRange.GetBoundingRectangles()[0].X >= editor.Current.BoundingRectangle.X);
+    }
+
+    [AzunoteUiFact]
     public void Projected_editor_keeps_long_document_text_in_the_document_owner()
     {
         var editor = _fixture.Editor;
