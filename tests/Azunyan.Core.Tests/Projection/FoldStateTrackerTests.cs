@@ -5,6 +5,56 @@ namespace Azunyan.Core.Tests;
 
 public sealed class FoldStateTrackerTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Deleting_a_fold_removes_its_state_and_preserves_surviving_folds(bool collapsed)
+    {
+        var oldSnapshot = new TextSnapshot("before\nfolded\nafter\n");
+        var newSnapshot = new TextSnapshot("before\nafter\n");
+        var tracker = CreateTracker(oldSnapshot,
+            new FoldRange("parent", new TextRange(0, 20)),
+            new FoldRange("deleted", new TextRange(7, 7)),
+            new FoldRange("after", new TextRange(14, 6)));
+        tracker.SetCollapsed("deleted", collapsed);
+        tracker.SetCollapsed("after", true);
+
+        tracker.ApplyTextChange(oldSnapshot, newSnapshot,
+            new TextChange(new TextRange(7, 7), "folded\n", string.Empty));
+
+        Assert.Same(newSnapshot, tracker.Snapshot);
+        Assert.Equal(new[] { "parent", "after" }, tracker.Folds.Select(fold => fold.Id));
+        Assert.Equal(new TextRange(0, 13), tracker.FindFold("parent")!.Range);
+        Assert.Equal(new TextRange(7, 6), tracker.FindFold("after")!.Range);
+        Assert.Equal(new[] { "after" }, tracker.CollapsedIds);
+
+        // An incomplete provider refresh must not resurrect the deleted fold.
+        tracker.ApplyProviderFolds(newSnapshot, Array.Empty<FoldRange>(), isComplete: false);
+        Assert.Equal("after", Assert.Single(tracker.Folds).Id);
+        Assert.Equal(new[] { "after" }, tracker.CollapsedIds);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Clearing_the_document_removes_all_fold_state(bool collapsed)
+    {
+        var oldSnapshot = new TextSnapshot("before\nfolded\nafter\n");
+        var newSnapshot = new TextSnapshot(string.Empty);
+        var tracker = CreateTracker(oldSnapshot,
+            new FoldRange("parent", new TextRange(0, 20)),
+            new FoldRange("child", new TextRange(7, 7)));
+        tracker.SetCollapsed("parent", collapsed);
+        tracker.SetCollapsed("child", collapsed);
+
+        tracker.ApplyTextChange(oldSnapshot, newSnapshot,
+            new TextChange(new TextRange(0, 20), oldSnapshot.Text, string.Empty));
+
+        Assert.Same(newSnapshot, tracker.Snapshot);
+        Assert.Empty(tracker.Folds);
+        Assert.Empty(tracker.CollapsedIds);
+    }
+
     [Fact]
     public void Text_edits_map_fold_candidates_and_preserve_collapsed_state_until_provider_refresh()
     {

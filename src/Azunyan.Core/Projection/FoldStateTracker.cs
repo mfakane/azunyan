@@ -39,9 +39,15 @@ public sealed class FoldStateTracker
         // Dropping touched folds here makes collapsed content and its gutter flicker per key.
         foreach (var fold in _candidates)
         {
+            var range = TextChangeMapper.MapRange(change, fold.Range);
+            if (range.IsEmpty)
+            {
+                continue;
+            }
+
             var mappedFold = new FoldRange(
                 fold.Id,
-                TextChangeMapper.MapRange(change, fold.Range),
+                range,
                 fold.Placeholder);
             mapped.Add(mappedFold);
             if (_collapsed.ContainsKey(fold.Id))
