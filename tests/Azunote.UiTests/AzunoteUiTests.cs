@@ -1407,6 +1407,27 @@ public sealed class AzunoteUiTests : IDisposable
         range = (RangeValuePattern)bar.GetCurrentPattern(RangeValuePattern.Pattern);
         var first = text.DocumentRange.FindText("aaa", false, false)!;
         var firstX = first.GetBoundingRectangles()[0].X;
+        var editorBounds = editor.Current.BoundingRectangle;
+        Assert.True(SetCursorPos((int)(editorBounds.X + editorBounds.Width / 2),
+            (int)(editorBounds.Y + editorBounds.Height / 2)));
+        SendHorizontalWheel(120);
+        AzunoteUiFixture.WaitFor(
+            () => range.Current.Value > 0
+                && text.DocumentRange.FindText("aaa", false, false)!.GetBoundingRectangles()[0].X < firstX
+                    ? editor : null,
+            "A right wheel tilt did not scroll the text right.");
+        SendHorizontalWheel(-120);
+        AzunoteUiFixture.WaitFor(
+            () => range.Current.Value < 1 ? editor : null,
+            "A left wheel tilt did not scroll back to the start.");
+        SendHorizontalWheel(30000);
+        AzunoteUiFixture.WaitFor(
+            () => range.Current.Value >= range.Current.Maximum - 1 ? editor : null,
+            "Horizontal wheel scrolling did not stop at the right boundary.");
+        SendHorizontalWheel(-30000);
+        AzunoteUiFixture.WaitFor(
+            () => range.Current.Value < 1 ? editor : null,
+            "Horizontal wheel scrolling did not stop at the left boundary.");
         range.SetValue(range.Current.Maximum);
         AzunoteUiFixture.WaitFor(
             () => text.DocumentRange.FindText("aaa", false, false)!.GetBoundingRectangles()[0].X < firstX - 100
@@ -1609,6 +1630,23 @@ public sealed class AzunoteUiTests : IDisposable
         Assert.Equal((uint)inputs.Length, SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<NativeInput>()));
     }
 
+    private static void SendHorizontalWheel(int delta)
+    {
+        NativeInput[] inputs = [new()
+        {
+            Type = 0,
+            Data = new InputUnion
+            {
+                Mouse = new MouseInput { MouseData = unchecked((uint)delta), Flags = 0x1000 }
+            }
+        }];
+        Assert.Equal(1u, SendInput(1, inputs, Marshal.SizeOf<NativeInput>()));
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetCursorPos(int x, int y);
+
     /// <summary>
     /// Presses the keys in order and releases them in reverse order.
     /// </summary>
@@ -1744,6 +1782,20 @@ public sealed class AzunoteUiTests : IDisposable
     {
         [FieldOffset(0)]
         public KeyboardInput Keyboard;
+
+        [FieldOffset(0)]
+        public MouseInput Mouse;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MouseInput
+    {
+        public int X;
+        public int Y;
+        public uint MouseData;
+        public uint Flags;
+        public uint Time;
+        public nuint ExtraInfo;
     }
 
     [StructLayout(LayoutKind.Sequential)]

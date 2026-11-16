@@ -3641,9 +3641,23 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         }
 
         var point = args.GetCurrentPoint(RootGrid);
-        if (point.Properties.IsHorizontalMouseWheel
-            || point.Properties.MouseWheelDelta == 0)
+        if (point.Properties.MouseWheelDelta == 0)
         {
+            return;
+        }
+
+        if (point.Properties.IsHorizontalMouseWheel)
+        {
+            const double WheelCharactersPerNotch = 3;
+            var horizontalDelta = point.Properties.MouseWheelDelta
+                / 120d
+                * _characterWidth
+                * WheelCharactersPerNotch;
+            ProjectedHorizontalScrollBar.Value = Math.Clamp(
+                _projectedHorizontalOffset + horizontalDelta,
+                0,
+                ProjectedHorizontalScrollBar.Maximum);
+            args.Handled = true;
             return;
         }
 
