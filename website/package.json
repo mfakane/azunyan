@@ -14,5 +14,5 @@
 		"sharp": "^0.35.3"
 	},
 	"private": true,
-	"packageManager": "pnpm@12.18.0"
+	"packageManager": "pnpm@12.20.0"
 }

@@ -14,6 +14,6 @@
     <InternalsVisibleTo Include="Azunote.Tests" />
     <ProjectReference Include="..\Azunyan.Core\Azunyan.Core.csproj" />
     <PackageReference Include="Microsoft.Graphics.Win2D" Version="[1.4.0-azunyan.25680382dd21.2]" />
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.6.4" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.6.5" />
   </ItemGroup>
 </Project>
