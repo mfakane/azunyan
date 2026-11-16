@@ -1105,7 +1105,7 @@ internal sealed class MainWindowRuntime : IDisposable
         {
             await _messageDialog.ShowAsync(
                 "About Azunote",
-                "Azunote\nA small WinUI 3 single-document text editor.");
+                $"{ApplicationIdentity.DisplayName}\nVersion {typeof(MainWindowRuntime).Assembly.GetName().Version}\nA small WinUI 3 single-document text editor.");
         }
         catch (Exception exception)
         {
