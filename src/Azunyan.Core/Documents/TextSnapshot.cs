@@ -71,7 +71,28 @@ public sealed class TextSnapshot
 
     public TextRange GetTextElementRange(int position) => UnicodeText.GetTextElementRange(Text, position);
 
-    public bool IsTextElementBoundary(int position) => UnicodeText.IsTextElementBoundary(Text, position);
+    public bool IsTextElementBoundary(int position)
+    {
+        if (position < 0 || position > Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(position));
+        }
+        if (position == 0 || position == Length)
+        {
+            return true;
+        }
+
+        var before = this[position - 1];
+        var after = this[position];
+        // Between two ASCII code units only CRLF can form one grapheme.
+        // Read the tree directly so input-window alignment does not materialize
+        // and segment the entire snapshot for ordinary text.
+        if (before <= '\x7f' && after <= '\x7f')
+        {
+            return before != '\r' || after != '\n';
+        }
+        return UnicodeText.IsTextElementBoundary(Text, position);
+    }
 
     public string GetText(TextRange range) => _tree.GetText(range);
 

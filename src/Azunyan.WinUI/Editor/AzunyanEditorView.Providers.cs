@@ -114,7 +114,7 @@ public sealed partial class AzunyanEditorView
                     selection,
                     frame?.Document,
                     frame?.Viewport);
-                RenderViewport();
+                RefreshPositionProviderPresentation();
             }
             _ = ApplyPositionProviderResultAsync(
                 _providerScheduler.RequestPositionAsync(
@@ -312,7 +312,7 @@ public sealed partial class AzunyanEditorView
                     Document.Selection,
                     currentFrame?.Document,
                     currentFrame?.Viewport,
-                    result));
+                    result), positionOnly: true);
             }
             catch (Exception exception)
             {
@@ -321,7 +321,7 @@ public sealed partial class AzunyanEditorView
         });
     }
 
-    private void PublishProviderFrame(EditorProviderFrame frame)
+    private void PublishProviderFrame(EditorProviderFrame frame, bool positionOnly = false)
     {
         // Provider channels complete independently. A partial result must not
         // erase channels that were already computed for this snapshot (most
@@ -337,11 +337,33 @@ public sealed partial class AzunyanEditorView
         }
 
         _providerFrame = frame;
-        RenderViewport();
+        if (positionOnly)
+        {
+            RefreshPositionProviderPresentation();
+        }
+        else
+        {
+            RenderViewport();
+        }
         ProviderFrameChanged?.Invoke(this, new EditorProviderFrameEventArgs(frame));
         ProviderResultsChanged?.Invoke(
             this,
             new EditorProviderResultsEventArgs(frame.ToLegacyResults()));
+    }
+
+    private void RefreshPositionProviderPresentation()
+    {
+        // The standard text layers do not consume completion/tooltip results.
+        // Custom renderers can consume them and still need the complete frame.
+        if (!IsProjectedTextSurface)
+        {
+            RenderViewport();
+            return;
+        }
+
+        UpdateCompletionPopup();
+        UpdateSignatureHelpPopup();
+        UpdateTooltipPopup();
     }
 
     private void InvalidateProviderGenerations()

@@ -21,6 +21,22 @@ If the executable is in a non-default location, set `AZUNOTE_EXE` to its full pa
 Each test starts its own process and closes it when the test finishes, so document,
 window, and menu state cannot leak into subsequent tests.
 
+The native Unicode input test sends real `SendInput` Unicode packets and checks
+selection replacement, grapheme deletion, undo/redo, immediate Enter followed by
+typing, and saved CRLF bytes. It does not simulate IME composition. A separate
+opt-in test drives the active Japanese IME with romaji keys, converts and commits
+`日本語`, then cancels a second composition and saves. Run it only on a desktop
+with the Japanese IME profile active:
+
+```powershell
+$env:AZUNOTE_JAPANESE_IME_TESTS = "1"
+dotnet test tests/Azunote.UiTests -c Debug --filter FullyQualifiedName~Japanese_ime_converts
+```
+
+`AZUNOTE_UI_TESTS=1` and an isolated native `AZUNOTE_EXE` are also required. The
+IME test verifies this flow for the active profile, not all IMEs or conversion
+settings. It returns its own window to alphanumeric input before closing.
+
 ## Windows Sandbox
 
 Use the repository script to run the tests on a disposable Windows desktop instead
@@ -76,5 +92,5 @@ The remaining accessibility acceptance is manual: focus the editor with Narrator
 read through Japanese, emoji, combining-mark, Arabic, and Hebrew lines, move by character,
 word, and line, select text, and edit through the value/text actions. Confirm that focus,
 selection, text-change, layout, and interactive-child announcements remain coherent.
-Actual IME composition, DPI changes, GPU antialiasing, and theme changes remain manual
+Other IME composition flows, DPI changes, GPU antialiasing, and theme changes remain manual
 acceptance cases because they depend on the active Windows desktop, IME, monitor, and GPU.

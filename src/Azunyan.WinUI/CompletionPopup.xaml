@@ -27,13 +27,17 @@
                     Foreground="Transparent"
                     IsItemClickEnabled="True"
                     SelectionMode="Single">
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock
+                                FontFamily="Consolas"
+                                FontSize="14"
+                                Padding="8,4,8,4"
+                                DataContextChanged="CompletionLabel_DataContextChanged" />
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
                     <ListView.ItemContainerTransitions>
-                        <TransitionCollection x:Name="CompletionRowTransitions">
-                            <AddDeleteThemeTransition />
-                            <ContentThemeTransition />
-                            <ReorderThemeTransition />
-                            <EntranceThemeTransition IsStaggeringEnabled="False" />
-                        </TransitionCollection>
+                        <TransitionCollection />
                     </ListView.ItemContainerTransitions>
                 </ListView>
                 <Border

@@ -11,6 +11,7 @@ internal sealed class DocumentStatusPresenter
     private readonly Func<string> _languageModeDisplayName;
     private readonly Func<IReadOnlyList<string>> _workspacePatterns;
     private (string FilePath, IReadOnlyList<string> Patterns, (string Folder, string Name) Short)? _shortFilePath;
+    private (TextSnapshot Snapshot, int? IndentSize, int TabSize, IndentationInputMode Mode, string DisplayName)? _indentation;
 
     public DocumentStatusPresenter(
         IEditorView editor,
@@ -39,11 +40,7 @@ internal sealed class DocumentStatusPresenter
             $"Ln {lineColumn.Line + 1}, Col {lineColumn.Column + 1}",
             _session.State.Encoding.DisplayName,
             TextFileService.GetLineEndingDisplayName(currentLineEnding),
-            TextEditorCommands.GetDocumentIndentationSettings(
-                snapshot,
-                _editor.IndentSize,
-                _editor.TabDisplaySize,
-                _editor.IndentationInputMode).DisplayName,
+            GetIndentationDisplayName(snapshot),
             _languageModeDisplayName(),
             _session.State.FilePath ?? "Untitled",
             _session.State.FilePath is not null,
@@ -51,6 +48,26 @@ internal sealed class DocumentStatusPresenter
             fileFolder,
             fileName);
         _statusBar.Apply(state);
+    }
+
+    private string GetIndentationDisplayName(TextSnapshot snapshot)
+    {
+        var indentSize = _editor.IndentSize;
+        var tabSize = _editor.TabDisplaySize;
+        var mode = _editor.IndentationInputMode;
+        // Text and selection notifications can refresh the same snapshot.
+        // Caret movement does not change document-wide indentation inference.
+        if (_indentation is not { } cached
+            || !ReferenceEquals(cached.Snapshot, snapshot)
+            || cached.IndentSize != indentSize
+            || cached.TabSize != tabSize
+            || cached.Mode != mode)
+        {
+            cached = (snapshot, indentSize, tabSize, mode,
+                TextEditorCommands.GetDocumentIndentationSettings(snapshot, indentSize, tabSize, mode).DisplayName);
+            _indentation = cached;
+        }
+        return cached.DisplayName;
     }
 
     /// <summary>
