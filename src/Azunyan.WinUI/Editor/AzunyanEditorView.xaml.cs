@@ -4315,7 +4315,9 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         out IReadOnlyList<Rect> rectangles)
     {
         rectangles = Array.Empty<Rect>();
-        if (!IsProjectedTextSurface
+        var xamlRoot = XamlRoot;
+        if (xamlRoot?.Content is not { } root
+            || !IsProjectedTextSurface
             || !_defaultRenderer.TextRenderer.TryGetRangeRectangles(
                 range,
                 out var localRectangles))
@@ -4325,7 +4327,10 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
 
         try
         {
-            var transform = ProjectedSurfaceHost.TransformToVisual(null);
+            // The root's screen origin is in pixels; XAML geometry is in DIPs.
+            var scale = xamlRoot.RasterizationScale;
+            var origin = root.TransformToVisual(null).TransformPoint(new Point());
+            var transform = ProjectedSurfaceHost.TransformToVisual(root);
             rectangles = localRectangles
                 .Select(rect =>
                 {
@@ -4333,10 +4338,10 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
                     var bottomRight = transform.TransformPoint(
                         new Point(rect.X + rect.Width, rect.Y + rect.Height));
                     return new Rect(
-                        topLeft.X,
-                        topLeft.Y,
-                        Math.Max(0, bottomRight.X - topLeft.X),
-                        Math.Max(0, bottomRight.Y - topLeft.Y));
+                        origin.X + topLeft.X * scale,
+                        origin.Y + topLeft.Y * scale,
+                        Math.Max(0, bottomRight.X - topLeft.X) * scale,
+                        Math.Max(0, bottomRight.Y - topLeft.Y) * scale);
                 })
                 .ToArray();
             return true;
@@ -4352,15 +4357,21 @@ public sealed partial class AzunyanEditorView : UserControl, IDisposable
         out TextRange range)
     {
         range = default;
-        if (!IsProjectedTextSurface)
+        var xamlRoot = XamlRoot;
+        if (xamlRoot?.Content is not { } root || !IsProjectedTextSurface)
         {
             return false;
         }
 
         try
         {
-            var transform = ProjectedSurfaceHost.TransformToVisual(null);
-            var localPoint = transform.Inverse.TransformPoint(screenPoint);
+            var scale = xamlRoot.RasterizationScale;
+            var origin = root.TransformToVisual(null).TransformPoint(new Point());
+            var transform = ProjectedSurfaceHost.TransformToVisual(root);
+            var rootPoint = new Point(
+                (screenPoint.X - origin.X) / scale,
+                (screenPoint.Y - origin.Y) / scale);
+            var localPoint = transform.Inverse.TransformPoint(rootPoint);
             if (!_defaultRenderer.TextRenderer.TryHitTest(
                 localPoint.X,
                 localPoint.Y,

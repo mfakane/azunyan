@@ -26,6 +26,22 @@ public sealed class AzunoteUiTests : IDisposable
     }
 
     [AzunoteUiFact]
+    public void Main_window_uses_per_monitor_v2_dpi_awareness()
+    {
+        var context = GetWindowDpiAwarenessContext(_fixture.Window.Current.NativeWindowHandle);
+        Assert.NotEqual(IntPtr.Zero, context);
+        Assert.True(AreDpiAwarenessContextsEqual(context, new IntPtr(-4)),
+            "The app must handle monitor DPI changes instead of relying on Windows bitmap scaling.");
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetWindowDpiAwarenessContext(IntPtr window);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool AreDpiAwarenessContextsEqual(IntPtr first, IntPtr second);
+
+    [AzunoteUiFact]
     public void Completion_scrolls_to_last_candidate_and_reopens_with_current_labels()
     {
         var editor = _fixture.Editor;
