@@ -26,6 +26,160 @@ public sealed class AzunoteUiTests : IDisposable
     }
 
     [AzunoteUiFact]
+    public void Completion_scrolls_to_last_candidate_and_reopens_with_current_labels()
+    {
+        var editor = _fixture.Editor;
+        var value = AzunoteUiFixture.WaitForValuePattern(editor);
+        var original = value.Current.Value;
+        var words = string.Join(" ", Enumerable.Range(0, 120).Select(i => $"benchmarkAlpha{i:D3}"));
+        var source = "ben\r\nbenchmarkBeta benchmarkBeta " + words;
+        try
+        {
+            void WaitCandidate(string label) => AzunoteUiFixture.WaitFor(
+                () => _fixture.Window.FindFirst(TreeScope.Descendants, new AndCondition(
+                    new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.ListItem),
+                    new PropertyCondition(AutomationElement.NameProperty, label))),
+                $"The completion list did not expose candidate {label}.");
+
+            void Open(string document, string label)
+            {
+                value.SetValue(document);
+                AzunoteUiFixture.WaitForDocumentText(
+                    AzunoteUiFixture.WaitForTextPattern(editor), text => text == document);
+                editor.SetFocus();
+                Assert.Equal(_fixture.Window.Current.NativeWindowHandle, GetForegroundWindow());
+                SendKeyChord(0x11, 0x24); // Ctrl+Home
+                SendKeyChord(0x23); // End of prefix line
+                SendKeyChord(0x11, 0x20);
+                WaitCandidate(label);
+            }
+
+            Open(source, "benchmarkBeta");
+            SendKeyChord(0x26); // Up wraps to the last of 100 candidates, beyond the visible rows.
+            WaitCandidate("benchmarkAlpha098");
+            SendKeyChord(0x0D);
+            AzunoteUiFixture.WaitForDocumentText(AzunoteUiFixture.WaitForTextPattern(editor),
+                text => text == source.Replace("ben\r\n", "benchmarkAlpha098\r\n", StringComparison.Ordinal));
+
+            Open(source, "benchmarkBeta");
+            SendUnicodeText("chmarkAlpha11");
+            WaitCandidate("benchmarkAlpha110");
+            SendKeyChord(0x09);
+            AzunoteUiFixture.WaitForDocumentText(AzunoteUiFixture.WaitForTextPattern(editor),
+                text => text == source.Replace("ben\r\n", "benchmarkAlpha110\r\n", StringComparison.Ordinal));
+
+            Open("uni\r\nuniqueSecond uniqueFirst uniqueSecond", "uniqueSecond");
+            SendKeyChord(0x1B);
+            Assert.Equal("uni\r\nuniqueSecond uniqueFirst uniqueSecond", value.Current.Value);
+            SendKeyChord(0x11, 0x20);
+            WaitCandidate("uniqueSecond");
+            SendKeyChord(0x09); // Tab accepts the current result after Escape/reopen.
+            AzunoteUiFixture.WaitForDocumentText(AzunoteUiFixture.WaitForTextPattern(editor),
+                text => text == "uniqueSecond\r\nuniqueSecond uniqueFirst uniqueSecond");
+        }
+        finally
+        {
+            value.SetValue(original);
+        }
+    }
+
+    [AzunoteUiFact]
+    public void Native_unicode_input_replaces_selection_deletes_graphemes_and_saves_crlf()
+    {
+        var root = Directory.CreateTempSubdirectory("azunote-native-input-");
+        var document = Path.Combine(root.FullName, "input.txt");
+        File.WriteAllText(document, "head\r\ntail", new System.Text.UTF8Encoding(false));
+        using var fixture = new AzunoteUiFixture(document);
+        try
+        {
+            var editor = fixture.Editor;
+            var text = AzunoteUiFixture.WaitForTextPattern(editor);
+            AzunoteUiFixture.WaitForDocumentText(text, value => value == "head\r\ntail");
+            text.DocumentRange.FindText("tail", false, false)!.Select();
+            editor.SetFocus();
+            Assert.Equal(fixture.Window.Current.NativeWindowHandle, GetForegroundWindow());
+            SendUnicodeText("日本語😀a\u0301");
+            AzunoteUiFixture.WaitForDocumentText(text, value => value == "head\r\n日本語😀a\u0301");
+
+            SendKeyChord(0x08); // Backspace removes one complete grapheme.
+            AzunoteUiFixture.WaitForDocumentText(text, value => value == "head\r\n日本語😀");
+            SendKeyChord(0x11, 0x5A);
+            AzunoteUiFixture.WaitForDocumentText(text, value => value == "head\r\n日本語😀a\u0301");
+            SendKeyChord(0x11, 0x59);
+            AzunoteUiFixture.WaitForDocumentText(text, value => value == "head\r\n日本語😀");
+
+            // Send an entire chord/packet sequence without waiting for TextChanged.
+            SendKeyChord(0x0D);
+            SendUnicodeText("次の行");
+            const string expected = "head\r\n日本語😀\r\n次の行";
+            AzunoteUiFixture.WaitForDocumentText(text, value => value == expected);
+            SendKeyChord(0x11, 0x53);
+            AzunoteUiFixture.WaitFor(
+                () => File.ReadAllText(document) == expected ? expected : null,
+                "Native input did not save with its CRLF positions intact.");
+            Assert.Equal(new System.Text.UTF8Encoding(false).GetBytes(expected), File.ReadAllBytes(document));
+        }
+        finally
+        {
+            fixture.Dispose();
+            root.Delete(recursive: true);
+        }
+    }
+
+    [JapaneseImeUiFact]
+    public void Japanese_ime_converts_commits_and_cancels_native_composition()
+    {
+        var root = Directory.CreateTempSubdirectory("azunote-ime-input-");
+        var document = Path.Combine(root.FullName, "ime.txt");
+        File.WriteAllText(document, string.Empty);
+        using var fixture = new AzunoteUiFixture(document);
+        var imeWindow = 0;
+        try
+        {
+            var editor = fixture.Editor;
+            imeWindow = fixture.Window.Current.NativeWindowHandle;
+            var text = AzunoteUiFixture.WaitForTextPattern(editor);
+            editor.SetFocus();
+            void Key(params ushort[] keys)
+            {
+                Assert.Equal(fixture.Window.Current.NativeWindowHandle, GetForegroundWindow());
+                SendKeyChord(keys);
+            }
+            Key(0xF2); // VK_DBE_HIRAGANA, requires the Japanese IME profile.
+            foreach (var key in new ushort[] { 0x4E, 0x49, 0x48, 0x4F, 0x4E, 0x47, 0x4F })
+            {
+                Key(key);
+                Thread.Sleep(30);
+            }
+            AzunoteUiFixture.WaitForDocumentText(text, value => value == "にほんご");
+            Key(0x20); // Convert.
+            AzunoteUiFixture.WaitForDocumentText(text, value => value == "日本語");
+            Key(0x0D); // Commit without adding an editor newline.
+            AzunoteUiFixture.WaitForDocumentText(text, value => value == "日本語");
+            foreach (var key in new ushort[] { 0x4B, 0x41, 0x4E, 0x41 })
+            {
+                Key(key);
+                Thread.Sleep(30);
+            }
+            AzunoteUiFixture.WaitForDocumentText(text, value => value == "日本語かな");
+            Key(0x1B); // Cancel the uncommitted composition.
+            AzunoteUiFixture.WaitForDocumentText(text, value => value == "日本語");
+            Key(0x11, 0x53);
+            AzunoteUiFixture.WaitFor(() => File.ReadAllText(document) == "日本語" ? "saved" : null,
+                "Committed IME text did not save after cancellation.");
+        }
+        finally
+        {
+            if (imeWindow != 0 && GetForegroundWindow() == imeWindow)
+            {
+                SendKeyChord(0xF0); // Return this test window to alphanumeric input.
+            }
+            fixture.Dispose();
+            root.Delete(recursive: true);
+        }
+    }
+
+    [AzunoteUiFact]
     public void Run_external_tool_dialog_opens_with_default_input_and_can_be_canceled()
     {
         var window = _fixture.Window;
@@ -1442,6 +1596,19 @@ public sealed class AzunoteUiTests : IDisposable
 
     private static void SendEnterKey() => SendKeyChord(0x0D);
 
+    private static void SendUnicodeText(string text)
+    {
+        var inputs = text.SelectMany(character => new[] { false, true }.Select(up => new NativeInput
+        {
+            Type = 1,
+            Data = new InputUnion
+            {
+                Keyboard = new KeyboardInput { ScanCode = character, Flags = up ? 6u : 4u }
+            }
+        })).ToArray();
+        Assert.Equal((uint)inputs.Length, SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<NativeInput>()));
+    }
+
     /// <summary>
     /// Presses the keys in order and releases them in reverse order.
     /// </summary>
@@ -2150,6 +2317,19 @@ internal sealed class AzunoteUiFactAttribute : FactAttribute
         if (!AzunoteUiTestEnvironment.IsEnabled)
         {
             Skip = "Set AZUNOTE_UI_TESTS=1 on an unlocked Windows desktop to run this test.";
+        }
+    }
+}
+
+[AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
+internal sealed class JapaneseImeUiFactAttribute : FactAttribute
+{
+    public JapaneseImeUiFactAttribute()
+    {
+        if (!AzunoteUiTestEnvironment.IsEnabled
+            || Environment.GetEnvironmentVariable("AZUNOTE_JAPANESE_IME_TESTS") != "1")
+        {
+            Skip = "Set AZUNOTE_UI_TESTS=1 and AZUNOTE_JAPANESE_IME_TESTS=1 with the Japanese IME profile active.";
         }
     }
 }

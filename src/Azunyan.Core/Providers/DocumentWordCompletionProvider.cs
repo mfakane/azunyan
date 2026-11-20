@@ -8,6 +8,7 @@ namespace Azunyan.Core;
 public sealed class DocumentWordCompletionProvider : ICompletionProvider
 {
     private const int MaximumCandidateCount = 100;
+    private WordIndex? _wordIndex;
 
     public ValueTask<CompletionResult?> GetCompletionsAsync(
         EditorProviderContext context,
@@ -24,7 +25,17 @@ public sealed class DocumentWordCompletionProvider : ICompletionProvider
             return ValueTask.FromResult<CompletionResult?>(null);
         }
 
-        var words = CollectWords(text, cancellationToken);
+        // Caret movement and explicit reopen requests share the immutable text.
+        // Keep only one index so undo history cannot retain an index per edit.
+        var index = Volatile.Read(ref _wordIndex);
+        if (index is null || !ReferenceEquals(index.Snapshot, context.Snapshot))
+        {
+            index = new WordIndex(context.Snapshot, CollectWords(text, cancellationToken));
+            cancellationToken.ThrowIfCancellationRequested();
+            Volatile.Write(ref _wordIndex, index);
+        }
+
+        var words = index.Words;
         var candidates = words
             .Where(word => word.Value.Text.Length > prefix.Length
                 && word.Value.Text.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
@@ -109,4 +120,6 @@ public sealed class DocumentWordCompletionProvider : ICompletionProvider
     }
 
     private sealed record WordInfo(string Text, int Count, int FirstPosition);
+
+    private sealed record WordIndex(TextSnapshot Snapshot, Dictionary<string, WordInfo> Words);
 }

@@ -70,6 +70,18 @@ public static class UnicodeText
         ArgumentNullException.ThrowIfNull(text);
         ValidatePosition(text, position, allowEnd: false);
 
+        // A single ASCII unit with ASCII (or document-edge) neighbors has
+        // boundaries on both sides, except at CRLF. Unicode neighbors must use
+        // the full segmenter: a combining mark or Prepend can join the ASCII.
+        if (text[position] <= '\x7f'
+            && (position == 0 || text[position - 1] <= '\x7f'
+                && (text[position - 1] != '\r' || text[position] != '\n'))
+            && (position + 1 == text.Length || text[position + 1] <= '\x7f'
+                && (text[position] != '\r' || text[position + 1] != '\n')))
+        {
+            return new TextRange(position, 1);
+        }
+
         var starts = StringInfo.ParseCombiningCharacters(text);
         var element = FindElementAt(starts, position);
         var end = element + 1 < starts.Length ? starts[element + 1] : text.Length;

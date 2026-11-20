@@ -22,6 +22,7 @@ public sealed partial class AzunyanTextInputWindow : UserControl
     private int _windowStart;
     private long _generation;
     private string? _preferredLineEnding;
+    private long? _pendingTextChangeGeneration;
 
     public AzunyanTextInputWindow()
     {
@@ -33,7 +34,7 @@ public sealed partial class AzunyanTextInputWindow : UserControl
             "Native text input window for the projected document editor");
         NativeTextBox.IsSpellCheckEnabled = false;
         NativeTextBox.IsTextPredictionEnabled = false;
-        NativeTextBox.BeforeTextChanging += OnBeforeTextChanging;
+        NativeTextBox.TextChanging += OnTextChanging;
         NativeTextBox.TextChanged += OnTextChanged;
         NativeTextBox.SelectionChanged += OnSelectionChanged;
         NativeTextBox.TextCompositionStarted += OnTextCompositionStarted;
@@ -107,6 +108,7 @@ public sealed partial class AzunyanTextInputWindow : UserControl
         {
             _windowStart = windowStart;
             _generation = generation;
+            _pendingTextChangeGeneration = null;
             _synchronizedText = text;
             _synchronizedNativeText = nativeText;
             _compositionRange = compositionRange;
@@ -185,16 +187,40 @@ public sealed partial class AzunyanTextInputWindow : UserControl
         }
     }
 
-    private void OnBeforeTextChanging(
+    private void OnTextChanging(
         TextBox sender,
-        TextBoxBeforeTextChangingEventArgs args)
+        TextBoxTextChangingEventArgs args)
     {
-        // This event is intentionally observed at the native boundary. The
-        // replacement is calculated in TextChanged, after Text is committed,
-        // so IME and paste operations follow the same path.
+        if (_synchronizing || _pendingTextChangeGeneration == _generation)
+        {
+            return;
+        }
+
+        // TextChanging is synchronous and must not modify the visual tree.
+        // Flush after the native callback returns, without waiting for the
+        // platform's asynchronous TextChanged event and its next layout pass.
+        var generation = _generation;
+        _pendingTextChangeGeneration = generation;
+        if (!DispatcherQueue.TryEnqueueReporting(() =>
+            {
+                if (_pendingTextChangeGeneration != generation)
+                {
+                    return;
+                }
+                _pendingTextChangeGeneration = null;
+                if (_generation == generation)
+                {
+                    ProcessNativeTextChange();
+                }
+            }))
+        {
+            _pendingTextChangeGeneration = null;
+        }
     }
 
-    private void OnTextChanged(object sender, TextChangedEventArgs args)
+    private void OnTextChanged(object sender, TextChangedEventArgs args) => ProcessNativeTextChange();
+
+    private void ProcessNativeTextChange()
     {
         if (_synchronizing)
         {

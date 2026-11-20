@@ -7,6 +7,43 @@ namespace Azunote.Tests.Shell;
 public sealed class DocumentStatusPresenterTests
 {
     [Fact]
+    public void Refresh_updates_position_and_invalidates_indentation_for_text_and_settings()
+    {
+        var editor = new FakeEditorView("root\n  child");
+        var status = new FakeStatusBarView();
+        var presenter = new DocumentStatusPresenter(editor, new DocumentSession(), status, new FakeWindowChromeView());
+        presenter.Refresh();
+        Assert.Equal("Spaces: 2", status.State?.Indentation);
+
+        editor.SetSelection(TextSelection.Caret(7));
+        presenter.Refresh();
+        Assert.Equal("Ln 2, Col 3", status.State?.Position);
+        Assert.Equal("Spaces: 2", status.State?.Indentation);
+
+        editor.Replace(new TextRange(5, 2), "    ");
+        presenter.Refresh();
+        Assert.Equal("Spaces: 4", status.State?.Indentation);
+
+        editor.SetIndentSize(8);
+        presenter.Refresh();
+        Assert.Equal("Spaces: 8", status.State?.Indentation);
+
+        editor.SetIndentationInputMode(IndentationInputMode.Tab);
+        presenter.Refresh();
+        Assert.Equal("Tab Size: 4", status.State?.Indentation);
+        editor.SetTabDisplaySize(6);
+        presenter.Refresh();
+        Assert.Equal("Tab Size: 6", status.State?.Indentation);
+
+        editor.SetIndentationInputMode(IndentationInputMode.Spaces);
+        presenter.Refresh();
+        Assert.Equal("Spaces: 8", status.State?.Indentation);
+        editor.SetIndentSize(null);
+        presenter.Refresh();
+        Assert.Equal("Spaces: 4", status.State?.Indentation);
+    }
+
+    [Fact]
     public void Read_only_document_title_contains_the_readonly_marker()
     {
         var session = new DocumentSession();

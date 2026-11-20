@@ -43,12 +43,15 @@ public sealed partial class CompletionPopup : UserControl
     private string _word = string.Empty;
     private AzunyanColorScheme _colorScheme = AzunyanColorScheme.Default;
     private bool _updatingItems;
+    private readonly SolidColorBrush _labelForeground = new();
+    private readonly SolidColorBrush _highlightForeground = new();
 
     public CompletionPopup()
     {
         InitializeComponent();
         CompletionList.ItemClick += CompletionList_ItemClick;
         CompletionList.SelectionChanged += CompletionList_SelectionChanged;
+        CompletionList.ContainerContentChanging += CompletionList_ContainerContentChanging;
         CompletionList.AddHandler(
             UIElement.KeyDownEvent,
             new KeyEventHandler(CompletionList_KeyDown),
@@ -98,38 +101,19 @@ public sealed partial class CompletionPopup : UserControl
 
         PopupHost.XamlRoot = xamlRoot;
 
-        if (!ReferenceEquals(_result, result) || _word != word)
+        var updateItems = !ReferenceEquals(_result, result) || _word != word;
+        if (updateItems)
         {
             _updatingItems = true;
             try
             {
-                // The rows animate in when the popup opens, but not when
-                // typing narrows them, which would make them flicker.
-                CompletionList.ItemContainerTransitions = PopupHost.IsOpen
-                    ? []
-                    : CompletionRowTransitions;
-                CompletionList.Items.Clear();
-                var highlightForeground = new SolidColorBrush(_colorScheme.PopupHighlightForeground);
-                foreach (var item in result.Items)
-                {
-                    var label = new TextBlock
-                    {
-                        FontFamily = new FontFamily("Consolas"),
-                        FontSize = 14,
-                        Foreground = new SolidColorBrush(_colorScheme.PopupForeground),
-                        Padding = new Thickness(8, 4, 8, 4)
-                    };
-                    AppendHighlightedLabel(
-                        label.Inlines,
-                        highlightForeground,
-                        item.Label,
-                        FuzzyMatch.MatchCompletion(word, item.Label)?.Positions ?? []);
-                    CompletionList.Items.Add(label);
-                }
-
                 _items = result.Items;
                 _result = result;
                 _word = word;
+                // Give the virtualizing panel data, so only realized rows build
+                // TextBlocks and highlighted runs, even for a large result set.
+                CompletionList.ItemsSource = null;
+                CompletionList.ItemsSource = result.Items;
                 CompletionList.SelectedIndex = result.Items.Count > 0 ? 0 : -1;
             }
             finally
@@ -146,12 +130,16 @@ public sealed partial class CompletionPopup : UserControl
         PopupHost.HorizontalOffset = horizontalOffset;
         PopupHost.VerticalOffset = verticalOffset;
         PopupHost.IsOpen = result.Items.Count > 0;
+        if (updateItems && CompletionList.SelectedItem is { } selectedItem)
+        {
+            CompletionList.ScrollIntoView(selectedItem);
+        }
     }
 
     public void Hide()
     {
         PopupHost.IsOpen = false;
-        CompletionList.Items.Clear();
+        CompletionList.ItemsSource = null;
         CompletionList.SelectedIndex = -1;
         _items = null;
         _result = null;
@@ -250,6 +238,32 @@ public sealed partial class CompletionPopup : UserControl
         }
     }
 
+    private void CompletionLabel_DataContextChanged(
+        FrameworkElement sender,
+        DataContextChangedEventArgs args)
+    {
+        var label = (TextBlock)sender;
+        label.Foreground = _labelForeground;
+        label.Inlines.Clear();
+        if (args.NewValue is CompletionItem item)
+        {
+            AppendHighlightedLabel(
+                label.Inlines,
+                _highlightForeground,
+                item.Label,
+                FuzzyMatch.MatchCompletion(_word, item.Label)?.Positions ?? []);
+        }
+    }
+
+    private static void CompletionList_ContainerContentChanging(
+        ListViewBase sender,
+        ContainerContentChangingEventArgs args)
+    {
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(
+            args.ItemContainer,
+            !args.InRecycleQueue && args.Item is CompletionItem item ? item.Label : string.Empty);
+    }
+
     private void CompletionList_ItemClick(object sender, ItemClickEventArgs args)
     {
         for (var index = 0; index < CompletionList.Items.Count; index++)
@@ -314,6 +328,8 @@ public sealed partial class CompletionPopup : UserControl
 
     private void ApplyColorScheme()
     {
+        _labelForeground.Color = _colorScheme.PopupForeground;
+        _highlightForeground.Color = _colorScheme.PopupHighlightForeground;
         PopupBorder.Background = new SolidColorBrush(_colorScheme.PopupBackground);
         PopupBorder.BorderBrush = new SolidColorBrush(_colorScheme.PopupBorder);
         CompletionList.Foreground = new SolidColorBrush(_colorScheme.PopupForeground);
