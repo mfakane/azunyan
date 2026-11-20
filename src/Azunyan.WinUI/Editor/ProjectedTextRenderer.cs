@@ -22,12 +22,16 @@ namespace Azunyan.WinUI;
 /// rows may be unwrapped lines or continuation segments produced by the
 /// framework-independent layout layer.
 /// </summary>
-internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
+internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer, IDisposable
 {
     private const double FoldChevronWidth = 20;
     private const double FoldChevronFontSize = 14;
     private readonly CanvasControl _gutterSurface;
     private readonly CanvasControl _textSurface;
+    private readonly CanvasSwapChainPanel _directSurface;
+    private CanvasSwapChain? _swapChain;
+    private float _swapChainWidth;
+    private float _swapChainHeight;
     private readonly Dictionary<ProjectedLine, UnwrappedLineLayout> _lineLayouts = new();
     private readonly Dictionary<VisualRow, GutterLayoutEntry> _gutterLayouts = new();
     private readonly Dictionary<TextLayoutRowKey, TextLayoutEntry> _textLayouts = new();
@@ -48,6 +52,11 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
     {
         _gutterSurface = gutterSurface ?? throw new ArgumentNullException(nameof(gutterSurface));
         _textSurface = textSurface ?? throw new ArgumentNullException(nameof(textSurface));
+        // CanvasControl still owns device recreation and draws underneath.
+        // The swap chain can submit text before XAML's next Rendering callback.
+        _directSurface = new CanvasSwapChainPanel { IsHitTestVisible = false };
+        Canvas.SetZIndex(_directSurface, Canvas.GetZIndex(_textSurface));
+        _textSurface.Loaded += OnDirectSurfaceLoaded;
         _gutterSurface.CreateResources += OnCreateResources;
         _gutterSurface.Draw += OnGutterDraw;
         _textSurface.CreateResources += OnCreateResources;
@@ -79,6 +88,10 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         }
 
         _disposed = true;
+        _textSurface.Loaded -= OnDirectSurfaceLoaded;
+        _directSurface.SwapChain = null;
+        _swapChain?.Dispose();
+        if (_directSurface.Parent is Panel directParent) directParent.Children.Remove(_directSurface);
         _gutterSurface.CreateResources -= OnCreateResources;
         _gutterSurface.Draw -= OnGutterDraw;
         _textSurface.CreateResources -= OnCreateResources;
@@ -1372,6 +1385,53 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             _gutterSurface.Invalidate();
         }
         _textSurface.Invalidate();
+        PresentDirectFrame(context);
+    }
+
+    private void PresentDirectFrame(AzunyanEditorRenderContext context)
+    {
+        if (!_textSurface.ReadyToDraw || _renderFrame is not { } frame) return;
+        var width = Math.Max(1, (float)context.ViewportWidth);
+        var height = Math.Max(1, (float)context.ViewportHeight);
+        var device = _textSurface.Device;
+        try
+        {
+            if (_swapChain is null)
+            {
+                _swapChain = new CanvasSwapChain(_textSurface, width, height);
+                _directSurface.SwapChain = _swapChain;
+            }
+            else if (_swapChainWidth != width || _swapChainHeight != height || _swapChain.Dpi != _textSurface.Dpi)
+            {
+                _swapChain.ResizeBuffers(width, height, _textSurface.Dpi);
+            }
+            // Compare requested DIPs, not the pixel-rounded buffer size, to
+            // avoid resizing every frame at fractional DPI.
+            _swapChainWidth = width;
+            _swapChainHeight = height;
+            using (var session = _swapChain.CreateDrawingSession(context.ColorScheme.EditorBackground))
+            {
+                DrawFrame(session, frame);
+            }
+            // Submit without requesting a refresh wait on the input thread.
+            _swapChain.Present(0);
+        }
+        catch (Exception exception) when (device.IsDeviceLost(exception.HResult))
+        {
+            device.RaiseDeviceLost();
+        }
+    }
+
+    private void OnDirectSurfaceLoaded(object sender, RoutedEventArgs args)
+    {
+        if (_directSurface.Parent is null && _textSurface.Parent is Panel parent)
+        {
+            parent.Children.Insert(parent.Children.IndexOf(_textSurface) + 1, _directSurface);
+            _textSurface.DispatcherQueue.TryEnqueueReporting(() =>
+            {
+                if (!_disposed) LayoutInvalidated?.Invoke(this, EventArgs.Empty);
+            });
+        }
     }
 
     private static bool GutterMatches(
@@ -1529,6 +1589,9 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
             return;
         }
 
+        _directSurface.SwapChain = null;
+        _swapChain?.Dispose();
+        _swapChain = null;
         ClearTextLayouts();
         _textLayoutCacheKey = null;
         _lineWidths.Clear();
@@ -1758,21 +1821,7 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         var hits = _textLayoutHits;
         args.DrawingSession.Clear(frame.Context.ColorScheme.EditorBackground);
 
-        for (var index = 0; index < frame.Layouts.Count; index++)
-        {
-            var rowLayout = frame.Layouts[index];
-            var top = frame.Context.ContentTop
-                + rowLayout.Top
-                - frame.Context.VerticalOffset;
-            if (rowLayout.TextLayout is { } layout)
-            {
-                DrawTextRow(args.DrawingSession, frame.Context, layout, top, rowLayout.Row);
-            }
-            else if (rowLayout.Row.BlockAdornment is { } block)
-            {
-                DrawBlock(args.DrawingSession, frame.Context, block, rowLayout.Height, top);
-            }
-        }
+        DrawFrame(args.DrawingSession, frame);
 
         if (frame.Context.DiagnosticSink is { } diagnosticSink)
         {
@@ -1789,6 +1838,15 @@ internal sealed class ProjectedTextRenderer : ICanvasEditorRenderer
         }
     }
 
+    private void DrawFrame(CanvasDrawingSession session, ProjectedTextRenderFrame frame)
+    {
+        foreach (var row in frame.Layouts)
+        {
+            var top = frame.Context.ContentTop + row.Top - frame.Context.VerticalOffset;
+            if (row.TextLayout is { } layout) DrawTextRow(session, frame.Context, layout, top, row.Row);
+            else if (row.Row.BlockAdornment is { } block) DrawBlock(session, frame.Context, block, row.Height, top);
+        }
+    }
     private ProjectedTextLayoutState GetLayoutState(
         AzunyanEditorRenderContext context,
         int wrapColumns,
