@@ -38,18 +38,30 @@ public sealed class DocumentSessionTests
         Assert.False(session.State.IsDirty);
     }
 
-    [Fact]
-    public void Comparing_large_CRLF_document_does_not_allocate_normalized_copies()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Comparing_large_CRLF_document_does_not_allocate_normalized_copies(bool matches)
     {
+        const int comparisons = 32;
         var saved = string.Concat(Enumerable.Repeat("line\r\n", 100_000));
+        var current = matches ? saved : saved[..^3] + "X\r\n";
         var session = new DocumentSession();
         session.MarkSaved("large.txt", saved, TextEncoding.Utf8, LineEndingKind.CrLf);
-        session.IsSameAsSaved(saved); // warm up diagnostics
+        for (var index = 0; index < 16; index++) session.IsSameAsSaved(current);
+
+        var matched = 0;
         var before = GC.GetAllocatedBytesForCurrentThread();
-        var same = session.IsSameAsSaved(saved);
+        for (var index = 0; index < comparisons; index++)
+        {
+            if (session.IsSameAsSaved(current)) matched++;
+        }
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
-        Assert.True(same);
-        Assert.True(allocated < 1024, $"Allocated {allocated} bytes comparing saved text");
+        Assert.Equal(matches ? comparisons : 0, matched);
+        // Amortize one-time runtime/diagnostic bookkeeping without accepting
+        // a document-sized normalized copy on each comparison.
+        Assert.True(allocated < comparisons * 1024,
+            $"Allocated {allocated} bytes across {comparisons} saved-text comparisons");
     }
 
     [Fact]
