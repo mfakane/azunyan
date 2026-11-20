@@ -11,3 +11,6 @@ using Windows.Foundation;
     typeof(TypedEventHandler<TextBox, TextCompositionChangedEventArgs>))]
 [assembly: WinRT.GeneratedWinRTExposedExternalType(
     typeof(TypedEventHandler<TextBox, TextCompositionEndedEventArgs>))]
+
+// Completion data crosses ItemsSource as a known WinRT-compatible vector.
+[assembly: WinRT.GeneratedWinRTExposedExternalType(typeof(object[]))]
