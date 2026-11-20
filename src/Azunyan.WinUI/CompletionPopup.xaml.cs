@@ -113,7 +113,9 @@ public sealed partial class CompletionPopup : UserControl
                 // Give the virtualizing panel data, so only realized rows build
                 // TextBlocks and highlighted runs, even for a large result set.
                 CompletionList.ItemsSource = null;
-                CompletionList.ItemsSource = result.Items;
+                var source = new object[result.Items.Count];
+                for (var index = 0; index < source.Length; index++) source[index] = result.Items[index];
+                CompletionList.ItemsSource = source;
                 CompletionList.SelectedIndex = result.Items.Count > 0 ? 0 : -1;
             }
             finally
