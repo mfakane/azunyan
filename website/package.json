@@ -9,10 +9,10 @@
 		"astro": "astro"
 	},
 	"dependencies": {
-		"@astrojs/starlight": "^0.42.7",
+		"@astrojs/starlight": "^0.43.0",
 		"astro": "^7.2.10",
 		"sharp": "^0.35.3"
 	},
 	"private": true,
-	"packageManager": "pnpm@12.20.0"
+	"packageManager": "pnpm@12.21.0"
 }
