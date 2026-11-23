@@ -573,13 +573,13 @@ public sealed class AzunoteUiTests : IDisposable
     public void Line_shortcuts_move_duplicate_and_delete_the_caret_line()
     {
         const ushort Shift = 0x10, Control = 0x11, Alt = 0x12, Up = 0x26, Down = 0x28, K = 0x4B;
-        var editor = _fixture.Editor;
-        var editorValue = AzunoteUiFixture.WaitForValuePattern(editor);
-        var original = editorValue.Current.Value;
-
+        var root = Directory.CreateTempSubdirectory("azunote-line-shortcuts-");
         try
         {
-            editorValue.SetValue("first\nsecond\nthird");
+            var document = Path.Combine(root.FullName, "lines.txt");
+            File.WriteAllText(document, "first\nsecond\nthird");
+            using var fixture = new AzunoteUiFixture(document);
+            var editor = fixture.Editor;
             var textPattern = AzunoteUiFixture.WaitForTextPattern(editor);
             AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "first\nsecond\nthird");
             textPattern.DocumentRange.FindText("first", false, false)!.Select();
@@ -594,13 +594,13 @@ public sealed class AzunoteUiTests : IDisposable
             SendKeyChord(Control, Shift, K);
             AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "second\nfirst\nthird");
 
-            AzunoteUiFixture.OpenMenu(_fixture.Window, "Edit");
-            InvokeSubmenuItem(_fixture.Window, "Line", "Move Line Up");
+            AzunoteUiFixture.OpenMenu(fixture.Window, "Edit");
+            InvokeSubmenuItem(fixture.Window, "Line", "Move Line Up");
             AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "first\nsecond\nthird");
         }
         finally
         {
-            AzunoteUiFixture.WaitForValuePattern(editor).SetValue(original);
+            root.Delete(recursive: true);
         }
     }
 
@@ -1173,12 +1173,8 @@ public sealed class AzunoteUiTests : IDisposable
             AzunoteUiFixture.WaitFor(
                 () => FindMenuItem(window, "Save with Encoding") is null ? window : null,
                 "The File menu did not close after Save with Encoding.");
-            // Enter chooses it as a user would, so the menu hands the focus
-            // back as it closes.
             AzunoteUiFixture.OpenMenu(window, "File");
-            WaitForSubmenuItem(window, "Save with Encoding", "Other...").SetFocus();
-            SendEnterKey();
-            Thread.Sleep(500);
+            InvokeSubmenuItem(window, "Save with Encoding", "Other...");
             SetCommandPaletteText(WaitForCommandPalette(window, text => text.Length == 0), "shift_jis");
             AzunoteUiFixture.WaitForElement(window, AutomationElement.NameProperty, "Japanese (Shift-JIS)");
             SendEnterKey();
@@ -1385,7 +1381,28 @@ public sealed class AzunoteUiTests : IDisposable
         void SetWrapping(bool enabled)
         {
             AzunoteUiFixture.OpenMenu(window, "View");
-            var item = AzunoteUiFixture.WaitForElement(window, AutomationElement.NameProperty, "Word Wrap");
+            var item = AzunoteUiFixture.WaitFor(
+                () =>
+                {
+                    try
+                    {
+                        var candidate = window.FindFirst(
+                            TreeScope.Descendants,
+                            new PropertyCondition(AutomationElement.NameProperty, "Word Wrap"));
+                        if (candidate is not null && !candidate.Current.IsOffscreen)
+                        {
+                            return candidate;
+                        }
+                    }
+                    catch (ElementNotAvailableException)
+                    {
+                        // A closing flyout can replace its UIA elements.
+                    }
+
+                    AzunoteUiFixture.OpenMenu(window, "View");
+                    return null;
+                },
+                "View > Word Wrap did not become visible.");
             var toggle = (TogglePattern)item.GetCurrentPattern(TogglePattern.Pattern);
             if ((toggle.Current.ToggleState == ToggleState.On) != enabled)
             {
@@ -1395,6 +1412,21 @@ public sealed class AzunoteUiTests : IDisposable
             {
                 AzunoteUiFixture.CloseMenu(window, "View");
             }
+
+            // A subsequent OpenMenu must not race the closing flyout.
+            AzunoteUiFixture.WaitFor(
+                () =>
+                {
+                    try
+                    {
+                        return item.Current.IsOffscreen ? window : null;
+                    }
+                    catch (ElementNotAvailableException)
+                    {
+                        return window;
+                    }
+                },
+                "View > Word Wrap did not close.");
         }
 
         AutomationElement WaitForBar() => AzunoteUiFixture.WaitFor(
@@ -2090,9 +2122,64 @@ public sealed class AzunoteUiFixture : IDisposable
         _process = Process.Start(startInfo)
             ?? throw new XunitException($"Could not start Azunote: {executablePath}");
 
-        _window = WaitFor(
-            FindWindow,
-            "Azunote did not expose a top-level UI Automation window.");
+        try
+        {
+            _window = WaitFor(
+                FindWindow,
+                "Azunote did not expose a top-level UI Automation window.");
+        }
+        catch (XunitException exception)
+        {
+            throw new XunitException($"{exception.Message}{Environment.NewLine}{DescribeWindowDiscovery()}");
+        }
+    }
+
+    private string DescribeWindowDiscovery()
+    {
+        if (_process is null)
+        {
+            return "No process was started.";
+        }
+
+        _process.Refresh();
+        var exited = _process.HasExited;
+        var details = $"Started PID={_process.Id}, exited={exited}, " +
+            $"exitCode={(exited ? _process.ExitCode.ToString() : "running")}, " +
+            $"mainHWND=0x{_process.MainWindowHandle.ToInt64():X}, " +
+            $"executable={ResolveExecutablePath()}, document={_verificationDocument ?? ResolveVerificationDocument()}";
+
+        try
+        {
+            var windows = AutomationElement.RootElement.FindAll(
+                TreeScope.Children, Condition.TrueCondition);
+            var matches = new List<string>();
+            foreach (AutomationElement window in windows)
+            {
+                try
+                {
+                    var name = window.Current.Name;
+                    if (name.Contains("Azunote", StringComparison.OrdinalIgnoreCase)
+                        || window.Current.ProcessId == _process.Id)
+                    {
+                        matches.Add($"PID={window.Current.ProcessId}, " +
+                            $"HWND=0x{window.Current.NativeWindowHandle:X}, " +
+                            $"name={name}, editorFound={FindEditor(window) is not null}");
+                    }
+                }
+                catch (ElementNotAvailableException)
+                {
+                    // A window disappeared while collecting diagnostics.
+                }
+            }
+
+            return details + Environment.NewLine + "Desktop candidates: " +
+                (matches.Count == 0 ? "(none)" : string.Join("; ", matches));
+        }
+        catch (Exception exception)
+        {
+            return details + Environment.NewLine +
+                $"Could not enumerate desktop UIA windows: {exception.GetType().Name}: {exception.Message}";
+        }
     }
 
     private AutomationElement? FindWindow()
