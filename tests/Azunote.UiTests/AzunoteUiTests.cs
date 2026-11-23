@@ -1385,7 +1385,28 @@ public sealed class AzunoteUiTests : IDisposable
         void SetWrapping(bool enabled)
         {
             AzunoteUiFixture.OpenMenu(window, "View");
-            var item = AzunoteUiFixture.WaitForElement(window, AutomationElement.NameProperty, "Word Wrap");
+            var item = AzunoteUiFixture.WaitFor(
+                () =>
+                {
+                    try
+                    {
+                        var candidate = window.FindFirst(
+                            TreeScope.Descendants,
+                            new PropertyCondition(AutomationElement.NameProperty, "Word Wrap"));
+                        if (candidate is not null && !candidate.Current.IsOffscreen)
+                        {
+                            return candidate;
+                        }
+                    }
+                    catch (ElementNotAvailableException)
+                    {
+                        // A closing flyout can replace its UIA elements.
+                    }
+
+                    AzunoteUiFixture.OpenMenu(window, "View");
+                    return null;
+                },
+                "View > Word Wrap did not become visible.");
             var toggle = (TogglePattern)item.GetCurrentPattern(TogglePattern.Pattern);
             if ((toggle.Current.ToggleState == ToggleState.On) != enabled)
             {
@@ -1395,6 +1416,21 @@ public sealed class AzunoteUiTests : IDisposable
             {
                 AzunoteUiFixture.CloseMenu(window, "View");
             }
+
+            // A subsequent OpenMenu must not race the closing flyout.
+            AzunoteUiFixture.WaitFor(
+                () =>
+                {
+                    try
+                    {
+                        return item.Current.IsOffscreen ? window : null;
+                    }
+                    catch (ElementNotAvailableException)
+                    {
+                        return window;
+                    }
+                },
+                "View > Word Wrap did not close.");
         }
 
         AutomationElement WaitForBar() => AzunoteUiFixture.WaitFor(
@@ -2090,9 +2126,64 @@ public sealed class AzunoteUiFixture : IDisposable
         _process = Process.Start(startInfo)
             ?? throw new XunitException($"Could not start Azunote: {executablePath}");
 
-        _window = WaitFor(
-            FindWindow,
-            "Azunote did not expose a top-level UI Automation window.");
+        try
+        {
+            _window = WaitFor(
+                FindWindow,
+                "Azunote did not expose a top-level UI Automation window.");
+        }
+        catch (XunitException exception)
+        {
+            throw new XunitException($"{exception.Message}{Environment.NewLine}{DescribeWindowDiscovery()}");
+        }
+    }
+
+    private string DescribeWindowDiscovery()
+    {
+        if (_process is null)
+        {
+            return "No process was started.";
+        }
+
+        _process.Refresh();
+        var exited = _process.HasExited;
+        var details = $"Started PID={_process.Id}, exited={exited}, " +
+            $"exitCode={(exited ? _process.ExitCode.ToString() : "running")}, " +
+            $"mainHWND=0x{_process.MainWindowHandle.ToInt64():X}, " +
+            $"executable={ResolveExecutablePath()}, document={_verificationDocument ?? ResolveVerificationDocument()}";
+
+        try
+        {
+            var windows = AutomationElement.RootElement.FindAll(
+                TreeScope.Children, Condition.TrueCondition);
+            var matches = new List<string>();
+            foreach (AutomationElement window in windows)
+            {
+                try
+                {
+                    var name = window.Current.Name;
+                    if (name.Contains("Azunote", StringComparison.OrdinalIgnoreCase)
+                        || window.Current.ProcessId == _process.Id)
+                    {
+                        matches.Add($"PID={window.Current.ProcessId}, " +
+                            $"HWND=0x{window.Current.NativeWindowHandle:X}, " +
+                            $"name={name}, editorFound={FindEditor(window) is not null}");
+                    }
+                }
+                catch (ElementNotAvailableException)
+                {
+                    // A window disappeared while collecting diagnostics.
+                }
+            }
+
+            return details + Environment.NewLine + "Desktop candidates: " +
+                (matches.Count == 0 ? "(none)" : string.Join("; ", matches));
+        }
+        catch (Exception exception)
+        {
+            return details + Environment.NewLine +
+                $"Could not enumerate desktop UIA windows: {exception.GetType().Name}: {exception.Message}";
+        }
     }
 
     private AutomationElement? FindWindow()
