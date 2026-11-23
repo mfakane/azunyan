@@ -573,13 +573,13 @@ public sealed class AzunoteUiTests : IDisposable
     public void Line_shortcuts_move_duplicate_and_delete_the_caret_line()
     {
         const ushort Shift = 0x10, Control = 0x11, Alt = 0x12, Up = 0x26, Down = 0x28, K = 0x4B;
-        var editor = _fixture.Editor;
-        var editorValue = AzunoteUiFixture.WaitForValuePattern(editor);
-        var original = editorValue.Current.Value;
-
+        var root = Directory.CreateTempSubdirectory("azunote-line-shortcuts-");
         try
         {
-            editorValue.SetValue("first\nsecond\nthird");
+            var document = Path.Combine(root.FullName, "lines.txt");
+            File.WriteAllText(document, "first\nsecond\nthird");
+            using var fixture = new AzunoteUiFixture(document);
+            var editor = fixture.Editor;
             var textPattern = AzunoteUiFixture.WaitForTextPattern(editor);
             AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "first\nsecond\nthird");
             textPattern.DocumentRange.FindText("first", false, false)!.Select();
@@ -594,13 +594,13 @@ public sealed class AzunoteUiTests : IDisposable
             SendKeyChord(Control, Shift, K);
             AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "second\nfirst\nthird");
 
-            AzunoteUiFixture.OpenMenu(_fixture.Window, "Edit");
-            InvokeSubmenuItem(_fixture.Window, "Line", "Move Line Up");
+            AzunoteUiFixture.OpenMenu(fixture.Window, "Edit");
+            InvokeSubmenuItem(fixture.Window, "Line", "Move Line Up");
             AzunoteUiFixture.WaitForDocumentText(textPattern, text => text == "first\nsecond\nthird");
         }
         finally
         {
-            AzunoteUiFixture.WaitForValuePattern(editor).SetValue(original);
+            root.Delete(recursive: true);
         }
     }
 
@@ -1173,12 +1173,8 @@ public sealed class AzunoteUiTests : IDisposable
             AzunoteUiFixture.WaitFor(
                 () => FindMenuItem(window, "Save with Encoding") is null ? window : null,
                 "The File menu did not close after Save with Encoding.");
-            // Enter chooses it as a user would, so the menu hands the focus
-            // back as it closes.
             AzunoteUiFixture.OpenMenu(window, "File");
-            WaitForSubmenuItem(window, "Save with Encoding", "Other...").SetFocus();
-            SendEnterKey();
-            Thread.Sleep(500);
+            InvokeSubmenuItem(window, "Save with Encoding", "Other...");
             SetCommandPaletteText(WaitForCommandPalette(window, text => text.Length == 0), "shift_jis");
             AzunoteUiFixture.WaitForElement(window, AutomationElement.NameProperty, "Japanese (Shift-JIS)");
             SendEnterKey();
