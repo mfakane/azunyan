@@ -54,5 +54,8 @@ await mkdir(assets, { recursive: true });
 await mkdir(publicDir, { recursive: true });
 await copyFile(path.join(repo, 'assets', 'icons', '01-paw-notebook.svg'), path.join(assets, 'icon.svg'));
 await copyFile(path.join(repo, 'assets', 'icons', '01-paw-notebook-small.svg'), path.join(assets, 'logo.svg'));
-await copyFile(path.join(repo, 'assets', 'screenshots', 'completion.png'), path.join(assets, 'completion.png'));
+for (const name of await readdir(path.join(repo, 'assets', 'screenshots'))) {
+	if (!name.endsWith('.png')) continue;
+	await copyFile(path.join(repo, 'assets', 'screenshots', name), path.join(assets, name));
+}
 await copyFile(path.join(repo, 'assets', 'icons', '01-paw-notebook-16.svg'), path.join(publicDir, 'favicon.svg'));

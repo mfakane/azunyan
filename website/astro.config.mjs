@@ -24,6 +24,7 @@ export default defineConfig({
 					label: 'Azunote',
 					items: [
 						{ label: 'Overview', link: '/' },
+						{ label: 'Screenshots', slug: 'screenshots' },
 						{ label: 'Download', slug: 'download' },
 						{ label: 'Privacy Policy', slug: 'privacy' },
 					],

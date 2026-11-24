@@ -1,0 +1,41 @@
+---
+title: Screenshots
+description: See language modes, completion, prompts, problems, and proposed changes in Azunote.
+---
+
+import { Image } from 'astro:assets';
+import screenshot from '../../assets/repo/completion.png';
+import languageModes from '../../assets/repo/language-modes.png';
+import prompt from '../../assets/repo/prompt.png';
+import chat from '../../assets/repo/chat.png';
+import problems from '../../assets/repo/problems.png';
+import proposedChanges from '../../assets/repo/proposed-changes.png';
+
+## Completion
+
+<Image src={screenshot} alt="Azunote editing a settings file with completion" />
+
+## Language modes
+
+Choose highlighting and editing behavior from the [language mode menu](/docs/language-modes/).
+
+<Image src={languageModes} alt="C# syntax highlighting with the Language Mode menu open" />
+
+## Prompts and chat
+
+[External tools](/docs/external-tools/) can ask for input at the caret and keep a conversation with their responses. Here, Calculate evaluates expressions and offers each result for insertion into the document.
+
+<Image src={prompt} alt="Calculate prompt accepting an expression beside planning notes" />
+<Image src={chat} alt="Calculate chat showing two expressions and their results, with insert and copy buttons" />
+
+## Problems
+
+[Problems](/docs/problems/) underline errors in the document and list them for quick navigation.
+
+<Image src={problems} alt="JSON trailing comma underlined as an error, with the Problems list open" />
+
+## Proposed changes
+
+Review a tool's output as a [proposed change](/docs/proposed-changes/) before applying it. This example previews JSON formatting.
+
+<Image src={proposedChanges} alt="JSON formatting diff in a read-only window with Apply and Discard buttons" />
